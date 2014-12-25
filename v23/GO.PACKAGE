@@ -1,0 +1,12 @@
+{
+	"dependencies": {
+		"incoming": [
+			    {"deny": "..."}
+		],
+		"outgoing": [
+			    {"allow": "veyron.io/lib/..."},
+			    {"allow": "veyron.io/tools/lib/..."},
+			    {"deny": "..."}
+		]
+	}
+}
