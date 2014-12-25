@@ -2,195 +2,202 @@
 // DO NOT UPDATE MANUALLY
 
 /*
-The veyron tool helps manage veyron development.
+The v23 tool helps manage vanadium development.
 
 Usage:
-   veyron [flags] <command>
+   v23 [flags] <command>
 
-The veyron commands are:
-   buildcop     Manage veyron build cop schedule
-   contributors List veyron project contributors
-   env          Print veyron environment variables
-   go           Execute the go tool using the veyron environment
-   goext        Veyron extensions of the go tool
-   profile      Manage veyron profiles
-   project      Manage veyron projects
-   run          Run an executable using the veyron environment
-   snapshot     Manage snapshots of the veyron project
-   test         Manage veyron tests
-   update       Update all veyron tools and projects
+The v23 commands are:
+   buildcop     Manage vanadium build cop schedule
+   contributors List vanadium project contributors
+   env          Print vanadium environment variables
+   go           Execute the go tool using the vanadium environment
+   goext        Vanadium extensions of the go tool
+   profile      Manage vanadium profiles
+   project      Manage the vanadium projects
+   run          Run an executable using the vanadium environment
+   snapshot     Manage snapshots of the vanadium project
+   test         Manage vanadium tests
+   update       Update all vanadium tools and projects
    version      Print version
-   xgo          Execute the go tool using the veyron environment and
+   xgo          Execute the go tool using the vanadium environment and
                 cross-compilation
    help         Display help for commands or topics
-Run "veyron help [command]" for command usage.
+Run "v23 help [command]" for command usage.
 
-The veyron flags are:
+The v23 flags are:
+ -n=false
+   Show what commands will run but do not execute them.
+ -nocolor=false
+   Do not use color to format output.
  -v=false
    Print verbose output.
 
-Veyron Buildcop
+V23 Buildcop
 
-Manage veyron build cop schedule. If no subcommand is given, it shows the LDAP
+Manage vanadium build cop schedule. If no subcommand is given, it shows the LDAP
 of the current build cop.
 
 Usage:
-   veyron buildcop <command>
-   veyron buildcop
+   v23 buildcop <command>
+   v23 buildcop
 
-The veyron buildcop commands are:
+The v23 buildcop commands are:
    list        List available build cop schedule
 
-Veyron Buildcop List
+V23 Buildcop List
 
 List available build cop schedule.
 
 Usage:
-   veyron buildcop list
+   v23 buildcop list
 
-Veyron Contributors
+V23 Contributors
 
-Lists veyron project contributors and the number of their commits. Veyron
+Lists vanadium project contributors and the number of their commits. Vanadium
 projects to consider can be specified as an argument. If no projects are
-specified, all veyron projects are considered by default.
+specified, all vanadium projects are considered by default.
 
 Usage:
-   veyron contributors <projects>
+   v23 contributors <projects>
 
 <projects> is a list of projects to consider.
 
-Veyron Env
+V23 Env
 
-Print veyron environment variables.
+Print vanadium environment variables.
 
 If no arguments are given, prints all variables in NAME="VALUE" format, each on
 a separate line ordered by name.  This format makes it easy to set all vars by
 running the following bash command (or similar for other shells):
-   eval $(veyron env)
+   eval $(v23 env)
 
 If arguments are given, prints only the value of each named variable, each on a
 separate line in the same order as the arguments.
 
 Usage:
-   veyron env [flags] [name ...]
+   v23 env [flags] [name ...]
 
 [name ...] is an optional list of variable names.
 
-The veyron env flags are:
+The v23 env flags are:
  -platform=
    Target platform.
 
-Veyron Go
+V23 Go
 
-Wrapper around the 'go' tool that can be used for compilation of veyron Go
-sources. It takes care of veyron-specific setup, such as setting up the Go
+Wrapper around the 'go' tool that can be used for compilation of vanadium Go
+sources. It takes care of vanadium-specific setup, such as setting up the Go
 specific environment variables or making sure that VDL generated files are
 regenerated before compilation.
 
 In particular, the tool invokes the following command before invoking any go
-tool commands that compile veyron Go code:
+tool commands that compile vanadium Go code:
 
 vdl generate -lang=go all
 
 Usage:
-   veyron go [flags] <arg ...>
+   v23 go [flags] <arg ...>
 
 <arg ...> is a list of arguments for the go tool.
 
-The veyron go flags are:
+The v23 go flags are:
  -host_go=go
    Go command for the host platform.
- -novdl=false
-   Disable automatic generation of vdl files.
  -target_go=go
    Go command for the target platform.
 
-Veyron Goext
+V23 Goext
 
-Veyron extension of the go tool.
+Vanadium extension of the go tool.
 
 Usage:
-   veyron goext <command>
+   v23 goext <command>
 
-The veyron goext commands are:
-   distclean   Restore the veyron Go repositories to their pristine state
+The v23 goext commands are:
+   distclean   Restore the vanadium Go workspaces to their pristine state
 
-Veyron Goext Distclean
+V23 Goext Distclean
 
 Unlike the 'go clean' command, which only removes object files for packages in
 the source tree, the 'goext disclean' command removes all object files from
-veyron Go workspaces. This functionality is needed to avoid accidental use of
+vanadium Go workspaces. This functionality is needed to avoid accidental use of
 stale object files that correspond to packages that no longer exist in the
 source tree.
 
 Usage:
-   veyron goext distclean
+   v23 goext distclean
 
-Veyron Profile
+V23 Profile
 
-To facilitate development across different platforms, veyron defines
+To facilitate development across different platforms, vanadium defines
 platform-independent profiles that map different platforms to a set of libraries
-and tools that can be used for a factor of veyron development.
+and tools that can be used for a factor of vanadium development.
 
 Usage:
-   veyron profile <command>
+   v23 profile <command>
 
-The veyron profile commands are:
-   list        List known veyron profiles
-   setup       Set up the given veyron profiles
+The v23 profile commands are:
+   list        List known vanadium profiles
+   setup       Set up the given vanadium profiles
 
-Veyron Profile List
+V23 Profile List
 
-List known veyron profiles.
-
-Usage:
-   veyron profile list
-
-Veyron Profile Setup
-
-Set up the given veyron profiles.
+List known vanadium profiles.
 
 Usage:
-   veyron profile setup <profiles>
+   v23 profile list
+
+V23 Profile Setup
+
+Set up the given vanadium profiles.
+
+Usage:
+   v23 profile setup <profiles>
 
 <profiles> is a list of profiles to set up.
 
-Veyron Project
+V23 Project
 
-Manage veyron projects.
+Manage the vanadium projects.
 
 Usage:
-   veyron project <command>
+   v23 project [flags] <command>
 
-The veyron project commands are:
-   list        List existing veyron projects and branches
-   poll        Poll existing veyron projects
+The v23 project commands are:
+   list         List existing vanadium projects and branches
+   shell-prompt Print a succinct status of projects, suitable for shell prompts
+   poll         Poll existing vanadium projects
 
-Veyron Project List
+The v23 project flags are:
+ -manifest=default
+   Name of the project manifest.
+
+V23 Project List
 
 Inspect the local filesystem and list the existing projects and branches.
 
 Usage:
-   veyron project list [flags]
+   v23 project list [flags]
 
-The veyron project list flags are:
+The v23 project list flags are:
  -branches=false
    Show project branches.
  -nopristine=false
    If true, omit pristine projects, i.e. projects with a clean master branch and
    no other branches.
 
-Veyron Project Shell-Prompt
+V23 Project Shell-Prompt
 
-Reports current branches of veyron projects (repositories) as well as an
+Reports current branches of vanadium projects (repositories) as well as an
 indication of each project's status:
   *  indicates that a repository contains uncommitted changes
   %  indicates that a repository contains untracked files
 
 Usage:
-   veyron project shell-prompt [flags]
+   v23 project shell-prompt [flags]
 
-The veyron project shell-prompt flags are:
+The v23 project shell-prompt flags are:
  -check_dirty=true
    If false, don't check for uncommitted changes or untracked files. Setting
    this option to false is dangerous: dirty master branches will not appear in
@@ -198,30 +205,30 @@ The veyron project shell-prompt flags are:
  -show_current_repo_name=false
    Show the name of the current repo.
 
-Veyron Project Poll
+V23 Project Poll
 
-Poll veyron projects that can affect the outcome of the given tests and report
+Poll vanadium projects that can affect the outcome of the given tests and report
 whether any new changes in these projects exist. If no tests are specified, all
 projects are polled by default.
 
 Usage:
-   veyron project poll <test ...>
+   v23 project poll <test ...>
 
 <test ...> is a list of tests that determine what projects to poll.
 
-Veyron Run
+V23 Run
 
-Run an executable using the veyron environment.
+Run an executable using the vanadium environment.
 
 Usage:
-   veyron run <executable> [arg ...]
+   v23 run <executable> [arg ...]
 
 <executable> [arg ...] is the executable to run and any arguments to pass
 verbatim to the executable.
 
-Veyron Snapshot
+V23 Snapshot
 
-The "veyron snapshot" command can be used to manage snapshots of the veyron
+The "v23 snapshot" command can be used to manage snapshots of the vanadium
 project. In particular, it can be used to create new snapshots and to list
 existing snapshots.
 
@@ -230,27 +237,27 @@ The command-line flag "-remote" determines whether the command pertains to
 revisioned in the manifest repository.
 
 Usage:
-   veyron snapshot [flags] <command>
+   v23 snapshot [flags] <command>
 
-The veyron snapshot commands are:
-   create      Create a new snapshot of the veyron project
-   list        List existing snapshots of veyron projects
+The v23 snapshot commands are:
+   create      Create a new snapshot of the vanadium project
+   list        List existing snapshots of vanadium projects
 
-The veyron snapshot flags are:
+The v23 snapshot flags are:
  -remote=false
    Manage remote snapshots.
 
-Veyron Snapshot Create
+V23 Snapshot Create
 
-The "veyron snapshot create <label>" command first checks whether the veyron
-tool configuration associates the given label with any tests. If so, the command
-checks that all of these tests pass.
+The "v23 snapshot create <label>" command first checks whether the vanadium
+project configuration associates the given label with any tests. If so, the
+command checks that all of these tests pass.
 
-Next, the command captures the current state of the veyron project as a manifest
-and, depending on the value of the -remote flag, the command either stores the
-manifest in the local $VANADIUM_ROOT/.snapshots directory, or in the manifest
-repository, pushing the change to the remote repository and thus making it
-available globally.
+Next, the command captures the current state of the vanadium project as a
+manifest and, depending on the value of the -remote flag, the command either
+stores the manifest in the local $VANADIUM_ROOT/.snapshots directory, or in the
+manifest repository, pushing the change to the remote repository and thus making
+it available globally.
 
 Internally, snapshots are organized as follows:
 
@@ -270,76 +277,76 @@ Internally, snapshots are organized as follows:
    <label2> # a symlink to the latest <label2-snapshot*>
    ...
 
-NOTE: Unlike the veyron tool commands, the above internal organization is not an
+NOTE: Unlike the v23 tool commands, the above internal organization is not an
 API. It is an implementation and can change without notice.
 
 Usage:
-   veyron snapshot create <label>
+   v23 snapshot create <label>
 
 <label> is the snapshot label.
 
-Veyron Snapshot List
+V23 Snapshot List
 
 The "snapshot list" command lists existing snapshots of the labels specified as
 command-line arguments. If no arguments are provided, the command lists
 snapshots for all known labels.
 
 Usage:
-   veyron snapshot list <label ...>
+   v23 snapshot list <label ...>
 
 <label ...> is a list of snapshot labels.
 
-Veyron Test
+V23 Test
 
-Manage veyron tests.
+Manage vanadium tests.
 
 Usage:
-   veyron test <command>
+   v23 test <command>
 
-The veyron test commands are:
-   project     Run tests for a veyron project
-   run         Run veyron tests
-   list        List veyron tests
+The v23 test commands are:
+   project     Run tests for a vanadium project
+   run         Run vanadium tests
+   list        List vanadium tests
 
-Veyron Test Project
+V23 Test Project
 
-Runs tests for a veyron project that is by the remote URL specified as the
+Runs tests for a vanadium project that is by the remote URL specified as the
 command-line argument. Projects hosted on googlesource.com, can be specified
-using the basename of the URL (e.g. "veyron.go.core" implies
-"https://veyron.googlesource.com/veyron.go.core").
+using the basename of the URL (e.g. "vanadium.go.core" implies
+"https://vanadium.googlesource.com/vanadium.go.core").
 
 Usage:
-   veyron test project <project>
+   v23 test project <project>
 
 <project> identifies the project for which to run tests.
 
-Veyron Test Run
+V23 Test Run
 
-Run veyron tests.
+Run vanadium tests.
 
 Usage:
-   veyron test run <name ...>
+   v23 test run <name ...>
 
 <name ...> is a list names identifying the tests to run.
 
-Veyron Test List
+V23 Test List
 
-List veyron tests.
+List vanadium tests.
 
 Usage:
-   veyron test list
+   v23 test list
 
-Veyron Update
+V23 Update
 
-Updates all veyron projects, builds the latest version of veyron tools, and
-installs the resulting binaries into $VANADIUM_ROOT/bin. The sequence in which the
-individual updates happen guarantees that we end up with a consistent set of
+Updates all vanadium projects, builds the latest version of vanadium tools, and
+installs the resulting binaries into $VANADIUM_ROOT/bin. The sequence in which
+the individual updates happen guarantees that we end up with a consistent set of
 tools and source code.
 
-The set of project and tools to update is describe by a manifest. Veyron
+The set of project and tools to update is describe by a manifest. Vanadium
 manifests are revisioned and stored in a "manifest" repository, that is
-available locally in $VANADIUM_ROOT/.manifest. The manifest uses the following XML
-schema:
+available locally in $VANADIUM_ROOT/.manifest. The manifest uses the following
+XML schema:
 
  <manifest>
    <imports>
@@ -347,7 +354,7 @@ schema:
      ...
    </imports>
    <projects>
-     <project name="https://veyron.googlesource.com/veyrong.go"
+     <project name="https://vanadium.googlesource.com/vanadium.go.core"
               path="veyron/go/src/veyron.io/veyron"
               protocol="git"
               revision="HEAD"/>
@@ -371,39 +378,39 @@ $VANADIUM_ROOT/.local_manifest file exists, then it is used. Otherwise, the
 $VANADIUM_ROOT/.manifest/v1/<manifest>.xml file is used, which <manifest> is the
 value of the -manifest command-line flag, which defaults to "default".
 
-NOTE: Unlike the veyron tool commands, the above manifest file format is not an
+NOTE: Unlike the v23 tool commands, the above manifest file format is not an
 API. It is an implementation and can change without notice.
 
 Usage:
-   veyron update [flags]
+   v23 update [flags]
 
-The veyron update flags are:
+The v23 update flags are:
  -gc=false
    Garbage collect obsolete repositories.
  -manifest=default
    Name of the project manifest.
 
-Veyron Version
+V23 Version
 
-Print version of the veyron tool.
+Print version of the v23 tool.
 
 Usage:
-   veyron version
+   v23 version
 
-Veyron Xgo
+V23 Xgo
 
-Wrapper around the 'go' tool that can be used for cross-compilation of veyron Go
-sources. It takes care of veyron-specific setup, such as setting up the Go
+Wrapper around the 'go' tool that can be used for cross-compilation of vanadium
+Go sources. It takes care of vanadium-specific setup, such as setting up the Go
 specific environment variables or making sure that VDL generated files are
 regenerated before compilation.
 
 In particular, the tool invokes the following command before invoking any go
-tool commands that compile veyron Go code:
+tool commands that compile vanadium Go code:
 
 vdl generate -lang=go all
 
 Usage:
-   veyron xgo [flags] <platform> <arg ...>
+   v23 xgo [flags] <platform> <arg ...>
 
 <platform> is the cross-compilation target and has the general format
 <arch><sub>-<os> or <arch><sub>-<os>-<env> where: - <arch> is the platform
@@ -413,15 +420,13 @@ darwin) - <env> is the platform environment (e.g. gnu or android)
 
 <arg ...> is a list of arguments for the go tool."
 
-The veyron xgo flags are:
+The v23 xgo flags are:
  -host_go=go
    Go command for the host platform.
- -novdl=false
-   Disable automatic generation of vdl files.
  -target_go=go
    Go command for the target platform.
 
-Veyron Help
+V23 Help
 
 Help with no args displays the usage of the parent command.
 
@@ -436,11 +441,11 @@ CMDLINE_WIDTH=x, if x > 0 the width is x, if x < 0 the width is unlimited, and
 if x == 0 or is unset one of the fallbacks is used.
 
 Usage:
-   veyron help [flags] [command/topic ...]
+   v23 help [flags] [command/topic ...]
 
 [command/topic ...] optionally identifies a specific sub-command or help topic.
 
-The veyron help flags are:
+The v23 help flags are:
  -style=text
    The formatting style for help output, either "text" or "godoc".
 */
