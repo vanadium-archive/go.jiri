@@ -4,8 +4,8 @@
 			    {"deny": "..."}
 		],
 		"outgoing": [
-			    {"allow": "veyron.io/lib/..."},
-			    {"allow": "veyron.io/tools/lib/..."},
+			    {"allow": "v.io/lib/..."},
+			    {"allow": "v.io/tools/lib/..."},
 			    {"deny": "..."}
 		]
 	}

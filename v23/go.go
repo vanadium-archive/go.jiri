@@ -10,10 +10,10 @@ import (
 	"regexp"
 	"strings"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/collect"
-	"veyron.io/tools/lib/envutil"
-	"veyron.io/tools/lib/util"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/collect"
+	"v.io/tools/lib/envutil"
+	"v.io/tools/lib/util"
 )
 
 // cmdGo represents the "v23 go" command.

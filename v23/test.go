@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"strings"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/testutil"
-	"veyron.io/tools/lib/util"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/testutil"
+	"v.io/tools/lib/util"
 )
 
 func init() {

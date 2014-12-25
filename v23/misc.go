@@ -5,9 +5,9 @@ import (
 	"os/exec"
 	"syscall"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/envutil"
-	"veyron.io/tools/lib/util"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/envutil"
+	"v.io/tools/lib/util"
 )
 
 // translateExitCode translates errors from the "os/exec" package that contain

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/collect"
-	"veyron.io/tools/lib/testutil"
-	"veyron.io/tools/lib/util"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/collect"
+	"v.io/tools/lib/testutil"
+	"v.io/tools/lib/util"
 )
 
 var cmdSnapshot = &cmdline.Command{

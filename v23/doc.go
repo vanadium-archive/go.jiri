@@ -355,13 +355,13 @@ XML schema:
    </imports>
    <projects>
      <project name="https://vanadium.googlesource.com/vanadium.go.core"
-              path="veyron/go/src/veyron.io/veyron"
+              path="veyron/go/src/v.io/veyron"
               protocol="git"
               revision="HEAD"/>
      ...
    </projects>
    <tools>
-     <tool name="v23" package="veyron.io/tools/v23"/>
+     <tool name="v23" package="v.io/tools/v23"/>
      ...
    </tools>
  </manifest>

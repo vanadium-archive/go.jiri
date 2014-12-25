@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/collect"
-	"veyron.io/tools/lib/gitutil"
-	"veyron.io/tools/lib/util"
-	"veyron.io/tools/lib/version"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/collect"
+	"v.io/tools/lib/gitutil"
+	"v.io/tools/lib/util"
+	"v.io/tools/lib/version"
 )
 
 var (

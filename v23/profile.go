@@ -12,10 +12,10 @@ import (
 	"strconv"
 	"strings"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/collect"
-	"veyron.io/tools/lib/envutil"
-	"veyron.io/tools/lib/util"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/collect"
+	"v.io/tools/lib/envutil"
+	"v.io/tools/lib/util"
 )
 
 var (
@@ -360,7 +360,7 @@ func setupArmLinux(ctx *util.Context) (e error) {
 		if err := run(ctx, bin, []string{"arm-unknown-linux-gnueabi"}, nil); err != nil {
 			return err
 		}
-		configFile := filepath.Join(root, "veyron", "go", "src", "veyron.io", "tools", "conf", "crosstool.config")
+		configFile := filepath.Join(root, "veyron", "go", "src", "v.io", "tools", "conf", "crosstool.config")
 		config, err := ioutil.ReadFile(configFile)
 		if err != nil {
 			return fmt.Errorf("ReadFile(%v) failed: %v", configFile, err)

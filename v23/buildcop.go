@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"veyron.io/lib/cmdline"
-	"veyron.io/tools/lib/util"
+	"v.io/lib/cmdline"
+	"v.io/tools/lib/util"
 )
 
 // cmdBuildCop represents the "v23 buildcop" command.

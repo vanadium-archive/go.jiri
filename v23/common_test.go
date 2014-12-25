@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"veyron.io/tools/lib/util"
+	"v.io/tools/lib/util"
 )
 
 func createConfig(t *testing.T, ctx *util.Context, config *util.Config) {
