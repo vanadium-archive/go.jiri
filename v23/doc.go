@@ -355,7 +355,7 @@ XML schema:
    </imports>
    <projects>
      <project name="https://vanadium.googlesource.com/vanadium.go.core"
-              path="release/go/src/v.io/veyron"
+              path="release/go/src/v.io/core"
               protocol="git"
               revision="HEAD"/>
      ...
