@@ -531,13 +531,17 @@ func setupMobileLinux(ctx *util.Context) (e error) {
 		if err := ctx.Run().Chdir(androidRoot); err != nil {
 			return err
 		}
-		// Download Go head as of 11/11/2014.
-		// TODO(spetrovic): this doesn't look as if it's necessary as of go1.4
-		remote, revision := "https://code.google.com/p/go", "fba0ff340b22"
-		if err := run(ctx, "hg", []string{"clone", "--noninteractive", remote, "-r", revision}, nil); err != nil {
+		// Download Go at a fixed revision.
+		remote, revision := "https://github.com/golang/go.git", "324f38a222cc48439a11a5545c85cb8614385987"
+		if err := run(ctx, "git", []string{"clone", remote}, nil); err != nil {
 			return err
 		}
-
+		if err := ctx.Run().Chdir(androidGo); err != nil {
+			return err
+		}
+		if err := run(ctx, "git", []string{"reset", "--hard", revision}, nil); err != nil {
+			return err
+		}
 		// Build.
 		srcDir := filepath.Join(androidGo, "src")
 		if err := ctx.Run().Chdir(srcDir); err != nil {
