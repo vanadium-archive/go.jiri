@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -21,12 +23,13 @@ import (
 var (
 	defaultDirPerm  = os.FileMode(0755)
 	defaultFilePerm = os.FileMode(0644)
-	knownProfiles   = map[string]string{
-		"arm":           "ARM cross-compilation components of the vanadium project",
-		"mobile":        "mobile components of the vanadium project",
-		"proximity":     "proximity components of the vanadium project",
-		"proximity-arm": "ARM cross-compilation of the proximity components of the vanadium project",
-		"web":           "web components of the vanadium project",
+	knownProfiles   = map[string]struct{}{
+		"arm":           struct{}{},
+		"mobile":        struct{}{},
+		"proximity":     struct{}{},
+		"proximity-arm": struct{}{},
+		"third-party":   struct{}{},
+		"web":           struct{}{},
 	}
 )
 
@@ -52,9 +55,13 @@ var cmdProfileList = &cmdline.Command{
 }
 
 func runProfileList(command *cmdline.Command, _ []string) error {
-	fmt.Fprintf(command.Stdout(), "Known profiles:\n")
-	for name, description := range knownProfiles {
-		fmt.Fprintf(command.Stdout(), "  %q: %s\n", name, description)
+	profiles := []string{}
+	for p := range knownProfiles {
+		profiles = append(profiles, p)
+	}
+	sort.Strings(profiles)
+	for _, p := range profiles {
+		fmt.Fprintf(command.Stdout(), "%s\n", p)
 	}
 	return nil
 }
@@ -104,9 +111,11 @@ func setup(ctx *util.Context, os, profile string) error {
 	switch os {
 	case "darwin":
 		switch profile {
+		case "third-party":
+			return setupThirdPartyDarwin(ctx)
 		case "web":
 			return setupWebDarwin(ctx)
-		case "arm", "mobile", "proximity", "proximity-arm":
+		default:
 			reportNotImplemented(ctx, os, profile)
 		}
 	case "linux":
@@ -121,6 +130,8 @@ func setup(ctx *util.Context, os, profile string) error {
 			return setupProximityArmLinux(ctx)
 		case "web":
 			return setupWebLinux(ctx)
+		default:
+			reportNotImplemented(ctx, os, profile)
 		}
 	default:
 		reportNotImplemented(ctx, os, profile)
@@ -965,9 +976,35 @@ func setupProximityLinuxHelper(ctx *util.Context, arch, host, path string) (e er
 	return nil
 }
 
+// setupThirdPartyDarwin sets up the third-party profile for darwin.
+func setupThirdPartyDarwin(ctx *util.Context) error {
+	if err := run(ctx, "brew", []string{"tap", "homebrew/dupes"}, nil); err != nil {
+		return err
+	}
+	{
+		var out bytes.Buffer
+		opts := ctx.Run().Opts()
+		opts.Stdout = io.MultiWriter(&out, opts.Stdout)
+		opts.Stderr = io.MultiWriter(&out, opts.Stdout)
+		if err := ctx.Run().CommandWithOpts(opts, "brew", "install", "openssh", "--with-brewed-openssl", "--with-keychain-support"); err != nil {
+			return err
+		}
+	}
+	{
+		var out bytes.Buffer
+		opts := ctx.Run().Opts()
+		opts.Stdout = io.MultiWriter(&out, opts.Stdout)
+		opts.Stderr = io.MultiWriter(&out, opts.Stdout)
+		if err := ctx.Run().CommandWithOpts(opts, "brew", "install", "dbus"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // setupWebDarwin sets up the web profile for darwin.
 func setupWebDarwin(ctx *util.Context) error {
-	return setupWebHelper(ctx)
+	return setupWebCommon(ctx)
 }
 
 // setupWebLinux sets up the web profile for linux
@@ -978,11 +1015,11 @@ func setupWebLinux(ctx *util.Context) error {
 		return err
 	}
 
-	return setupWebHelper(ctx)
+	return setupWebCommon(ctx)
 }
 
 // setupWebHelper sets up the web profile.
-func setupWebHelper(ctx *util.Context) error {
+func setupWebCommon(ctx *util.Context) error {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
