@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"runtime"
-	"strings"
 
 	"v.io/lib/cmdline"
 	"v.io/tools/lib/testutil"
@@ -43,9 +42,6 @@ func runTestProject(command *cmdline.Command, args []string) error {
 	}
 	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
 	project := args[0]
-	if !strings.HasPrefix(project, "http") {
-		project = util.VanadiumGitRepoHost() + project
-	}
 	results, err := testutil.RunProjectTests(ctx, nil, []string{project})
 	if err != nil {
 		return err
