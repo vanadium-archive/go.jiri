@@ -367,7 +367,7 @@ XML schema:
  </manifest>
 
 The <import> element can be used to share settings across multiple manifests.
-Import names are interpreted relative to the $VANADIUM_ROOT/.manifest/v1
+Import names are interpreted relative to the $VANADIUM_ROOT/.manifest/v2
 directory. Import cycles are not allowed and if a project or a tool is specified
 multiple times, the last specification takes effect. In particular, the elements
 <project name="foo" exclude="true"/> and <tool name="bar" exclude="true"/> can
@@ -375,7 +375,7 @@ be used to exclude previously included projects and tools.
 
 The tool identifies which manifest to use using the following algorithm. If the
 $VANADIUM_ROOT/.local_manifest file exists, then it is used. Otherwise, the
-$VANADIUM_ROOT/.manifest/v1/<manifest>.xml file is used, which <manifest> is the
+$VANADIUM_ROOT/.manifest/v2/<manifest>.xml file is used, which <manifest> is the
 value of the -manifest command-line flag, which defaults to "default".
 
 NOTE: Unlike the v23 tool commands, the above manifest file format is not an

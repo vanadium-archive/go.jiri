@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -15,6 +14,15 @@ import (
 	"v.io/tools/lib/envutil"
 	"v.io/tools/lib/util"
 )
+
+// reportOutdated determines if outdated projects are reported. It is
+// set to true by default and is only overridden from tests in order
+// to prevent tests of this package from indirectly invoking the
+// createV23Dir() function.
+//
+// TODO(jsimsa): Remove this when the createV23Dir() function
+// invocation is removed from LocalProjects.
+var reportOutdated = true
 
 // cmdGo represents the "v23 go" command.
 var cmdGo = &cmdline.Command{
@@ -93,8 +101,10 @@ func runGoForPlatform(ctx *util.Context, platform util.Platform, command *cmdlin
 		// Check that all non-master branches have merged the
 		// master branch to make sure the vdl tool is not run
 		// against out-of-date code base.
-		if err := reportOutdatedBranches(ctx); err != nil {
-			return err
+		if reportOutdated {
+			if err := reportOutdatedBranches(ctx); err != nil {
+				return err
+			}
 		}
 
 		if err := generateVDL(ctx, args); err != nil {
@@ -173,6 +183,9 @@ func reportOutdatedBranches(ctx *util.Context) (e error) {
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
 	projects, err := util.LocalProjects(ctx)
+	if err != nil {
+		return err
+	}
 	for _, project := range projects {
 		if err := ctx.Run().Chdir(project.Path); err != nil {
 			return err
@@ -195,7 +208,7 @@ func reportOutdatedBranches(ctx *util.Context) (e error) {
 				return err
 			}
 			if !found && !merging {
-				fmt.Fprintf(ctx.Stderr(), "NOTE: project=%q path=%q\n", path.Base(project.Name), project.Path)
+				fmt.Fprintf(ctx.Stderr(), "NOTE: project=%q path=%q\n", project.Name, project.Path)
 				fmt.Fprintf(ctx.Stderr(), "This project is on a non-master branch that is out of date.\n")
 				fmt.Fprintf(ctx.Stderr(), "Please update this branch using %q.\n", "git merge master")
 				fmt.Fprintf(ctx.Stderr(), "Until then the %q tool might not function properly.\n", "v23")

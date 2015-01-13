@@ -40,15 +40,17 @@ func TestGoVDLGeneration(t *testing.T) {
 	ctx, testCmd := util.DefaultContext(), *cmdGo
 	var stdout, stderr bytes.Buffer
 	testCmd.Init(nil, &stdout, &stderr)
-	// Create a tmpdir for all our work.
+	// Create a temporary directory for all our work.
 	const tmpDirPrefix = "test_vgo"
-	tmpdir, err := ctx.Run().TempDir("", tmpDirPrefix)
+	tmpDir, err := ctx.Run().TempDir("", tmpDirPrefix)
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
-	defer ctx.Run().RemoveAll(tmpdir)
-	// Create test files tmpdir/src/testpkg/test.vdl and tmpdir/src/testpkg/doc.go
-	pkgdir := filepath.Join(tmpdir, "src", "testpkg")
+	defer ctx.Run().RemoveAll(tmpDir)
+
+	// Create test files <tmpDir>/src/testpkg/test.vdl and
+	// <tmpDir>/src/testpkg/doc.go
+	pkgdir := filepath.Join(tmpDir, "src", "testpkg")
 	const perm = os.ModePerm
 	if err := ctx.Run().MkdirAll(pkgdir, perm); err != nil {
 		t.Fatalf(`MkdirAll(%q) failed: %v`, pkgdir, err)
@@ -62,11 +64,12 @@ func TestGoVDLGeneration(t *testing.T) {
 	if err := ctx.Run().WriteFile(inFile, []byte("package testpkg\n"), perm); err != nil {
 		t.Fatalf(`WriteFile(%q) failed: %v`, inFile, err)
 	}
-	// Add tmpdir as first component of GOPATH and VDLPATH, so we'll be able to
-	// find testpkg.  We need GOPATH for the "go list" call when computing
-	// dependencies, and VDLPATH for the "vdl generate" call.
-	os.Setenv("GOPATH", tmpdir+":"+os.Getenv("GOPATH"))
-	os.Setenv("VDLPATH", tmpdir+":"+os.Getenv("VDLPATH"))
+	// Add <tmpDir> as first component of GOPATH and VDLPATH, so
+	// we'll be able to find testpkg.  We need GOPATH for the "go
+	// list" call when computing dependencies, and VDLPATH for the
+	// "vdl generate" call.
+	os.Setenv("GOPATH", tmpDir+":"+os.Getenv("GOPATH"))
+	os.Setenv("VDLPATH", tmpDir+":"+os.Getenv("VDLPATH"))
 	// Check that the 'env' go command does not generate the test VDL file.
 	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())
@@ -79,6 +82,7 @@ func TestGoVDLGeneration(t *testing.T) {
 		t.Fatalf("file %v exists and it should not.", outFile)
 	}
 	// Check that the 'build' go command generates the test VDL file.
+	reportOutdated = false
 	if err := runGo(&testCmd, []string{"build", "testpkg"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())
 	}

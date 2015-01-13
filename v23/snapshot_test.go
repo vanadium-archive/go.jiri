@@ -176,8 +176,8 @@ func checkReadme(t *testing.T, ctx *util.Context, project, message string) {
 	}
 }
 
-func createRemoteManifest(t *testing.T, ctx *util.Context, rootDir string, remotes []string) {
-	manifestDir, perm := filepath.Join(rootDir, "v1"), os.FileMode(0755)
+func createRemoteManifest(t *testing.T, ctx *util.Context, dir string, remotes []string) {
+	manifestDir, perm := filepath.Join(dir, "v2"), os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(manifestDir, perm); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -187,10 +187,11 @@ func createRemoteManifest(t *testing.T, ctx *util.Context, rootDir string, remot
 			Name:     remote,
 			Path:     localProjectName(i),
 			Protocol: "git",
+			Remote:   remote,
 		}
 		manifest.Projects = append(manifest.Projects, project)
 	}
-	commitManifest(t, ctx, &manifest, rootDir)
+	commitManifest(t, ctx, &manifest, dir)
 }
 
 func commitManifest(t *testing.T, ctx *util.Context, manifest *util.Manifest, manifestDir string) {
@@ -198,7 +199,7 @@ func commitManifest(t *testing.T, ctx *util.Context, manifest *util.Manifest, ma
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	manifestFile, perm := filepath.Join(manifestDir, "v1", "default"), os.FileMode(0644)
+	manifestFile, perm := filepath.Join(manifestDir, "v2", "default"), os.FileMode(0644)
 	if err := ioutil.WriteFile(manifestFile, data, perm); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", manifestFile, err, perm)
 	}
@@ -212,17 +213,6 @@ func commitManifest(t *testing.T, ctx *util.Context, manifest *util.Manifest, ma
 	}
 	if err := ctx.Git().CommitFile(manifestFile, "creating manifest"); err != nil {
 		t.Fatalf("%v", err)
-	}
-}
-
-func ignoreDirs(t *testing.T, rootDir string, projects []string) {
-	contents := ""
-	for _, project := range projects {
-		contents += project + "\n"
-	}
-	path, perm := filepath.Join(rootDir, ".v23ignore"), os.FileMode(0644)
-	if err := ioutil.WriteFile(path, []byte(contents), perm); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", path, perm, err)
 	}
 }
 
@@ -285,13 +275,14 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
 	defer ctx.Run().RemoveAll(rootDir)
+	localDir := filepath.Join(rootDir, "local")
+	remoteDir := filepath.Join(rootDir, "remote")
 	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", rootDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", localDir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
-	remoteDir := filepath.Join(rootDir, "remote")
-	localManifest := setupNewProject(t, ctx, rootDir, ".manifest")
+	localManifest := setupNewProject(t, ctx, localDir, ".manifest")
 	remoteManifest := setupNewProject(t, ctx, remoteDir, "test-remote-manifest")
 	addRemote(t, ctx, localManifest, "origin", remoteManifest)
 	numProjects, remoteProjects := 2, []string{}
@@ -302,7 +293,6 @@ func TestCreate(t *testing.T) {
 	createRemoteManifest(t, ctx, remoteManifest, remoteProjects)
 	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"remote-snapshot": []string{}}))
 	createConfig(t, ctx, config)
-	ignoreDirs(t, rootDir, []string{"remote"})
 
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
@@ -335,7 +325,7 @@ func TestCreate(t *testing.T) {
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(rootDir, localProjectName(i))
+		localProject := filepath.Join(localDir, localProjectName(i))
 		if err := ctx.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -352,7 +342,7 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(rootDir, localProjectName(i))
+		localProject := filepath.Join(localDir, localProjectName(i))
 		checkReadme(t, ctx, localProject, "revision 1")
 	}
 
@@ -364,7 +354,7 @@ func TestCreate(t *testing.T) {
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(rootDir, localProjectName(i))
+		localProject := filepath.Join(localDir, localProjectName(i))
 		if err := ctx.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -375,7 +365,7 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(rootDir, localProjectName(i))
+		localProject := filepath.Join(localDir, localProjectName(i))
 		checkReadme(t, ctx, localProject, "revision 1")
 	}
 }
