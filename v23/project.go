@@ -263,7 +263,7 @@ func runProjectPoll(command *cmdline.Command, args []string) error {
 		// outcome of the test.
 		testProjects := map[string][]string{}
 		for _, project := range config.Projects() {
-			for _, test := range config.ProjectTests(project) {
+			for _, test := range config.ProjectTests([]string{project}) {
 				testProjects[test] = append(testProjects[test], project)
 			}
 		}
