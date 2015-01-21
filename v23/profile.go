@@ -33,6 +33,11 @@ var (
 	}
 )
 
+const (
+	// Number of retries for profile setup.
+	numRetries = 3
+)
+
 // cmdProfile represents the "v23 profile" command.
 var cmdProfile = &cmdline.Command{
 	Name:  "profile",
@@ -88,7 +93,15 @@ func runProfileSetup(command *cmdline.Command, args []string) error {
 	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, true)
 	for _, arg := range args {
 		setupFn := func() error {
-			return setup(ctx, runtime.GOOS, arg)
+			var err error
+			for i := 1; i <= numRetries; i++ {
+				fmt.Fprintf(ctx.Stdout(), fmt.Sprintf("Attempt #%d\n", i))
+				err = setup(ctx, runtime.GOOS, arg)
+				if err == nil {
+					return nil
+				}
+			}
+			return err
 		}
 		if err := ctx.Run().Function(setupFn, fmt.Sprintf("Set up profile %q", arg)); err != nil {
 			return err
