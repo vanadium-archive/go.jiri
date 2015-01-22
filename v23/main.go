@@ -4,6 +4,8 @@
 
 package main
 
+import "os"
+
 func main() {
-	root().Main()
+	os.Exit(root().Main())
 }
