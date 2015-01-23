@@ -87,6 +87,19 @@ func printSummary(ctx *util.Context, results map[string]*testutil.TestResult) {
 	fmt.Fprintf(ctx.Stdout(), "SUMMARY:\n")
 	for name, result := range results {
 		fmt.Fprintf(ctx.Stdout(), "%v %s\n", name, result.Status)
+		if len(result.ExcludedPkgs) > 0 {
+			fmt.Fprintf(ctx.Stdout(), "Excluded %d Packages: %v\n", len(result.ExcludedPkgs), result.ExcludedPkgs)
+		}
+		if len(result.ExcludedTests) > 0 {
+			for pkg, tests := range result.ExcludedTests {
+				fmt.Fprintf(ctx.Stdout(), "Excluded %d Tests from %v: %v\n", len(tests), pkg, tests)
+			}
+		}
+		if len(result.SkippedTests) > 0 {
+			for pkg, tests := range result.SkippedTests {
+				fmt.Fprintf(ctx.Stdout(), "Skipped %d Tests from %v: %v\n", len(tests), pkg, tests)
+			}
+		}
 	}
 }
 
