@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -76,5 +77,14 @@ func runUpdate(command *cmdline.Command, _ []string) error {
 	}
 
 	// Update all projects to their latest version.
-	return util.UpdateUniverse(ctx, manifestFlag, gcFlag)
+	// Attempt <attemptsFlag> times before failing.
+	for i := 1; i <= attemptsFlag; i++ {
+		if i > 1 {
+			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, attemptsFlag)
+		}
+		if err = util.UpdateUniverse(ctx, manifestFlag, gcFlag); err == nil {
+			break
+		}
+	}
+	return err
 }

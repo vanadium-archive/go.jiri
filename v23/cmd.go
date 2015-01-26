@@ -27,6 +27,7 @@ var (
 	noColorFlag             bool
 	remoteFlag              bool
 	gcFlag                  bool
+	attemptsFlag            int
 )
 
 func init() {
@@ -44,6 +45,7 @@ func init() {
 	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
+	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 	// The "v23 xgo" commands has the same flags as "v23 go".
 	cmdXGo.Flags = cmdGo.Flags
 }
