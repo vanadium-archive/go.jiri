@@ -84,6 +84,8 @@ func runUpdate(command *cmdline.Command, _ []string) error {
 		}
 		if err = util.UpdateUniverse(ctx, manifestFlag, gcFlag); err == nil {
 			break
+		} else {
+			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
 		}
 	}
 	return err
