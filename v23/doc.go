@@ -385,6 +385,8 @@ Usage:
    v23 update [flags]
 
 The v23 update flags are:
+ -attempts=1
+   Number of attempts before failing.
  -gc=false
    Garbage collect obsolete repositories.
  -manifest=default
