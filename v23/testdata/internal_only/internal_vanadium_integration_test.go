@@ -6,6 +6,7 @@ import "testing"
 import "os"
 
 import "v.io/core/veyron/lib/modules"
+import "v.io/core/veyron/lib/testutil"
 
 func init() {
 	modules.RegisterChild("module", `Oh..`, module)
