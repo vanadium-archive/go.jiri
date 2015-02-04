@@ -66,6 +66,7 @@ var cmdRoot = &cmdline.Command{
 		cmdEnv,
 		cmdGo,
 		cmdGoExt,
+		cmdIntegration,
 		cmdProfile,
 		cmdProject,
 		cmdRun,
