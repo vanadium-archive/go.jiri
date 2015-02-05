@@ -161,9 +161,9 @@ streamlined. Arguably this should be in a separate command/file but for now they
 are lumped together. The additional functionality is as follows:
 
 1. v.io/veyron/lib/modules requires the use of an explicit
-   registration mechanism and a 'helper' function (TestHelperProcess). 'v23
-   integration generate' automatically generates these registration functions
-   for any test function matches the modules.Main signature.
+   registration mechanism. 'v23 integration generate' automatically
+   generates these registration functions for any test function matches
+   the modules.Main signature.
 
    For:
    // SubProc does the following...
@@ -175,17 +175,11 @@ are lumped together. The additional functionality is as follows:
    modules.RegisterChild("SubProc",`SubProc does the following...
 Usage: <a> <b>...`, SubProc)
 
-2. The modules framework relies on a specific test being defined
-   'TestHelperProcess', that in turn invokes modules.DispatchInTest.
-   v23 will generate this helper function if it's not already defined,
-   in both the external and internal packages.
-
-3. We are planning on using 'TestMain' as the entry point for all our
-   tests, integration and otherwise. v23 will generate an appropriate
-   version of this if one is not already defined. TestMain is 'special'
-   in that only one definiton can occur across both the internal and
-   external test packages. This is a consequence of how the go testing
-   system is implemented.
+2. 'TestMain' is used as the entry point for all vanadium tests, integration
+   and otherwise. v23 will generate an appropriate version of this if one is
+   not already defined. TestMain is 'special' in that only one definiton can
+   occur across both the internal and external test packages. This is a
+   consequence of how the go testing system is implemented.
 
 Usage:
    v23 integration generate [flags] [packages]
@@ -193,7 +187,7 @@ Usage:
 list of go packages
 
 The v23 integration generate flags are:
- -output=vanadium_integration_test.go
+ -output=v23_test.go
    name of output files; two files are generated, <file_name> and
    internal_<file_name>.
 
