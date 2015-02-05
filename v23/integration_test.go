@@ -37,17 +37,17 @@ func TestIntegration(t *testing.T) {
 		internal, external []string
 	}{
 		{"testdata/empty", "",
-			[]string{"TestHelperProcess", "TestMain"},
-			[]string{"TestHelperProcess"},
+			[]string{"TestMain"},
+			nil,
 		},
 		{"testdata/internal_only", "", []string{"TestMain", "init"}, nil},
-		{"testdata/external_only", "", nil, []string{"TestHelperProcess", "init"}},
+		{"testdata/external_only", "", nil, []string{"init"}},
 		{"testdata/one_test", "",
-			[]string{"TestHelperProcess", "init"},
+			[]string{"init"},
 			[]string{"TestV23B", "TestV23C", "init"},
 		},
 		{"testdata/filename", "other_test.go",
-			[]string{"TestHelperProcess"},
+			nil,
 			[]string{"TestV23B"},
 		},
 	}
@@ -63,7 +63,7 @@ func TestIntegration(t *testing.T) {
 		}
 		output := c.output
 		if len(output) == 0 {
-			output = "vanadium_integration_test.go"
+			output = "v23_test.go"
 		}
 		if err := cmdIntegrationGenerate.Execute([]string{"--output=" + output}); err != nil {
 			t.Fatal(err)

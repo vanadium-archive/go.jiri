@@ -49,9 +49,9 @@ for now they are lumped together. The additional functionality is as
 follows:
 
 1. v.io/veyron/lib/modules requires the use of an explicit
-   registration mechanism and a 'helper' function (TestHelperProcess). 'v23
-   integration generate' automatically generates these registration functions
-   for any test function matches the modules.Main signature.
+   registration mechanism. 'v23 integration generate' automatically
+   generates these registration functions for any test function matches
+   the modules.Main signature.
 
    For:
    // SubProc does the following...
@@ -63,18 +63,11 @@ follows:
    modules.RegisterChild("SubProc",` + "`" + `SubProc does the following...
 Usage: <a> <b>...` + "`" + `, SubProc)
 
-
-2. The modules framework relies on a specific test being defined
-   'TestHelperProcess', that in turn invokes modules.DispatchInTest.
-   v23 will generate this helper function if it's not already defined,
-   in both the external and internal packages.
-
-3. We are planning on using 'TestMain' as the entry point for all our
-   tests, integration and otherwise. v23 will generate an appropriate
-   version of this if one is not already defined. TestMain is 'special'
-   in that only one definiton can occur across both the internal and
-   external test packages. This is a consequence of how the go testing
-   system is implemented.
+2. 'TestMain' is used as the entry point for all vanadium tests, integration
+   and otherwise. v23 will generate an appropriate version of this if one is
+   not already defined. TestMain is 'special' in that only one definiton can
+   occur across both the internal and external test packages. This is a
+   consequence of how the go testing system is implemented.
 `,
 
 	// TODO(cnicolaou): once the initial deployment is done, revisit the
@@ -90,7 +83,7 @@ var (
 )
 
 func init() {
-	cmdIntegrationGenerate.Flags.StringVar(&outputFileName, "output", "vanadium_integration_test.go", "name of output files; two files are generated, <file_name> and internal_<file_name>.")
+	cmdIntegrationGenerate.Flags.StringVar(&outputFileName, "output", "v23_test.go", "name of output files; two files are generated, <file_name> and internal_<file_name>.")
 }
 
 func runIntegrationGenerate(command *cmdline.Command, args []string) error {
@@ -121,8 +114,6 @@ func runIntegrationGenerate(command *cmdline.Command, args []string) error {
 	internalModules := []moduleCommand{}
 	externalModules := []moduleCommand{}
 
-	hasInternalTestHelper := false
-	hasExternalTestHelper := false
 	hasTestMain := false
 	packageName := ""
 
@@ -163,17 +154,6 @@ func runIntegrationGenerate(command *cmdline.Command, args []string) error {
 				}
 			}
 
-			// If this function is the modules TestHelperProcess
-			// function, keep track of whether we've seen it in the
-			// internal and external test packages.
-			if isTestHelper(fn) {
-				if isExternal {
-					hasExternalTestHelper = true
-				} else {
-					hasInternalTestHelper = true
-				}
-			}
-
 			// If this function is the testing TestMain then
 			// keep track of the fact that we've seen it.
 			if isTestMain(fn) {
@@ -186,8 +166,8 @@ func runIntegrationGenerate(command *cmdline.Command, args []string) error {
 		}
 	}
 
-	needInternalFile := !hasInternalTestHelper || len(internalModules) > 0
-	needExternalFile := !hasExternalTestHelper || len(externalModules) > 0 || len(integrationTests) > 0
+	needInternalFile := len(internalModules) > 0
+	needExternalFile := len(externalModules) > 0 || len(integrationTests) > 0
 
 	// TestMain is special in that it can only occur once even across
 	// internal and external test packages. If if it doesn't occur
@@ -198,14 +178,14 @@ func runIntegrationGenerate(command *cmdline.Command, args []string) error {
 	}
 
 	if needInternalFile {
-		if err := writeInternalFile("internal_"+outputFileName, packageName, !hasInternalTestHelper, !hasTestMain, internalModules); err != nil {
+		if err := writeInternalFile("internal_"+outputFileName, packageName, !hasTestMain, internalModules); err != nil {
 			return err
 		}
 		hasTestMain = true
 	}
 
 	if needExternalFile {
-		return writeExternalFile(outputFileName, packageName, !hasExternalTestHelper, !hasTestMain, externalModules, integrationTests)
+		return writeExternalFile(outputFileName, packageName, !hasTestMain, externalModules, integrationTests)
 	}
 	return nil
 }
@@ -291,14 +271,6 @@ func isModulesMain(d ast.Decl) (string, string) {
 	return name, comments(fn.Doc)
 }
 
-func isTestHelper(fn *ast.FuncDecl) bool {
-	// TODO(cnicolaou): check the signature as well as the name
-	if fn.Name.Name != "TestHelperProcess" {
-		return false
-	}
-	return true
-}
-
 func isTestMain(fn *ast.FuncDecl) bool {
 	// TODO(cnicolaou): check the signature as well as the name
 	if fn.Name.Name != "TestMain" {
@@ -313,11 +285,11 @@ type moduleCommand struct {
 
 // writeInternalFile writes a generated test file that is inside the package.
 // It cannot contain integration tests.
-func writeInternalFile(fileName string, packageName string, needsTestHelper, needsTestMain bool, modules []moduleCommand) (e error) {
+func writeInternalFile(fileName string, packageName string, needsTestMain bool, modules []moduleCommand) (e error) {
 
 	hasModules := len(modules) > 0
 
-	if !needsTestHelper && !needsTestMain && !hasModules {
+	if !needsTestMain && !hasModules {
 		return nil
 	}
 
@@ -331,7 +303,7 @@ func writeInternalFile(fileName string, packageName string, needsTestHelper, nee
 	fmt.Fprintln(out, "// DO NOT UPDATE MANUALLY")
 	fmt.Fprintf(out, "package %s\n\n", packageName)
 
-	if needsTestHelper || needsTestMain {
+	if needsTestMain {
 		fmt.Fprintln(out, `import "testing"`)
 		if needsTestMain {
 			fmt.Fprintln(out, `import "os"`)
@@ -339,7 +311,7 @@ func writeInternalFile(fileName string, packageName string, needsTestHelper, nee
 		fmt.Fprintln(out, "")
 	}
 
-	if needsTestHelper || hasModules {
+	if hasModules {
 		fmt.Fprintln(out, `import "v.io/core/veyron/lib/modules"`)
 	}
 
@@ -354,10 +326,6 @@ func writeInternalFile(fileName string, packageName string, needsTestHelper, nee
 		fmt.Fprintln(out, "}")
 	}
 
-	if needsTestHelper {
-		writeTestHelper(out)
-	}
-
 	if needsTestMain {
 		writeTestMain(out)
 	}
@@ -366,11 +334,11 @@ func writeInternalFile(fileName string, packageName string, needsTestHelper, nee
 
 // writeExternalFile write a generated test file that is outside the package.
 // It can contain intgreation tests.
-func writeExternalFile(fileName string, packageName string, needsTestHelper, needsTestMain bool, modules []moduleCommand, tests []string) (e error) {
+func writeExternalFile(fileName string, packageName string, needsTestMain bool, modules []moduleCommand, tests []string) (e error) {
 
 	hasTests := len(tests) > 0
 	hasModules := len(modules) > 0
-	if !needsTestHelper && !needsTestMain && !hasModules && !hasTests {
+	if !needsTestMain && !hasModules && !hasTests {
 		return nil
 	}
 
@@ -384,7 +352,7 @@ func writeExternalFile(fileName string, packageName string, needsTestHelper, nee
 	fmt.Fprintln(out, "// DO NOT UPDATE MANUALLY")
 	fmt.Fprintf(out, "package %s_test\n\n", packageName)
 
-	if needsTestHelper || needsTestMain {
+	if needsTestMain {
 		fmt.Fprintln(out, `import "testing"`)
 		if needsTestMain {
 			fmt.Fprintln(out, `import "os"`)
@@ -392,7 +360,7 @@ func writeExternalFile(fileName string, packageName string, needsTestHelper, nee
 		fmt.Fprintln(out, "")
 	}
 
-	if needsTestHelper || hasModules {
+	if hasModules {
 		fmt.Fprintln(out, `import "v.io/core/veyron/lib/modules"`)
 	}
 
@@ -411,10 +379,6 @@ func writeExternalFile(fileName string, packageName string, needsTestHelper, nee
 		fmt.Fprintln(out, "}")
 	}
 
-	if needsTestHelper {
-		writeTestHelper(out)
-	}
-
 	if needsTestMain {
 		writeTestMain(out)
 	}
@@ -425,14 +389,6 @@ func writeExternalFile(fileName string, packageName string, needsTestHelper, nee
 		fmt.Fprintf(out, "\tintegration.RunTest(t, V23Test%s)\n}\n", t)
 	}
 	return nil
-}
-
-func writeTestHelper(out io.Writer) {
-	fmt.Fprintf(out, `
-func TestHelperProcess(t *testing.T) {
-	modules.DispatchInTest()
-}
-`)
 }
 
 func writeTestMain(out io.Writer) {

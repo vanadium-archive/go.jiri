@@ -5,12 +5,7 @@ package empty
 import "testing"
 import "os"
 
-import "v.io/core/veyron/lib/modules"
 import "v.io/core/veyron/lib/testutil"
-
-func TestHelperProcess(t *testing.T) {
-	modules.DispatchInTest()
-}
 
 func TestMain(m *testing.M) {
 	testutil.Init()
