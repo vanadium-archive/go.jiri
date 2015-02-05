@@ -131,8 +131,8 @@ func runIntegrationGenerate(command *cmdline.Command, args []string) error {
 
 		// An external test package is one named <pkg>_test.
 		isExternal := strings.HasSuffix(f.Name.Name, "_test")
-		if !isExternal && len(packageName) == 0 {
-			packageName = f.Name.Name
+		if len(packageName) == 0 {
+			packageName = strings.TrimSuffix(f.Name.Name, "_test")
 		}
 		for _, d := range f.Decls {
 			fn, ok := d.(*ast.FuncDecl)
