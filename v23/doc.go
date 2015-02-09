@@ -152,7 +152,7 @@ of the package being tested). This ensures that integration tests are isolated
 from the packages being tested and can be moved to their own package if need be.
 Integration tests have the following form:
 
-    func V23Test<x> (i integration.T)
+    func V23Test<x> (i v23tests.T)
 
     'v23 integration generate' operates as follows:
 

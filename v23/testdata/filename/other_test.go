@@ -2,8 +2,8 @@
 // DO NOT UPDATE MANUALLY
 package one_test
 
-import "v.io/core/veyron/lib/testutil/integration"
+import "v.io/core/veyron/lib/testutil/v23tests"
 
 func TestV23B(t *testing.T) {
-	integration.RunTest(t, V23TestB)
+	v23tests.RunTest(t, V23TestB)
 }

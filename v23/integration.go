@@ -39,7 +39,7 @@ being part of the package being tested). This ensures that integration
 tests are isolated from the packages being tested and can be moved to their
 own package if need be. Integration tests have the following form:
 
-    func V23Test<x> (i integration.T)
+    func V23Test<x> (i v23tests.T)
 
     'v23 integration generate' operates as follows:
 
@@ -369,7 +369,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	}
 
 	if hasTests {
-		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil/integration"`)
+		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil/v23tests"`)
 	}
 
 	if hasModules {
@@ -386,7 +386,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	// integration test wrappers.
 	for _, t := range tests {
 		fmt.Fprintf(out, "\nfunc TestV23%s(t *testing.T) {\n", t)
-		fmt.Fprintf(out, "\tintegration.RunTest(t, V23Test%s)\n}\n", t)
+		fmt.Fprintf(out, "\tv23tests.RunTest(t, V23Test%s)\n}\n", t)
 	}
 	return nil
 }
