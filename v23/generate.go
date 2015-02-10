@@ -15,22 +15,14 @@ import (
 	"v.io/tools/lib/collect"
 )
 
-// cmdIntegration represents the "v23 integration" command
-var cmdIntegration = &cmdline.Command{
-	Name:     "integration",
-	Short:    "Manage vanadium integration test support",
-	Long:     "Manage vanadium integration test support",
-	Children: []*cmdline.Command{cmdIntegrationGenerate},
-}
-
-var cmdIntegrationGenerate = &cmdline.Command{
-	Run:   runIntegrationGenerate,
+var cmdV23Generate = &cmdline.Command{
+	Run:   runV23Generate,
 	Name:  "generate",
-	Short: "Generates supporting code for vanadium tests.",
+	Short: "Generates supporting code for v23 integration tests.",
 	Long: `
-The v23 integration subcommand supports the vanadium integration test
+The generate subcommand supports the vanadium integration test
 framework and unit tests by generating go files that contain supporting
-code. v23 integration generate is intended to be invoked via the
+code. v23 test generate is intended to be invoked via the
 'go generate' mechanism and the resulting files are to be checked in.
 
 Integration tests are functions of the form shown below that are defined
@@ -41,7 +33,7 @@ own package if need be. Integration tests have the following form:
 
     func V23Test<x> (i v23tests.T)
 
-    'v23 integration generate' operates as follows:
+    'v23 test generate' operates as follows:
 
 In addition, some commonly used functionality in vanadium unit tests
 is streamlined. Arguably this should be in a separate command/file but
@@ -49,7 +41,7 @@ for now they are lumped together. The additional functionality is as
 follows:
 
 1. v.io/veyron/lib/modules requires the use of an explicit
-   registration mechanism. 'v23 integration generate' automatically
+   registration mechanism. 'v23 test generate' automatically
    generates these registration functions for any test function matches
    the modules.Main signature.
 
@@ -83,10 +75,10 @@ var (
 )
 
 func init() {
-	cmdIntegrationGenerate.Flags.StringVar(&outputFileName, "output", "v23_test.go", "name of output files; two files are generated, <file_name> and internal_<file_name>.")
+	cmdV23Generate.Flags.StringVar(&outputFileName, "output", "v23_test.go", "name of output files; two files are generated, <file_name> and internal_<file_name>.")
 }
 
-func runIntegrationGenerate(command *cmdline.Command, args []string) error {
+func runV23Generate(command *cmdline.Command, args []string) error {
 	// TODO(cnicolaou): use http://godoc.org/golang.org/x/tools/go/loader
 	// to replace accessing the AST directly. In the meantime make sure
 	// the command line API is consistent with that change.
@@ -352,7 +344,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	fmt.Fprintln(out, "// DO NOT UPDATE MANUALLY")
 	fmt.Fprintf(out, "package %s_test\n\n", packageName)
 
-	if needsTestMain {
+	if needsTestMain || hasTests {
 		fmt.Fprintln(out, `import "testing"`)
 		if needsTestMain {
 			fmt.Fprintln(out, `import "os"`)

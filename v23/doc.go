@@ -13,7 +13,6 @@ The v23 commands are:
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
-   integration  Manage vanadium integration test support
    profile      Manage vanadium profiles
    project      Manage the vanadium projects
    run          Run an executable using the vanadium environment
@@ -128,68 +127,6 @@ source tree.
 
 Usage:
    v23 goext distclean
-
-V23 Integration
-
-Manage vanadium integration test support
-
-Usage:
-   v23 integration <command>
-
-The v23 integration commands are:
-   generate    Generates supporting code for vanadium tests.
-
-V23 Integration Generate
-
-The v23 integration subcommand supports the vanadium integration test framework
-and unit tests by generating go files that contain supporting code. v23
-integration generate is intended to be invoked via the 'go generate' mechanism
-and the resulting files are to be checked in.
-
-Integration tests are functions of the form shown below that are defined in
-'external' tests (i.e. those occurring in _test packages, rather than being part
-of the package being tested). This ensures that integration tests are isolated
-from the packages being tested and can be moved to their own package if need be.
-Integration tests have the following form:
-
-    func V23Test<x> (i v23tests.T)
-
-    'v23 integration generate' operates as follows:
-
-In addition, some commonly used functionality in vanadium unit tests is
-streamlined. Arguably this should be in a separate command/file but for now they
-are lumped together. The additional functionality is as follows:
-
-1. v.io/veyron/lib/modules requires the use of an explicit
-   registration mechanism. 'v23 integration generate' automatically
-   generates these registration functions for any test function matches
-   the modules.Main signature.
-
-   For:
-   // SubProc does the following...
-   // Usage: <a> <b>...
-   func SubProc(stdin io.Reader, stdout, stderr io.Writer, env map[string]string, args ...string) error
-
-   It will generate:
-
-   modules.RegisterChild("SubProc",`SubProc does the following...
-Usage: <a> <b>...`, SubProc)
-
-2. 'TestMain' is used as the entry point for all vanadium tests, integration
-   and otherwise. v23 will generate an appropriate version of this if one is
-   not already defined. TestMain is 'special' in that only one definiton can
-   occur across both the internal and external test packages. This is a
-   consequence of how the go testing system is implemented.
-
-Usage:
-   v23 integration generate [flags] [packages]
-
-list of go packages
-
-The v23 integration generate flags are:
- -output=v23_test.go
-   name of output files; two files are generated, <file_name> and
-   internal_<file_name>.
 
 V23 Profile
 
@@ -370,6 +307,7 @@ The v23 test commands are:
    project     Run tests for a vanadium project
    run         Run vanadium tests
    list        List vanadium tests
+   generate    Generates supporting code for v23 integration tests.
 
 V23 Test Project
 
@@ -388,9 +326,14 @@ V23 Test Run
 Run vanadium tests.
 
 Usage:
-   v23 test run <name ...>
+   v23 test run [flags] <name...>
 
-<name ...> is a list names identifying the tests to run.
+<name...> identifies the project for which to run tests and optionally a comma
+separated list of packages within those tests.
+
+The v23 test run flags are:
+ -subtests=
+   comma separated list of subtests/packages; not all tests act on this option.
 
 V23 Test List
 
@@ -398,6 +341,58 @@ List vanadium tests.
 
 Usage:
    v23 test list
+
+V23 Test Generate
+
+The generate subcommand supports the vanadium integration test framework and
+unit tests by generating go files that contain supporting code. v23 test
+generate is intended to be invoked via the 'go generate' mechanism and the
+resulting files are to be checked in.
+
+Integration tests are functions of the form shown below that are defined in
+'external' tests (i.e. those occurring in _test packages, rather than being part
+of the package being tested). This ensures that integration tests are isolated
+from the packages being tested and can be moved to their own package if need be.
+Integration tests have the following form:
+
+    func V23Test<x> (i v23tests.T)
+
+    'v23 test generate' operates as follows:
+
+In addition, some commonly used functionality in vanadium unit tests is
+streamlined. Arguably this should be in a separate command/file but for now they
+are lumped together. The additional functionality is as follows:
+
+1. v.io/veyron/lib/modules requires the use of an explicit
+   registration mechanism. 'v23 test generate' automatically
+   generates these registration functions for any test function matches
+   the modules.Main signature.
+
+   For:
+   // SubProc does the following...
+   // Usage: <a> <b>...
+   func SubProc(stdin io.Reader, stdout, stderr io.Writer, env map[string]string, args ...string) error
+
+   It will generate:
+
+   modules.RegisterChild("SubProc",`SubProc does the following...
+Usage: <a> <b>...`, SubProc)
+
+2. 'TestMain' is used as the entry point for all vanadium tests, integration
+   and otherwise. v23 will generate an appropriate version of this if one is
+   not already defined. TestMain is 'special' in that only one definiton can
+   occur across both the internal and external test packages. This is a
+   consequence of how the go testing system is implemented.
+
+Usage:
+   v23 test generate [flags] [packages]
+
+list of go packages
+
+The v23 test generate flags are:
+ -output=v23_test.go
+   name of output files; two files are generated, <file_name> and
+   internal_<file_name>.
 
 V23 Update
 

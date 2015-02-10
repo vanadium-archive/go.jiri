@@ -56,7 +56,7 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmdIntegrationGenerate.Init(nil, os.Stdout, os.Stderr)
+	cmdV23Generate.Init(nil, os.Stdout, os.Stderr)
 	for _, c := range cases {
 		if err := os.Chdir(c.dir); err != nil {
 			t.Fatal(err)
@@ -65,7 +65,7 @@ func TestIntegration(t *testing.T) {
 		if len(output) == 0 {
 			output = "v23_test.go"
 		}
-		if err := cmdIntegrationGenerate.Execute([]string{"--output=" + output}); err != nil {
+		if err := cmdV23Generate.Execute([]string{"--output=" + output}); err != nil {
 			t.Fatal(err)
 		}
 		// parseFile returns nil if the file doesn't exist, which must

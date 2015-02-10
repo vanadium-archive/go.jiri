@@ -2,6 +2,8 @@
 // DO NOT UPDATE MANUALLY
 package one_test
 
+import "testing"
+
 import "v.io/core/veyron/lib/modules"
 import "v.io/core/veyron/lib/testutil/v23tests"
 

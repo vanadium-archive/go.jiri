@@ -3,14 +3,18 @@ package main
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	"v.io/lib/cmdline"
 	"v.io/tools/lib/testutil"
 	"v.io/tools/lib/util"
 )
 
+var testPkgs string
+
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	cmdTestRun.Flags.StringVar(&testPkgs, "pkgs", "", "comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
 }
 
 // cmdTest represents the "v23 test" command.
@@ -18,7 +22,7 @@ var cmdTest = &cmdline.Command{
 	Name:     "test",
 	Short:    "Manage vanadium tests",
 	Long:     "Manage vanadium tests.",
-	Children: []*cmdline.Command{cmdTestProject, cmdTestRun, cmdTestList},
+	Children: []*cmdline.Command{cmdTestProject, cmdTestRun, cmdTestList, cmdV23Generate},
 }
 
 // cmdTestProject represents the "v23 test project" command.
@@ -61,8 +65,8 @@ var cmdTestRun = &cmdline.Command{
 	Name:     "run",
 	Short:    "Run vanadium tests",
 	Long:     "Run vanadium tests.",
-	ArgsName: "<name ...>",
-	ArgsLong: "<name ...> is a list names identifying the tests to run.",
+	ArgsName: "<name...>",
+	ArgsLong: "<name...> is a list names identifying the tests to run.",
 }
 
 func runTestRun(command *cmdline.Command, args []string) error {
@@ -70,7 +74,13 @@ func runTestRun(command *cmdline.Command, args []string) error {
 		return command.UsageErrorf("unexpected number of arguments")
 	}
 	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
-	results, err := testutil.RunTests(ctx, nil, args)
+	pkgs := []string{}
+	for _, pkg := range strings.Split(testPkgs, ",") {
+		if len(pkg) > 0 {
+			pkgs = append(pkgs, pkg)
+		}
+	}
+	results, err := testutil.RunTests(ctx, nil, args, testutil.SubTestsOpt(pkgs))
 	if err != nil {
 		return err
 	}
