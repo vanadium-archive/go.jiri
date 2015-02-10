@@ -328,12 +328,12 @@ Run vanadium tests.
 Usage:
    v23 test run [flags] <name...>
 
-<name...> identifies the project for which to run tests and optionally a comma
-separated list of packages within those tests.
+<name...> is a list names identifying the tests to run.
 
 The v23 test run flags are:
- -subtests=
-   comma separated list of subtests/packages; not all tests act on this option.
+ -pkgs=
+   comma-separated list of Go package expressions that identify a subset of
+   tests to run; only relevant for Go-based tests
 
 V23 Test List
 
