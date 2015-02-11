@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,9 +29,13 @@ var (
 	remoteFlag              bool
 	gcFlag                  bool
 	attemptsFlag            int
+	pkgsFlag                string
+	outputFlag              string
 )
 
 func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	cmdEnv.Flags.StringVar(&platformFlag, "platform", "", "Target platform.")
 	cmdGo.Flags.StringVar(&hostGoFlag, "host_go", "go", "Go command for the host platform.")
 	cmdGo.Flags.StringVar(&targetGoFlag, "target_go", "go", "Go command for the target platform.")
@@ -43,9 +48,11 @@ func init() {
 	cmdRoot.Flags.BoolVar(&dryRunFlag, "n", false, "Show what commands will run but do not execute them.")
 	cmdRoot.Flags.BoolVar(&noColorFlag, "nocolor", false, "Do not use color to format output.")
 	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
+	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
+	cmdV23Generate.Flags.StringVar(&outputFlag, "output", "v23_test.go", "Specifies what file to output the generated code to. Two files are generated, <output> and internal_<output>.")
 	// The "v23 xgo" commands has the same flags as "v23 go".
 	cmdXGo.Flags = cmdGo.Flags
 }
