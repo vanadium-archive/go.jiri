@@ -4,7 +4,9 @@
 
 package main
 
-import "os"
+import (
+	"os"
+)
 
 func main() {
 	os.Exit(root().Main())
