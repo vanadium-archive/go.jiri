@@ -15,15 +15,6 @@ import (
 	"v.io/tools/lib/util"
 )
 
-// reportOutdated determines if outdated projects are reported. It is
-// set to true by default and is only overridden from tests in order
-// to prevent tests of this package from indirectly invoking the
-// createV23Dir() function.
-//
-// TODO(jsimsa): Remove this when the createV23Dir() function
-// invocation is removed from LocalProjects.
-var reportOutdated = true
-
 // cmdGo represents the "v23 go" command.
 var cmdGo = &cmdline.Command{
 	Run:   runGo,
@@ -101,10 +92,8 @@ func runGoForPlatform(ctx *util.Context, platform util.Platform, command *cmdlin
 		// Check that all non-master branches have merged the
 		// master branch to make sure the vdl tool is not run
 		// against out-of-date code base.
-		if reportOutdated {
-			if err := reportOutdatedBranches(ctx); err != nil {
-				return err
-			}
+		if err := reportOutdatedBranches(ctx); err != nil {
+			return err
 		}
 
 		if err := generateVDL(ctx, args); err != nil {

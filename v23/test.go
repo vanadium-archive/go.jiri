@@ -2,20 +2,12 @@ package main
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 
 	"v.io/lib/cmdline"
 	"v.io/tools/lib/testutil"
 	"v.io/tools/lib/util"
 )
-
-var testPkgs string
-
-func init() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	cmdTestRun.Flags.StringVar(&testPkgs, "pkgs", "", "comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
-}
 
 // cmdTest represents the "v23 test" command.
 var cmdTest = &cmdline.Command{
@@ -75,12 +67,12 @@ func runTestRun(command *cmdline.Command, args []string) error {
 	}
 	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
 	pkgs := []string{}
-	for _, pkg := range strings.Split(testPkgs, ",") {
+	for _, pkg := range strings.Split(pkgsFlag, ",") {
 		if len(pkg) > 0 {
 			pkgs = append(pkgs, pkg)
 		}
 	}
-	results, err := testutil.RunTests(ctx, nil, args, testutil.SubTestsOpt(pkgs))
+	results, err := testutil.RunTests(ctx, nil, args, testutil.PkgsOpt(pkgs))
 	if err != nil {
 		return err
 	}

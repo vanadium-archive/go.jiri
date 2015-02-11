@@ -70,14 +70,6 @@ Usage: <a> <b>...` + "`" + `, SubProc)
 	ArgsName: "[packages]",
 	ArgsLong: "list of go packages"}
 
-var (
-	outputFileName string
-)
-
-func init() {
-	cmdV23Generate.Flags.StringVar(&outputFileName, "output", "v23_test.go", "name of output files; two files are generated, <file_name> and internal_<file_name>.")
-}
-
 func runV23Generate(command *cmdline.Command, args []string) error {
 	// TODO(cnicolaou): use http://godoc.org/golang.org/x/tools/go/loader
 	// to replace accessing the AST directly. In the meantime make sure
@@ -113,7 +105,7 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 	fset := token.NewFileSet() // positions are relative to fset
 	for _, file := range candidates {
 		// Ignore the files we are generating.
-		if file == outputFileName || file == "internal_"+outputFileName {
+		if file == outputFlag || file == "internal_"+outputFlag {
 			continue
 		}
 		f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
@@ -170,14 +162,14 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 	}
 
 	if needInternalFile {
-		if err := writeInternalFile("internal_"+outputFileName, packageName, !hasTestMain, internalModules); err != nil {
+		if err := writeInternalFile("internal_"+outputFlag, packageName, !hasTestMain, internalModules); err != nil {
 			return err
 		}
 		hasTestMain = true
 	}
 
 	if needExternalFile {
-		return writeExternalFile(outputFileName, packageName, !hasTestMain, externalModules, integrationTests)
+		return writeExternalFile(outputFlag, packageName, !hasTestMain, externalModules, integrationTests)
 	}
 	return nil
 }

@@ -391,8 +391,8 @@ list of go packages
 
 The v23 test generate flags are:
  -output=v23_test.go
-   name of output files; two files are generated, <file_name> and
-   internal_<file_name>.
+   Specifies what file to output the generated code to. Two files are generated,
+   <output> and internal_<output>.
 
 V23 Update
 
