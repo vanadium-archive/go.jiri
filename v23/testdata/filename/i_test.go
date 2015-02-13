@@ -1,4 +1,4 @@
-package external_only_test
+package filename
 
 import (
 	"fmt"
@@ -9,21 +9,22 @@ import (
 
 	"v.io/core/veyron/lib/expect"
 	"v.io/core/veyron/lib/modules"
-	_ "v.io/core/veyron/profiles"
 )
 
+var cmd = "moduleInternalFilename"
+
 // Oh..
-func moduleExternalOnly(stdin io.Reader, stdout, stderr io.Writer, env map[string]string, args ...string) error {
-	fmt.Fprintf(stdout, "moduleExternalOnly\n")
+func moduleInternalFilename(stdin io.Reader, stdout, stderr io.Writer, env map[string]string, args ...string) error {
+	fmt.Fprintln(stdout, cmd)
 	return nil
 }
 
-func TestExternalOnly(t *testing.T) {
+func TestInternalFilename(t *testing.T) {
 	sh, err := modules.NewShell(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := sh.Start("moduleExternalOnly", nil)
+	m, err := sh.Start(cmd, nil)
 	if err != nil {
 		if m != nil {
 			m.Shutdown(os.Stderr, os.Stderr)
@@ -31,5 +32,5 @@ func TestExternalOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := expect.NewSession(t, m.Stdout(), time.Minute)
-	s.Expect("moduleExternalOnly")
+	s.Expect(cmd)
 }
