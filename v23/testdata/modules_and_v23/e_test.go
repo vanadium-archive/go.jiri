@@ -1,4 +1,4 @@
-package internal_only
+package modules_and_v23_test
 
 import (
 	"fmt"
@@ -9,18 +9,21 @@ import (
 
 	"v.io/core/veyron/lib/expect"
 	"v.io/core/veyron/lib/modules"
-	_ "v.io/core/veyron/profiles"
+	"v.io/core/veyron/lib/testutil/v23tests"
 )
 
-var cmd = "moduleInternalOnly"
+func V23TestModulesAndV23A(i *v23tests.T) {}
 
-// Oh..
-func moduleInternalOnly(stdin io.Reader, stdout, stderr io.Writer, env map[string]string, args ...string) error {
+func V23TestModulesAndV23B(i *v23tests.T) {}
+
+var cmd = "modulesModulesAndV23Ext"
+
+func modulesModulesAndV23Ext(stdin io.Reader, stdout io.Writer, stderr io.Writer, env map[string]string, args ...string) error {
 	fmt.Fprintln(stdout, cmd)
 	return nil
 }
 
-func TestModulesInternalOnly(t *testing.T) {
+func TestModulesAndV23Ext(t *testing.T) {
 	sh, err := modules.NewShell(nil, nil)
 	if err != nil {
 		t.Fatal(err)

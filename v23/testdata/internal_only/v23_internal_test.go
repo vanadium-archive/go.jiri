@@ -1,6 +1,6 @@
 // This file was auto-generated via go generate.
 // DO NOT UPDATE MANUALLY
-package external_only_test
+package internal_only
 
 import "fmt"
 import "testing"
@@ -10,7 +10,7 @@ import "v.io/core/veyron/lib/modules"
 import "v.io/core/veyron/lib/testutil"
 
 func init() {
-	modules.RegisterChild("moduleExternalOnly", `Oh..`, moduleExternalOnly)
+	modules.RegisterChild("moduleInternalOnly", `Oh..`, moduleInternalOnly)
 }
 
 func TestMain(m *testing.M) {

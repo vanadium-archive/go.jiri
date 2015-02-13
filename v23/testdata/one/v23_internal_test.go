@@ -1,6 +1,6 @@
 // This file was auto-generated via go generate.
 // DO NOT UPDATE MANUALLY
-package external_only_test
+package one
 
 import "fmt"
 import "testing"
@@ -8,9 +8,13 @@ import "os"
 
 import "v.io/core/veyron/lib/modules"
 import "v.io/core/veyron/lib/testutil"
+import "v.io/core/veyron/lib/testutil/v23tests"
 
 func init() {
-	modules.RegisterChild("moduleExternalOnly", `Oh..`, moduleExternalOnly)
+	modules.RegisterChild("modulesOneInt", `modulesOneInt does the following...
+Usage: <a> <b>...`, modulesOneInt)
+	modules.RegisterChild("modulesTwoInt", `modulesTwoInt does the following...
+<ab> <cd>`, modulesTwoInt)
 }
 
 func TestMain(m *testing.M) {
@@ -22,5 +26,8 @@ func TestMain(m *testing.M) {
 		}
 		return
 	}
-	os.Exit(m.Run())
+	cleanup := v23tests.UseSharedBinDir()
+	r := m.Run()
+	cleanup()
+	os.Exit(r)
 }

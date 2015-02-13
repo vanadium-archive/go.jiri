@@ -70,6 +70,8 @@ Usage: <a> <b>...` + "`" + `, SubProc)
 	ArgsName: "[packages]",
 	ArgsLong: "list of go packages"}
 
+const defaultV23TestOutputPrefix = "v23"
+
 func runV23Generate(command *cmdline.Command, args []string) error {
 	// TODO(cnicolaou): use http://godoc.org/golang.org/x/tools/go/loader
 	// to replace accessing the AST directly. In the meantime make sure
@@ -93,7 +95,7 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 		}
 	}
 
-	integrationTests := []string{}
+	v23Tests := []string{}
 
 	internalModules := []moduleCommand{}
 	externalModules := []moduleCommand{}
@@ -101,11 +103,14 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 	hasTestMain := false
 	packageName := ""
 
+	externalFile := outputFlag + "_test.go"
+	internalFile := outputFlag + "_internal_test.go"
+
 	re = regexp.MustCompile(`V23Test(.*)`)
 	fset := token.NewFileSet() // positions are relative to fset
 	for _, file := range candidates {
 		// Ignore the files we are generating.
-		if file == outputFlag || file == "internal_"+outputFlag {
+		if file == externalFile || file == internalFile {
 			continue
 		}
 		f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
@@ -145,13 +150,14 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 			}
 			name := fn.Name.String()
 			if parts := re.FindStringSubmatch(name); isExternal && len(parts) == 2 {
-				integrationTests = append(integrationTests, parts[1])
+				v23Tests = append(v23Tests, parts[1])
 			}
 		}
 	}
 
+	hasV23Tests := len(v23Tests) > 0
 	needInternalFile := len(internalModules) > 0
-	needExternalFile := len(externalModules) > 0 || len(integrationTests) > 0
+	needExternalFile := len(externalModules) > 0 || hasV23Tests
 
 	// TestMain is special in that it can only occur once even across
 	// internal and external test packages. If if it doesn't occur
@@ -162,14 +168,14 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 	}
 
 	if needInternalFile {
-		if err := writeInternalFile("internal_"+outputFlag, packageName, !hasTestMain, internalModules); err != nil {
+		if err := writeInternalFile(internalFile, packageName, !hasTestMain, hasV23Tests, internalModules); err != nil {
 			return err
 		}
 		hasTestMain = true
 	}
 
 	if needExternalFile {
-		return writeExternalFile(outputFlag, packageName, !hasTestMain, externalModules, integrationTests)
+		return writeExternalFile(externalFile, packageName, !hasTestMain, externalModules, v23Tests)
 	}
 	return nil
 }
@@ -269,7 +275,7 @@ type moduleCommand struct {
 
 // writeInternalFile writes a generated test file that is inside the package.
 // It cannot contain integration tests.
-func writeInternalFile(fileName string, packageName string, needsTestMain bool, modules []moduleCommand) (e error) {
+func writeInternalFile(fileName string, packageName string, needsTestMain, hasV23Tests bool, modules []moduleCommand) (e error) {
 
 	hasModules := len(modules) > 0
 
@@ -288,11 +294,12 @@ func writeInternalFile(fileName string, packageName string, needsTestMain bool, 
 	fmt.Fprintf(out, "package %s\n\n", packageName)
 
 	if needsTestMain {
-		fmt.Fprintln(out, `import "testing"`)
-		if needsTestMain {
-			fmt.Fprintln(out, `import "os"`)
+		if hasModules {
+			fmt.Fprintln(out, `import "fmt"`)
 		}
-		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, `import "testing"`)
+		fmt.Fprintln(out, `import "os"`)
+		fmt.Fprintln(out)
 	}
 
 	if hasModules {
@@ -301,28 +308,32 @@ func writeInternalFile(fileName string, packageName string, needsTestMain bool, 
 
 	if needsTestMain {
 		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil"`)
+		if hasV23Tests {
+			fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil/v23tests"`)
+		}
 	}
 
 	if hasModules {
-		fmt.Fprintln(out, "")
+		fmt.Fprintln(out)
 		fmt.Fprintln(out, "func init() {")
 		writeModuleRegistration(out, modules)
 		fmt.Fprintln(out, "}")
 	}
 
 	if needsTestMain {
-		writeTestMain(out)
+		writeTestMain(out, hasModules, hasV23Tests)
 	}
+
 	return nil
 }
 
 // writeExternalFile write a generated test file that is outside the package.
 // It can contain intgreation tests.
-func writeExternalFile(fileName string, packageName string, needsTestMain bool, modules []moduleCommand, tests []string) (e error) {
+func writeExternalFile(fileName string, packageName string, needsTestMain bool, modules []moduleCommand, v23Tests []string) (e error) {
 
-	hasTests := len(tests) > 0
+	hasV23Tests := len(v23Tests) > 0
 	hasModules := len(modules) > 0
-	if !needsTestMain && !hasModules && !hasTests {
+	if !needsTestMain && !hasModules && !hasV23Tests {
 		return nil
 	}
 
@@ -336,12 +347,21 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	fmt.Fprintln(out, "// DO NOT UPDATE MANUALLY")
 	fmt.Fprintf(out, "package %s_test\n\n", packageName)
 
-	if needsTestMain || hasTests {
+	trailingLine := false
+	if needsTestMain && hasModules {
+		fmt.Fprintln(out, `import "fmt"`)
+		trailingLine = true
+	}
+	if needsTestMain || hasV23Tests {
 		fmt.Fprintln(out, `import "testing"`)
-		if needsTestMain {
-			fmt.Fprintln(out, `import "os"`)
-		}
-		fmt.Fprintln(out, "")
+		trailingLine = true
+	}
+	if needsTestMain {
+		fmt.Fprintln(out, `import "os"`)
+		trailingLine = true
+	}
+	if trailingLine {
+		fmt.Fprintln(out)
 	}
 
 	if hasModules {
@@ -352,38 +372,100 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil"`)
 	}
 
-	if hasTests {
+	if hasV23Tests {
 		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil/v23tests"`)
 	}
 
 	if hasModules {
-		fmt.Fprintln(out, "")
+		fmt.Fprintln(out)
 		fmt.Fprintln(out, "func init() {")
 		writeModuleRegistration(out, modules)
 		fmt.Fprintln(out, "}")
 	}
 
 	if needsTestMain {
-		writeTestMain(out)
+		writeTestMain(out, hasModules, hasV23Tests)
 	}
 
 	// integration test wrappers.
-	for _, t := range tests {
+	for _, t := range v23Tests {
 		fmt.Fprintf(out, "\nfunc TestV23%s(t *testing.T) {\n", t)
 		fmt.Fprintf(out, "\tv23tests.RunTest(t, V23Test%s)\n}\n", t)
 	}
 	return nil
 }
 
-func writeTestMain(out io.Writer) {
-	fmt.Fprintf(out, `
+func writeTestMain(out io.Writer, hasModules, hasV23Tests bool) {
+	switch {
+	case hasModules && hasV23Tests:
+		writeModulesAndV23TestMain(out)
+	case hasModules:
+		writeModulesTestMain(out)
+	case hasV23Tests:
+		writeV23TestMain(out)
+	default:
+		writeGoTestMain(out)
+	}
+}
+
+var modulesSubprocess = `
+	if modules.IsModulesProcess() {
+		if err := modules.Dispatch(); err != nil {
+			fmt.Fprintf(os.Stderr, "modules.Dispatch failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+`
+
+// writeModulesTestMain writes out a TestMain appropriate for tests
+// that have only modules.
+func writeModulesTestMain(out io.Writer) {
+	fmt.Fprint(out, `
+func TestMain(m *testing.M) {
+	testutil.Init()`+
+		modulesSubprocess+
+		`	os.Exit(m.Run())
+}
+`)
+}
+
+// writeModulesAndV23TestMain writes out a TestMain appropriate for tests
+// that have both modules and v23 tests.
+func writeModulesAndV23TestMain(out io.Writer) {
+	fmt.Fprint(out, `
+func TestMain(m *testing.M) {
+	testutil.Init()`+
+		modulesSubprocess+
+		`	cleanup := v23tests.UseSharedBinDir()
+	r := m.Run()
+	cleanup()
+	os.Exit(r)
+}
+`)
+}
+
+// writeV23TestMain writes out a TestMain appropriate for tests
+// that have only v23 tests.
+func writeV23TestMain(out io.Writer) {
+	fmt.Fprint(out, `
 func TestMain(m *testing.M) {
 	testutil.Init()
 	cleanup := v23tests.UseSharedBinDir()
 	r := m.Run()
 	cleanup()
-	// TODO(cnicolaou): call modules.Dispatch and remove the need for TestHelperProcess
 	os.Exit(r)
+}
+`)
+}
+
+// writeGoTestMain writes out a TestMain appropriate for vanadium
+// tests that use neither modules nor v23 tests.
+func writeGoTestMain(out io.Writer) {
+	fmt.Fprint(out, `
+func TestMain(m *testing.M) {
+	testutil.Init()
+	os.Exit(m.Run())
 }
 `)
 }

@@ -390,9 +390,10 @@ Usage:
 list of go packages
 
 The v23 test generate flags are:
- -output=v23_test.go
-   Specifies what file to output the generated code to. Two files are generated,
-   <output> and internal_<output>.
+ -output-prefix=v23
+   Specifies the prefix to use for generated files. Up to two files may
+   generated, the defaults are v23_test.go and v23_internal_test.go, or
+   <output-prefix>_test.go and <output-prefix>_internal_test.go.
 
 V23 Update
 

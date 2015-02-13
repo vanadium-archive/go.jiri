@@ -52,7 +52,7 @@ func init() {
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
-	cmdV23Generate.Flags.StringVar(&outputFlag, "output", "v23_test.go", "Specifies what file to output the generated code to. Two files are generated, <output> and internal_<output>.")
+	cmdV23Generate.Flags.StringVar(&outputFlag, "output-prefix", defaultV23TestOutputPrefix, "Specifies the prefix to use for generated files. Up to two files may generated, the defaults are v23_test.go and v23_internal_test.go, or <output-prefix>_test.go and <output-prefix>_internal_test.go.")
 	// The "v23 xgo" commands has the same flags as "v23 go".
 	cmdXGo.Flags = cmdGo.Flags
 }
