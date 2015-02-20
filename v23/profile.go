@@ -28,6 +28,7 @@ var (
 		"mobile":        struct{}{},
 		"proximity":     struct{}{},
 		"proximity-arm": struct{}{},
+		"syncbase":      struct{}{},
 		"third-party":   struct{}{},
 		"web":           struct{}{},
 	}
@@ -141,6 +142,8 @@ func setup(ctx *util.Context, os, profile string) error {
 			return setupProximityLinux(ctx)
 		case "proximity-arm":
 			return setupProximityArmLinux(ctx)
+		case "syncbase":
+			return setupSyncbaseLinux(ctx)
 		case "web":
 			return setupWebLinux(ctx)
 		default:
@@ -1126,6 +1129,53 @@ codegoogle.password=YOUR_GOOGLECODE_PASSWORD
 		return nil
 	}
 	if err := atomicAction(ctx, compileGoPpapiFn, goPpapiBinDir, "Compile Go Ppapi compiler"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// setupSyncbaseLinux sets up the syncbase profile for linux.
+func setupSyncbaseLinux(ctx *util.Context) (e error) {
+	root, err := util.VanadiumRoot()
+	if err != nil {
+		return err
+	}
+
+	// Build and install LevelDB.
+	leveldbOutDir := filepath.Join(root, "third_party", "cout", "leveldb")
+	installLeveldbFn := func() error {
+		leveldbSrcDir := filepath.Join(root, "third_party", "csrc", "leveldb")
+		if err := ctx.Run().Chdir(leveldbSrcDir); err != nil {
+			return err
+		}
+		// LevelDB outputs built files into the source directory.
+		// LevelDB does not provide a function for configuring the Makefile, so
+		// we explicitly migrate the built files to the output directories.
+		defer run(ctx, "make", []string{"clean"}, nil)
+		if err := run(ctx, "make", []string{"clean"}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "make", []string{"all"}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "mkdir", []string{"-p", leveldbOutDir}, nil); err != nil {
+			return err
+		}
+		leveldbIncludeDir := filepath.Join(leveldbOutDir, "include")
+		if err := run(ctx, "cp", []string{"-R", "include", leveldbIncludeDir}, nil); err != nil {
+			return err
+		}
+		leveldbLibDir := filepath.Join(leveldbOutDir, "lib")
+		if err := run(ctx, "mkdir", []string{"-p", leveldbLibDir}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "mv", []string{"-t", leveldbLibDir, "libleveldb.a", "libleveldb.so", "libleveldb.so.1", "libleveldb.so.1.18"}, nil); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := atomicAction(ctx, installLeveldbFn, leveldbOutDir, "Build and install LevelDB"); err != nil {
 		return err
 	}
 
