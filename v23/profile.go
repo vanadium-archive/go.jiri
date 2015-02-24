@@ -1165,16 +1165,6 @@ func setupSyncbaseLinux(ctx *util.Context) (e error) {
 		if err := ctx.Run().Chdir(leveldbSrcDir); err != nil {
 			return err
 		}
-		// LevelDB outputs built files into the source directory.
-		// LevelDB does not provide a function for configuring the Makefile, so
-		// we explicitly migrate the built files to the output directories.
-		defer run(ctx, "make", []string{"clean"}, nil)
-		if err := run(ctx, "make", []string{"clean"}, nil); err != nil {
-			return err
-		}
-		if err := run(ctx, "make", []string{"all"}, nil); err != nil {
-			return err
-		}
 		if err := run(ctx, "mkdir", []string{"-p", leveldbOutDir}, nil); err != nil {
 			return err
 		}
@@ -1183,10 +1173,14 @@ func setupSyncbaseLinux(ctx *util.Context) (e error) {
 			return err
 		}
 		leveldbLibDir := filepath.Join(leveldbOutDir, "lib")
-		if err := run(ctx, "mkdir", []string{"-p", leveldbLibDir}, nil); err != nil {
+		if err := run(ctx, "mkdir", []string{leveldbLibDir}, nil); err != nil {
 			return err
 		}
-		if err := run(ctx, "mv", []string{"-t", leveldbLibDir, "libleveldb.a", "libleveldb.so", "libleveldb.so.1", "libleveldb.so.1.18"}, nil); err != nil {
+		env := map[string]string{"PREFIX": leveldbLibDir}
+		if err := run(ctx, "make", []string{"clean"}, env); err != nil {
+			return err
+		}
+		if err := run(ctx, "make", []string{"all"}, env); err != nil {
 			return err
 		}
 		return nil
