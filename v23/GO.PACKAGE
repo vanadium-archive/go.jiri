@@ -1,7 +1,7 @@
 {
 	"dependencies": {
 		"incoming": [
-			    {"deny": "..."}
+   			    {"deny": "..."}
 		],
 		"outgoing": [
 			    {"allow": "v.io/lib/..."},
