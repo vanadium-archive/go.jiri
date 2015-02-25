@@ -289,8 +289,7 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, hasV2
 	}
 	defer collect.Error(func() error { return out.Close() }, &e)
 
-	fmt.Fprintln(out, "// This file was auto-generated via go generate.")
-	fmt.Fprintln(out, "// DO NOT UPDATE MANUALLY")
+	writeHeader(out)
 	fmt.Fprintf(out, "package %s\n\n", packageName)
 
 	if needsTestMain {
@@ -343,8 +342,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	}
 	defer collect.Error(func() error { return out.Close() }, &e)
 
-	fmt.Fprintln(out, "// This file was auto-generated via go generate.")
-	fmt.Fprintln(out, "// DO NOT UPDATE MANUALLY")
+	writeHeader(out)
 	fmt.Fprintf(out, "package %s_test\n\n", packageName)
 
 	trailingLine := false
@@ -393,6 +391,15 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 		fmt.Fprintf(out, "\tv23tests.RunTest(t, V23Test%s)\n}\n", t)
 	}
 	return nil
+}
+
+func writeHeader(out io.Writer) {
+	fmt.Fprintln(out,
+		`// Copyright 2015 The Vanadium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.`)
+	fmt.Fprintln(out, `// This file was auto-generated via go generate.
+// DO NOT UPDATE MANUALLY`)
 }
 
 func writeTestMain(out io.Writer, hasModules, hasV23Tests bool) {
