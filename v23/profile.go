@@ -36,7 +36,8 @@ var (
 
 const (
 	// Number of retries for profile setup.
-	numRetries = 3
+	numRetries              = 3
+	actionCompletedFileName = ".vanadium_action_completed"
 )
 
 // cmdProfile represents the "v23 profile" command.
@@ -157,13 +158,24 @@ func setup(ctx *util.Context, os, profile string) error {
 
 func atomicAction(ctx *util.Context, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
+		actionCompletedFile := filepath.Join(dir, actionCompletedFileName)
 		if dir != "" && directoryExists(ctx, dir) {
-			return nil
+			// If the dir exists but the actionCompletedFile doesn't, then it means
+			// the previous action didn't finish.
+			// Remove the dir so we can perform the action again.
+			if !fileExists(ctx, actionCompletedFile) {
+				ctx.Run().RemoveAll(dir)
+			} else {
+				return nil
+			}
 		}
 		if err := installFn(); err != nil {
 			if dir != "" {
 				ctx.Run().RemoveAll(dir)
 			}
+			return err
+		}
+		if err := ctx.Run().WriteFile(actionCompletedFile, []byte("completed"), 0644); err != nil {
 			return err
 		}
 		return nil
@@ -173,6 +185,10 @@ func atomicAction(ctx *util.Context, installFn func() error, dir, message string
 
 func directoryExists(ctx *util.Context, dir string) bool {
 	return ctx.Run().Command("test", "-d", dir) == nil
+}
+
+func fileExists(ctx *util.Context, file string) bool {
+	return ctx.Run().Command("test", "-f", file) == nil
 }
 
 type androidPkg struct {
