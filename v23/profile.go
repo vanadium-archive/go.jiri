@@ -126,6 +126,8 @@ func setup(ctx *util.Context, os, profile string) error {
 	switch os {
 	case "darwin":
 		switch profile {
+		case "syncbase":
+			return setupSyncbaseDarwin(ctx)
 		case "third-party":
 			return setupThirdPartyDarwin(ctx)
 		case "web":
@@ -1153,6 +1155,15 @@ codegoogle.password=YOUR_GOOGLECODE_PASSWORD
 
 // setupSyncbaseLinux sets up the syncbase profile for linux.
 func setupSyncbaseLinux(ctx *util.Context) (e error) {
+	return setupSyncbaseHelper(ctx)
+}
+
+// setupSyncbaseDarwin sets up the syncbase profile for darwin.
+func setupSyncbaseDarwin(ctx *util.Context) (e error) {
+	return setupSyncbaseHelper(ctx)
+}
+
+func setupSyncbaseHelper(ctx *util.Context) (e error) {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
