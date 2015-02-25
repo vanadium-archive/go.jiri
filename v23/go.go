@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"v.io/lib/cmdline"
 	"v.io/tools/lib/collect"
@@ -85,10 +87,39 @@ func runXGo(command *cmdline.Command, args []string) error {
 	return runGoForPlatform(ctx, platform, command, args[1:])
 }
 
+func setBuildInfoFlags(args []string, platform util.Platform) []string {
+	const buildInfoPackage = "v.io/core/veyron/lib/flags/buildinfo"
+
+	userName := ""
+	if currUser, err := user.Current(); err == nil {
+		userName = currUser.Name
+	}
+
+	settings := []struct {
+		variable, value string
+	}{
+		{"platform", platform.String()},
+		{"username", userName},
+		{"timestamp", time.Now().UTC().Format(time.RFC3339)},
+	}
+	flags := []string{}
+	for _, s := range settings {
+		flags = append(flags, "-X", buildInfoPackage+"."+s.variable, fmt.Sprintf("%q", s.value))
+	}
+	ldflags := "-ldflags=" + strings.Join(flags, " ")
+	return append([]string{args[0], ldflags}, args[1:]...)
+}
+
 func runGoForPlatform(ctx *util.Context, platform util.Platform, command *cmdline.Command, args []string) error {
 	// Generate vdl files, if necessary.
 	switch args[0] {
-	case "build", "generate", "install", "run", "test":
+	case "build", "install":
+		// Provide default ldflags to populate build info metadata in
+		// the binary.  Any manual specification of ldflags already in
+		// the args will override this.
+		args = setBuildInfoFlags(args, platform)
+		fallthrough
+	case "generate", "run", "test":
 		// Check that all non-master branches have merged the
 		// master branch to make sure the vdl tool is not run
 		// against out-of-date code base.
