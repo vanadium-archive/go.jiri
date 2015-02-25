@@ -332,8 +332,10 @@ Usage:
 
 The v23 test run flags are:
  -pkgs=
-   comma-separated list of Go package expressions that identify a subset of
+   Comma-separated list of Go package expressions that identify a subset of
    tests to run; only relevant for Go-based tests
+ -report=false
+   Upload test report to Vanadium servers.
 
 V23 Test List
 
@@ -390,10 +392,10 @@ Usage:
 list of go packages
 
 The v23 test generate flags are:
- -output-prefix=v23
+ -prefix=v23
    Specifies the prefix to use for generated files. Up to two files may
    generated, the defaults are v23_test.go and v23_internal_test.go, or
-   <output-prefix>_test.go and <output-prefix>_internal_test.go.
+   <prefix>_test.go and <prefix>_internal_test.go.
 
 V23 Update
 

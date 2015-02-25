@@ -30,7 +30,8 @@ var (
 	gcFlag                  bool
 	attemptsFlag            int
 	pkgsFlag                string
-	outputFlag              string
+	prefixFlag              string
+	reportFlag              bool
 )
 
 func init() {
@@ -48,11 +49,12 @@ func init() {
 	cmdRoot.Flags.BoolVar(&dryRunFlag, "n", false, "Show what commands will run but do not execute them.")
 	cmdRoot.Flags.BoolVar(&noColorFlag, "nocolor", false, "Do not use color to format output.")
 	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
-	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
+	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
+	cmdTestRun.Flags.BoolVar(&reportFlag, "report", false, "Upload test report to Vanadium servers.")
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
-	cmdV23Generate.Flags.StringVar(&outputFlag, "output-prefix", defaultV23TestOutputPrefix, "Specifies the prefix to use for generated files. Up to two files may generated, the defaults are v23_test.go and v23_internal_test.go, or <output-prefix>_test.go and <output-prefix>_internal_test.go.")
+	cmdV23Generate.Flags.StringVar(&prefixFlag, "prefix", defaultV23TestPrefix, "Specifies the prefix to use for generated files. Up to two files may generated, the defaults are v23_test.go and v23_internal_test.go, or <prefix>_test.go and <prefix>_internal_test.go.")
 	// The "v23 xgo" commands has the same flags as "v23 go".
 	cmdXGo.Flags = cmdGo.Flags
 }

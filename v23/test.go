@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"v.io/lib/cmdline"
 	"v.io/tools/lib/testutil"
@@ -38,7 +39,7 @@ func runTestProject(command *cmdline.Command, args []string) error {
 	}
 	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
 	project := args[0]
-	results, err := testutil.RunProjectTests(ctx, nil, []string{project})
+	results, err := testutil.RunProjectTests(ctx, nil, []string{project}, optsFromFlags()...)
 	if err != nil {
 		return err
 	}
@@ -66,13 +67,7 @@ func runTestRun(command *cmdline.Command, args []string) error {
 		return command.UsageErrorf("unexpected number of arguments")
 	}
 	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
-	pkgs := []string{}
-	for _, pkg := range strings.Split(pkgsFlag, ",") {
-		if len(pkg) > 0 {
-			pkgs = append(pkgs, pkg)
-		}
-	}
-	results, err := testutil.RunTests(ctx, nil, args, testutil.PkgsOpt(pkgs))
+	results, err := testutil.RunTests(ctx, nil, args, optsFromFlags()...)
 	if err != nil {
 		return err
 	}
@@ -83,6 +78,21 @@ func runTestRun(command *cmdline.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+func optsFromFlags() (opts []testutil.TestOpt) {
+	if reportFlag {
+		opt := testutil.PrefixOpt(time.Now().Format(time.RFC3339))
+		opts = append(opts, opt)
+	}
+	pkgs := []string{}
+	for _, pkg := range strings.Split(pkgsFlag, ",") {
+		if len(pkg) > 0 {
+			pkgs = append(pkgs, pkg)
+		}
+	}
+	opts = append(opts, testutil.PkgsOpt(pkgs))
+	return
 }
 
 func printSummary(ctx *util.Context, results map[string]*testutil.TestResult) {

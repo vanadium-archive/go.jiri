@@ -70,7 +70,7 @@ Usage: <a> <b>...` + "`" + `, SubProc)
 	ArgsName: "[packages]",
 	ArgsLong: "list of go packages"}
 
-const defaultV23TestOutputPrefix = "v23"
+const defaultV23TestPrefix = "v23"
 
 func runV23Generate(command *cmdline.Command, args []string) error {
 	// TODO(cnicolaou): use http://godoc.org/golang.org/x/tools/go/loader
@@ -103,8 +103,8 @@ func runV23Generate(command *cmdline.Command, args []string) error {
 	hasTestMain := false
 	packageName := ""
 
-	externalFile := outputFlag + "_test.go"
-	internalFile := outputFlag + "_internal_test.go"
+	externalFile := prefixFlag + "_test.go"
+	internalFile := prefixFlag + "_internal_test.go"
 
 	re = regexp.MustCompile(`V23Test(.*)`)
 	fset := token.NewFileSet() // positions are relative to fset
