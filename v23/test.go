@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/testutil"
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/testutil"
+	"v.io/x/devtools/lib/util"
 )
 
 // cmdTest represents the "v23 test" command.

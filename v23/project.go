@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/util"
 )
 
 // cmdProject represents the "v23 project" command.

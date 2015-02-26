@@ -6,8 +6,8 @@ import (
 	"syscall"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/envutil"
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/envutil"
+	"v.io/x/devtools/lib/util"
 )
 
 // translateExitCode translates errors from the "os/exec" package that contain

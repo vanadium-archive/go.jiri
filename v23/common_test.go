@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/util"
 )
 
 func createConfig(t *testing.T, ctx *util.Context, config *util.Config) {

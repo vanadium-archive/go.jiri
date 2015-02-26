@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/util"
 )
 
 // cmdUpdate represents the "v23 update" command.
@@ -38,7 +38,7 @@ manifest uses the following XML schema:
      ...
    </projects>
    <tools>
-     <tool name="v23" package="v.io/tools/v23"/>
+     <tool name="v23" package="v.io/x/devtools/v23"/>
      ...
    </tools>
  </manifest>

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/util"
 )
 
 // TestGoVanadiumEnvironment checks that the implementation of the
@@ -236,10 +236,10 @@ func TestComputeGoDeps(t *testing.T) {
 		// This is checking the actual dependencies of the specified packages, so it
 		// may break if we change the implementation; we try to pick dependencies
 		// that are likely to remain in these packages.
-		{nil, []string{"v.io/tools/v23", "fmt"}},
-		{[]string{"."}, []string{"v.io/tools/v23", "fmt"}},
-		{[]string{"v.io/tools/v23"}, []string{"v.io/tools/v23", "fmt"}},
-		{[]string{"v.io/tools/v23/..."}, []string{"v.io/tools/v23", "fmt"}},
+		{nil, []string{"v.io/x/devtools/v23", "fmt"}},
+		{[]string{"."}, []string{"v.io/x/devtools/v23", "fmt"}},
+		{[]string{"v.io/x/devtools/v23"}, []string{"v.io/x/devtools/v23", "fmt"}},
+		{[]string{"v.io/x/devtools/v23/..."}, []string{"v.io/x/devtools/v23", "fmt"}},
 	}
 	for _, test := range tests {
 		t.Logf("%v\n", test.Pkgs)

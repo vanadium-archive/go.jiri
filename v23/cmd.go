@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/collect"
-	"v.io/tools/lib/gitutil"
-	"v.io/tools/lib/util"
-	"v.io/tools/lib/version"
+	"v.io/x/devtools/lib/collect"
+	"v.io/x/devtools/lib/gitutil"
+	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/lib/version"
 )
 
 var (

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/util"
+	"v.io/x/devtools/lib/util"
 )
 
 // cmdBuildCop represents the "v23 buildcop" command.

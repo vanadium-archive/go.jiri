@@ -5,7 +5,7 @@
 		],
 		"outgoing": [
 			{"allow": "v.io/lib/..."},
-			{"allow": "v.io/tools/lib/..."},
+			{"allow": "v.io/x/devtools/lib/..."},
 			{"deny": "..."}
 		]
 	}

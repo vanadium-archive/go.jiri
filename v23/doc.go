@@ -422,7 +422,7 @@ XML schema:
      ...
    </projects>
    <tools>
-     <tool name="v23" package="v.io/tools/v23"/>
+     <tool name="v23" package="v.io/x/devtools/v23"/>
      ...
    </tools>
  </manifest>

@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"v.io/lib/cmdline"
-	"v.io/tools/lib/collect"
+	"v.io/x/devtools/lib/collect"
 )
 
 var cmdV23Generate = &cmdline.Command{
