@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"v.io/lib/cmdline"
 	"v.io/x/devtools/lib/util"
+	"v.io/x/lib/cmdline"
 )
 
 // cmdUpdate represents the "v23 update" command.

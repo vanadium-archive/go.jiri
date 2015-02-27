@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"v.io/lib/cmdline"
 	"v.io/x/devtools/lib/util"
+	"v.io/x/lib/cmdline"
 )
 
 // cmdProject represents the "v23 project" command.

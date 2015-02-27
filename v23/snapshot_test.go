@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/lib/cmdline"
 	"v.io/x/devtools/lib/util"
+	"v.io/x/lib/cmdline"
 )
 
 func createLabelDir(t *testing.T, ctx *util.Context, snapshotDir, name string, snapshots []string) {

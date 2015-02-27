@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"v.io/lib/cmdline"
 	"v.io/x/devtools/lib/collect"
 	"v.io/x/devtools/lib/envutil"
 	"v.io/x/devtools/lib/util"
+	"v.io/x/lib/cmdline"
 )
 
 // cmdGo represents the "v23 go" command.

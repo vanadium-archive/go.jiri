@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 
-	"v.io/lib/cmdline"
 	"v.io/x/devtools/lib/collect"
+	"v.io/x/lib/cmdline"
 )
 
 var cmdV23Generate = &cmdline.Command{
