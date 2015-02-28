@@ -88,7 +88,7 @@ func runXGo(command *cmdline.Command, args []string) error {
 }
 
 func setBuildInfoFlags(args []string, platform util.Platform) []string {
-	const buildInfoPackage = "v.io/core/veyron/lib/flags/buildinfo"
+	const buildInfoPackage = "v.io/x/ref/lib/flags/buildinfo"
 
 	userName := ""
 	if currUser, err := user.Current(); err == nil {

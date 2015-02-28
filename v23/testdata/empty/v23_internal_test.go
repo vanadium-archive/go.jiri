@@ -9,7 +9,7 @@ package empty
 import "testing"
 import "os"
 
-import "v.io/core/veyron/lib/testutil"
+import "v.io/x/ref/lib/testutil"
 
 func TestMain(m *testing.M) {
 	testutil.Init()

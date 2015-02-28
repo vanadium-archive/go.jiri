@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"v.io/core/veyron/lib/expect"
-	"v.io/core/veyron/lib/modules"
-	"v.io/core/veyron/lib/testutil/v23tests"
-	_ "v.io/core/veyron/profiles"
+	"v.io/x/ref/lib/expect"
+	"v.io/x/ref/lib/modules"
+	"v.io/x/ref/lib/testutil/v23tests"
+	_ "v.io/x/ref/profiles"
 )
 
 func TestV23TestMain(t *testing.T) {}

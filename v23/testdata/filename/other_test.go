@@ -8,7 +8,7 @@ package filename_test
 
 import "testing"
 
-import "v.io/core/veyron/lib/testutil/v23tests"
+import "v.io/x/ref/lib/testutil/v23tests"
 
 func TestV23Filename(t *testing.T) {
 	v23tests.RunTest(t, V23TestFilename)

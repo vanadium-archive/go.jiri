@@ -6,7 +6,7 @@
 // DO NOT UPDATE MANUALLY
 package has_main_test
 
-import "v.io/core/veyron/lib/modules"
+import "v.io/x/ref/lib/modules"
 
 func init() {
 	modules.RegisterChild("moduleHasMainExt", `Oh..`, moduleHasMainExt)

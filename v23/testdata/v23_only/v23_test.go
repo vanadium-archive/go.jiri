@@ -9,8 +9,8 @@ package v23_only_test
 import "testing"
 import "os"
 
-import "v.io/core/veyron/lib/testutil"
-import "v.io/core/veyron/lib/testutil/v23tests"
+import "v.io/x/ref/lib/testutil"
+import "v.io/x/ref/lib/testutil/v23tests"
 
 func TestMain(m *testing.M) {
 	testutil.Init()

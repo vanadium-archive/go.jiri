@@ -302,13 +302,13 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, hasV2
 	}
 
 	if hasModules {
-		fmt.Fprintln(out, `import "v.io/core/veyron/lib/modules"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/lib/modules"`)
 	}
 
 	if needsTestMain {
-		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil"`)
 		if hasV23Tests {
-			fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil/v23tests"`)
+			fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil/v23tests"`)
 		}
 	}
 
@@ -363,15 +363,15 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	}
 
 	if hasModules {
-		fmt.Fprintln(out, `import "v.io/core/veyron/lib/modules"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/lib/modules"`)
 	}
 
 	if needsTestMain {
-		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil"`)
 	}
 
 	if hasV23Tests {
-		fmt.Fprintln(out, `import "v.io/core/veyron/lib/testutil/v23tests"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil/v23tests"`)
 	}
 
 	if hasModules {

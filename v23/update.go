@@ -31,8 +31,8 @@ manifest uses the following XML schema:
      ...
    </imports>
    <projects>
-     <project name="https://vanadium.googlesource.com/vanadium.go.core"
-              path="release/go/src/v.io/core"
+     <project name="https://vanadium.googlesource.com/release.go.v23"
+              path="release/go/src/v.io/v23"
               protocol="git"
               revision="HEAD"/>
      ...
