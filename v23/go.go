@@ -366,7 +366,7 @@ func computeGoDeps(ctx *util.Context, env *envutil.Snapshot, pkgs []string) ([]s
 	opts.Stderr = &stderr
 	opts.Env = env.Map()
 	if err := ctx.Run().CommandWithOpts(opts, hostGoFlag, goListArgs...); err != nil {
-		return nil, fmt.Errorf("failed to compute go deps: %v\n%s", err, stderr.String())
+		return nil, fmt.Errorf("failed to compute go deps: %v\n%s\n%v", err, stderr.String(), pkgs)
 	}
 	scanner := bufio.NewScanner(&stdout)
 	scanner.Split(bufio.ScanWords)
