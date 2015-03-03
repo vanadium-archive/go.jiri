@@ -25,6 +25,11 @@ func TestTestProject(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	oldWorkspace := os.Getenv("WORKSPACE")
+	if err := os.Setenv("WORKSPACE", rootDir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("WORKSPACE", oldWorkspace)
 
 	config := util.NewConfig(util.ProjectTestsOpt(map[string][]string{"https://test-project": []string{"ignore-this"}}))
 	createConfig(t, ctx, config)
@@ -61,6 +66,11 @@ func TestTestRun(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	oldWorkspace := os.Getenv("WORKSPACE")
+	if err := os.Setenv("WORKSPACE", rootDir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("WORKSPACE", oldWorkspace)
 
 	// Check that running the test generates the expected output.
 	var out bytes.Buffer
