@@ -271,7 +271,7 @@ Usage:
 <test ...> is a list of tests that determine what projects to poll.
 
 The v23 project poll flags are:
- -manifest=default
+ -manifest=
    Name of the project manifest.
 
 V23 Run
@@ -508,7 +508,7 @@ The v23 update flags are:
    Number of attempts before failing.
  -gc=false
    Garbage collect obsolete repositories.
- -manifest=default
+ -manifest=
    Name of the project manifest.
 
 V23 Version

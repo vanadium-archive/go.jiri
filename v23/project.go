@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	cmdProjectPoll.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
+	cmdProjectPoll.Flags.StringVar(&manifestFlag, "manifest", "", "Name of the project manifest.")
 	cmdProjectList.Flags.BoolVar(&branchesFlag, "branches", false, "Show project branches.")
 	cmdProjectList.Flags.BoolVar(&noPristineFlag, "nopristine", false, "If true, omit pristine projects, i.e. projects with a clean master branch and no other branches.")
 	cmdProjectShellPrompt.Flags.BoolVar(&checkDirtyFlag, "check_dirty", true, "If false, don't check for uncommitted changes or untracked files. Setting this option to false is dangerous: dirty master branches will not appear in the output.")

@@ -16,7 +16,7 @@ var (
 
 func init() {
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
-	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
+	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "", "Name of the project manifest.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 }
 
