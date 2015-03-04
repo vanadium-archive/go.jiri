@@ -15,6 +15,14 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+var (
+	remoteFlag bool
+)
+
+func init() {
+	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
+}
+
 var cmdSnapshot = &cmdline.Command{
 	Name:  "snapshot",
 	Short: "Manage snapshots of the vanadium project",

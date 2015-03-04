@@ -17,6 +17,18 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+var (
+	hostGoFlag   string
+	targetGoFlag string
+)
+
+func init() {
+	cmdGo.Flags.StringVar(&hostGoFlag, "host_go", "go", "Go command for the host platform.")
+	cmdGo.Flags.StringVar(&targetGoFlag, "target_go", "go", "Go command for the target platform.")
+	// The "v23 xgo" commands has the same flags as "v23 go".
+	cmdXGo.Flags = cmdGo.Flags
+}
+
 // cmdGo represents the "v23 go" command.
 var cmdGo = &cmdline.Command{
 	Run:   runGo,

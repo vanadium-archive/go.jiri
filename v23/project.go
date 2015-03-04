@@ -14,6 +14,21 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+var (
+	branchesFlag   bool
+	noPristineFlag bool
+	checkDirtyFlag bool
+	showNameFlag   bool
+)
+
+func init() {
+	cmdProjectPoll.Flags.StringVar(&manifestFlag, "manifest", "default", "Name of the project manifest.")
+	cmdProjectList.Flags.BoolVar(&branchesFlag, "branches", false, "Show project branches.")
+	cmdProjectList.Flags.BoolVar(&noPristineFlag, "nopristine", false, "If true, omit pristine projects, i.e. projects with a clean master branch and no other branches.")
+	cmdProjectShellPrompt.Flags.BoolVar(&checkDirtyFlag, "check_dirty", true, "If false, don't check for uncommitted changes or untracked files. Setting this option to false is dangerous: dirty master branches will not appear in the output.")
+	cmdProjectShellPrompt.Flags.BoolVar(&showNameFlag, "show_name", false, "Show the name of the current repo.")
+}
+
 // cmdProject represents the "v23 project" command.
 var cmdProject = &cmdline.Command{
 	Name:     "project",
@@ -191,7 +206,7 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 		short := rs.currentBranch + status
 		long := filepath.Base(name) + ":" + short
 		if name == currentProjectName {
-			if showCurrentRepoNameFlag {
+			if showNameFlag {
 				statuses = append([]string{long}, statuses...)
 			} else {
 				statuses = append([]string{short}, statuses...)

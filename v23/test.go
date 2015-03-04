@@ -10,12 +10,22 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+var (
+	pkgsFlag   string
+	reportFlag bool
+)
+
+func init() {
+	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
+	cmdTestRun.Flags.BoolVar(&reportFlag, "report", false, "Upload test report to Vanadium servers.")
+}
+
 // cmdTest represents the "v23 test" command.
 var cmdTest = &cmdline.Command{
 	Name:     "test",
 	Short:    "Manage vanadium tests",
 	Long:     "Manage vanadium tests.",
-	Children: []*cmdline.Command{cmdTestProject, cmdTestRun, cmdTestList, cmdV23Generate},
+	Children: []*cmdline.Command{cmdTestGenerate, cmdTestProject, cmdTestRun, cmdTestList},
 }
 
 // cmdTestProject represents the "v23 test project" command.
