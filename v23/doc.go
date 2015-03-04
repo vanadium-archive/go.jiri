@@ -9,6 +9,7 @@ Usage:
 
 The v23 commands are:
    buildcop     Manage vanadium build cop schedule
+   cl           Manage vanadium changelists
    contributors List vanadium project contributors
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
@@ -51,6 +52,63 @@ List available build cop schedule.
 
 Usage:
    v23 buildcop list
+
+V23 Cl
+
+Manage vanadium changelists.
+
+Usage:
+   v23 cl <command>
+
+The v23 cl commands are:
+   cleanup     Clean up branches that have been merged
+   mail        Mail a changelist based on the current branch to Gerrit for
+               review
+
+V23 Cl Cleanup
+
+The cleanup command checks that the given branches have been merged into the
+master branch. If a branch differs from the master, it reports the difference
+and stops. Otherwise, it deletes the branch.
+
+Usage:
+   v23 cl cleanup [flags] <branches>
+
+<branches> is a list of branches to cleanup.
+
+The v23 cl cleanup flags are:
+ -f=false
+   Ignore unmerged changes.
+
+V23 Cl Mail
+
+Squashes all commits of a local branch into a single "changelist" and mails this
+changelist to Gerrit as a single commit. First time the command is invoked, it
+generates a Change-Id for the changelist, which is appended to the commit
+message. Consecutive invocations of the command use the same Change-Id by
+default, informing Gerrit that the incomming commit is an update of an existing
+changelist.
+
+Usage:
+   v23 cl mail [flags]
+
+The v23 cl mail flags are:
+ -cc=
+   Comma-seperated list of emails or LDAPs to cc.
+ -check_depcop=true
+   Check that no go-depcop violations exist.
+ -check_gofmt=true
+   Check that no go fmt violations exist.
+ -check_uncommitted=true
+   Check that no uncommitted changes exist.
+ -d=false
+   Send a draft changelist.
+ -edit=true
+   Open an editor to edit the commit message.
+ -presubmit=all
+   The type of presubmit tests to run. Valid values: none,all.
+ -r=
+   Comma-seperated list of emails or LDAPs to request review.
 
 V23 Contributors
 
@@ -162,16 +220,12 @@ V23 Project
 Manage the vanadium projects.
 
 Usage:
-   v23 project [flags] <command>
+   v23 project <command>
 
 The v23 project commands are:
    list         List existing vanadium projects and branches
    shell-prompt Print a succinct status of projects, suitable for shell prompts
    poll         Poll existing vanadium projects
-
-The v23 project flags are:
- -manifest=default
-   Name of the project manifest.
 
 V23 Project List
 
@@ -202,7 +256,7 @@ The v23 project shell-prompt flags are:
    If false, don't check for uncommitted changes or untracked files. Setting
    this option to false is dangerous: dirty master branches will not appear in
    the output.
- -show_current_repo_name=false
+ -show_name=false
    Show the name of the current repo.
 
 V23 Project Poll
@@ -212,9 +266,13 @@ whether any new changes in these projects exist. If no tests are specified, all
 projects are polled by default.
 
 Usage:
-   v23 project poll <test ...>
+   v23 project poll [flags] <test ...>
 
 <test ...> is a list of tests that determine what projects to poll.
+
+The v23 project poll flags are:
+ -manifest=default
+   Name of the project manifest.
 
 V23 Run
 
@@ -304,45 +362,10 @@ Usage:
    v23 test <command>
 
 The v23 test commands are:
+   generate    Generates supporting code for v23 integration tests.
    project     Run tests for a vanadium project
    run         Run vanadium tests
    list        List vanadium tests
-   generate    Generates supporting code for v23 integration tests.
-
-V23 Test Project
-
-Runs tests for a vanadium project that is by the remote URL specified as the
-command-line argument. Projects hosted on googlesource.com, can be specified
-using the basename of the URL (e.g. "vanadium.go.core" implies
-"https://vanadium.googlesource.com/vanadium.go.core").
-
-Usage:
-   v23 test project <project>
-
-<project> identifies the project for which to run tests.
-
-V23 Test Run
-
-Run vanadium tests.
-
-Usage:
-   v23 test run [flags] <name...>
-
-<name...> is a list names identifying the tests to run.
-
-The v23 test run flags are:
- -pkgs=
-   Comma-separated list of Go package expressions that identify a subset of
-   tests to run; only relevant for Go-based tests
- -report=false
-   Upload test report to Vanadium servers.
-
-V23 Test List
-
-List vanadium tests.
-
-Usage:
-   v23 test list
 
 V23 Test Generate
 
@@ -396,6 +419,41 @@ The v23 test generate flags are:
    Specifies the prefix to use for generated files. Up to two files may
    generated, the defaults are v23_test.go and v23_internal_test.go, or
    <prefix>_test.go and <prefix>_internal_test.go.
+
+V23 Test Project
+
+Runs tests for a vanadium project that is by the remote URL specified as the
+command-line argument. Projects hosted on googlesource.com, can be specified
+using the basename of the URL (e.g. "vanadium.go.core" implies
+"https://vanadium.googlesource.com/vanadium.go.core").
+
+Usage:
+   v23 test project <project>
+
+<project> identifies the project for which to run tests.
+
+V23 Test Run
+
+Run vanadium tests.
+
+Usage:
+   v23 test run [flags] <name...>
+
+<name...> is a list names identifying the tests to run.
+
+The v23 test run flags are:
+ -pkgs=
+   Comma-separated list of Go package expressions that identify a subset of
+   tests to run; only relevant for Go-based tests
+ -report=false
+   Upload test report to Vanadium servers.
+
+V23 Test List
+
+List vanadium tests.
+
+Usage:
+   v23 test list
 
 V23 Update
 

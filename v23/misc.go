@@ -10,6 +10,14 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+var (
+	platformFlag string
+)
+
+func init() {
+	cmdEnv.Flags.StringVar(&platformFlag, "platform", "", "Target platform.")
+}
+
 // translateExitCode translates errors from the "os/exec" package that contain
 // exit codes into cmdline.ErrExitCode errors.
 func translateExitCode(err error) error {

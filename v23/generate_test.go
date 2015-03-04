@@ -105,7 +105,7 @@ func TestV23Generate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmdV23Generate.Init(nil, os.Stdout, os.Stderr)
+	cmdTestGenerate.Init(nil, os.Stdout, os.Stderr)
 	for _, c := range cases {
 		if err := os.Chdir(c.dir); err != nil {
 			t.Fatal(err)
@@ -115,7 +115,7 @@ func TestV23Generate(t *testing.T) {
 		if len(output) == 0 {
 			output = "v23"
 		}
-		if err := cmdV23Generate.Execute([]string{"--prefix=" + output}); err != nil {
+		if err := cmdTestGenerate.Execute([]string{"--prefix=" + output}); err != nil {
 			t.Fatal(err)
 		}
 		// parseFile returns nil if the file doesn't exist, which must

@@ -15,8 +15,16 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-var cmdV23Generate = &cmdline.Command{
-	Run:   runV23Generate,
+var (
+	prefixFlag string
+)
+
+func init() {
+	cmdTestGenerate.Flags.StringVar(&prefixFlag, "prefix", defaultV23TestPrefix, "Specifies the prefix to use for generated files. Up to two files may generated, the defaults are v23_test.go and v23_internal_test.go, or <prefix>_test.go and <prefix>_internal_test.go.")
+}
+
+var cmdTestGenerate = &cmdline.Command{
+	Run:   runTestGenerate,
 	Name:  "generate",
 	Short: "Generates supporting code for v23 integration tests.",
 	Long: `
@@ -72,7 +80,7 @@ Usage: <a> <b>...` + "`" + `, SubProc)
 
 const defaultV23TestPrefix = "v23"
 
-func runV23Generate(command *cmdline.Command, args []string) error {
+func runTestGenerate(command *cmdline.Command, args []string) error {
 	// TODO(cnicolaou): use http://godoc.org/golang.org/x/tools/go/loader
 	// to replace accessing the AST directly. In the meantime make sure
 	// the command line API is consistent with that change.
