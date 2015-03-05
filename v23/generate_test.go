@@ -4,14 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
+
+	"v.io/x/devtools/lib/util"
 )
 
 func fnNames(decls []ast.Decl) []string {
@@ -34,38 +38,91 @@ func parseFile(t *testing.T, file string) []string {
 	return fnNames(f.Decls)
 }
 
+func TestMain(m *testing.M) {
+	env, err := util.VanadiumEnvironment(util.HostPlatform())
+	if err != nil {
+		panic(err)
+	}
+	build.Default.GOPATH = env.Get("GOPATH")
+	os.Exit(m.Run())
+}
+
+func importPackage(t *testing.T, path string) *build.Package {
+	bpkg, err := build.Import(path, ".", build.ImportMode(build.ImportComment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bpkg
+}
+
+func cmpImports(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i, g := range got {
+		if g != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestV23Generate(t *testing.T) {
+	sysImports := []string{"fmt", "io", "os", "testing", "time"}
+	modulesImports := []string{"v.io/x/ref/lib/expect", "v.io/x/ref/lib/modules"}
+	vioImports := []string{"v.io/x/ref/lib/testutil", "v.io/x/ref/profiles"}
+	v23Imports := []string{"v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/v23tests", "v.io/x/ref/profiles"}
+
+	common := append(sysImports, modulesImports...)
+	usesModules := append([]string{}, common...)
+	usesModules = append(usesModules, vioImports...)
+	usesModulesAndV23Tests := append([]string{}, common...)
+	usesModulesAndV23Tests = append(usesModulesAndV23Tests, v23Imports...)
+	usesModulesAndV23TestsNoProfile := append([]string{}, common...)
+	usesModulesAndV23TestsNoProfile = append(usesModulesAndV23TestsNoProfile, "v.io/x/ref/lib/testutil/v23tests")
+	testdata := "v.io/x/devtools/v23/testdata/"
+	middle := testdata + "transitive/middle"
+
 	cases := []struct {
-		dir, output        string
-		internal, external []string
-		testOutput         []string
+		dir, output                      string
+		internal, external               []string
+		testOutput                       []string
+		internalImports, externalImports []string
 	}{
 		// an empty package.
-		{"testdata/empty", "",
+		{"empty", "",
 			[]string{"TestMain"},
 			nil,
 			nil,
+			[]string{"os", "testing", "v.io/x/ref/lib/testutil"},
+			nil,
 		},
 		// has a TestMain and a single module, hence the init function.
-		{"testdata/has_main", "",
+		{"has_main", "",
 			nil,
 			[]string{"init"},
 			[]string{"TestHasMain"},
+			nil,
+			usesModules,
 		},
 		// has internal tests only
-		{"testdata/internal_only", "",
+		{"internal_only", "",
 			[]string{"TestMain", "init"},
 			nil,
 			[]string{"TestModulesInternalOnly"},
+			usesModules,
+			nil,
 		},
 		// has external modules only
-		{"testdata/external_only", "",
+		{"external_only", "",
 			nil,
 			[]string{"TestMain", "init"},
 			[]string{"TestExternalOnly"},
+			nil,
+			usesModules,
 		},
 		// has V23 tests and internal+external modules
-		{"testdata/one", "",
+		{"one", "",
 			[]string{"TestMain", "init"},
 			[]string{"TestV23OneA", "TestV23OneB", "init"},
 			[]string{
@@ -74,30 +131,62 @@ func TestV23Generate(t *testing.T) {
 				"TestV23OneA",
 				"TestV23OneB",
 				"TestV23TestMain"},
+			usesModulesAndV23Tests,
+			usesModulesAndV23TestsNoProfile,
 		},
 		// test the -output flag.
-		{"testdata/filename", "other",
+		{"filename", "other",
 			[]string{"TestMain", "init"},
 			[]string{"TestV23Filename"},
 			[]string{"TestInternalFilename", "TestV23Filename"},
+			append(append([]string{}, common...), "v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/v23tests"),
+			[]string{"testing", "v.io/x/ref/lib/testutil/v23tests", "v.io/x/ref/profiles"},
 		},
-		{"testdata/modules_and_v23", "",
+		{"modules_and_v23", "",
 			[]string{"TestMain", "init"},
 			[]string{"TestV23ModulesAndV23A", "TestV23ModulesAndV23B", "init"},
 			[]string{"TestModulesAndV23Ext",
 				"TestModulesAndV23Int",
 				"TestV23ModulesAndV23A",
 				"TestV23ModulesAndV23B"},
+			usesModulesAndV23Tests,
+			usesModulesAndV23TestsNoProfile,
 		},
-		{"testdata/modules_only", "",
+		{"modules_only", "",
 			[]string{"TestMain", "init"},
 			[]string{"init"},
 			[]string{"TestModulesOnlyExt", "TestModulesOnlyInt"},
+			usesModules,
+			append(append([]string{}, common...), "v.io/x/ref/profiles"),
 		},
-		{"testdata/v23_only", "",
+		{"v23_only", "",
 			nil,
 			[]string{"TestMain", "TestV23V23OnlyA", "TestV23V23OnlyB"},
 			[]string{"TestV23V23OnlyA", "TestV23V23OnlyB"},
+			nil,
+			append(append([]string{}, "os", "testing"), v23Imports...),
+		},
+		{"transitive", "",
+			[]string{"TestMain"},
+			nil,
+			[]string{"TestModulesInternalOnly"},
+			append(append(append([]string{}, "fmt", "os", "testing", "time", middle), modulesImports...), vioImports...),
+			nil,
+		},
+		{"transitive_no_use", "",
+			[]string{"TestMain"},
+			nil,
+			[]string{"TestWithoutModules"},
+			append(append([]string{}, "os", "testing", middle), vioImports...),
+			nil,
+		},
+		{"transitive_external", "",
+			nil,
+			[]string{"TestMain", "TestV23OneA"},
+			[]string{"TestModulesExternal", "TestV23OneA"},
+			[]string{
+				"os", "testing", "time", middle, "v.io/x/ref/lib/expect", "v.io/x/ref/lib/modules", "v.io/x/ref/profiles"},
+			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/lib/modules"}, v23Imports...),
 		},
 	}
 
@@ -107,10 +196,11 @@ func TestV23Generate(t *testing.T) {
 	}
 	cmdTestGenerate.Init(nil, os.Stdout, os.Stderr)
 	for _, c := range cases {
-		if err := os.Chdir(c.dir); err != nil {
+		dir := filepath.Join("testdata", c.dir)
+		if err := os.Chdir(dir); err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("test: %v", c.dir)
+		t.Logf("test: %v", dir)
 		output := c.output
 		if len(output) == 0 {
 			output = "v23"
@@ -121,10 +211,10 @@ func TestV23Generate(t *testing.T) {
 		// parseFile returns nil if the file doesn't exist, which must
 		// be matched by nil in the internal/external fields in the cases.
 		if got, want := parseFile(t, output+"_internal_test.go"), c.internal; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%s: got: %v, want: %#v", c.dir, got, want)
+			t.Fatalf("%s: got: %v, want: %#v", dir, got, want)
 		}
 		if got, want := parseFile(t, output+"_test.go"), c.external; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%s: got: %v, want: %#v", c.dir, got, want)
+			t.Fatalf("%s: got: %v, want: %#v", dir, got, want)
 		}
 
 		testCmd := *cmdGo
@@ -132,7 +222,7 @@ func TestV23Generate(t *testing.T) {
 		testCmd.Init(nil, &stdout, &stderr)
 		if err := runGo(&testCmd, []string{"test", "-v", "--v23.tests"}); err != nil {
 			t.Log(stderr.String())
-			t.Fatalf("%s: %v", c.dir, err)
+			t.Fatalf("%s: %v", dir, err)
 		}
 
 		scanner := bufio.NewScanner(&stdout)
@@ -150,7 +240,7 @@ func TestV23Generate(t *testing.T) {
 		// ok v.io.... <time>
 
 		if got, want := len(lines), (len(c.testOutput)*2)+2; got != want {
-			t.Fatalf("%s: got %v, want %v", c.dir, got, want)
+			t.Fatalf("%s: got %v, want %v", dir, got, want)
 		}
 
 		l := 0
@@ -158,27 +248,33 @@ func TestV23Generate(t *testing.T) {
 			for _, fn := range c.testOutput {
 				got, want := lines[l], prefix+fn
 				if !strings.HasPrefix(got, want) {
-					t.Fatalf("%s: expected %q to start with %q", c.dir, got, want)
+					t.Fatalf("%s: expected %q to start with %q", dir, got, want)
 				}
 				l++
 			}
 		}
 		if got, want := lines[l], "PASS"; got != want {
-			t.Fatalf("%s: got %v, want %v", c.dir, got, want)
+			t.Fatalf("%s: got %v, want %v", dir, got, want)
 		}
 		l++
 		got := lines[l]
 		if !strings.HasPrefix(got, "ok") {
-			t.Fatalf("%s: line %q doesn't start with \"ok\"", c.dir, got)
+			t.Fatalf("%s: line %q doesn't start with \"ok\"", dir, got)
 		}
 
-		if !strings.Contains(got, c.dir) {
-			t.Fatalf("%s: line %q doesn't contain %q", c.dir, c.dir)
+		if !strings.Contains(got, dir) {
+			t.Fatalf("%s: line %q doesn't contain %q", dir, dir)
 		}
 
+		bpkg := importPackage(t, "v.io/x/devtools/v23/testdata/"+c.dir)
+		if got, want := bpkg.TestImports, c.internalImports; !cmpImports(got, want) {
+			t.Fatalf("got %v, want %v,", got, want)
+		}
+		if got, want := bpkg.XTestImports, c.externalImports; !cmpImports(got, want) {
+			t.Fatalf("got %v, want %v,", got, want)
+		}
 		if err := os.Chdir(cwd); err != nil {
 			t.Fatal(err)
 		}
 	}
-
 }

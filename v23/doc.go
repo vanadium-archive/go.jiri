@@ -419,6 +419,8 @@ The v23 test generate flags are:
    Specifies the prefix to use for generated files. Up to two files may
    generated, the defaults are v23_test.go and v23_internal_test.go, or
    <prefix>_test.go and <prefix>_internal_test.go.
+ -progress=false
+   Print verbose progress information.
 
 V23 Test Project
 
