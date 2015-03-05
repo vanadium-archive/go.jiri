@@ -3,24 +3,29 @@ package main
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"v.io/x/devtools/lib/collect"
+	"v.io/x/devtools/lib/goutil"
+	"v.io/x/devtools/lib/util"
 	"v.io/x/lib/cmdline"
 )
 
 var (
-	prefixFlag string
+	prefixFlag   string
+	progressFlag bool
 )
 
 func init() {
 	cmdTestGenerate.Flags.StringVar(&prefixFlag, "prefix", defaultV23TestPrefix, "Specifies the prefix to use for generated files. Up to two files may generated, the defaults are v23_test.go and v23_internal_test.go, or <prefix>_test.go and <prefix>_internal_test.go.")
+	cmdTestGenerate.Flags.BoolVar(&progressFlag, "progress", false, "Print verbose progress information.")
 }
 
 var cmdTestGenerate = &cmdline.Command{
@@ -78,77 +83,85 @@ Usage: <a> <b>...` + "`" + `, SubProc)
 	ArgsName: "[packages]",
 	ArgsLong: "list of go packages"}
 
-const defaultV23TestPrefix = "v23"
+const (
+	defaultV23TestPrefix   = "v23"
+	externalSuffix         = "_test.go"
+	internalSuffix         = "_internal_test.go"
+	traceTransitiveImports = false
+)
+
+func configureBuilder() (cleanup func(), err error) {
+	env, err := util.VanadiumEnvironment(util.HostPlatform())
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain the Vanadium environment: %v", err)
+	}
+	prevGOPATH := build.Default.GOPATH
+	cleanup = func() {
+		build.Default.GOPATH = prevGOPATH
+	}
+	build.Default.GOPATH = env.Get("GOPATH")
+	return cleanup, nil
+}
 
 func runTestGenerate(command *cmdline.Command, args []string) error {
-	// TODO(cnicolaou): use http://godoc.org/golang.org/x/tools/go/loader
-	// to replace accessing the AST directly. In the meantime make sure
-	// the command line API is consistent with that change.
-
-	if len(args) > 1 || (len(args) == 1 && args[0] != ".") {
-		return command.UsageErrorf("unexpected or wrong arguments, currently only . is supported as a package name.")
+	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	packages, err := goutil.List(ctx, args)
+	if err != nil {
+		return command.UsageErrorf("failed to list %s: %s", args, err)
 	}
-	fi, err := ioutil.ReadDir(".")
+
+	cleanup, err := configureBuilder()
 	if err != nil {
 		return err
 	}
-	candidates := []string{}
-	re := regexp.MustCompile(".*_test.go")
-	for _, f := range fi {
-		if f.IsDir() {
-			continue
-		}
-		if re.MatchString(f.Name()) {
-			candidates = append(candidates, f.Name())
-		}
+	defer cleanup()
+
+	if progressFlag {
+		fmt.Fprintf(ctx.Stdout(), "test generate %v expands to %v\n", args, packages)
 	}
 
-	v23Tests := []string{}
+	for _, pkg := range packages {
+		bpkg, err := build.Import(pkg, ".", build.ImportMode(build.ImportComment))
+		if err != nil {
+			return command.UsageErrorf("failed to import %q: err: %s", pkg, err)
+		}
+		if err := generatePackage(ctx, bpkg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	internalModules := []moduleCommand{}
-	externalModules := []moduleCommand{}
-
+// processFiles parses the specified files and returns the following:
+// - a boolean indicating if the package already includes a TestMain
+// - a list of modules command functions defined in these files
+// - a list of the V23tests tests defined in these files
+func processFiles(fset *token.FileSet, dir string, files []string) (bool, []moduleCommand, []string, error) {
+	re := regexp.MustCompile(`V23Test(.*)`)
+	modules := []moduleCommand{}
 	hasTestMain := false
-	packageName := ""
-
-	externalFile := prefixFlag + "_test.go"
-	internalFile := prefixFlag + "_internal_test.go"
-
-	re = regexp.MustCompile(`V23Test(.*)`)
-	fset := token.NewFileSet() // positions are relative to fset
-	for _, file := range candidates {
+	v23Tests := []string{}
+	for _, base := range files {
+		file := filepath.Join(dir, base)
 		// Ignore the files we are generating.
-		if file == externalFile || file == internalFile {
+		if (base == prefixFlag+externalSuffix) || base == (prefixFlag+internalSuffix) {
 			continue
 		}
 		f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
 		if err != nil {
-			return err
-		}
-
-		// An external test package is one named <pkg>_test.
-		isExternal := strings.HasSuffix(f.Name.Name, "_test")
-		if len(packageName) == 0 {
-			packageName = strings.TrimSuffix(f.Name.Name, "_test")
+			return false, nil, nil, fmt.Errorf("error parsing %q: %s", file, err)
 		}
 		for _, d := range f.Decls {
 			fn, ok := d.(*ast.FuncDecl)
 			if !ok {
 				continue
 			}
-
 			// If this function matches the declaration for modules.Main,
 			// keep track of the names and comments associated with
 			// such functions so that we can generate calls to
 			// modules.RegisterChild for them.
 			if n, c := isModulesMain(fn); len(n) > 0 {
-
-				if isExternal {
-					externalModules = append(externalModules, moduleCommand{n, c})
-				} else {
-					internalModules = append(internalModules, moduleCommand{n, c})
-
-				}
+				modules = append(modules, moduleCommand{n, c})
 			}
 
 			// If this function is the testing TestMain then
@@ -156,36 +169,229 @@ func runTestGenerate(command *cmdline.Command, args []string) error {
 			if isTestMain(fn) {
 				hasTestMain = true
 			}
+
 			name := fn.Name.String()
-			if parts := re.FindStringSubmatch(name); isExternal && len(parts) == 2 {
+			if parts := re.FindStringSubmatch(name); len(parts) == 2 {
 				v23Tests = append(v23Tests, parts[1])
 			}
 		}
 	}
+	return hasTestMain, modules, v23Tests, nil
+}
 
-	hasV23Tests := len(v23Tests) > 0
-	needInternalFile := len(internalModules) > 0
-	needExternalFile := len(externalModules) > 0 || hasV23Tests
+// importCache keeps track of which files have been imported and parsed so
+// that we only parse them once, rather than every time an import of them
+// is encountered.
+type importCache map[string]struct{}
 
-	// TestMain is special in that it can only occur once even across
-	// internal and external test packages. If if it doesn't occur
-	// in either, we want to make sure we write it out in the internal
-	// package.
-	if !hasTestMain && !needInternalFile && !needExternalFile {
-		needInternalFile = true
+func (c importCache) transitiveModules(pkg *build.Package, imports []string, fset *token.FileSet) (bool, error) {
+	if _, present := c[pkg.Name]; present {
+		return false, nil
+	}
+	for _, imported := range imports {
+		// ignore cgo imports.
+		if imported == "C" {
+			continue
+		}
+		bpkg, err := build.Import(imported, ".", build.ImportMode(build.ImportComment))
+		if err != nil {
+			return false, fmt.Errorf("Import(%q) failed: %v", imported, err)
+		}
+		if filepath.HasPrefix(bpkg.Dir, build.Default.GOROOT) {
+			continue
+		}
+		if traceTransitiveImports {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", pkg.ImportPath, imported)
+		}
+		for _, base := range bpkg.GoFiles {
+			file := filepath.Join(bpkg.Dir, base)
+			f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
+			if err != nil {
+				return false, fmt.Errorf("ParseFile(%q): failed: %v", file, err)
+			}
+			localModulesName := findModulesLocalName(f.Imports)
+			for _, d := range f.Decls {
+				fn, ok := d.(*ast.FuncDecl)
+				if !ok {
+					continue
+				}
+				if len(localModulesName) > 0 &&
+					hasRegisterChild(fn.Body, localModulesName) {
+					return true, nil
+				}
+			}
+		}
+		if traceTransitiveImports {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", imported, bpkg.Imports)
+		}
+		usesModules, err := c.transitiveModules(bpkg, bpkg.Imports, fset)
+		if err != nil {
+			return false, err
+		}
+		if usesModules {
+			return true, nil
+		}
 	}
 
-	if needInternalFile {
-		if err := writeInternalFile(internalFile, packageName, !hasTestMain, hasV23Tests, internalModules); err != nil {
+	c[pkg.Name] = struct{}{}
+	return false, nil
+}
+
+func importsModules(imports []string) bool {
+	for _, imp := range imports {
+		if imp == "v.io/x/ref/lib/modules" || imp == "v.io/x/ref/lib/testutil/v23tests" {
+			return true
+		}
+	}
+	return false
+}
+
+func generatePackage(ctx *util.Context, pkg *build.Package) error {
+	fset := token.NewFileSet() // positions are relative to fset
+	cache := importCache{}
+	intTestUsesModules := importsModules(pkg.TestImports)
+	intTestMain, intModules, _, err := processFiles(fset, pkg.Dir, pkg.TestGoFiles)
+	if err != nil {
+		return err
+	}
+	extTestUsesModules := importsModules(pkg.XTestImports)
+	extTestMain, extModules, v23Tests, err := processFiles(fset, pkg.Dir, pkg.XTestGoFiles)
+	if err != nil {
+		return err
+	}
+
+	// Don't bother with transitive checks if we don't actually call
+	// modules from this test.
+	intDepsDefineModules, extDepsDefineModules := false, false
+	if intTestUsesModules {
+		// Determine if we transitively import packages that define modules.
+		imports := append([]string{}, pkg.Imports...)
+		imports = append(imports, pkg.TestImports...)
+		intDepsDefineModules, err = cache.transitiveModules(pkg, imports, fset)
+		if err != nil {
 			return err
 		}
-		hasTestMain = true
+	}
+	if extTestUsesModules {
+		// Determine if we transitively import packages that define modules.
+		extDepsDefineModules, err = cache.transitiveModules(pkg, pkg.XTestImports, fset)
+		if err != nil {
+			return err
+		}
 	}
 
-	if needExternalFile {
-		return writeExternalFile(externalFile, packageName, !hasTestMain, externalModules, v23Tests)
+	needsIntTM := !intTestMain || intDepsDefineModules
+	needsExtTM := !extTestMain || extDepsDefineModules
+
+	hasV23Tests := len(v23Tests) > 0
+	needIntFile := len(intModules) > 0
+	needExtFile := len(extModules) > 0 || hasV23Tests
+
+	// TestMain is special in that it can only occur once even across
+	// internal and external test packages. If it doesn't occur
+	// in either, we want to make sure we write it out in the internal
+	// package.
+	if (needsIntTM || needsExtTM) && !needIntFile && !needExtFile {
+		needIntFile = true
+		needsIntTM = true
+		needsExtTM = false
+	}
+
+	extFile := filepath.Join(pkg.Dir, prefixFlag+externalSuffix)
+	intFile := filepath.Join(pkg.Dir, prefixFlag+internalSuffix)
+
+	if progressFlag {
+		fmt.Fprintf(ctx.Stdout(), "Package: %s\n", pkg.ImportPath)
+		if needIntFile {
+			fmt.Fprintf(ctx.Stdout(), "Writing internal test file: %s\n", intFile)
+		}
+		if needExtFile {
+			fmt.Fprintf(ctx.Stdout(), "Writing external test file: %s\n", extFile)
+		}
+		if hasV23Tests {
+			fmt.Fprintf(ctx.Stdout(), "Number of V23Tests: %d\n", len(v23Tests))
+		}
+		if len(intModules) > 0 {
+			fmt.Fprintf(ctx.Stdout(), "Number of internal module commands: %d\n", len(intModules))
+		}
+		if len(extModules) > 0 {
+			fmt.Fprintf(ctx.Stdout(), "Number of external module commands: %d\n", len(extModules))
+		}
+		modulesSummary := func(s string, uses, imports bool) {
+			switch {
+			case uses && imports:
+				fmt.Fprintf(ctx.Stdout(), "%s test uses modules and transitively imports them.\n", s)
+			case uses && !imports:
+				fmt.Fprintf(ctx.Stdout(), "%s test uses modules but does not transitively import them.\n", s)
+			case !uses && imports:
+				fmt.Fprintf(ctx.Stdout(), "%s test does not uses modules but transitively imports them.\n", s)
+			case !uses && !imports:
+				fmt.Fprintf(ctx.Stdout(), "%s test does not use modules and does not transitively imports them.\n", s)
+			}
+		}
+		modulesSummary("Internal", intTestUsesModules, intDepsDefineModules)
+		modulesSummary("External", extTestUsesModules, extDepsDefineModules)
+
+		if !needIntFile && intDepsDefineModules && intTestUsesModules {
+			fmt.Fprintf(ctx.Stdout(), "Internal tests imports and uses modules, but TestMain is being written to an external test file.\n")
+		}
+	}
+
+	if needIntFile {
+		if err := writeInternalFile(intFile, pkg.Name, needsIntTM || needsExtTM, intDepsDefineModules, hasV23Tests, intModules); err != nil {
+			return err
+		}
+		needsExtTM = false
+	}
+
+	if needExtFile {
+		if !needIntFile && intDepsDefineModules && intTestUsesModules {
+			extDepsDefineModules = true
+		}
+		return writeExternalFile(extFile, pkg.Name, needsExtTM, extDepsDefineModules, extModules, v23Tests)
 	}
 	return nil
+}
+
+func findModulesLocalName(imports []*ast.ImportSpec) string {
+	for _, i := range imports {
+		if i.Path.Value == `"v.io/x/ref/lib/modules"` {
+			if i.Name != nil {
+				return i.Name.Name
+			}
+			return "modules"
+		}
+	}
+	return ""
+}
+
+func hasRegisterChild(body *ast.BlockStmt, importName string) bool {
+	if body == nil {
+		return false
+	}
+	for _, l := range body.List {
+		expr, ok := l.(*ast.ExprStmt)
+		if !ok {
+			continue
+		}
+		call, ok := expr.X.(*ast.CallExpr)
+		if !ok {
+			continue
+		}
+		fn, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			continue
+		}
+		method := fn.Sel.Name
+		pkg, ok := fn.X.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if pkg.Name == importName && method == "RegisterChild" {
+			return true
+		}
+	}
+	return false
 }
 
 func isModulesMain(d ast.Decl) (string, string) {
@@ -283,11 +489,12 @@ type moduleCommand struct {
 
 // writeInternalFile writes a generated test file that is inside the package.
 // It cannot contain integration tests.
-func writeInternalFile(fileName string, packageName string, needsTestMain, hasV23Tests bool, modules []moduleCommand) (e error) {
+func writeInternalFile(fileName string, packageName string, needsTestMain, needsModulesDispatch, hasV23Tests bool, modules []moduleCommand) (e error) {
 
 	hasModules := len(modules) > 0
+	needsModulesInTestMain := needsModulesDispatch || hasModules
 
-	if !needsTestMain && !hasModules {
+	if !needsTestMain && !needsModulesInTestMain {
 		return nil
 	}
 
@@ -301,7 +508,7 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, hasV2
 	fmt.Fprintf(out, "package %s\n\n", packageName)
 
 	if needsTestMain {
-		if hasModules {
+		if needsModulesInTestMain {
 			fmt.Fprintln(out, `import "fmt"`)
 		}
 		fmt.Fprintln(out, `import "testing"`)
@@ -309,7 +516,7 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, hasV2
 		fmt.Fprintln(out)
 	}
 
-	if hasModules {
+	if needsModulesInTestMain {
 		fmt.Fprintln(out, `import "v.io/x/ref/lib/modules"`)
 	}
 
@@ -328,7 +535,7 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, hasV2
 	}
 
 	if needsTestMain {
-		writeTestMain(out, hasModules, hasV23Tests)
+		writeTestMain(out, needsModulesInTestMain, hasV23Tests)
 	}
 
 	return nil
@@ -336,11 +543,12 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, hasV2
 
 // writeExternalFile write a generated test file that is outside the package.
 // It can contain intgreation tests.
-func writeExternalFile(fileName string, packageName string, needsTestMain bool, modules []moduleCommand, v23Tests []string) (e error) {
+func writeExternalFile(fileName string, packageName string, needsTestMain, needsModulesDispatch bool, modules []moduleCommand, v23Tests []string) (e error) {
 
 	hasV23Tests := len(v23Tests) > 0
 	hasModules := len(modules) > 0
-	if !needsTestMain && !hasModules && !hasV23Tests {
+	needsModulesInTestMain := needsModulesDispatch || hasModules
+	if !needsTestMain && !needsModulesInTestMain && !hasV23Tests {
 		return nil
 	}
 
@@ -354,7 +562,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	fmt.Fprintf(out, "package %s_test\n\n", packageName)
 
 	trailingLine := false
-	if needsTestMain && hasModules {
+	if needsTestMain && needsModulesInTestMain {
 		fmt.Fprintln(out, `import "fmt"`)
 		trailingLine = true
 	}
@@ -370,7 +578,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 		fmt.Fprintln(out)
 	}
 
-	if hasModules {
+	if needsModulesInTestMain {
 		fmt.Fprintln(out, `import "v.io/x/ref/lib/modules"`)
 	}
 
@@ -390,7 +598,7 @@ func writeExternalFile(fileName string, packageName string, needsTestMain bool, 
 	}
 
 	if needsTestMain {
-		writeTestMain(out, hasModules, hasV23Tests)
+		writeTestMain(out, needsModulesInTestMain, hasV23Tests)
 	}
 
 	// integration test wrappers.
@@ -411,11 +619,11 @@ func writeHeader(out io.Writer) {
 // DO NOT UPDATE MANUALLY`)
 }
 
-func writeTestMain(out io.Writer, hasModules, hasV23Tests bool) {
+func writeTestMain(out io.Writer, needsModulesDispatch, hasV23Tests bool) {
 	switch {
-	case hasModules && hasV23Tests:
+	case needsModulesDispatch && hasV23Tests:
 		writeModulesAndV23TestMain(out)
-	case hasModules:
+	case needsModulesDispatch:
 		writeModulesTestMain(out)
 	case hasV23Tests:
 		writeV23TestMain(out)
