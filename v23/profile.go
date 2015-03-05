@@ -608,37 +608,6 @@ func setupMobileLinux(ctx *util.Context) (e error) {
 		return err
 	}
 
-	// Build and install JNI wrapper library.
-	jniOutDir := filepath.Join(root, "environment", "cout", "jni-wrapper-1.0", "android")
-	installJniFn := func() error {
-		jniSrcDir := filepath.Join(root, "environment", "csrc", "jni-wrapper-1.0")
-		if err := ctx.Run().Chdir(jniSrcDir); err != nil {
-			return err
-		}
-		env := envutil.NewSnapshotFromOS()
-		env.Set("CC", filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-gcc"))
-		if err := run(ctx, "autoreconf", []string{"--install", "--force", "--verbose"}, env.Map()); err != nil {
-			return err
-		}
-		confArgs := []string{fmt.Sprintf("--prefix=%v", jniOutDir), "--host=arm-unknown-linux-gnu"}
-		if err := run(ctx, "./configure", confArgs, env.Map()); err != nil {
-			return err
-		}
-		if err := run(ctx, "make", []string{fmt.Sprintf("-j%d", runtime.NumCPU())}, env.Map()); err != nil {
-			return err
-		}
-		if err := run(ctx, "make", []string{"install"}, env.Map()); err != nil {
-			return err
-		}
-		if err := run(ctx, "make", []string{"distclean"}, env.Map()); err != nil {
-			return err
-		}
-		return nil
-	}
-	if err := atomicAction(ctx, installJniFn, jniOutDir, "Build and install JNI wrapper library"); err != nil {
-		return err
-	}
-
 	return nil
 }
 
