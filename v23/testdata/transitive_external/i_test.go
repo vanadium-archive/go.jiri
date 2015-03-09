@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"v.io/x/ref/lib/expect"
 	"v.io/x/ref/lib/modules"
+	"v.io/x/ref/lib/testutil/expect"
 	_ "v.io/x/ref/profiles"
 
 	"v.io/x/devtools/v23/testdata/transitive/middle"

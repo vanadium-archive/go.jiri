@@ -59,6 +59,8 @@ func cmpImports(got, want []string) bool {
 	if len(got) != len(want) {
 		return false
 	}
+	sort.Strings(got)
+	sort.Strings(want)
 	for i, g := range got {
 		if g != want[i] {
 			return false
@@ -69,7 +71,7 @@ func cmpImports(got, want []string) bool {
 
 func TestV23Generate(t *testing.T) {
 	sysImports := []string{"fmt", "io", "os", "testing", "time"}
-	modulesImports := []string{"v.io/x/ref/lib/expect", "v.io/x/ref/lib/modules"}
+	modulesImports := []string{"v.io/x/ref/lib/testutil/expect", "v.io/x/ref/lib/modules"}
 	vioImports := []string{"v.io/x/ref/lib/testutil", "v.io/x/ref/profiles"}
 	v23Imports := []string{"v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/v23tests", "v.io/x/ref/profiles"}
 
@@ -185,7 +187,7 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestMain", "TestV23OneA"},
 			[]string{"TestModulesExternal", "TestV23OneA"},
 			[]string{
-				"os", "testing", "time", middle, "v.io/x/ref/lib/expect", "v.io/x/ref/lib/modules", "v.io/x/ref/profiles"},
+				"os", "testing", "time", middle, "v.io/x/ref/lib/modules", "v.io/x/ref/lib/testutil/expect", "v.io/x/ref/profiles"},
 			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/lib/modules"}, v23Imports...),
 		},
 	}

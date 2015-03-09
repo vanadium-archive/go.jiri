@@ -188,6 +188,7 @@ func (c importCache) transitiveModules(pkg *build.Package, imports []string, fse
 	if _, present := c[pkg.Name]; present {
 		return false, nil
 	}
+	gorootPrefix := build.Default.GOROOT + string(filepath.Separator)
 	for _, imported := range imports {
 		// ignore cgo imports.
 		if imported == "C" {
@@ -197,7 +198,7 @@ func (c importCache) transitiveModules(pkg *build.Package, imports []string, fse
 		if err != nil {
 			return false, fmt.Errorf("Import(%q) failed: %v", imported, err)
 		}
-		if filepath.HasPrefix(bpkg.Dir, build.Default.GOROOT) {
+		if filepath.HasPrefix(bpkg.Dir, gorootPrefix) {
 			continue
 		}
 		if traceTransitiveImports {
