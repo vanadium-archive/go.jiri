@@ -339,7 +339,7 @@ func generatePackage(ctx *util.Context, pkg *build.Package) error {
 	}
 
 	if needIntFile {
-		if err := writeInternalFile(intFile, pkg.Name, needsIntTM || needsExtTM, intDepsDefineModules, hasV23Tests, intModules); err != nil {
+		if err := writeInternalFile(intFile, pkg.Name, needsIntTM || needsExtTM, intDepsDefineModules || extDepsDefineModules, hasV23Tests, intModules); err != nil {
 			return err
 		}
 		needsExtTM = false
