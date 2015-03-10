@@ -223,9 +223,24 @@ Usage:
    v23 project <command>
 
 The v23 project commands are:
+   clean        Restore vanadium projects to their pristine state
    list         List existing vanadium projects and branches
    shell-prompt Print a succinct status of projects, suitable for shell prompts
    poll         Poll existing vanadium projects
+
+V23 Project Clean
+
+Restore vanadium projects back to their master branches and get rid of all the
+local branches and changes.
+
+Usage:
+   v23 project clean [flags] <project ...>
+
+<project ...> is a list of projects to clean up.
+
+The v23 project clean flags are:
+ -branches=false
+   Delete all non-master branches.
 
 V23 Project List
 

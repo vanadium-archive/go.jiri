@@ -15,13 +15,15 @@ import (
 )
 
 var (
-	branchesFlag   bool
-	noPristineFlag bool
-	checkDirtyFlag bool
-	showNameFlag   bool
+	branchesFlag        bool
+	cleanupBranchesFlag bool
+	noPristineFlag      bool
+	checkDirtyFlag      bool
+	showNameFlag        bool
 )
 
 func init() {
+	cmdProjectClean.Flags.BoolVar(&cleanupBranchesFlag, "branches", false, "Delete all non-master branches.")
 	cmdProjectPoll.Flags.StringVar(&manifestFlag, "manifest", "", "Name of the project manifest.")
 	cmdProjectList.Flags.BoolVar(&branchesFlag, "branches", false, "Show project branches.")
 	cmdProjectList.Flags.BoolVar(&noPristineFlag, "nopristine", false, "If true, omit pristine projects, i.e. projects with a clean master branch and no other branches.")
@@ -34,7 +36,41 @@ var cmdProject = &cmdline.Command{
 	Name:     "project",
 	Short:    "Manage the vanadium projects",
 	Long:     "Manage the vanadium projects.",
-	Children: []*cmdline.Command{cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
+	Children: []*cmdline.Command{cmdProjectClean, cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
+}
+
+// cmdProjectClean represents the "v23 project clean" command.
+var cmdProjectClean = &cmdline.Command{
+	Run:      runProjectClean,
+	Name:     "clean",
+	Short:    "Restore vanadium projects to their pristine state",
+	Long:     "Restore vanadium projects back to their master branches and get rid of all the local branches and changes.",
+	ArgsName: "<project ...>",
+	ArgsLong: "<project ...> is a list of projects to clean up.",
+}
+
+func runProjectClean(command *cmdline.Command, args []string) (e error) {
+	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	localProjects, err := util.LocalProjects(ctx)
+	if err != nil {
+		return err
+	}
+	projects := map[string]util.Project{}
+	if len(args) > 0 {
+		for _, arg := range args {
+			if p, ok := localProjects[arg]; ok {
+				projects[p.Name] = p
+			} else {
+				fmt.Fprintf(ctx.Stderr(), "Local project %q not found.\n", p.Name)
+			}
+		}
+	} else {
+		projects = localProjects
+	}
+	if err := util.CleanupProjects(ctx, projects, cleanupBranchesFlag); err != nil {
+		return err
+	}
+	return nil
 }
 
 // cmdProjectList represents the "v23 project list" command.
