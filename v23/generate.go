@@ -634,7 +634,7 @@ func writeTestMain(out io.Writer, needsModulesDispatch, hasV23Tests bool) {
 }
 
 var modulesSubprocess = `
-	if modules.IsModulesProcess() {
+	if modules.IsModulesChildProcess() {
 		if err := modules.Dispatch(); err != nil {
 			fmt.Fprintf(os.Stderr, "modules.Dispatch failed: %v\n", err)
 			os.Exit(1)
