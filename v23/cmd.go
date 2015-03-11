@@ -43,6 +43,7 @@ var cmdRoot = &cmdline.Command{
 		cmdBuildCop,
 		cmdCL,
 		cmdContributors,
+		cmdCopyright,
 		cmdEnv,
 		cmdGo,
 		cmdGoExt,
