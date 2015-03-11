@@ -11,11 +11,13 @@ import (
 )
 
 var (
+	partFlag   int
 	pkgsFlag   string
 	reportFlag bool
 )
 
 func init() {
+	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")
 	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
 	cmdTestRun.Flags.BoolVar(&reportFlag, "report", false, "Upload test report to Vanadium servers.")
 }
@@ -91,6 +93,10 @@ func runTestRun(command *cmdline.Command, args []string) error {
 }
 
 func optsFromFlags() (opts []testutil.TestOpt) {
+	if partFlag >= 0 {
+		opt := testutil.PartOpt(partFlag)
+		opts = append(opts, opt)
+	}
 	if reportFlag {
 		opt := testutil.PrefixOpt(time.Now().Format(time.RFC3339))
 		opts = append(opts, opt)

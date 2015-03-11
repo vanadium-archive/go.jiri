@@ -459,6 +459,8 @@ Usage:
 <name...> is a list names identifying the tests to run.
 
 The v23 test run flags are:
+ -part=-1
+   Specify which part of the test to run.
  -pkgs=
    Comma-separated list of Go package expressions that identify a subset of
    tests to run; only relevant for Go-based tests
