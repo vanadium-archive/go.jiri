@@ -11,6 +11,7 @@ The v23 commands are:
    buildcop     Manage vanadium build cop schedule
    cl           Manage vanadium changelists
    contributors List vanadium project contributors
+   copyright    Manage vanadium copyright
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
@@ -120,6 +121,42 @@ Usage:
    v23 contributors <projects>
 
 <projects> is a list of projects to consider.
+
+V23 Copyright
+
+This command can be used to check if all source code files of Vanadium projects
+contain the appropriate copyright header and also if all projects contains the
+appropriate licensing files. Optionally, the command can be used to fix the
+appropriate copyright headers and licensing files.
+
+Usage:
+   v23 copyright [flags] <command>
+
+The v23 copyright commands are:
+   check       Check copyright headers and licensing files
+   fix         Fix copyright headers and licensing files
+
+The v23 copyright flags are:
+ -manifest=
+   Name of the project manifest.
+
+V23 Copyright Check
+
+Check copyright headers and licensing files.
+
+Usage:
+   v23 copyright check <projects>
+
+<projects> is a list of projects to check.
+
+V23 Copyright Fix
+
+Fix copyright headers and licensing files.
+
+Usage:
+   v23 copyright fix <projects>
+
+<projects> is a list of projects to fix.
 
 V23 Env
 
