@@ -190,6 +190,14 @@ func TestV23Generate(t *testing.T) {
 				"os", "testing", "time", middle, "v.io/x/ref/lib/modules", "v.io/x/ref/lib/testutil/expect", "v.io/x/ref/profiles"},
 			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/lib/modules"}, v23Imports...),
 		},
+		{"internal_transitive_external", "",
+			[]string{"TestMain"},
+			nil,
+			[]string{"TestInternal", "TestModulesExternal"},
+			[]string{
+				"fmt", "os", "testing", "time", middle, "v.io/x/ref/lib/modules", "v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/expect", "v.io/x/ref/profiles"},
+			[]string{"testing", testdata + "internal_transitive_external", "v.io/x/ref/profiles"},
+		},
 	}
 
 	cwd, err := os.Getwd()

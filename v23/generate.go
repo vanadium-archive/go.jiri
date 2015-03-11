@@ -144,7 +144,7 @@ func processFiles(fset *token.FileSet, dir string, files []string) (bool, []modu
 	for _, base := range files {
 		file := filepath.Join(dir, base)
 		// Ignore the files we are generating.
-		if (base == prefixFlag+externalSuffix) || base == (prefixFlag+internalSuffix) {
+		if base == prefixFlag+externalSuffix || base == prefixFlag+internalSuffix {
 			continue
 		}
 		f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
@@ -185,7 +185,7 @@ func processFiles(fset *token.FileSet, dir string, files []string) (bool, []modu
 type importCache map[string]struct{}
 
 func (c importCache) transitiveModules(pkg *build.Package, imports []string, fset *token.FileSet) (bool, error) {
-	if _, present := c[pkg.Name]; present {
+	if _, present := c[pkg.ImportPath]; present {
 		return false, nil
 	}
 	gorootPrefix := build.Default.GOROOT + string(filepath.Separator)
@@ -234,7 +234,7 @@ func (c importCache) transitiveModules(pkg *build.Package, imports []string, fse
 		}
 	}
 
-	c[pkg.Name] = struct{}{}
+	c[pkg.ImportPath] = struct{}{}
 	return false, nil
 }
 
@@ -273,6 +273,14 @@ func generatePackage(ctx *util.Context, pkg *build.Package) error {
 			return err
 		}
 	}
+
+	// TODO(suharshs): Find a better way to fix this, maybe always generating TestMain
+	// in the internal package could solve this?
+	//
+	// We need to clear the root package from the first transitiveModules call to prevent
+	// the transitiveModules external package call from always returning true.
+	delete(cache, pkg.ImportPath)
+
 	if extTestUsesModules {
 		// Determine if we transitively import packages that define modules.
 		extDepsDefineModules, err = cache.transitiveModules(pkg, pkg.XTestImports, fset)
@@ -281,8 +289,8 @@ func generatePackage(ctx *util.Context, pkg *build.Package) error {
 		}
 	}
 
-	needsIntTM := !intTestMain || intDepsDefineModules
-	needsExtTM := !extTestMain || extDepsDefineModules
+	needsIntTM := !intTestMain
+	needsExtTM := !extTestMain
 
 	hasV23Tests := len(v23Tests) > 0
 	needIntFile := len(intModules) > 0
