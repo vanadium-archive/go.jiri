@@ -5,11 +5,9 @@ import (
 	"io"
 	"os"
 	"testing"
-	"time"
 
-	"v.io/x/ref/lib/modules"
-	"v.io/x/ref/lib/testutil/expect"
-	"v.io/x/ref/lib/testutil/v23tests"
+	"v.io/x/ref/test/modules"
+	"v.io/x/ref/test/v23tests"
 )
 
 func V23TestOneA(i *v23tests.T) {}
@@ -27,7 +25,7 @@ func modulesTwoExt(stdin io.Reader, stdout io.Writer, stderr io.Writer, env map[
 }
 
 func TestModulesOneExt(t *testing.T) {
-	sh, err := modules.NewShell(nil, nil)
+	sh, err := modules.NewExpectShell(nil, nil, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +37,6 @@ func TestModulesOneExt(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		s := expect.NewSession(t, m.Stdout(), time.Minute)
-		s.Expect(cmd)
+		m.Expect(cmd)
 	}
 }

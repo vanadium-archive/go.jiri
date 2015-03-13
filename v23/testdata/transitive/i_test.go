@@ -3,11 +3,9 @@ package transitive
 import (
 	"os"
 	"testing"
-	"time"
 
-	"v.io/x/ref/lib/modules"
-	"v.io/x/ref/lib/testutil/expect"
 	_ "v.io/x/ref/profiles"
+	"v.io/x/ref/test/modules"
 
 	"v.io/x/devtools/v23/testdata/transitive/middle"
 )
@@ -19,7 +17,7 @@ func init() {
 }
 
 func TestModulesInternalOnly(t *testing.T) {
-	sh, err := modules.NewShell(nil, nil)
+	sh, err := modules.NewExpectShell(nil, nil, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +28,5 @@ func TestModulesInternalOnly(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	s := expect.NewSession(t, m.Stdout(), time.Minute)
-	s.Expect(cmd)
+	m.Expect(cmd)
 }

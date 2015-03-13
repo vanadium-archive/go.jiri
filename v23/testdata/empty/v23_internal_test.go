@@ -9,9 +9,9 @@ package empty
 import "testing"
 import "os"
 
-import "v.io/x/ref/lib/testutil"
+import "v.io/x/ref/test"
 
 func TestMain(m *testing.M) {
-	testutil.Init()
+	test.Init()
 	os.Exit(m.Run())
 }

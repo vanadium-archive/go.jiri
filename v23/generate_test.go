@@ -70,10 +70,10 @@ func cmpImports(got, want []string) bool {
 }
 
 func TestV23Generate(t *testing.T) {
-	sysImports := []string{"fmt", "io", "os", "testing", "time"}
-	modulesImports := []string{"v.io/x/ref/lib/testutil/expect", "v.io/x/ref/lib/modules"}
-	vioImports := []string{"v.io/x/ref/lib/testutil", "v.io/x/ref/profiles"}
-	v23Imports := []string{"v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/v23tests", "v.io/x/ref/profiles"}
+	sysImports := []string{"fmt", "io", "os", "testing"}
+	modulesImports := []string{"v.io/x/ref/test/modules"}
+	vioImports := []string{"v.io/x/ref/profiles", "v.io/x/ref/test"}
+	v23Imports := []string{"v.io/x/ref/test", "v.io/x/ref/test/v23tests", "v.io/x/ref/profiles"}
 
 	common := append(sysImports, modulesImports...)
 	usesModules := append([]string{}, common...)
@@ -81,7 +81,7 @@ func TestV23Generate(t *testing.T) {
 	usesModulesAndV23Tests := append([]string{}, common...)
 	usesModulesAndV23Tests = append(usesModulesAndV23Tests, v23Imports...)
 	usesModulesAndV23TestsNoProfile := append([]string{}, common...)
-	usesModulesAndV23TestsNoProfile = append(usesModulesAndV23TestsNoProfile, "v.io/x/ref/lib/testutil/v23tests")
+	usesModulesAndV23TestsNoProfile = append(usesModulesAndV23TestsNoProfile, "v.io/x/ref/test/v23tests")
 	testdata := "v.io/x/devtools/v23/testdata/"
 	middle := testdata + "transitive/middle"
 
@@ -96,7 +96,7 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestMain"},
 			nil,
 			nil,
-			[]string{"os", "testing", "v.io/x/ref/lib/testutil"},
+			[]string{"os", "testing", "v.io/x/ref/test"},
 			nil,
 		},
 		// has a TestMain and a single module, hence the init function.
@@ -141,8 +141,8 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestMain", "init"},
 			[]string{"TestV23Filename"},
 			[]string{"TestInternalFilename", "TestV23Filename"},
-			append(append([]string{}, common...), "v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/v23tests"),
-			[]string{"testing", "v.io/x/ref/lib/testutil/v23tests", "v.io/x/ref/profiles"},
+			append(append([]string{}, common...), "v.io/x/ref/test", "v.io/x/ref/test/v23tests"),
+			[]string{"testing", "v.io/x/ref/test/v23tests", "v.io/x/ref/profiles"},
 		},
 		{"modules_and_v23", "",
 			[]string{"TestMain", "init"},
@@ -172,7 +172,7 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestMain"},
 			nil,
 			[]string{"TestModulesInternalOnly"},
-			append(append(append([]string{}, "fmt", "os", "testing", "time", middle), modulesImports...), vioImports...),
+			append(append(append([]string{}, "fmt", "os", "testing", middle), modulesImports...), vioImports...),
 			nil,
 		},
 		{"transitive_no_use", "",
@@ -187,15 +187,15 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestMain", "TestV23OneA"},
 			[]string{"TestModulesExternal", "TestV23OneA"},
 			[]string{
-				"os", "testing", "time", middle, "v.io/x/ref/lib/modules", "v.io/x/ref/lib/testutil/expect", "v.io/x/ref/profiles"},
-			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/lib/modules"}, v23Imports...),
+				"os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/profiles"},
+			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/test/modules"}, v23Imports...),
 		},
 		{"internal_transitive_external", "",
 			[]string{"TestMain"},
 			nil,
 			[]string{"TestInternal", "TestModulesExternal"},
 			[]string{
-				"fmt", "os", "testing", "time", middle, "v.io/x/ref/lib/modules", "v.io/x/ref/lib/testutil", "v.io/x/ref/lib/testutil/expect", "v.io/x/ref/profiles"},
+				"fmt", "os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/test", "v.io/x/ref/profiles"},
 			[]string{"testing", testdata + "internal_transitive_external", "v.io/x/ref/profiles"},
 		},
 	}

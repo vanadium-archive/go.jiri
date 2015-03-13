@@ -6,7 +6,7 @@
 // DO NOT UPDATE MANUALLY
 package modules_only_test
 
-import "v.io/x/ref/lib/modules"
+import "v.io/x/ref/test/modules"
 
 func init() {
 	modules.RegisterChild("moduleModulesOnlyExt", `Oh..`, moduleModulesOnlyExt)

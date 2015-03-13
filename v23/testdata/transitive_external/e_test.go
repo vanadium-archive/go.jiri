@@ -3,8 +3,8 @@ package transitive_external_test
 import (
 	"testing"
 
-	"v.io/x/ref/lib/testutil/v23tests"
 	_ "v.io/x/ref/profiles"
+	"v.io/x/ref/test/v23tests"
 
 	"v.io/x/devtools/v23/testdata/transitive_external"
 )

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	xm "v.io/x/ref/lib/modules"
 	_ "v.io/x/ref/profiles"
+	xm "v.io/x/ref/test/modules"
 )
 
 var cmd = "moduleInternalOnly"

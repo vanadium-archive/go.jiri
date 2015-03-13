@@ -8,8 +8,8 @@ package modules_and_v23_test
 
 import "testing"
 
-import "v.io/x/ref/lib/modules"
-import "v.io/x/ref/lib/testutil/v23tests"
+import "v.io/x/ref/test/modules"
+import "v.io/x/ref/test/v23tests"
 
 func init() {
 	modules.RegisterChild("modulesModulesAndV23Ext", ``, modulesModulesAndV23Ext)

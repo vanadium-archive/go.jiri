@@ -5,11 +5,9 @@ import (
 	"io"
 	"os"
 	"testing"
-	"time"
 
-	"v.io/x/ref/lib/modules"
-	"v.io/x/ref/lib/testutil/expect"
 	_ "v.io/x/ref/profiles"
+	"v.io/x/ref/test/modules"
 )
 
 var cmd = "moduleModulesOnlyExt"
@@ -21,7 +19,7 @@ func moduleModulesOnlyExt(stdin io.Reader, stdout, stderr io.Writer, env map[str
 }
 
 func TestModulesOnlyExt(t *testing.T) {
-	sh, err := modules.NewShell(nil, nil)
+	sh, err := modules.NewExpectShell(nil, nil, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,6 +30,5 @@ func TestModulesOnlyExt(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	s := expect.NewSession(t, m.Stdout(), time.Minute)
-	s.Expect(cmd)
+	m.Expect(cmd)
 }
