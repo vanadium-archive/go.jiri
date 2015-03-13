@@ -440,7 +440,7 @@ In addition, some commonly used functionality in vanadium unit tests is
 streamlined. Arguably this should be in a separate command/file but for now they
 are lumped together. The additional functionality is as follows:
 
-1. v.io/veyron/lib/modules requires the use of an explicit
+1. v.io/veyron/test/modules requires the use of an explicit
    registration mechanism. 'v23 test generate' automatically
    generates these registration functions for any test function matches
    the modules.Main signature.

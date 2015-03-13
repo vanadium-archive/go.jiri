@@ -10,9 +10,9 @@ import "fmt"
 import "testing"
 import "os"
 
-import "v.io/x/ref/lib/modules"
-import "v.io/x/ref/lib/testutil"
-import "v.io/x/ref/lib/testutil/v23tests"
+import "v.io/x/ref/test"
+import "v.io/x/ref/test/modules"
+import "v.io/x/ref/test/v23tests"
 
 func init() {
 	modules.RegisterChild("modulesOneInt", `modulesOneInt does the following...
@@ -22,7 +22,7 @@ Usage: <a> <b>...`, modulesOneInt)
 }
 
 func TestMain(m *testing.M) {
-	testutil.Init()
+	test.Init()
 	if modules.IsModulesChildProcess() {
 		if err := modules.Dispatch(); err != nil {
 			fmt.Fprintf(os.Stderr, "modules.Dispatch failed: %v\n", err)

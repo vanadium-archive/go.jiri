@@ -53,7 +53,7 @@ is streamlined. Arguably this should be in a separate command/file but
 for now they are lumped together. The additional functionality is as
 follows:
 
-1. v.io/veyron/lib/modules requires the use of an explicit
+1. v.io/veyron/test/modules requires the use of an explicit
    registration mechanism. 'v23 test generate' automatically
    generates these registration functions for any test function matches
    the modules.Main signature.
@@ -74,11 +74,6 @@ Usage: <a> <b>...` + "`" + `, SubProc)
    occur across both the internal and external test packages. This is a
    consequence of how the go testing system is implemented.
 `,
-
-	// TODO(cnicolaou): once the initial deployment is done, revisit the
-	// this functionality and possibly dissallow the 'if this doesn't exist
-	// generate it' behaviour and instead always generate the required helper
-	// functions.
 
 	ArgsName: "[packages]",
 	ArgsLong: "list of go packages"}
@@ -240,7 +235,7 @@ func (c importCache) transitiveModules(pkg *build.Package, imports []string, fse
 
 func importsModules(imports []string) bool {
 	for _, imp := range imports {
-		if imp == "v.io/x/ref/lib/modules" || imp == "v.io/x/ref/lib/testutil/v23tests" {
+		if imp == "v.io/x/ref/test/modules" || imp == "v.io/x/ref/test/v23tests" {
 			return true
 		}
 	}
@@ -260,6 +255,13 @@ func generatePackage(ctx *util.Context, pkg *build.Package) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO(cnicolaou): need to filter out from TestImports and XTestImports
+	// any imports that are specific to the generated files that we may
+	// process. For example, if a generated v23_test.go imports a package
+	// that has moved, then we will fail to find (since that package is
+	// included in XTestImports) and then we won't overwrite that
+	// generated file with a fixed one.
 
 	// Don't bother with transitive checks if we don't actually call
 	// modules from this test.
@@ -364,7 +366,7 @@ func generatePackage(ctx *util.Context, pkg *build.Package) error {
 
 func findModulesLocalName(imports []*ast.ImportSpec) string {
 	for _, i := range imports {
-		if i.Path.Value == `"v.io/x/ref/lib/modules"` {
+		if i.Path.Value == `"v.io/x/ref/test/modules"` {
 			if i.Name != nil {
 				return i.Name.Name
 			}
@@ -523,16 +525,12 @@ func writeInternalFile(fileName string, packageName string, needsTestMain, needs
 		fmt.Fprintln(out, `import "testing"`)
 		fmt.Fprintln(out, `import "os"`)
 		fmt.Fprintln(out)
-	}
-
-	if needsModulesInTestMain {
-		fmt.Fprintln(out, `import "v.io/x/ref/lib/modules"`)
-	}
-
-	if needsTestMain {
-		fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/test"`)
+		if needsModulesInTestMain {
+			fmt.Fprintln(out, `import "v.io/x/ref/test/modules"`)
+		}
 		if hasV23Tests {
-			fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil/v23tests"`)
+			fmt.Fprintln(out, `import "v.io/x/ref/test/v23tests"`)
 		}
 	}
 
@@ -586,17 +584,14 @@ func writeExternalFile(fileName string, packageName string, needsTestMain, needs
 	if trailingLine {
 		fmt.Fprintln(out)
 	}
-
-	if needsModulesInTestMain {
-		fmt.Fprintln(out, `import "v.io/x/ref/lib/modules"`)
-	}
-
 	if needsTestMain {
-		fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/test"`)
 	}
-
+	if needsModulesInTestMain {
+		fmt.Fprintln(out, `import "v.io/x/ref/test/modules"`)
+	}
 	if hasV23Tests {
-		fmt.Fprintln(out, `import "v.io/x/ref/lib/testutil/v23tests"`)
+		fmt.Fprintln(out, `import "v.io/x/ref/test/v23tests"`)
 	}
 
 	if hasModules {
@@ -656,7 +651,7 @@ var modulesSubprocess = `
 func writeModulesTestMain(out io.Writer) {
 	fmt.Fprint(out, `
 func TestMain(m *testing.M) {
-	testutil.Init()`+
+	test.Init()`+
 		modulesSubprocess+
 		`	os.Exit(m.Run())
 }
@@ -668,7 +663,7 @@ func TestMain(m *testing.M) {
 func writeModulesAndV23TestMain(out io.Writer) {
 	fmt.Fprint(out, `
 func TestMain(m *testing.M) {
-	testutil.Init()`+
+	test.Init()`+
 		modulesSubprocess+
 		`	cleanup := v23tests.UseSharedBinDir()
 	r := m.Run()
@@ -683,7 +678,7 @@ func TestMain(m *testing.M) {
 func writeV23TestMain(out io.Writer) {
 	fmt.Fprint(out, `
 func TestMain(m *testing.M) {
-	testutil.Init()
+	test.Init()
 	cleanup := v23tests.UseSharedBinDir()
 	r := m.Run()
 	cleanup()
@@ -697,7 +692,7 @@ func TestMain(m *testing.M) {
 func writeGoTestMain(out io.Writer) {
 	fmt.Fprint(out, `
 func TestMain(m *testing.M) {
-	testutil.Init()
+	test.Init()
 	os.Exit(m.Run())
 }
 `)
