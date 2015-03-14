@@ -623,7 +623,7 @@ Usage:
 [command/topic ...] optionally identifies a specific sub-command or help topic.
 
 The v23 help flags are:
- -style=text
-   The formatting style for help output, either "text" or "godoc".
+ -style=default
+   The formatting style for help output, either "default" or "godoc".
 */
 package main
