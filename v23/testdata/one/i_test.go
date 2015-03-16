@@ -31,7 +31,7 @@ func modulesTwoInt(stdin io.Reader, stdout io.Writer, stderr io.Writer, env map[
 }
 
 func TestModulesOneAndTwo(t *testing.T) {
-	sh, err := modules.NewExpectShell(nil, nil, t, false)
+	sh, err := modules.NewShell(nil, nil, false, t)
 	if err != nil {
 		t.Fatal(err)
 	}

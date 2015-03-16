@@ -17,7 +17,7 @@ func init() {
 }
 
 func TestModulesInternalOnly(t *testing.T) {
-	sh, err := modules.NewExpectShell(nil, nil, t, false)
+	sh, err := modules.NewShell(nil, nil, false, t)
 	if err != nil {
 		t.Fatal(err)
 	}

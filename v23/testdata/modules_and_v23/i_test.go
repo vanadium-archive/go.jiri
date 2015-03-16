@@ -19,7 +19,7 @@ func modulesModulesAndV23Int(stdin io.Reader, stdout, stderr io.Writer, env map[
 }
 
 func TestModulesAndV23Int(t *testing.T) {
-	sh, err := modules.NewExpectShell(nil, nil, t, false)
+	sh, err := modules.NewShell(nil, nil, false, t)
 	if err != nil {
 		t.Fatal(err)
 	}
