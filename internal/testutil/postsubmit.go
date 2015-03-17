@@ -23,7 +23,7 @@ func vanadiumPostsubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_
 	args = append(args,
 		"-host", jenkinsHost,
 		"poll",
-		"-manifest", "public-mirror",
+		"-manifest", "mirror/public",
 	)
 	if err := ctx.Run().Command("postsubmit", args...); err != nil {
 		return nil, err
