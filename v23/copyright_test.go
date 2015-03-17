@@ -8,15 +8,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 )
 
 func TestCopyright(t *testing.T) {
 	var errOut bytes.Buffer
-	ctx := util.NewContext(nil, os.Stdin, os.Stdout, io.MultiWriter(os.Stderr, &errOut), false, false, true)
+	ctx := tool.NewContext(tool.ContextOpts{
+		Stderr: io.MultiWriter(os.Stderr, &errOut),
+	})
 
 	// Load assets.
-	projects, tools, err := util.ReadManifest(ctx, manifestFlag)
+	projects, tools, err := util.ReadManifest(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -26,21 +29,28 @@ func TestCopyright(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Create a fake VANADIUM_ROOT.
-	tmpDir, err := ctx.Run().TempDir("", "")
+	// Setup a fake VANADIUM_ROOT.
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().RemoveAll(tmpDir)
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", tmpDir); err != nil {
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+	oldRoot, err := util.VanadiumRoot()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("Setenv() failed: %v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
 
 	// Write out test licensing files and sample source code files to a
 	// project and verify that the project checks out.
-	projectPath := filepath.Join(tmpDir, "test")
+	projectPath := filepath.Join(root.Dir, "test")
 	project := util.Project{
 		Path: projectPath,
 	}

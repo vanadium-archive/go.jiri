@@ -9,14 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/x/devtools/lib/gerrit"
-	"v.io/x/devtools/lib/gitutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/gerrit"
+	"v.io/x/devtools/internal/gitutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 )
 
 // assertCommitCount asserts that the commit count between two
 // branches matches the expectedCount.
-func assertCommitCount(t *testing.T, ctx *util.Context, branch, baseBranch string, expectedCount int) {
+func assertCommitCount(t *testing.T, ctx *tool.Context, branch, baseBranch string, expectedCount int) {
 	got, err := ctx.Git().CountCommits(branch, baseBranch)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -28,7 +29,7 @@ func assertCommitCount(t *testing.T, ctx *util.Context, branch, baseBranch strin
 
 // assertFileContent asserts that the content of the given file
 // matches the expected content.
-func assertFileContent(t *testing.T, ctx *util.Context, file, want string) {
+func assertFileContent(t *testing.T, ctx *tool.Context, file, want string) {
 	got, err := ioutil.ReadFile(file)
 	if err != nil {
 		t.Fatalf("ReadFile(%v) failed: %v", file, err)
@@ -40,7 +41,7 @@ func assertFileContent(t *testing.T, ctx *util.Context, file, want string) {
 
 // assertFilesCommitted asserts that the files exist and are committed
 // in the current branch.
-func assertFilesCommitted(t *testing.T, ctx *util.Context, files []string) {
+func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
 	for _, file := range files {
 		if _, err := os.Stat(file); err != nil {
 			if os.IsNotExist(err) {
@@ -56,7 +57,7 @@ func assertFilesCommitted(t *testing.T, ctx *util.Context, files []string) {
 
 // assertFilesNotCommitted asserts that the files exist and are *not*
 // committed in the current branch.
-func assertFilesNotCommitted(t *testing.T, ctx *util.Context, files []string) {
+func assertFilesNotCommitted(t *testing.T, ctx *tool.Context, files []string) {
 	for _, file := range files {
 		if _, err := os.Stat(file); err != nil {
 			if os.IsNotExist(err) {
@@ -72,7 +73,7 @@ func assertFilesNotCommitted(t *testing.T, ctx *util.Context, files []string) {
 
 // assertFilesPushedToRef asserts that the given files have been
 // pushed to the given remote repository reference.
-func assertFilesPushedToRef(t *testing.T, ctx *util.Context, repoPath, gerritPath, pushedRef string, files []string) {
+func assertFilesPushedToRef(t *testing.T, ctx *tool.Context, repoPath, gerritPath, pushedRef string, files []string) {
 	if err := ctx.Run().Chdir(gerritPath); err != nil {
 		t.Fatalf("Chdir(%v) failed: %v", gerritPath, err)
 	}
@@ -88,7 +89,7 @@ func assertFilesPushedToRef(t *testing.T, ctx *util.Context, repoPath, gerritPat
 
 // assertStashSize asserts that the stash size matches the expected
 // size.
-func assertStashSize(t *testing.T, ctx *util.Context, want int) {
+func assertStashSize(t *testing.T, ctx *tool.Context, want int) {
 	got, err := ctx.Git().StashSize()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -99,7 +100,7 @@ func assertStashSize(t *testing.T, ctx *util.Context, want int) {
 }
 
 // commitFiles commits the given files into to current branch.
-func commitFiles(t *testing.T, ctx *util.Context, fileNames []string) {
+func commitFiles(t *testing.T, ctx *tool.Context, fileNames []string) {
 	// Create and commit the files one at a time.
 	for _, fileName := range fileNames {
 		fileContent := "This is file " + fileName
@@ -113,7 +114,7 @@ func commitFiles(t *testing.T, ctx *util.Context, fileNames []string) {
 	}
 }
 
-func createTestGoDependencyPackages(t *testing.T, ctx *util.Context, rootDir string) {
+func createTestGoDependencyPackages(t *testing.T, ctx *tool.Context, rootDir string) {
 	fooDir := filepath.Join(rootDir, "src", "v.io", "foo")
 	if err := ctx.Run().MkdirAll(fooDir, os.FileMode(0755)); err != nil {
 		t.Fatalf("MkdirAll(%v) failed: %v", fooDir, err)
@@ -152,7 +153,7 @@ func Bar() string {
 	}
 }
 
-func createTestGoDependencyConstraint(t *testing.T, ctx *util.Context, rootDir, command string) {
+func createTestGoDependencyConstraint(t *testing.T, ctx *tool.Context, rootDir, command string) {
 	depFile := filepath.Join(rootDir, "src", "v.io", "foo", "GO.PACKAGE")
 	depData := `{
   "dependencies": {
@@ -171,7 +172,7 @@ func createTestGoDependencyConstraint(t *testing.T, ctx *util.Context, rootDir, 
 }
 
 // createRepo creates a new repository in the given working directory.
-func createRepo(t *testing.T, ctx *util.Context, workingDir, prefix string) string {
+func createRepo(t *testing.T, ctx *tool.Context, workingDir, prefix string) string {
 	repoPath, err := ctx.Run().TempDir(workingDir, "repo-"+prefix)
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
@@ -193,7 +194,7 @@ echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 `
 
 // installCommitMsgHook links the gerrit commit-msg hook into a different repo.
-func installCommitMsgHook(t *testing.T, ctx *util.Context, repoPath string) {
+func installCommitMsgHook(t *testing.T, ctx *tool.Context, repoPath string) {
 	hookLocation := path.Join(repoPath, ".git/hooks/commit-msg")
 	if err := ctx.Run().WriteFile(hookLocation, []byte(commitMsgHook), 0755); err != nil {
 		t.Fatalf("WriteFile(%v) failed: %v", hookLocation, err)
@@ -203,7 +204,7 @@ func installCommitMsgHook(t *testing.T, ctx *util.Context, repoPath string) {
 // createTestRepos sets up three local repositories: origin, gerrit,
 // and the main test repository which pulls from origin and can push
 // to gerrit.
-func createTestRepos(t *testing.T, ctx *util.Context, workingDir string) (string, string, string) {
+func createTestRepos(t *testing.T, ctx *tool.Context, workingDir string) (string, string, string) {
 	// Create origin.
 	originPath := createRepo(t, ctx, workingDir, "origin")
 	if err := ctx.Run().Chdir(originPath); err != nil {
@@ -242,29 +243,29 @@ func createTestRepos(t *testing.T, ctx *util.Context, workingDir string) (string
 }
 
 // setup creates a set up for testing the review tool.
-func setupTest(t *testing.T, ctx *util.Context, installHook bool) (string, string, string, string) {
-	workingDir, err := ctx.Run().TempDir("", "test-git-v23-review")
+func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*util.FakeVanadiumRoot, string, string, string) {
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
+		t.Fatalf("%v", err)
 	}
-	repoPath, originPath, gerritPath := createTestRepos(t, ctx, workingDir)
+	repoPath, originPath, gerritPath := createTestRepos(t, ctx, root.Dir)
 	if installHook == true {
 		for _, path := range []string{repoPath, originPath, gerritPath} {
 			installCommitMsgHook(t, ctx, path)
 		}
 	}
 	if err := ctx.Run().Chdir(repoPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", repoPath, err)
+		t.Fatalf("%v", err)
 	}
-	return workingDir, repoPath, originPath, gerritPath
+	return root, repoPath, originPath, gerritPath
 }
 
 // teardownTest cleans up the set up for testing the review tool.
-func teardownTest(t *testing.T, ctx *util.Context, oldDir, workingDir string) {
-	if err := ctx.Run().Chdir(oldDir); err != nil {
+func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util.FakeVanadiumRoot) {
+	if err := ctx.Run().Chdir(oldWorkDir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := ctx.Run().RemoveAll(workingDir); err != nil {
+	if err := root.Cleanup(ctx); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -272,13 +273,13 @@ func teardownTest(t *testing.T, ctx *util.Context, oldDir, workingDir string) {
 // TestCleanupClean checks that cleanup succeeds if the branch to be
 // cleaned up has been merged with the master.
 func TestCleanupClean(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, _ := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, _ := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -304,13 +305,13 @@ func TestCleanupClean(t *testing.T) {
 // TestCleanupDirty checks that cleanup is a no-op if the branch to be
 // cleaned up has unmerged changes.
 func TestCleanupDirty(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, _ := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, _ := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -332,13 +333,13 @@ func TestCleanupDirty(t *testing.T) {
 // TestCreateReviewBranch checks that the temporary review branch is
 // created correctly.
 func TestCreateReviewBranch(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, _ := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, _ := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -372,13 +373,13 @@ func TestCreateReviewBranch(t *testing.T) {
 // createReviewBranch() on a branch with no changes will result in an
 // EmptyChangeError.
 func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, _ := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, _ := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -399,15 +400,16 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 }
 
 func TestGoDependencyError(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
+
 	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", workingDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
@@ -420,8 +422,6 @@ func TestGoDependencyError(t *testing.T) {
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	config := util.Config{}
-	createConfig(t, ctx, &config)
 	createTestGoDependencyPackages(t, ctx, repoPath)
 	createTestGoDependencyConstraint(t, ctx, repoPath, "deny")
 	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
@@ -437,15 +437,15 @@ func TestGoDependencyError(t *testing.T) {
 }
 
 func TestGoDependencyOK(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", workingDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
@@ -458,8 +458,6 @@ func TestGoDependencyOK(t *testing.T) {
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	config := util.Config{}
-	createConfig(t, ctx, &config)
 	createTestGoDependencyPackages(t, ctx, repoPath)
 	createTestGoDependencyConstraint(t, ctx, repoPath, "allow")
 	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
@@ -473,13 +471,13 @@ func TestGoDependencyOK(t *testing.T) {
 }
 
 func TestGoFormatError(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -508,13 +506,13 @@ func main() {}
 }
 
 func TestGoFormatOK(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -553,13 +551,13 @@ func main() {}
 
 // TestSendReview checks the various options for sending a review.
 func TestSendReview(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -623,14 +621,14 @@ func TestSendReview(t *testing.T) {
 // TestSendReviewNoChangeID checks that review.send() correctly errors when
 // not run with a commit hook that adds a Change-Id.
 func TestSendReviewNoChangeID(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
 	// Pass 'false' to setup so it doesn't install the commit-msg hook.
-	workingDir, _, _, gerritPath := setupTest(t, ctx, false)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, gerritPath := setupTest(t, ctx, false)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -652,13 +650,13 @@ func TestSendReviewNoChangeID(t *testing.T) {
 
 // TestEndToEnd checks the end-to-end functionality of the review tool.
 func TestEndToEnd(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -679,13 +677,13 @@ func TestEndToEnd(t *testing.T) {
 // TestPresubmitLabelInCommitMessage checks the PresubmitType label is correctly
 // processed for the commit message.
 func TestPresubmitLabelInCommitMessage(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -746,13 +744,13 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 // TestDirtyBranch checks that the tool correctly handles unstaged and
 // untracked changes in a working branch with stashed changes.
 func TestDirtyBranch(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -813,13 +811,13 @@ func TestDirtyBranch(t *testing.T) {
 // within a subdirectory of a branch that does not exist on master branch, and
 // will return the user to the subdirectory after completion.
 func TestRunInSubdirectory(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -846,13 +844,13 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EvalSymlinks(%v) failed: %v", path, err)
 	}
-	workingDir, err = os.Getwd()
+	cwd, err = os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	got, err := filepath.EvalSymlinks(workingDir)
+	got, err := filepath.EvalSymlinks(cwd)
 	if err != nil {
-		t.Fatalf("EvalSymlinks(%v) failed: %v", workingDir, err)
+		t.Fatalf("EvalSymlinks(%v) failed: %v", cwd, err)
 	}
 	if got != want {
 		t.Fatalf("unexpected working directory: got %v, want %v", got, want)
@@ -910,13 +908,13 @@ Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
 
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	workingDir, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, workingDir)
+	root, _, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)

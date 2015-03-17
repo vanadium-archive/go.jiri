@@ -6,33 +6,43 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/x/devtools/lib/testutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/testutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
 func TestTestProject(t *testing.T) {
-	ctx := util.DefaultContext()
-
-	// Setup an instance of vanadium universe.
-	rootDir, err := ctx.Run().TempDir("", "")
+	// Setup a fake VANADIUM_ROOT.
+	ctx := tool.NewDefaultContext()
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
+		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().RemoveAll(rootDir)
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+
+	// Setup a fake config.
+	config := util.NewConfig(util.ProjectTestsOpt(map[string][]string{"https://test-project": []string{"ignore-this"}}))
+	if err := root.WriteLocalToolsConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Point the VANADIUM_ROOT and WORKSPACE environment variables to
+	// the fake.
 	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", rootDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
 	oldWorkspace := os.Getenv("WORKSPACE")
-	if err := os.Setenv("WORKSPACE", rootDir); err != nil {
+	if err := os.Setenv("WORKSPACE", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("WORKSPACE", oldWorkspace)
-
-	config := util.NewConfig(util.ProjectTestsOpt(map[string][]string{"https://test-project": []string{"ignore-this"}}))
-	createConfig(t, ctx, config)
 
 	// Check that running the tests for the test project generates
 	// the expected output.
@@ -53,21 +63,27 @@ ignore-this PASSED
 }
 
 func TestTestRun(t *testing.T) {
-	ctx := util.DefaultContext()
-
-	// Setup an instance of vanadium universe.
-	rootDir, err := ctx.Run().TempDir("", "")
+	// Setup a fake VANADIUM_ROOT.
+	ctx := tool.NewDefaultContext()
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
+		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().RemoveAll(rootDir)
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+
+	// Point the VANADIUM_ROOT and WORKSPACE environment variables to
+	// the fake.
 	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", rootDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
 	oldWorkspace := os.Getenv("WORKSPACE")
-	if err := os.Setenv("WORKSPACE", rootDir); err != nil {
+	if err := os.Setenv("WORKSPACE", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("WORKSPACE", oldWorkspace)
@@ -90,22 +106,32 @@ ignore-this PASSED
 }
 
 func TestTestList(t *testing.T) {
-	ctx := util.DefaultContext()
-
-	// Setup an instance of vanadium universe.
-	rootDir, err := ctx.Run().TempDir("", "")
+	// Setup a fake VANADIUM_ROOT.
+	ctx := tool.NewDefaultContext()
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
+		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().RemoveAll(rootDir)
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+
+	// Point the VANADIUM_ROOT and WORKSPACE environment variables to
+	// the fake.
 	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", rootDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	oldWorkspace := os.Getenv("WORKSPACE")
+	if err := os.Setenv("WORKSPACE", root.Dir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("WORKSPACE", oldWorkspace)
 
-	// Check that listing existing tests generates the expected
-	// output.
+	// Check that listing existing tests generates the expected output.
 	var out bytes.Buffer
 	command := cmdline.Command{}
 	command.Init(nil, &out, &out)

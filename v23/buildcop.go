@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -29,7 +30,11 @@ var cmdBuildCopList = &cmdline.Command{
 }
 
 func runBuildCop(command *cmdline.Command, _ []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	buildcop, err := util.BuildCop(ctx, time.Now())
 	if err != nil {
 		return err
@@ -39,8 +44,12 @@ func runBuildCop(command *cmdline.Command, _ []string) error {
 }
 
 func runBuildCopList(command *cmdline.Command, _ []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
-	rotation, err := util.LoadBuildCopRotation()
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	rotation, err := util.LoadBuildCopRotation(ctx)
 	if err != nil {
 		return err
 	}

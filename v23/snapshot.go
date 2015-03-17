@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"v.io/x/devtools/lib/collect"
-	"v.io/x/devtools/lib/testutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/testutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -83,8 +84,12 @@ func runSnapshotCreate(command *cmdline.Command, args []string) error {
 	if len(args) != 1 {
 		return command.UsageErrorf("unexpected number of arguments")
 	}
-	ctx, label := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag), args[0]
-
+	label := args[0]
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	if !remoteFlag {
 		if err := checkSnapshotDir(ctx); err != nil {
 			return err
@@ -135,7 +140,7 @@ func runSnapshotCreate(command *cmdline.Command, args []string) error {
 
 // checkSnapshotDir makes sure that he local snapshot directory exists
 // and is initialized properly.
-func checkSnapshotDir(ctx *util.Context) (e error) {
+func checkSnapshotDir(ctx *tool.Context) (e error) {
 	snapshotDir, err := util.LocalSnapshotDir()
 	if err != nil {
 		return err
@@ -172,7 +177,7 @@ func checkSnapshotDir(ctx *util.Context) (e error) {
 	return nil
 }
 
-func createSnapshot(ctx *util.Context, snapshotDir, snapshotFile, label string) error {
+func createSnapshot(ctx *tool.Context, snapshotDir, snapshotFile, label string) error {
 	// Create a snapshot that encodes the current state of master
 	// branches for all local projects.
 	if err := util.CreateSnapshot(ctx, snapshotFile); err != nil {
@@ -205,7 +210,7 @@ func createSnapshot(ctx *util.Context, snapshotDir, snapshotFile, label string) 
 // respecting the value of the "-remote" command-line flag.
 func getSnapshotDir() (string, error) {
 	if remoteFlag {
-		snapshotDir, err := util.RemoteManifestDir()
+		snapshotDir, err := util.ManifestDir()
 		if err != nil {
 			return "", err
 		}
@@ -221,7 +226,7 @@ func getSnapshotDir() (string, error) {
 // revisionChanges commits changes identified by the given manifest
 // file and label to the manifest repository and (if applicable)
 // pushes these changes to the remote repository.
-func revisionChanges(ctx *util.Context, snapshotDir, snapshotFile, label string) (e error) {
+func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -250,9 +255,9 @@ func revisionChanges(ctx *util.Context, snapshotDir, snapshotFile, label string)
 }
 
 // runTests runs the tests associated with the given snapshot label.
-func runTests(ctx *util.Context, label string) error {
-	var config util.Config
-	if err := util.LoadConfig("common", &config); err != nil {
+func runTests(ctx *tool.Context, label string) error {
+	config, err := util.LoadConfig(ctx)
+	if err != nil {
 		return err
 	}
 	found := false
@@ -268,13 +273,13 @@ func runTests(ctx *util.Context, label string) error {
 		}
 		return nil
 	}
-	for _, test := range config.SnapshotLabelTests(label) {
-		result, err := testutil.RunTests(ctx, nil, []string{test})
+	for _, t := range config.SnapshotLabelTests(label) {
+		result, err := testutil.RunTests(ctx, nil, []string{t})
 		if err != nil {
 			return err
 		}
-		if result[test].Status != testutil.TestPassed {
-			return fmt.Errorf("%v failed", test)
+		if result[t].Status != testutil.TestPassed {
+			return fmt.Errorf("%v failed", t)
 		}
 	}
 	return nil

@@ -12,9 +12,10 @@ import (
 	"regexp"
 	"strings"
 
-	"v.io/x/devtools/lib/collect"
-	"v.io/x/devtools/lib/goutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/goutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -85,8 +86,8 @@ const (
 	traceTransitiveImports = false
 )
 
-func configureBuilder() (cleanup func(), err error) {
-	env, err := util.VanadiumEnvironment(util.HostPlatform())
+func configureBuilder(ctx *tool.Context) (cleanup func(), err error) {
+	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain the Vanadium environment: %v", err)
 	}
@@ -99,13 +100,17 @@ func configureBuilder() (cleanup func(), err error) {
 }
 
 func runTestGenerate(command *cmdline.Command, args []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	packages, err := goutil.List(ctx, args)
 	if err != nil {
 		return command.UsageErrorf("failed to list %s: %s", args, err)
 	}
 
-	cleanup, err := configureBuilder()
+	cleanup, err := configureBuilder(ctx)
 	if err != nil {
 		return err
 	}
@@ -242,7 +247,7 @@ func importsModules(imports []string) bool {
 	return false
 }
 
-func generatePackage(ctx *util.Context, pkg *build.Package) error {
+func generatePackage(ctx *tool.Context, pkg *build.Package) error {
 	fset := token.NewFileSet() // positions are relative to fset
 	cache := importCache{}
 	intTestUsesModules := importsModules(pkg.TestImports)

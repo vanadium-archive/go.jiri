@@ -10,7 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -50,7 +51,12 @@ var cmdProjectClean = &cmdline.Command{
 }
 
 func runProjectClean(command *cmdline.Command, args []string) (e error) {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
 	localProjects, err := util.LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -89,12 +95,12 @@ type repoState struct {
 	hasUntracked   bool
 }
 
-func fillRepoState(ctx *util.Context, rs *repoState, checkDirty bool, ch chan<- error) {
+func fillRepoState(ctx *tool.Context, rs *repoState, checkDirty bool, ch chan<- error) {
 	// TODO(sadovsky): Create a common interface for Git and Hg.
 	var err error
 	switch rs.project.Protocol {
 	case "git":
-		scm := ctx.Git(util.RootDirOpt(rs.project.Path))
+		scm := ctx.Git(tool.RootDirOpt(rs.project.Path))
 		rs.branches, rs.currentBranch, err = scm.GetBranches()
 		if err != nil {
 			ch <- err
@@ -113,7 +119,7 @@ func fillRepoState(ctx *util.Context, rs *repoState, checkDirty bool, ch chan<- 
 			}
 		}
 	case "hg":
-		scm := ctx.Hg(util.RootDirOpt(rs.project.Path))
+		scm := ctx.Hg(tool.RootDirOpt(rs.project.Path))
 		rs.branches, rs.currentBranch, err = scm.GetBranches()
 		if err != nil {
 			ch <- err
@@ -134,7 +140,12 @@ func fillRepoState(ctx *util.Context, rs *repoState, checkDirty bool, ch chan<- 
 
 // runProjectList generates a listing of local projects.
 func runProjectList(command *cmdline.Command, _ []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
 	projects, err := util.LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -196,7 +207,12 @@ indication of each project's status:
 }
 
 func runProjectShellPrompt(command *cmdline.Command, args []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
 	projects, err := util.LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -263,7 +279,7 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 
 // getRepoName gets the name of a repo from the current directory by reading
 // the .v23/metadata.v2 file located at the root of the repo.
-func getRepoName(ctx *util.Context) (string, error) {
+func getRepoName(ctx *tool.Context) (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("Getwd() failed: %v", err)
@@ -304,10 +320,16 @@ tests are specified, all projects are polled by default.
 // runProjectPoll generates a description of changes that exist
 // remotely but do not exist locally.
 func runProjectPoll(command *cmdline.Command, args []string) error {
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
 	projectSet := map[string]struct{}{}
 	if len(args) > 0 {
-		var config util.Config
-		if err := util.LoadConfig("common", &config); err != nil {
+		config, err := util.LoadConfig(ctx)
+		if err != nil {
 			return err
 		}
 		// Compute a map from tests to projects that can change the
@@ -328,7 +350,6 @@ func runProjectPoll(command *cmdline.Command, args []string) error {
 			}
 		}
 	}
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
 	update, err := util.PollProjects(ctx, manifestFlag, projectSet)
 	if err != nil {
 		return err

@@ -8,14 +8,15 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 )
 
 // TestGoVanadiumEnvironment checks that the implementation of the
 // "v23 go" command sets up the vanadium environment and then
 // dispatches calls to the go tool.
 func TestGoVanadiumEnvironment(t *testing.T) {
-	testCmd := *cmdGo
+	ctx, testCmd := tool.NewDefaultContext(), *cmdGo
 	var stdout, stderr bytes.Buffer
 	testCmd.Init(nil, &stdout, &stderr)
 	if err := os.Setenv("GOPATH", ""); err != nil {
@@ -24,7 +25,7 @@ func TestGoVanadiumEnvironment(t *testing.T) {
 	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	env, err := util.VanadiumEnvironment(util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -37,7 +38,7 @@ func TestGoVanadiumEnvironment(t *testing.T) {
 // go" command generates up-to-date VDL files for select go tool
 // commands before dispatching these commands to the go tool.
 func TestGoVDLGeneration(t *testing.T) {
-	ctx, testCmd := util.DefaultContext(), *cmdGo
+	ctx, testCmd := tool.NewDefaultContext(), *cmdGo
 	var stdout, stderr bytes.Buffer
 	testCmd.Init(nil, &stdout, &stderr)
 	// Create a temporary directory for all our work.
@@ -225,8 +226,8 @@ func TestExtractGoPackagesOrFiles(t *testing.T) {
 // TestComputeGoDeps tests the internal function that calls "go list" to get
 // transitive dependencies.
 func TestComputeGoDeps(t *testing.T) {
-	ctx := util.DefaultContext()
-	hostEnv, err := util.VanadiumEnvironment(util.HostPlatform())
+	ctx := tool.NewDefaultContext()
+	hostEnv, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

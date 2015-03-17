@@ -14,9 +14,10 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/x/devtools/lib/collect"
-	"v.io/x/devtools/lib/envutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/envutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -92,7 +93,11 @@ func runProfileSetup(command *cmdline.Command, args []string) error {
 	}
 
 	// Setup the profiles.
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, true)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	for _, arg := range args {
 		setupFn := func() error {
 			var err error
@@ -118,11 +123,11 @@ func (e unknownProfileErr) Error() string {
 	return fmt.Sprintf("unknown profile %q", e)
 }
 
-func reportNotImplemented(ctx *util.Context, os, profile string) {
+func reportNotImplemented(ctx *tool.Context, os, profile string) {
 	ctx.Run().Output([]string{fmt.Sprintf("profile %q is not implemented on %q", profile, os)})
 }
 
-func setup(ctx *util.Context, os, profile string) error {
+func setup(ctx *tool.Context, os, profile string) error {
 	switch os {
 	case "darwin":
 		switch profile {
@@ -158,7 +163,7 @@ func setup(ctx *util.Context, os, profile string) error {
 	return nil
 }
 
-func atomicAction(ctx *util.Context, installFn func() error, dir, message string) error {
+func atomicAction(ctx *tool.Context, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
 		actionCompletedFile := filepath.Join(dir, actionCompletedFileName)
 		if dir != "" && directoryExists(ctx, dir) {
@@ -185,11 +190,11 @@ func atomicAction(ctx *util.Context, installFn func() error, dir, message string
 	return ctx.Run().Function(atomicFn, message)
 }
 
-func directoryExists(ctx *util.Context, dir string) bool {
+func directoryExists(ctx *tool.Context, dir string) bool {
 	return ctx.Run().Command("test", "-d", dir) == nil
 }
 
-func fileExists(ctx *util.Context, file string) bool {
+func fileExists(ctx *tool.Context, file string) bool {
 	return ctx.Run().Command("test", "-f", file) == nil
 }
 
@@ -198,7 +203,7 @@ type androidPkg struct {
 	directory string
 }
 
-func installAndroidPkg(ctx *util.Context, sdkRoot string, pkg androidPkg) error {
+func installAndroidPkg(ctx *tool.Context, sdkRoot string, pkg androidPkg) error {
 	installPkgFn := func() error {
 		// Identify all indexes that match the given package.
 		var out bytes.Buffer
@@ -259,7 +264,7 @@ func installAndroidPkg(ctx *util.Context, sdkRoot string, pkg androidPkg) error 
 
 // installDeps identifies the dependencies that need to be installed
 // and installs them using the OS-specific package manager.
-func installDeps(ctx *util.Context, pkgs []string) error {
+func installDeps(ctx *tool.Context, pkgs []string) error {
 	installDepsFn := func() error {
 		switch runtime.GOOS {
 		case "linux":
@@ -294,7 +299,7 @@ func installDeps(ctx *util.Context, pkgs []string) error {
 	return ctx.Run().Function(installDepsFn, "Install dependencies")
 }
 
-func run(ctx *util.Context, bin string, args []string, env map[string]string) error {
+func run(ctx *tool.Context, bin string, args []string, env map[string]string) error {
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stdout = &out
@@ -311,7 +316,7 @@ func run(ctx *util.Context, bin string, args []string, env map[string]string) er
 //
 // For more on Go cross-compilation for arm/linux information see:
 // http://www.bootc.net/archives/2012/05/26/how-to-build-a-cross-compiler-for-your-raspberry-pi/
-func setupArmLinux(ctx *util.Context) (e error) {
+func setupArmLinux(ctx *tool.Context) (e error) {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
@@ -463,7 +468,7 @@ func setupArmLinux(ctx *util.Context) (e error) {
 }
 
 // setupMobileLinux sets up the mobile profile for linux.
-func setupMobileLinux(ctx *util.Context) (e error) {
+func setupMobileLinux(ctx *tool.Context) (e error) {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
@@ -612,7 +617,7 @@ func setupMobileLinux(ctx *util.Context) (e error) {
 }
 
 // setupProximityLinux sets up the proximity profile for linux.
-func setupProximityLinux(ctx *util.Context) error {
+func setupProximityLinux(ctx *tool.Context) error {
 	archCmd := exec.Command("uname", "-m")
 	out, err := archCmd.Output()
 	if err != nil {
@@ -622,7 +627,7 @@ func setupProximityLinux(ctx *util.Context) error {
 }
 
 // setupProximityArmLinux sets up the proximity componenets for for arm/linux.
-func setupProximityArmLinux(ctx *util.Context) error {
+func setupProximityArmLinux(ctx *tool.Context) error {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
@@ -654,7 +659,7 @@ ac_cv_func_realloc_works=yes
 `
 
 // setupProximityLinuxHelper sets up the proximity profile for linux.
-func setupProximityLinuxHelper(ctx *util.Context, arch, host, path string) (e error) {
+func setupProximityLinuxHelper(ctx *tool.Context, arch, host, path string) (e error) {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
@@ -980,7 +985,7 @@ func setupProximityLinuxHelper(ctx *util.Context, arch, host, path string) (e er
 }
 
 // setupThirdPartyDarwin sets up the third-party profile for darwin.
-func setupThirdPartyDarwin(ctx *util.Context) error {
+func setupThirdPartyDarwin(ctx *tool.Context) error {
 	if err := run(ctx, "brew", []string{"tap", "homebrew/dupes"}, nil); err != nil {
 		return err
 	}
@@ -1006,12 +1011,12 @@ func setupThirdPartyDarwin(ctx *util.Context) error {
 }
 
 // setupWebDarwin sets up the web profile for darwin.
-func setupWebDarwin(ctx *util.Context) error {
+func setupWebDarwin(ctx *tool.Context) error {
 	return setupWebCommon(ctx)
 }
 
 // setupWebLinux sets up the web profile for linux
-func setupWebLinux(ctx *util.Context) error {
+func setupWebLinux(ctx *tool.Context) error {
 	// Install dependencies.
 	pkgs := []string{"g++", "libc6-i386", "zip"}
 	if err := installDeps(ctx, pkgs); err != nil {
@@ -1022,7 +1027,7 @@ func setupWebLinux(ctx *util.Context) error {
 }
 
 // setupWebHelper sets up the web profile.
-func setupWebCommon(ctx *util.Context) error {
+func setupWebCommon(ctx *tool.Context) error {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
@@ -1123,16 +1128,16 @@ codegoogle.password=YOUR_GOOGLECODE_PASSWORD
 }
 
 // setupSyncbaseLinux sets up the syncbase profile for linux.
-func setupSyncbaseLinux(ctx *util.Context) (e error) {
+func setupSyncbaseLinux(ctx *tool.Context) (e error) {
 	return setupSyncbaseHelper(ctx)
 }
 
 // setupSyncbaseDarwin sets up the syncbase profile for darwin.
-func setupSyncbaseDarwin(ctx *util.Context) (e error) {
+func setupSyncbaseDarwin(ctx *tool.Context) (e error) {
 	return setupSyncbaseHelper(ctx)
 }
 
-func setupSyncbaseHelper(ctx *util.Context) (e error) {
+func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return err
