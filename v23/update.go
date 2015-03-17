@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -74,7 +75,12 @@ is not an API. It is an implementation and can change without notice.
 }
 
 func runUpdate(command *cmdline.Command, _ []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
 
 	// Create a snapshot of the current state of all projects and
 	// write it to the $VANADIUM_ROOT/.update_history folder.
@@ -93,7 +99,7 @@ func runUpdate(command *cmdline.Command, _ []string) error {
 		if i > 1 {
 			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, attemptsFlag)
 		}
-		if err = util.UpdateUniverse(ctx, manifestFlag, gcFlag); err == nil {
+		if err = util.UpdateUniverse(ctx, gcFlag); err == nil {
 			break
 		} else {
 			fmt.Fprintf(ctx.Stderr(), "%v\n", err)

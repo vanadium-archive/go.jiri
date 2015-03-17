@@ -13,7 +13,8 @@ import (
 	"regexp"
 	"strings"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -111,8 +112,13 @@ func runCopyrightFix(command *cmdline.Command, args []string) error {
 
 // copyrightHelper implements the logic of "v23 copyright {check,fix}".
 func copyrightHelper(command *cmdline.Command, args []string, fix bool) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
-	projects, tools, err := util.ReadManifest(ctx, manifestFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
+	projects, tools, err := util.ReadManifest(ctx)
 	if err != nil {
 		return err
 	}
@@ -141,7 +147,7 @@ func createComment(comment, header string) string {
 
 // checkFile checks that the given file contains the appropriate
 // copyright header.
-func checkFile(ctx *util.Context, path string, info os.FileInfo, assets *copyrightAssets, fix bool) error {
+func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrightAssets, fix bool) error {
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
 	file, err := os.Open(path)
@@ -195,7 +201,7 @@ func checkFile(ctx *util.Context, path string, info os.FileInfo, assets *copyrig
 // appropriate copyright header. If the fix option is set, the
 // function fixes up the project. Otherwise, the function reports
 // violations to standard error output.
-func checkProject(ctx *util.Context, project util.Project, assets *copyrightAssets, fix bool) error {
+func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAssets, fix bool) error {
 	// Check the licensing files.
 	for file, want := range assets.Files {
 		path := filepath.Join(project.Path, file)
@@ -259,7 +265,7 @@ func hasCopyright(data []byte, comment string) bool {
 
 // loadAssets returns an in-memory representation of the copyright
 // assets.
-func loadAssets(ctx *util.Context, dir string) (*copyrightAssets, error) {
+func loadAssets(ctx *tool.Context, dir string) (*copyrightAssets, error) {
 	result := copyrightAssets{
 		Files: map[string]string{},
 	}

@@ -1,0 +1,9 @@
+{
+	"dependencies": {
+		"outgoing": [
+			{"allow": "v.io/x/lib/..."},
+			{"allow": "v.io/x/devtools/internal/..."},
+			{"deny": "..."}
+		]
+	}
+}

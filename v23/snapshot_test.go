@@ -2,18 +2,18 @@ package main
 
 import (
 	"bytes"
-	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
-func createLabelDir(t *testing.T, ctx *util.Context, snapshotDir, name string, snapshots []string) {
+func createLabelDir(t *testing.T, ctx *tool.Context, snapshotDir, name string, snapshots []string) {
 	labelDir, perm := filepath.Join(snapshotDir, "labels", name), os.FileMode(0700)
 	if err := ctx.Run().MkdirAll(labelDir, perm); err != nil {
 		t.Fatalf("MkdirAll(%v, %v) failed: %v", labelDir, perm, err)
@@ -55,25 +55,29 @@ type label struct {
 }
 
 func TestList(t *testing.T) {
-	ctx := util.DefaultContext()
+	ctx := tool.NewDefaultContext()
 
 	// Setup a fake VANADIUM_ROOT.
-	tmpDir, err := ctx.Run().TempDir("", "")
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
+		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().RemoveAll(tmpDir)
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
 	oldRoot, err := util.VanadiumRoot()
-	if err := os.Setenv("VANADIUM_ROOT", tmpDir); err != nil {
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
 
-	remoteManifestDir, err := util.RemoteManifestDir()
+	manifestDir, err := util.ManifestDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	localSnapshotDir, err := util.LocalSnapshotDir()
+	snapshotDir, err := util.LocalSnapshotDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -82,11 +86,11 @@ func TestList(t *testing.T) {
 	tests := []config{
 		config{
 			remote: false,
-			dir:    localSnapshotDir,
+			dir:    snapshotDir,
 		},
 		config{
 			remote: true,
-			dir:    remoteManifestDir,
+			dir:    manifestDir,
 		},
 	}
 	labels := []label{
@@ -148,21 +152,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func addRemote(t *testing.T, ctx *util.Context, localProject, name, remoteProject string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer ctx.Run().Chdir(cwd)
-	if err := ctx.Run().Chdir(localProject); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().AddRemote(name, remoteProject); err != nil {
-		t.Fatalf("%v", err)
-	}
-}
-
-func checkReadme(t *testing.T, ctx *util.Context, project, message string) {
+func checkReadme(t *testing.T, ctx *tool.Context, project, message string) {
 	if _, err := os.Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -176,46 +166,6 @@ func checkReadme(t *testing.T, ctx *util.Context, project, message string) {
 	}
 }
 
-func createRemoteManifest(t *testing.T, ctx *util.Context, dir string, remotes []string) {
-	manifestDir, perm := filepath.Join(dir, "v2"), os.FileMode(0755)
-	if err := ctx.Run().MkdirAll(manifestDir, perm); err != nil {
-		t.Fatalf("%v", err)
-	}
-	manifest := util.Manifest{}
-	for i, remote := range remotes {
-		project := util.Project{
-			Name:     remote,
-			Path:     localProjectName(i),
-			Protocol: "git",
-			Remote:   remote,
-		}
-		manifest.Projects = append(manifest.Projects, project)
-	}
-	commitManifest(t, ctx, &manifest, dir)
-}
-
-func commitManifest(t *testing.T, ctx *util.Context, manifest *util.Manifest, manifestDir string) {
-	data, err := xml.Marshal(*manifest)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	manifestFile, perm := filepath.Join(manifestDir, "v2", "default"), os.FileMode(0644)
-	if err := ioutil.WriteFile(manifestFile, data, perm); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", manifestFile, err, perm)
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer ctx.Run().Chdir(cwd)
-	if err := ctx.Run().Chdir(manifestDir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().CommitFile(manifestFile, "creating manifest"); err != nil {
-		t.Fatalf("%v", err)
-	}
-}
-
 func localProjectName(i int) string {
 	return "test-local-project-" + fmt.Sprintf("%d", i+1)
 }
@@ -224,32 +174,10 @@ func remoteProjectName(i int) string {
 	return "test-remote-project-" + fmt.Sprintf("%d", i+1)
 }
 
-func setupNewProject(t *testing.T, ctx *util.Context, dir, name string) string {
-	projectDir, perm := filepath.Join(dir, name), os.FileMode(0755)
-	if err := ctx.Run().MkdirAll(projectDir, perm); err != nil {
-		t.Fatalf("%v", err)
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer ctx.Run().Chdir(cwd)
-	if err := ctx.Run().Chdir(projectDir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().Init(projectDir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().Commit(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	return projectDir
-}
-
-func writeReadme(t *testing.T, ctx *util.Context, projectDir, message string) {
+func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
-	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", path, perm, err)
+	if err := ctx.Run().WriteFile(path, []byte(message), perm); err != nil {
+		t.Fatalf("%v", err)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -265,54 +193,46 @@ func writeReadme(t *testing.T, ctx *util.Context, projectDir, message string) {
 }
 
 func TestCreate(t *testing.T) {
-	// Setup an instance of vanadium universe, creating the remote
-	// repositories for the manifest and projects under the
-	// "remote" directory, which is ignored from the consideration
-	// of LocalProjects().
-	ctx := util.DefaultContext()
-	rootDir, err := ctx.Run().TempDir("", "")
+	// Setup a fake VANADIUM_ROOT instance.
+	ctx := tool.NewDefaultContext()
+	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
+		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().RemoveAll(rootDir)
-	localDir := filepath.Join(rootDir, "local")
-	remoteDir := filepath.Join(rootDir, "remote")
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", localDir); err != nil {
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+
+	// Setup the initial remote and local projects.
+	numProjects, remoteProjects := 2, []string{}
+	for i := 0; i < numProjects; i++ {
+		root.CreateRemoteProject(ctx, remoteProjectName(i))
+		root.AddProject(ctx, util.Project{
+			Name:   remoteProjectName(i),
+			Path:   localProjectName(i),
+			Remote: root.Projects[remoteProjectName(i)],
+		})
+	}
+
+	// Create a fake configuration file.
+	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"remote-snapshot": []string{}}))
+	root.WriteLocalToolsConfig(ctx, config)
+
+	oldRoot, err := util.VanadiumRoot()
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
-	localManifest := setupNewProject(t, ctx, localDir, ".manifest")
-	remoteManifest := setupNewProject(t, ctx, remoteDir, "test-remote-manifest")
-	addRemote(t, ctx, localManifest, "origin", remoteManifest)
-	numProjects, remoteProjects := 2, []string{}
-	for i := 0; i < numProjects; i++ {
-		remoteProject := setupNewProject(t, ctx, remoteDir, remoteProjectName(i))
-		remoteProjects = append(remoteProjects, remoteProject)
-	}
-	createRemoteManifest(t, ctx, remoteManifest, remoteProjects)
-	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"remote-snapshot": []string{}}))
-	createConfig(t, ctx, config)
 
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
-	for _, remoteProject := range remoteProjects {
-		writeReadme(t, ctx, remoteProject, "revision 1")
+	for i := 0; i < numProjects; i++ {
+		writeReadme(t, ctx, root.Projects[remoteProjectName(i)], "revision 1")
 	}
-	if err := util.UpdateUniverse(ctx, "default", true); err != nil {
+	if err := util.UpdateUniverse(ctx, true); err != nil {
 		t.Fatalf("%v", err)
-	}
-
-	// Change the branch of the remote manifest repository away
-	// from the "master" branch, so that we can push changes to it
-	// from the local manifest repository in the course of
-	// creating a remote snapshot.
-	if err := ctx.Run().Chdir(remoteManifest); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().CreateAndCheckoutBranch("non-master"); err != nil {
-		t.Fatalf("%v", err)
-
 	}
 
 	// Create a local snapshot.
@@ -325,7 +245,7 @@ func TestCreate(t *testing.T) {
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(localDir, localProjectName(i))
+		localProject := filepath.Join(root.Dir, localProjectName(i))
 		if err := ctx.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -338,34 +258,42 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	snapshotFile := filepath.Join(snapshotDir, "local-snapshot")
-	if err := util.UpdateUniverse(ctx, snapshotFile, true); err != nil {
+	localCtx := ctx.Clone(tool.ContextOpts{
+		Manifest: &snapshotFile,
+	})
+	if err := util.UpdateUniverse(localCtx, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(localDir, localProjectName(i))
+		localProject := filepath.Join(root.Dir, localProjectName(i))
 		checkReadme(t, ctx, localProject, "revision 1")
 	}
 
 	// Create a remote snapshot.
 	remoteFlag = true
-	if err := runSnapshotCreate(&command, []string{"remote-snapshot"}); err != nil {
+	manifest := "remote-snapshot"
+	root.EnableRemoteManifestPush(ctx)
+	if err := runSnapshotCreate(&command, []string{manifest}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(localDir, localProjectName(i))
+		localProject := filepath.Join(root.Dir, localProjectName(i))
 		if err := ctx.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
 
 	// Check that invoking the UpdateUniverse() with the remote snapshot.
-	if err := util.UpdateUniverse(ctx, "remote-snapshot", true); err != nil {
+	remoteCtx := ctx.Clone(tool.ContextOpts{
+		Manifest: &manifest,
+	})
+	if err := util.UpdateUniverse(remoteCtx, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(localDir, localProjectName(i))
+		localProject := filepath.Join(root.Dir, localProjectName(i))
 		checkReadme(t, ctx, localProject, "revision 1")
 	}
 }

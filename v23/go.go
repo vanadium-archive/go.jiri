@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"v.io/x/devtools/lib/collect"
-	"v.io/x/devtools/lib/envutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/envutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -53,7 +54,11 @@ func runGo(command *cmdline.Command, args []string) error {
 	if len(args) == 0 {
 		return command.UsageErrorf("not enough arguments")
 	}
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	return runGoForPlatform(ctx, util.HostPlatform(), command, args)
 }
 
@@ -91,7 +96,11 @@ func runXGo(command *cmdline.Command, args []string) error {
 	if len(args) < 2 {
 		return command.UsageErrorf("not enough arguments")
 	}
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	platform, err := util.ParsePlatform(args[0])
 	if err != nil {
 		return err
@@ -122,7 +131,7 @@ func setBuildInfoFlags(args []string, platform util.Platform) []string {
 	return append([]string{args[0], ldflags}, args[1:]...)
 }
 
-func runGoForPlatform(ctx *util.Context, platform util.Platform, command *cmdline.Command, args []string) error {
+func runGoForPlatform(ctx *tool.Context, platform util.Platform, command *cmdline.Command, args []string) error {
 	// Generate vdl files, if necessary.
 	switch args[0] {
 	case "build", "install":
@@ -145,7 +154,7 @@ func runGoForPlatform(ctx *util.Context, platform util.Platform, command *cmdlin
 	}
 
 	// Run the go tool for the given platform.
-	targetEnv, err := util.VanadiumEnvironment(platform)
+	targetEnv, err := util.VanadiumEnvironment(ctx, platform)
 	if err != nil {
 		return err
 	}
@@ -174,8 +183,8 @@ func runGoForPlatform(ctx *util.Context, platform util.Platform, command *cmdlin
 //
 // TODO(toddw): Change the vdl tool to return vdl packages given the
 // full Go dependencies, after vdl config files are implemented.
-func generateVDL(ctx *util.Context, cmdArgs []string) error {
-	hostEnv, err := util.VanadiumEnvironment(util.HostPlatform())
+func generateVDL(ctx *tool.Context, cmdArgs []string) error {
+	hostEnv, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		return err
 	}
@@ -208,7 +217,7 @@ func generateVDL(ctx *util.Context, cmdArgs []string) error {
 // reportOutdatedProjects checks if the currently checked out branches
 // are up-to-date with respect to the local master branch. For each
 // branch that is not, a notification is printed.
-func reportOutdatedBranches(ctx *util.Context) (e error) {
+func reportOutdatedBranches(ctx *tool.Context) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -365,7 +374,7 @@ func makeStringSet(values []string) map[string]bool {
 // string that dumps the specified pkgs and all deps as space / newline
 // separated tokens.  The pkgs may be in any format recognized by "go list"; dir
 // paths, import paths, or go files.
-func computeGoDeps(ctx *util.Context, env *envutil.Snapshot, pkgs []string) ([]string, error) {
+func computeGoDeps(ctx *tool.Context, env *envutil.Snapshot, pkgs []string) ([]string, error) {
 	goListArgs := []string{`list`, `-f`, `{{.ImportPath}} {{join .Deps " "}}`}
 	goListArgs = append(goListArgs, pkgs...)
 	var stdout, stderr bytes.Buffer
@@ -425,8 +434,12 @@ packages that no longer exist in the source tree.
 }
 
 func runGoExtDistClean(command *cmdline.Command, _ []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
-	env, err := util.VanadiumEnvironment(util.HostPlatform())
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		return err
 	}

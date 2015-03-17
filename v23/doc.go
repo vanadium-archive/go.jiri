@@ -28,10 +28,10 @@ The v23 commands are:
 Run "v23 help [command]" for command usage.
 
 The v23 flags are:
+ -color=true
+   Use color to format output.
  -n=false
    Show what commands will run but do not execute them.
- -nocolor=false
-   Do not use color to format output.
  -v=false
    Print verbose output.
 

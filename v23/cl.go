@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"strings"
 
-	"v.io/x/devtools/lib/collect"
-	"v.io/x/devtools/lib/gerrit"
-	"v.io/x/devtools/lib/gitutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/gerrit"
+	"v.io/x/devtools/internal/gitutil"
+	"v.io/x/devtools/internal/tool"
 	"v.io/x/lib/cmdline"
 )
 
@@ -68,7 +68,7 @@ reports the difference and stops. Otherwise, it deletes the branch.
 	ArgsLong: "<branches> is a list of branches to cleanup.",
 }
 
-func cleanup(ctx *util.Context, branches []string) (e error) {
+func cleanup(ctx *tool.Context, branches []string) (e error) {
 	currentBranch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return err
@@ -96,7 +96,7 @@ func cleanup(ctx *util.Context, branches []string) (e error) {
 	return nil
 }
 
-func cleanupBranch(ctx *util.Context, branch string) error {
+func cleanupBranch(ctx *tool.Context, branch string) error {
 	if err := ctx.Git().CheckoutBranch(branch, !gitutil.Force); err != nil {
 		return err
 	}
@@ -135,7 +135,11 @@ func runCLCleanup(command *cmdline.Command, args []string) error {
 	if len(args) == 0 {
 		return command.UsageErrorf("cleanup requires at least one argument")
 	}
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	return cleanup(ctx, args)
 }
 
@@ -235,8 +239,11 @@ func runCLMail(command *cmdline.Command, _ []string) error {
 		return command.UsageErrorf("Invalid value for -presubmit flag. Valid values: %s.",
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
-
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	repo := ""
 	review, err := newReview(ctx, draftFlag, editFlag, repo, reviewersFlag, ccsFlag, gerrit.PresubmitTestType(presubmitFlag))
 	if err != nil {
@@ -285,7 +292,7 @@ type review struct {
 	// ccs is the list of LDAPs or emails to cc on the review.
 	ccs string
 	// ctx is an instance of the command-line tool context.
-	ctx *util.Context
+	ctx *tool.Context
 	// draft indicates whether to create a draft review.
 	draft bool
 	// edit indicates whether to edit the review message.
@@ -303,7 +310,7 @@ type review struct {
 // newReview is the review factory.
 //
 // TODO(jingjin): use optional arguments.
-func newReview(ctx *util.Context, draft, edit bool, repo, reviewers, ccs string, presubmit gerrit.PresubmitTestType) (*review, error) {
+func newReview(ctx *tool.Context, draft, edit bool, repo, reviewers, ccs string, presubmit gerrit.PresubmitTestType) (*review, error) {
 	branch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return nil, err

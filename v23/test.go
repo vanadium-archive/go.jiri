@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"v.io/x/devtools/lib/testutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/testutil"
+	"v.io/x/devtools/internal/tool"
 	"v.io/x/lib/cmdline"
 )
 
@@ -49,7 +49,11 @@ func runTestProject(command *cmdline.Command, args []string) error {
 	if len(args) != 1 {
 		return command.UsageErrorf("unexpected number of arguments")
 	}
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	project := args[0]
 	results, err := testutil.RunProjectTests(ctx, nil, []string{project}, optsFromFlags()...)
 	if err != nil {
@@ -78,7 +82,11 @@ func runTestRun(command *cmdline.Command, args []string) error {
 	if len(args) == 0 {
 		return command.UsageErrorf("unexpected number of arguments")
 	}
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	results, err := testutil.RunTests(ctx, nil, args, optsFromFlags()...)
 	if err != nil {
 		return err
@@ -111,7 +119,7 @@ func optsFromFlags() (opts []testutil.TestOpt) {
 	return
 }
 
-func printSummary(ctx *util.Context, results map[string]*testutil.TestResult) {
+func printSummary(ctx *tool.Context, results map[string]*testutil.TestResult) {
 	fmt.Fprintf(ctx.Stdout(), "SUMMARY:\n")
 	for name, result := range results {
 		fmt.Fprintf(ctx.Stdout(), "%v %s\n", name, result.Status)
@@ -137,7 +145,12 @@ var cmdTestList = &cmdline.Command{
 }
 
 func runTestList(command *cmdline.Command, _ []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:    &colorFlag,
+		DryRun:   &dryRunFlag,
+		Manifest: &manifestFlag,
+		Verbose:  &verboseFlag,
+	})
 	testList, err := testutil.TestList()
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr(), "%v\n", err)

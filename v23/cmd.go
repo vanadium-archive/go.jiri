@@ -7,17 +7,17 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/x/devtools/lib/collect"
-	"v.io/x/devtools/lib/gitutil"
-	"v.io/x/devtools/lib/util"
-	"v.io/x/devtools/lib/version"
+	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/gitutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
 var (
 	verboseFlag  bool
 	dryRunFlag   bool
-	noColorFlag  bool
+	colorFlag    bool
 	manifestFlag string
 )
 
@@ -26,7 +26,7 @@ func init() {
 
 	cmdRoot.Flags.BoolVar(&verboseFlag, "v", false, "Print verbose output.")
 	cmdRoot.Flags.BoolVar(&dryRunFlag, "n", false, "Show what commands will run but do not execute them.")
-	cmdRoot.Flags.BoolVar(&noColorFlag, "nocolor", false, "Do not use color to format output.")
+	cmdRoot.Flags.BoolVar(&colorFlag, "color", true, "Use color to format output.")
 }
 
 // root returns a command that represents the root of the v23 tool.
@@ -74,7 +74,11 @@ considered by default.
 }
 
 func runContributors(command *cmdline.Command, args []string) error {
-	ctx := util.NewContextFromCommand(command, !noColorFlag, dryRunFlag, verboseFlag)
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	projects, err := util.LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -100,7 +104,7 @@ func runContributors(command *cmdline.Command, args []string) error {
 		}
 		switch project.Protocol {
 		case "git":
-			lines, err := listCommitters(ctx.Git())
+			lines, err := listCommitters(ctx)
 			if err != nil {
 				return err
 			}
@@ -126,23 +130,23 @@ func runContributors(command *cmdline.Command, args []string) error {
 	return nil
 }
 
-func listCommitters(git *gitutil.Git) (_ []string, e error) {
-	branch, err := git.CurrentBranchName()
+func listCommitters(ctx *tool.Context) (_ []string, e error) {
+	branch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
-	stashed, err := git.Stash()
+	stashed, err := ctx.Git().Stash()
 	if err != nil {
 		return nil, err
 	}
 	if stashed {
-		defer collect.Error(func() error { return git.StashPop() }, &e)
+		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
 	}
-	if err := git.CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
 		return nil, err
 	}
-	defer collect.Error(func() error { return git.CheckoutBranch(branch, !gitutil.Force) }, &e)
-	return git.Committers()
+	defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch, !gitutil.Force) }, &e)
+	return ctx.Git().Committers()
 }
 
 // cmdVersion represents the "v23 version" command.
@@ -154,6 +158,6 @@ var cmdVersion = &cmdline.Command{
 }
 
 func runVersion(command *cmdline.Command, _ []string) error {
-	fmt.Fprintf(command.Stdout(), "v23 tool version %v\n", version.Version)
+	fmt.Fprintf(command.Stdout(), "v23 tool version %v\n", tool.Version)
 	return nil
 }

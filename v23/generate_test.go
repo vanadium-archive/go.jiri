@@ -15,7 +15,8 @@ import (
 	"go/parser"
 	"go/token"
 
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 )
 
 func fnNames(decls []ast.Decl) []string {
@@ -39,7 +40,8 @@ func parseFile(t *testing.T, file string) []string {
 }
 
 func TestMain(m *testing.M) {
-	env, err := util.VanadiumEnvironment(util.HostPlatform())
+	ctx := tool.NewDefaultContext()
+	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		panic(err)
 	}

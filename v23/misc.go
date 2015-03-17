@@ -5,8 +5,9 @@ import (
 	"os/exec"
 	"syscall"
 
-	"v.io/x/devtools/lib/envutil"
-	"v.io/x/devtools/lib/util"
+	"v.io/x/devtools/internal/envutil"
+	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -52,11 +53,16 @@ each on a separate line in the same order as the arguments.
 }
 
 func runEnv(command *cmdline.Command, args []string) error {
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
 	platform, err := util.ParsePlatform(platformFlag)
 	if err != nil {
 		return err
 	}
-	env, err := util.VanadiumEnvironment(platform)
+	env, err := util.VanadiumEnvironment(ctx, platform)
 	if err != nil {
 		return err
 	}
@@ -89,7 +95,12 @@ func runRun(command *cmdline.Command, args []string) error {
 	if len(args) == 0 {
 		return command.UsageErrorf("no command to run")
 	}
-	env, err := util.VanadiumEnvironment(util.HostPlatform())
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		return err
 	}
