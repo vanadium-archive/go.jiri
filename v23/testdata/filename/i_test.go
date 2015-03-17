@@ -18,7 +18,7 @@ func moduleInternalFilename(stdin io.Reader, stdout, stderr io.Writer, env map[s
 }
 
 func TestInternalFilename(t *testing.T) {
-	sh, err := modules.NewExpectShell(nil, nil, t, false)
+	sh, err := modules.NewShell(nil, nil, false, t)
 	if err != nil {
 		t.Fatal(err)
 	}
