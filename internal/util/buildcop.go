@@ -4,9 +4,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"os"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"v.io/x/devtools/internal/tool"
@@ -58,16 +55,4 @@ func BuildCop(ctx *tool.Context, targetTime time.Time) (string, error) {
 		}
 	}
 	return "", nil
-}
-
-// ThirdPartyBinPath returns the path to the given third-party tool
-// taking into account the host and the target Go architecture.
-func ThirdPartyBinPath(root, name string) string {
-	bin := filepath.Join(root, "third_party", "go", "bin", name)
-	goArch := os.Getenv("GOARCH")
-	// runtime.GOARCH is not affected by GOARCH environment variable.
-	if goArch != "" && goArch != runtime.GOARCH {
-		bin = filepath.Join(root, "third_party", "go", "bin", fmt.Sprintf("%s_%s", runtime.GOOS, goArch), name)
-	}
-	return bin
 }
