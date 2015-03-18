@@ -5,16 +5,21 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"v.io/x/lib/envutil"
 )
 
 // ThirdPartyBinPath returns the path to the given third-party tool
 // taking into account the host and the target Go architecture.
-func ThirdPartyBinPath(root, name string) string {
+func ThirdPartyBinPath(root, name string) (string, error) {
+	machineArch, err := envutil.Arch()
+	if err != nil {
+		return "", err
+	}
 	bin := filepath.Join(root, "third_party", "go", "bin", name)
 	goArch := os.Getenv("GOARCH")
-	// TODO(jingjin): we assume now we run all our tests on amd64 machines.
-	if goArch != "" && goArch != "amd64" {
+	if goArch != "" && goArch != machineArch {
 		bin = filepath.Join(root, "third_party", "go", "bin", fmt.Sprintf("%s_%s", runtime.GOOS, goArch), name)
 	}
-	return bin
+	return bin, nil
 }

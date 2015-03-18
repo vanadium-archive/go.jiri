@@ -776,7 +776,10 @@ func installGoCoverCobertura(ctx *tool.Context) error {
 		return err
 	}
 	// Check if the tool exists.
-	bin := util.ThirdPartyBinPath(root, "gocover-cobertura")
+	bin, err := util.ThirdPartyBinPath(root, "gocover-cobertura")
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(bin); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -796,7 +799,10 @@ func installGo2XUnit(ctx *tool.Context) error {
 		return err
 	}
 	// Check if the tool exists.
-	bin := util.ThirdPartyBinPath(root, "go2xunit")
+	bin, err := util.ThirdPartyBinPath(root, "go2xunit")
+	if err != nil {
+		return err
+	}
 	if _, err := os.Stat(bin); err != nil {
 		if !os.IsNotExist(err) {
 			return err

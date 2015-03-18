@@ -70,7 +70,10 @@ func coverageFromGoTestOutput(ctx *tool.Context, testOutput io.Reader) (*testCov
 	if err != nil {
 		return nil, err
 	}
-	bin := util.ThirdPartyBinPath(root, "gocover-cobertura")
+	bin, err := util.ThirdPartyBinPath(root, "gocover-cobertura")
+	if err != nil {
+		return nil, err
+	}
 	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		return nil, err

@@ -128,7 +128,10 @@ func TestSuiteFromGoTestOutput(ctx *tool.Context, testOutput io.Reader) (*TestSu
 	if err != nil {
 		return nil, err
 	}
-	bin := util.ThirdPartyBinPath(root, "go2xunit")
+	bin, err := util.ThirdPartyBinPath(root, "go2xunit")
+	if err != nil {
+		return nil, err
+	}
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stdin = testOutput
