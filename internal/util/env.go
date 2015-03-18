@@ -83,12 +83,13 @@ func ConfigPath(ctx *tool.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if tool.Name == "" {
+	toolName := tool.Name
+	if toolName == "" {
 		// If the tool name is not set, use "v23" as the default. As a
 		// consequence, any manifest is assumed to specify a "v23" tool.
-		tool.Name = "v23"
+		toolName = "v23"
 	}
-	tool, ok := tools[tool.Name]
+	tool, ok := tools[toolName]
 	if !ok {
 		return "", fmt.Errorf("tool %q not found in the manifest", tool.Name)
 	}
