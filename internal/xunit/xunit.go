@@ -128,7 +128,7 @@ func TestSuiteFromGoTestOutput(ctx *tool.Context, testOutput io.Reader) (*TestSu
 	if err != nil {
 		return nil, err
 	}
-	bin := filepath.Join(root, "third_party", "go", "bin", "go2xunit")
+	bin := util.ThirdPartyBinPath(root, "go2xunit")
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stdin = testOutput
