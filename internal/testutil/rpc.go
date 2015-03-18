@@ -31,19 +31,19 @@ const (
 	gceZone              = "asia-east1-a"
 	gceServerMachineType = "n1-highcpu-8"
 	gceClientMachineType = "n1-highcpu-4"
-	gceNodePrefix        = "tmpnode-ipc-stress"
+	gceNodePrefix        = "tmpnode-rpc-stress"
 
 	vcloudPkg = "v.io/x/devtools/vcloud"
-	serverPkg = "v.io/x/ref/profiles/internal/ipc/stress/stressd"
-	clientPkg = "v.io/x/ref/profiles/internal/ipc/stress/stress"
+	serverPkg = "v.io/x/ref/profiles/internal/rpc/stress/stressd"
+	clientPkg = "v.io/x/ref/profiles/internal/rpc/stress/stress"
 )
 
 var (
 	binPath = filepath.Join("release", "go", "bin")
 )
 
-// vanadiumGoIPCStress runs an IPC stress test with multiple GCE instances.
-func vanadiumGoIPCStress(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+// vanadiumGoRPCStress runs an RPC stress test with multiple GCE instances.
+func vanadiumGoRPCStress(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
@@ -227,7 +227,7 @@ func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
 		return nil, err
 	}
 
-	// Get the ipc stats from the servers and stop them.
+	// Get the rpc stats from the servers and stop them.
 	args = []string{
 		"run",
 		"-failfast",
@@ -246,7 +246,7 @@ func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
 		return nil, err
 	}
 
-	// Verify the ipc stats.
+	// Verify the rpc stats.
 	cStats, sStats, err := readStats(out.String())
 	if err != nil {
 		if err := xunit.CreateFailureReport(ctx, testName, "StressTest", "ReadStats", "Failure", err.Error()); err != nil {
@@ -256,8 +256,8 @@ func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
 	}
 
 	fmt.Fprint(ctx.Stdout(), "\nRESULT:\n")
-	fmt.Fprintf(ctx.Stdout(), "client ipc stats: %+v\n", *cStats)
-	fmt.Fprintf(ctx.Stdout(), "server ipc stats: %+v\n", *sStats)
+	fmt.Fprintf(ctx.Stdout(), "client rpc stats: %+v\n", *cStats)
+	fmt.Fprintf(ctx.Stdout(), "server rpc stats: %+v\n", *sStats)
 	fmt.Fprint(ctx.Stdout(), "\n")
 
 	if cStats.sumCount != sStats.sumCount || cStats.sumStreamCount != sStats.sumStreamCount {
@@ -314,7 +314,7 @@ func readOneStats(re *regexp.Regexp, out string) (int, *stressStats, error) {
 			return 0, nil, fmt.Errorf("%v: %v", err, match)
 		}
 		if sumCount == 0 || sumStreamCount == 0 {
-			// Although clients choose servers and IPC methods randomly, we report
+			// Although clients choose servers and RPC methods randomly, we report
 			// this as a failure since it is very unlikely.
 			return 0, nil, fmt.Errorf("zero count: %v", match)
 		}

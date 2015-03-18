@@ -222,7 +222,7 @@ var defaultMessageHeader = `
 #
 # For example:
 #
-# ipc/stream/proxy: add publish address
+# rpc/stream/proxy: add publish address
 #
 # The listen address is not always the same as the address that external
 # users need to connect to. This CL adds a new argument to proxy.New()

@@ -125,7 +125,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...TestOpt) (*TestRes
 	"vanadium-go-snapshot":            vanadiumGoSnapshot,
 	"vanadium-go-test":                vanadiumGoTest,
 	"vanadium-go-vdl":                 vanadiumGoVDL,
-	"vanadium-go-ipc-stress":          vanadiumGoIPCStress,
+	"vanadium-go-rpc-stress":          vanadiumGoRPCStress,
 	"vanadium-integration-test":       vanadiumIntegrationTest,
 	"vanadium-js-build-extension":     vanadiumJSBuildExtension,
 	"vanadium-js-doc":                 vanadiumJSDoc,
