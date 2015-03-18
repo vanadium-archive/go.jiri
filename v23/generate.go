@@ -247,26 +247,36 @@ func importsModules(imports []string) bool {
 	return false
 }
 
+func filteredImports(imports []string, pos map[string][]token.Position) []string {
+	var ret []string
+	for _, imp := range imports {
+		// If the only importer of this package is one of the files we are regenerating,
+		// then filter those imports out.
+		if positions := pos[imp]; len(positions) == 1 {
+			if fname := positions[0].Filename; fname == prefixFlag+externalSuffix || fname == prefixFlag+internalSuffix {
+				continue
+			}
+		}
+		ret = append(ret, imp)
+	}
+	return ret
+}
+
 func generatePackage(ctx *tool.Context, pkg *build.Package) error {
 	fset := token.NewFileSet() // positions are relative to fset
 	cache := importCache{}
-	intTestUsesModules := importsModules(pkg.TestImports)
+	testImports := filteredImports(pkg.TestImports, pkg.TestImportPos)
+	xtestImports := filteredImports(pkg.XTestImports, pkg.XTestImportPos)
+	intTestUsesModules := importsModules(testImports)
 	intTestMain, intModules, _, err := processFiles(fset, pkg.Dir, pkg.TestGoFiles)
 	if err != nil {
 		return err
 	}
-	extTestUsesModules := importsModules(pkg.XTestImports)
+	extTestUsesModules := importsModules(xtestImports)
 	extTestMain, extModules, v23Tests, err := processFiles(fset, pkg.Dir, pkg.XTestGoFiles)
 	if err != nil {
 		return err
 	}
-
-	// TODO(cnicolaou): need to filter out from TestImports and XTestImports
-	// any imports that are specific to the generated files that we may
-	// process. For example, if a generated v23_test.go imports a package
-	// that has moved, then we will fail to find (since that package is
-	// included in XTestImports) and then we won't overwrite that
-	// generated file with a fixed one.
 
 	// Don't bother with transitive checks if we don't actually call
 	// modules from this test.
@@ -274,7 +284,7 @@ func generatePackage(ctx *tool.Context, pkg *build.Package) error {
 	if intTestUsesModules {
 		// Determine if we transitively import packages that define modules.
 		imports := append([]string{}, pkg.Imports...)
-		imports = append(imports, pkg.TestImports...)
+		imports = append(imports, testImports...)
 		intDepsDefineModules, err = cache.transitiveModules(pkg, imports, fset)
 		if err != nil {
 			return err
@@ -290,7 +300,7 @@ func generatePackage(ctx *tool.Context, pkg *build.Package) error {
 
 	if extTestUsesModules {
 		// Determine if we transitively import packages that define modules.
-		extDepsDefineModules, err = cache.transitiveModules(pkg, pkg.XTestImports, fset)
+		extDepsDefineModules, err = cache.transitiveModules(pkg, xtestImports, fset)
 		if err != nil {
 			return err
 		}
