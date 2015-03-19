@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+func is386() bool {
+	return runtime.GOARCH == "386"
+}
+
 func isCI() bool {
 	return os.Getenv("USER") == "veyron"
 }
@@ -24,12 +28,4 @@ func isYosemite() bool {
 		return true
 	}
 	return strings.Contains(string(out), "Version 14.")
-}
-
-func isLinux() bool {
-	return runtime.GOOS == "linux"
-}
-
-func isCIOrDarwin() bool {
-	return isCI() || isDarwin()
 }
