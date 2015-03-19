@@ -3,6 +3,7 @@ package testutil
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -32,28 +33,37 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 	}
 
 	// Upload all v.io binaries to Google Storage.
-	bucket := fmt.Sprintf("gs://vanadium-binaries/%s_%s/%s/", runtime.GOOS, runtime.GOARCH, time.Now().Format(time.RFC3339))
+	timestamp := time.Now().Format(time.RFC3339)
+	bucket := fmt.Sprintf("gs://vanadium-binaries/%s_%s/", runtime.GOOS, runtime.GOARCH)
 	root, err := util.VanadiumRoot()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
 	binaries := filepath.Join(root, "release", "go", "bin", "*")
-	if err := ctx.Run().Command("gsutil", "-m", "-q", "cp", binaries, bucket); err != nil {
+	if err := ctx.Run().Command("gsutil", "-m", "-q", "cp", binaries, path.Join(bucket, timestamp)); err != nil {
 		return nil, internalTestError{err, "Upload"}
 	}
 
-	// Create a file that indicates that the upload of binaries
-	// succeeded.
+	// Upload two files: 1) a file that identifies the directory
+	// containing the latest set of binaries and 2) a file that
+	// indicates that the upload of binaries succeeded.
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
 		return nil, internalTestError{err, "TempDir"}
 	}
 	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-	tmpFile := filepath.Join(tmpDir, ".done")
-	if err := ctx.Run().WriteFile(tmpFile, nil, os.FileMode(0600)); err != nil {
+	doneFile := filepath.Join(tmpDir, ".done")
+	if err := ctx.Run().WriteFile(doneFile, nil, os.FileMode(0600)); err != nil {
 		return nil, internalTestError{err, "WriteFile"}
 	}
-	if err := ctx.Run().Command("gsutil", "-m", "-q", "cp", tmpFile, bucket); err != nil {
+	if err := ctx.Run().Command("gsutil", "-q", "cp", doneFile, path.Join(bucket, timestamp)); err != nil {
+		return nil, internalTestError{err, "Upload"}
+	}
+	latestFile := filepath.Join(tmpDir, "latest")
+	if err := ctx.Run().WriteFile(latestFile, []byte(timestamp), os.FileMode(0600)); err != nil {
+		return nil, internalTestError{err, "WriteFile"}
+	}
+	if err := ctx.Run().Command("gsutil", "-q", "cp", latestFile, bucket); err != nil {
 		return nil, internalTestError{err, "Upload"}
 	}
 
