@@ -8,7 +8,7 @@ import (
 )
 
 func is386() bool {
-	return runtime.GOARCH == "386"
+	return runtime.GOARCH == "386" || os.Getenv("GOARCH") == "386"
 }
 
 func isCI() bool {
