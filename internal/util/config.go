@@ -182,13 +182,13 @@ func (c Config) VDLWorkspaces() []string {
 }
 
 type config struct {
-	GoWorkspaces       []string            `json:"go-workspaces"`
+	GoWorkspaces       []string            `json:"go-workspaces-new"`
 	ProjectTests       map[string][]string `json:"project-tests"`
 	SnapshotLabelTests map[string][]string `json:"snapshot-label-tests"`
 	TestDependencies   map[string][]string `json:"test-dependencies"`
 	TestGroups         map[string][]string `json:"test-groups"`
 	TestParts          map[string][]string `json:"test-parts"`
-	VDLWorkspaces      []string            `json:"vdl-workspaces"`
+	VDLWorkspaces      []string            `json:"vdl-workspaces-new"`
 }
 
 var _ json.Marshaler = (*Config)(nil)
