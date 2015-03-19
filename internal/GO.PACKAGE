@@ -3,6 +3,8 @@
 		"outgoing": [
 			{"allow": "v.io/x/lib/..."},
 			{"allow": "v.io/x/devtools/internal/..."},
+			{"allow": "code.google.com/p/goauth2/..."},
+			{"allow": "google.golang.org/api/cloudmonitoring/..."},
 			{"deny": "..."}
 		]
 	}
