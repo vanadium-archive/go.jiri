@@ -886,10 +886,16 @@ type exclusion struct {
 	exclude bool
 }
 
-var thirdPartyExclusions []exclusion
+var (
+	exclusions []exclusion
+)
 
 func init() {
-	thirdPartyExclusions = []exclusion{
+	exclusions = []exclusion{
+		// This test triggers a bug in go 1.4.1 garbage collector.
+		//
+		// https://github.com/veyron/release-issues/issues/1494
+		exclusion{test{pkg: "v.io/x/ref/profiles/internal/rpc/stream/vc", name: "TestConcurrentFlows"}, isDarwin() && is386()},
 		// The fsnotify package tests are flaky on darwin. This begs the
 		// question of whether we should be relying on this library at
 		// all.
@@ -922,10 +928,10 @@ func init() {
 	}
 }
 
-// ExcludedThirdPartyTests returns the set of tests to be excluded from
-// the third_party project.
-func ExcludedThirdPartyTests() ([]test, error) {
-	return excludedTests(thirdPartyExclusions)
+// ExcludedTests returns the set of tests to be excluded from
+// the Vanadium projects.
+func ExcludedTests() ([]test, error) {
+	return excludedTests(exclusions)
 }
 
 func excludedTests(exclusions []exclusion) ([]test, error) {
@@ -1029,7 +1035,7 @@ func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 	if err != nil {
 		return nil, err
 	}
-	exclusions, err := ExcludedThirdPartyTests()
+	exclusions, err := ExcludedTests()
 	if err != nil {
 		return nil, err
 	}
@@ -1049,7 +1055,7 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 		return nil, err
 	}
 	args := argsOpt([]string{"-race"})
-	exclusions, err := ExcludedThirdPartyTests()
+	exclusions, err := ExcludedTests()
 	if err != nil {
 		return nil, err
 	}
@@ -1260,13 +1266,17 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 	if err != nil {
 		return nil, err
 	}
+	exclusions, err := ExcludedTests()
+	if err != nil {
+		return nil, err
+	}
 	args := argsOpt([]string{"-race"})
 	if getShortTestsOnlyOptValue(opts) {
 		args = append(args, "-short")
 	}
 	timeout := timeoutOpt("15m")
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
-	return goTest(ctx, testName, args, timeout, suffix, partPkgs)
+	return goTest(ctx, testName, args, timeout, suffix, excludedTestsOpt(exclusions), partPkgs)
 }
 
 // identifyPackagesToTest returns a slice of packages to test using the
@@ -1369,10 +1379,14 @@ func vanadiumGoTest(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 	if err != nil {
 		return nil, err
 	}
+	exclusions, err := ExcludedTests()
+	if err != nil {
+		return nil, err
+	}
 	args := argsOpt([]string{})
 	if getShortTestsOnlyOptValue(opts) {
 		args = append(args, "-short")
 	}
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, pkgs, args)
+	return goTest(ctx, testName, suffix, excludedTestsOpt(exclusions), pkgs, args)
 }
