@@ -242,8 +242,8 @@ func setArmEnv(env *envutil.Snapshot, platform Platform) error {
 func setGoPath(env *envutil.Snapshot, root string, config *Config) {
 	gopath := env.GetTokens("GOPATH", ":")
 	// Append an entry to gopath for each vanadium go workspace.
-	for _, repo := range config.GoWorkspaces() {
-		gopath = append(gopath, filepath.Join(root, repo, "go"))
+	for _, workspace := range config.GoWorkspaces() {
+		gopath = append(gopath, filepath.Join(root, workspace))
 	}
 	env.SetTokens("GOPATH", gopath, ":")
 }
@@ -256,8 +256,8 @@ func setVdlPath(env *envutil.Snapshot, root string, config *Config) {
 	//
 	// TODO(toddw): This logic will change when we pull vdl into a
 	// separate repo.
-	for _, repo := range config.VDLWorkspaces() {
-		vdlpath = append(vdlpath, filepath.Join(root, repo, "go"))
+	for _, workspace := range config.VDLWorkspaces() {
+		vdlpath = append(vdlpath, filepath.Join(root, workspace))
 	}
 	env.SetTokens("VDLPATH", vdlpath, ":")
 }
