@@ -3,7 +3,6 @@ package testutil
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -40,7 +39,7 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
 	binaries := filepath.Join(root, "release", "go", "bin", "*")
-	if err := ctx.Run().Command("gsutil", "-m", "-q", "cp", binaries, path.Join(bucket, timestamp)); err != nil {
+	if err := ctx.Run().Command("gsutil", "-m", "-q", "cp", binaries, bucket+timestamp); err != nil {
 		return nil, internalTestError{err, "Upload"}
 	}
 
@@ -56,7 +55,7 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 	if err := ctx.Run().WriteFile(doneFile, nil, os.FileMode(0600)); err != nil {
 		return nil, internalTestError{err, "WriteFile"}
 	}
-	if err := ctx.Run().Command("gsutil", "-q", "cp", doneFile, path.Join(bucket, timestamp)); err != nil {
+	if err := ctx.Run().Command("gsutil", "-q", "cp", doneFile, bucket+timestamp); err != nil {
 		return nil, internalTestError{err, "Upload"}
 	}
 	latestFile := filepath.Join(tmpDir, "latest")
