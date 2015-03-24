@@ -129,6 +129,30 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	return nil
 }
 
+// CurrentProjectName gets the name of the current project from the
+// current directory by reading the .v23/metadata.v2 file located at
+// the root of the current repository.
+func CurrentProjectName(ctx *tool.Context) (string, error) {
+	topLevel, err := ctx.Git().TopLevel()
+	if err != nil {
+		return "", nil
+	}
+	v23Dir := filepath.Join(topLevel, ".v23")
+	if _, err := os.Stat(v23Dir); err == nil {
+		metadataFile := filepath.Join(v23Dir, metadataFileName)
+		bytes, err := ctx.Run().ReadFile(metadataFile)
+		if err != nil {
+			return "", err
+		}
+		var project Project
+		if err := xml.Unmarshal(bytes, &project); err != nil {
+			return "", fmt.Errorf("Unmarshal() failed: %v", err)
+		}
+		return project.Name, nil
+	}
+	return "", nil
+}
+
 // LocalProjects scans the local filesystem to identify existing
 // projects.
 func LocalProjects(ctx *tool.Context) (Projects, error) {
@@ -461,6 +485,8 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 	return nil
 }
 
+const metadataFileName = "metadata.v2"
+
 // findLocalProjects implements LocalProjects.
 func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e error) {
 	cwd, err := os.Getwd()
@@ -471,9 +497,13 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 	if err := ctx.Run().Chdir(path); err != nil {
 		return err
 	}
+	root, err := VanadiumRoot()
+	if err != nil {
+		return err
+	}
 	v23Dir := filepath.Join(path, ".v23")
 	if _, err := os.Stat(v23Dir); err == nil {
-		metadataFile := filepath.Join(v23Dir, "metadata.v2")
+		metadataFile := filepath.Join(v23Dir, metadataFileName)
 		bytes, err := ctx.Run().ReadFile(metadataFile)
 		if err != nil {
 			return err
@@ -484,6 +514,10 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		}
 		if p, ok := projects[project.Name]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
+		}
+		// Root relative paths in the VANADIUM_ROOT.
+		if !filepath.IsAbs(project.Path) {
+			project.Path = filepath.Join(root, project.Path)
 		}
 		projects[project.Name] = project
 		return nil
@@ -757,11 +791,21 @@ func writeMetadata(ctx *tool.Context, project Project) (e error) {
 	if err := ctx.Run().Chdir(metadataDir); err != nil {
 		return err
 	}
+	// Replace absolute project paths with relative paths to make it
+	// possible to move VANADIUM_ROOT locally.
+	root, err := VanadiumRoot()
+	if err != nil {
+		return err
+	}
+	if !strings.HasSuffix(root, string(filepath.Separator)) {
+		root += string(filepath.Separator)
+	}
+	project.Path = strings.TrimPrefix(project.Path, root)
 	bytes, err := xml.Marshal(project)
 	if err != nil {
 		return fmt.Errorf("Marhsal() failed: %v", err)
 	}
-	metadataFile := filepath.Join(metadataDir, "metadata.v2")
+	metadataFile := filepath.Join(metadataDir, metadataFileName)
 	tmpMetadataFile := metadataFile + ".tmp"
 	if err := ctx.Run().WriteFile(tmpMetadataFile, bytes, os.FileMode(0644)); err != nil {
 		return err

@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -238,8 +236,8 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 		}
 	}
 
-	// Get the name of the current repository from .v23/metadata.v2, if applicable.
-	currentProjectName, err := getRepoName(ctx)
+	// Get the name of the current project.
+	currentProjectName, err := util.CurrentProjectName(ctx)
 	if err != nil {
 		return err
 	}
@@ -275,32 +273,6 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 	}
 	fmt.Println(strings.Join(statuses, ","))
 	return nil
-}
-
-// getRepoName gets the name of a repo from the current directory by reading
-// the .v23/metadata.v2 file located at the root of the repo.
-func getRepoName(ctx *tool.Context) (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("Getwd() failed: %v", err)
-	}
-	for wd != "/" {
-		curV23Dir := filepath.Join(wd, ".v23")
-		if _, err := os.Stat(curV23Dir); err == nil {
-			metadataFile := filepath.Join(curV23Dir, "metadata.v2")
-			bytes, err := ctx.Run().ReadFile(metadataFile)
-			if err != nil {
-				return "", err
-			}
-			var project util.Project
-			if err := xml.Unmarshal(bytes, &project); err != nil {
-				return "", fmt.Errorf("Unmarshal() failed: %v", err)
-			}
-			return project.Name, nil
-		}
-		wd = filepath.Dir(wd)
-	}
-	return "", nil
 }
 
 // cmdProjectPoll represents the "v23 project poll" command.
