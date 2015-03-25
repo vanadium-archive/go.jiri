@@ -62,7 +62,7 @@ func TestCopyright(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	for _, lang := range languages {
-		path := filepath.Join(projectPath, "test"+lang.Suffix)
+		path := filepath.Join(projectPath, "test"+lang.FileExtension)
 		if err := ctx.Run().WriteFile(path, nil, os.FileMode(0600)); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -120,7 +120,7 @@ func TestCopyright(t *testing.T) {
 		if err := checkProject(ctx, project, assets, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		path := filepath.Join(projectPath, "test"+lang.Suffix)
+		path := filepath.Join(projectPath, "test"+lang.FileExtension)
 		if err := ctx.Run().WriteFile(path, []byte("garbage"), os.FileMode(0600)); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -181,7 +181,7 @@ func TestCopyright(t *testing.T) {
 		if err := checkProject(ctx, project, assets, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		path := filepath.Join(projectPath, "test"+lang.Suffix)
+		path := filepath.Join(projectPath, "test"+lang.FileExtension)
 		if err := ctx.Run().WriteFile(path, []byte("garbage"), os.FileMode(0600)); err != nil {
 			t.Fatalf("%v", err)
 		}

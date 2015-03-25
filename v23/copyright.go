@@ -45,31 +45,41 @@ type copyrightAssets struct {
 }
 
 type languageSpec struct {
-	Comment      string
-	Interpreters map[string]struct{}
-	Suffix       string
+	CommentPrefix string
+	CommentSuffix string
+	Interpreters  map[string]struct{}
+	FileExtension string
 }
 
 var languages map[string]languageSpec = map[string]languageSpec{
+	"css": languageSpec{
+		CommentPrefix: "/* ",
+		CommentSuffix: " */",
+		FileExtension: ".css",
+	},
 	"go": languageSpec{
-		Comment: "//",
-		Suffix:  ".go",
+		CommentPrefix: "// ",
+		FileExtension: ".go",
 	},
 	"java": languageSpec{
-		Comment: "//",
-		Suffix:  ".java",
+		CommentPrefix: "// ",
+		FileExtension: ".java",
 	},
 	"javascript": languageSpec{
-		Comment: "//",
-		Suffix:  ".js",
+		CommentPrefix: "// ",
+		FileExtension: ".js",
 	},
 	"shell": languageSpec{
-		Comment: "#",
+		CommentPrefix: "# ",
+		FileExtension: ".sh",
 		Interpreters: map[string]struct{}{
 			"bash": struct{}{},
 			"sh":   struct{}{},
 		},
-		Suffix: ".sh",
+	},
+	"vdl": languageSpec{
+		CommentPrefix: "// ",
+		FileExtension: ".vdl",
 	},
 }
 
@@ -146,8 +156,8 @@ func copyrightHelper(command *cmdline.Command, args []string, fix bool) error {
 
 // createComment creates a copyright header comment out of the given
 // comment symbol and copyright header data.
-func createComment(comment, header string) string {
-	return comment + " " + strings.Replace(header, "\n", "\n"+comment+" ", -1) + "\n\n"
+func createComment(prefix, suffix, header string) string {
+	return prefix + strings.Replace(header, "\n", suffix+"\n"+prefix, -1) + suffix + "\n\n"
 }
 
 // checkFile checks that the given file contains the appropriate
@@ -167,14 +177,14 @@ func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrig
 		return err
 	}
 	for _, lang := range languages {
-		if _, ok := lang.Interpreters[filepath.Base(interpreter)]; ok || strings.HasSuffix(path, lang.Suffix) {
+		if _, ok := lang.Interpreters[filepath.Base(interpreter)]; ok || strings.HasSuffix(path, lang.FileExtension) {
 			data, err := ctx.Run().ReadFile(path)
 			if err != nil {
 				return err
 			}
-			if !hasCopyright(data, lang.Comment) {
+			if !hasCopyright(data, lang.CommentPrefix, lang.CommentSuffix) {
 				if fix {
-					copyright := createComment(lang.Comment, assets.Copyright)
+					copyright := createComment(lang.CommentPrefix, lang.CommentSuffix, assets.Copyright)
 					// Add the copyright header to the beginning of the file.
 					if interpreter != "" {
 						// Handle the interpreter directive.
@@ -271,7 +281,7 @@ func detectInterpreter(path string) (string, error) {
 
 // hasCopyright checks that the given byte slice contains the
 // copyright header.
-func hasCopyright(data []byte, comment string) bool {
+func hasCopyright(data []byte, prefix, suffix string) bool {
 	buffer := bytes.NewBuffer(data)
 	lines, nlines := "", 0
 	for nlines < 3 {
@@ -283,7 +293,7 @@ func hasCopyright(data []byte, comment string) bool {
 		if strings.HasPrefix(line, hashbang) {
 			continue
 		}
-		lines += strings.TrimPrefix(line, comment+" ")
+		lines += strings.TrimSuffix(strings.TrimPrefix(line, prefix), suffix+"\n") + "\n"
 		nlines++
 	}
 	return copyrightRE.MatchString(lines)
