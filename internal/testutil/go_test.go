@@ -1,3 +1,7 @@
+// Copyright 2015 The Vanadium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package testutil
 
 import (
@@ -250,9 +254,9 @@ var (
 								BranchRate: 0,
 								Signature:  "",
 								Lines: []testCoverageLine{
-									testCoverageLine{Number: 3, Hits: 1},
-									testCoverageLine{Number: 4, Hits: 1},
-									testCoverageLine{Number: 5, Hits: 1},
+									testCoverageLine{Number: 7, Hits: 1},
+									testCoverageLine{Number: 8, Hits: 1},
+									testCoverageLine{Number: 9, Hits: 1},
 								},
 							},
 						},
