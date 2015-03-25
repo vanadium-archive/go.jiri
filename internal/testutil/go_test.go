@@ -129,10 +129,10 @@ var (
 	wantBuild = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v_io.x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Build",
 					},
 				},
@@ -143,22 +143,22 @@ var (
 	wantTest = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v_io.x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test1",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test2",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test3",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "TestV23",
 					},
 				},
@@ -170,10 +170,10 @@ var (
 	wantV23Test = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v_io.x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "TestV23",
 					},
 				},
@@ -185,22 +185,22 @@ var (
 	wantTestWithSuffix = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v_io.x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test1 [Suffix]",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test2 [Suffix]",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test3 [Suffix]",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "TestV23 [Suffix]",
 					},
 				},
@@ -212,14 +212,14 @@ var (
 	wantTestWithExcludedTests = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v_io.x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "Test1",
 					},
 					xunit.TestCase{
-						Classname: "v_io.x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
 						Name:      "TestV23",
 					},
 				},
