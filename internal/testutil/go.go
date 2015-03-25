@@ -1158,7 +1158,15 @@ func vanadiumGoDoc(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestRes
 	// when the shell exits. To prevent Jenkins from doing that,
 	// use nil as standard input, redirect output to a file, and
 	// set the BUILD_ID environment variable to "dontKillMe".
-	godocCmd := exec.Command("godoc", "-analysis=type", "-index", "-http=127.0.0.1:"+godocPort)
+	assetsPath := filepath.Join(os.Getenv("HOME"), "godoc")
+	godocCmd := exec.Command(
+		"godoc",
+		"-analysis=type",
+		"-goroot="+assetsPath,
+		"-http=127.0.0.1:"+godocPort,
+		"-index",
+		"-templates="+assetsPath,
+	)
 	godocCmd.Stdin = nil
 	fd, err := os.Create(filepath.Join(root, "godoc.out"))
 	if err != nil {
