@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -161,21 +162,8 @@ func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrig
 	}
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
-	file, err := os.Open(path)
+	interpreter, err := detectInterpreter(path)
 	if err != nil {
-		return fmt.Errorf("Open(%v) failed: %v", path, err)
-	}
-	defer file.Close()
-	interpreter := ""
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, hashbang) {
-			interpreter = strings.TrimPrefix(line, hashbang)
-		}
-		break
-	}
-	if err := scanner.Err(); err != nil {
 		return err
 	}
 	for _, lang := range languages {
@@ -252,6 +240,33 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 		return err
 	}
 	return nil
+}
+
+// detectInterpret returns the interpreter directive of the given
+// file, if it contains one.
+func detectInterpreter(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("Open(%v) failed: %v", path, err)
+	}
+	defer file.Close()
+	// Only consider the first 256 bytes to account for binary files
+	// with lines too long to fit into a memory buffer.
+	data := make([]byte, 256)
+	if _, err := file.Read(data); err != nil && err != io.EOF {
+		return "", fmt.Errorf("failed to read %v: %v", file.Name(), err)
+	}
+	scanner := bufio.NewScanner(bytes.NewBuffer(data))
+	scanner.Scan()
+	if err := scanner.Err(); err == nil {
+		line := scanner.Text()
+		if strings.HasPrefix(line, hashbang) {
+			return strings.TrimPrefix(line, hashbang), nil
+		}
+		return "", nil
+	} else {
+		return "", fmt.Errorf("failed to scan %v: %v", file.Name(), err)
+	}
 }
 
 // hasCopyright checks that the given byte slice contains the
