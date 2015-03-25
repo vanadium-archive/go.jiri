@@ -502,8 +502,16 @@ func (g *Git) TopLevel() (string, error) {
 	return strings.Join(out, "\n"), nil
 }
 
-// UntrackedFiles returns the list of files that are not
-// tracked.
+// TrackedFiles returns the list of files that are tracked.
+func (g *Git) TrackedFiles() ([]string, error) {
+	out, err := g.runOutput("ls-files")
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UntrackedFiles returns the list of files that are not tracked.
 func (g *Git) UntrackedFiles() ([]string, error) {
 	out, err := g.runOutput("ls-files", "--others", "--directory", "--exclude-standard")
 	if err != nil {

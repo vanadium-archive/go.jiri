@@ -212,12 +212,16 @@ func TestCreate(t *testing.T) {
 	// Setup the initial remote and local projects.
 	numProjects, remoteProjects := 2, []string{}
 	for i := 0; i < numProjects; i++ {
-		root.CreateRemoteProject(ctx, remoteProjectName(i))
-		root.AddProject(ctx, util.Project{
+		if err := root.CreateRemoteProject(ctx, remoteProjectName(i)); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := root.AddProject(ctx, util.Project{
 			Name:   remoteProjectName(i),
 			Path:   localProjectName(i),
 			Remote: root.Projects[remoteProjectName(i)],
-		})
+		}); err != nil {
+			t.Fatalf("%v", err)
+		}
 	}
 
 	// Create a fake configuration file.

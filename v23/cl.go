@@ -428,20 +428,9 @@ func (r *review) checkGoFormat() (e error) {
 // checkCopyright checks if the submitted code introduces source code
 // without proper copyright.
 func (r *review) checkCopyright() error {
-	path, err := r.ctx.Git().TopLevel()
+	name, err := util.CurrentProjectName(r.ctx)
 	if err != nil {
 		return err
-	}
-	projects, err := util.LocalProjects(r.ctx)
-	if err != nil {
-		return err
-	}
-	name := ""
-	for _, project := range projects {
-		if project.Path == path {
-			name = project.Name
-			break
-		}
 	}
 	if name == "" {
 		return fmt.Errorf("current project is not a 'v23' project")

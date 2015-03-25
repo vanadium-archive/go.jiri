@@ -162,14 +162,7 @@ func createComment(prefix, suffix, header string) string {
 
 // checkFile checks that the given file contains the appropriate
 // copyright header.
-func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrightAssets, fix bool) error {
-	if info.IsDir() {
-		// Skip the .git directory.
-		if info.Name() == ".git" {
-			return filepath.SkipDir
-		}
-		return nil
-	}
+func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool) error {
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
 	interpreter, err := detectInterpreter(path)
@@ -193,6 +186,10 @@ func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrig
 						copyright = directiveLine + copyright
 					}
 					data := append([]byte(copyright), data...)
+					info, err := os.Stat(path)
+					if err != nil {
+						return err
+					}
 					if err := ctx.Run().WriteFile(path, data, info.Mode()); err != nil {
 						return err
 					}
@@ -239,15 +236,14 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 			}
 		}
 	}
-	// Check the copyright header.
-	helper := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	files, err := ctx.Git(tool.RootDirOpt(project.Path)).TrackedFiles()
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if err := checkFile(ctx, filepath.Join(project.Path, file), assets, fix); err != nil {
 			return err
 		}
-		return checkFile(ctx, path, info, assets, fix)
-	}
-	if err := filepath.Walk(project.Path, helper); err != nil {
-		return err
 	}
 	return nil
 }

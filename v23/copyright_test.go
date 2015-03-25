@@ -43,6 +43,20 @@ func TestCopyright(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
+	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := root.AddProject(ctx, util.Project{
+		Name:   "test",
+		Path:   "test",
+		Remote: root.Projects["test"],
+	}); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := root.UpdateUniverse(ctx, false); err != nil {
+		t.Fatalf("%v", err)
+	}
+
 	oldRoot, err := util.VanadiumRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -55,20 +69,26 @@ func TestCopyright(t *testing.T) {
 	// Write out test licensing files and sample source code files to a
 	// project and verify that the project checks out.
 	projectPath := filepath.Join(root.Dir, "test")
-	project := util.Project{
-		Path: projectPath,
-	}
-	if err := ctx.Run().MkdirAll(projectPath, os.FileMode(0700)); err != nil {
-		t.Fatalf("%v", err)
-	}
+	project := util.Project{Path: projectPath}
 	for _, lang := range languages {
-		path := filepath.Join(projectPath, "test"+lang.FileExtension)
-		if err := ctx.Run().WriteFile(path, nil, os.FileMode(0600)); err != nil {
+		file := "test" + lang.FileExtension
+		if err := ctx.Run().WriteFile(filepath.Join(projectPath, file), nil, os.FileMode(0600)); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if checkFile(ctx, filepath.Join(project.Path, file), assets, true); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := ctx.Git(tool.RootDirOpt(projectPath)).CommitFile(file, "adding "+file); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
-	if err := checkProject(ctx, project, assets, true); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	for file, data := range assets.Files {
+		if err := ctx.Run().WriteFile(filepath.Join(projectPath, file), []byte(data), os.FileMode(0600)); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := ctx.Git(tool.RootDirOpt(projectPath)).CommitFile(file, "adding "+file); err != nil {
+			t.Fatalf("%v", err)
+		}
 	}
 	if err := checkProject(ctx, project, assets, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -84,7 +104,7 @@ func TestCopyright(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		path := filepath.Join(projectPath, file)
-		if err := ctx.Run().RemoveAll(path); err != nil {
+		if err := ctx.Git(tool.RootDirOpt(projectPath)).Remove(file); err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := checkProject(ctx, project, assets, false); err != nil {
