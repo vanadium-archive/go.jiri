@@ -114,6 +114,26 @@ func commitFiles(t *testing.T, ctx *tool.Context, fileNames []string) {
 	}
 }
 
+// copyAssets copies the copyright assets from the source directory to
+// the target directory.
+func copyAssets(t *testing.T, ctx *tool.Context, srcDir, dstDir string) {
+	assets, err := loadAssets(ctx, srcDir)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	for name, data := range assets.Files {
+		path := filepath.Join(dstDir, name)
+		if err := ctx.Run().WriteFile(path, []byte(data), os.FileMode(0644)); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}
+	path := filepath.Join(dstDir, "COPYRIGHT")
+	if err := ctx.Run().WriteFile(path, []byte(assets.Copyright), os.FileMode(0644)); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// createTestGoDependencyPackages creates test Go dependency packages.
 func createTestGoDependencyPackages(t *testing.T, ctx *tool.Context, rootDir string) {
 	fooDir := filepath.Join(rootDir, "src", "v.io", "foo")
 	if err := ctx.Run().MkdirAll(fooDir, os.FileMode(0755)); err != nil {
@@ -153,6 +173,8 @@ func Bar() string {
 	}
 }
 
+// createTestGoDependencyConstraint creates a test Go dependency
+// constraint.
 func createTestGoDependencyConstraint(t *testing.T, ctx *tool.Context, rootDir, command string) {
 	depFile := filepath.Join(rootDir, "src", "v.io", "foo", "GO.PACKAGE")
 	depData := `{
@@ -346,8 +368,7 @@ func TestCreateReviewBranch(t *testing.T) {
 	}
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, "", "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -384,8 +405,7 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, branch, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{repo: branch})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -399,7 +419,83 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	}
 }
 
-func TestGoDependencyError(t *testing.T) {
+// testCopyrightHelper is a function that contains the logic shared by
+// TestCopyrightError and TestCopyrightOK.
+func testCopyrightHelper(t *testing.T, ok bool) error {
+	// Setup a fake VANADIUM_ROOT, copy the copyright assets into its
+	// tools/data directory, and create a "test" project that does not
+	// contain the assets.
+	ctx := tool.NewDefaultContext()
+	root, err := util.NewFakeVanadiumRoot(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	root.AddProject(ctx, util.Project{
+		Name:   "test",
+		Path:   "test",
+		Remote: root.Projects["test"],
+	})
+	root.UpdateUniverse(ctx, false)
+	projects, tools, err := util.ReadManifest(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	v23Tool := tools["v23"]
+	srcDir := filepath.Join(projects[v23Tool.Project].Path, v23Tool.Data)
+	copyAssets(t, ctx, filepath.Join(srcDir), filepath.Join(root.Dir, "tools", v23Tool.Data))
+	if ok {
+		copyAssets(t, ctx, filepath.Join(srcDir), filepath.Join(root.Dir, "test"))
+	}
+	// Create a review in the "test" project and check that the
+	// copyright check fails.
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	defer func() {
+		if err := ctx.Run().Chdir(cwd); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+	if err := ctx.Run().Chdir(filepath.Join(root.Dir, "test")); err != nil {
+		t.Fatalf("%v", err)
+	}
+	review, err := newReview(ctx, reviewOpts{})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	oldRoot := os.Getenv("VANADIUM_ROOT")
+	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	return review.checkCopyright()
+}
+
+// TestCopyrightError checks that the copyright check fails for a CL
+// that introduces a copyright violation.
+func TestCopyrightError(t *testing.T) {
+	if err := testCopyrightHelper(t, false); err == nil {
+		t.Fatalf("copyright check did not fail when it should")
+	} else if _, ok := err.(copyrightError); !ok {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestCopyrightOK checks that the copyright check succeeds for a CL
+// that does not introduce a copyright violation.
+func TestCopyrightOK(t *testing.T) {
+	if err := testCopyrightHelper(t, true); err != nil {
+		t.Fatalf("copyright check failed: %v", err)
+	}
+}
+
+// testGoDependencyHelper is a function that contains the logic shared
+// by TestGoDependencyError and TestGoDependencyOK.
+func testGoDependencyHelper(t *testing.T, ok bool) error {
 	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -423,54 +519,39 @@ func TestGoDependencyError(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	createTestGoDependencyPackages(t, ctx, repoPath)
-	createTestGoDependencyConstraint(t, ctx, repoPath, "deny")
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	constraint := "deny"
+	if ok {
+		constraint = "allow"
+	}
+	createTestGoDependencyConstraint(t, ctx, repoPath, constraint)
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := review.checkGoDependencies(); err == nil {
+	return review.checkGoDependencies()
+}
+
+// TestGoDependencyError checks that the Go dependency check fails for
+// a CL that introduces a dependency violation.
+func TestGoDependencyError(t *testing.T) {
+	if err := testGoDependencyHelper(t, false); err == nil {
 		t.Fatalf("go format check did not fail when it should")
 	} else if _, ok := err.(goDependencyError); !ok {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
+// TestGoDependencyOK checks that the Go dependency check succeeds for
+// a CL that does not introduce a dependency violation.
 func TestGoDependencyOK(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, root)
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
-	oldGoPath := os.Getenv("GOPATH")
-	if err := os.Setenv("GOPATH", repoPath); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("GOPATH", oldGoPath)
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
-	createTestGoDependencyPackages(t, ctx, repoPath)
-	createTestGoDependencyConstraint(t, ctx, repoPath, "allow")
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := review.checkGoDependencies(); err != nil {
+	if err := testGoDependencyHelper(t, true); err != nil {
 		t.Fatalf("go dependency check failed: %v", err)
 	}
 }
 
-func TestGoFormatError(t *testing.T) {
+// testGoFormatHelper is a function that contains the logic shared
+// by TestGoFormatError and TestGoFormatOK.
+func testGoFormatHelper(t *testing.T, ok bool) error {
 	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -482,69 +563,50 @@ func TestGoFormatError(t *testing.T) {
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	file, fileContent := "file.go", ` package main
+	file, fileContent := "file.go", `package main
 
-func main() {}
-`
+func main() {}`
+	if ok {
+		fileContent = fileContent + "\n"
+	}
+	fmt.Println(fileContent)
 	if err := ctx.Run().WriteFile(file, []byte(fileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", file, fileContent, err)
+	}
+	// Make an invalid Go file in a testdata/ directory.
+	const testdata = "testdata"
+	ignoredFile, ignoredContent := filepath.Join(testdata, "ignored.go"), "// No package decl"
+	if err := ctx.Run().MkdirAll(testdata, 0744); err != nil {
+		t.Fatalf("MkdirAll(%v) failed: %v", testdata, err)
+	}
+	if err := ctx.Run().WriteFile(ignoredFile, []byte(ignoredContent), 0644); err != nil {
+		t.Fatalf("WriteFile(%v, %v) failed: %v", ignoredFile, ignoredContent, err)
 	}
 	commitMessage := "Commit " + file
 	if err := ctx.Git().CommitFile(file, commitMessage); err != nil {
 		t.Fatalf("%v", err)
 	}
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := review.checkGoFormat(); err == nil {
+	return review.checkGoFormat()
+}
+
+// TestGoFormatError checks that the Go format check fails for a CL
+// containing an incorrectly format file.
+func TestGoFormatError(t *testing.T) {
+	if err := testGoFormatHelper(t, false); err == nil {
 		t.Fatalf("go format check did not fail when it should")
 	} else if _, ok := err.(goFormatError); !ok {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
+// TestGoFormatOK checks that the Go format check succeeds for a CL
+// that does not contain incorrectly format file.
 func TestGoFormatOK(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, root)
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
-	// Make a simple Go file.
-	file, fileContent := "file.go", `package main
-
-func main() {}
-`
-	if err := ctx.Run().WriteFile(file, []byte(fileContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", file, fileContent, err)
-	}
-	// Make an invalid Go file in a testdata/ directory.
-	const testdata = "testdata"
-	testFile, testContent := filepath.Join(testdata, "invalid.go"), "// No package decl"
-	if err := ctx.Run().MkdirAll(testdata, 0744); err != nil {
-		t.Fatalf("MkdirAll(%v) failed: %v", testdata, err)
-	}
-	if err := ctx.Run().WriteFile(testFile, []byte(testContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", testFile, testContent, err)
-	}
-	// Commit the files.
-	commitMessage := fmt.Sprint("Commit %v", []string{file, testFile})
-	if err := ctx.Git().CommitWithMessage(commitMessage); err != nil {
-		t.Fatalf("%v", err)
-	}
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := review.checkGoFormat(); err != nil {
+	if err := testGoFormatHelper(t, true); err != nil {
 		t.Fatalf("go format check failed: %v", err)
 	}
 }
@@ -566,8 +628,7 @@ func TestSendReview(t *testing.T) {
 	commitFiles(t, ctx, files)
 	{
 		// Test with draft = false, no reviewiers, and no ccs.
-		draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-		review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+		review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -579,41 +640,49 @@ func TestSendReview(t *testing.T) {
 	}
 	{
 		// Test with draft = true, no reviewers, and no ccs.
-		draft, edit, repo, reviewers, ccs, presubmit := true, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-		review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+		review, err := newReview(ctx, reviewOpts{
+			draft: true,
+			repo:  gerritPath,
+		})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(draft, reviewers, ccs, review.branch)
+		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = false, reviewers, and no ccs.
-		draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "reviewer1,reviewer2@example.org", "", gerrit.PresubmitTestTypeAll
-		review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+		review, err := newReview(ctx, reviewOpts{
+			repo:      gerritPath,
+			reviewers: "reviewer1,reviewer2@example.org",
+		})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(draft, reviewers, ccs, branch)
+		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = true, reviewers, and ccs.
-		draft, edit, repo, reviewers, ccs, presubmit := true, false, gerritPath, "reviewer3@example.org,reviewer4", "cc1@example.org,cc2", gerrit.PresubmitTestTypeAll
-		review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+		review, err := newReview(ctx, reviewOpts{
+			ccs:       "cc1@example.org,cc2",
+			draft:     true,
+			repo:      gerritPath,
+			reviewers: "reviewer3@example.org,reviewer4",
+		})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(draft, reviewers, ccs, branch)
+		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 }
@@ -634,8 +703,7 @@ func TestSendReviewNoChangeID(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	commitFiles(t, ctx, []string{"file1"})
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -663,14 +731,13 @@ func TestEndToEnd(t *testing.T) {
 	}
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	depcopFlag = false
+	copyrightFlag, depcopFlag = false, false
 	review.run()
-	expectedRef := gerrit.Reference(draft, reviewers, ccs, branch)
+	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
@@ -692,14 +759,16 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 	// Test setting -presubmit=none.
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeNone
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{
+		presubmit: gerrit.PresubmitTestTypeNone,
+		repo:      gerritPath,
+	})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	depcopFlag = false
+	copyrightFlag, depcopFlag = false, false
 	review.run()
-	expectedRef := gerrit.Reference(draft, reviewers, ccs, branch)
+	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	// The last two lines of the gerrit commit message file should be:
 	// PresubmitTest: none
@@ -724,8 +793,7 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting -presubmit=all.
-	draft, edit, repo, reviewers, ccs, presubmit = false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err = newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err = newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -784,14 +852,13 @@ func TestDirtyBranch(t *testing.T) {
 	if err := ctx.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %t) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	depcopFlag = false
+	copyrightFlag, depcopFlag = false, false
 	review.run()
-	expectedRef := gerrit.Reference(draft, reviewers, ccs, branch)
+	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	assertFilesNotCommitted(t, ctx, []string{stagedFile})
 	assertFilesNotCommitted(t, ctx, []string{untrackedFile})
@@ -832,12 +899,11 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err := ctx.Run().Chdir(subdir); err != nil {
 		t.Fatalf("Chdir(%v) failed: %v", subdir, err)
 	}
-	draft, edit, repo, reviewers, ccs, presubmit := false, false, gerritPath, "", "", gerrit.PresubmitTestTypeAll
-	review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, presubmit)
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	depcopFlag = false
+	copyrightFlag, depcopFlag = false, false
 	review.run()
 	path := path.Join(repoPath, subdir)
 	want, err := filepath.EvalSymlinks(path)
@@ -855,7 +921,8 @@ func TestRunInSubdirectory(t *testing.T) {
 	if got != want {
 		t.Fatalf("unexpected working directory: got %v, want %v", got, want)
 	}
-	expectedRef := gerrit.Reference(draft, reviewers, ccs, branch)
+	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	fmt.Printf("%v\n", expectedRef)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
@@ -907,7 +974,6 @@ Change-Id: I0000000000000000000000000000000000000000`,
 Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
-
 	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -919,10 +985,11 @@ Change-Id: I0000000000000000000000000000000000000000`,
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	draft, edit, repo, reviewers, ccs := false, false, gerritPath, "", ""
-
 	for _, test := range testCases {
-		review, err := newReview(ctx, draft, edit, repo, reviewers, ccs, test.presubmitType)
+		review, err := newReview(ctx, reviewOpts{
+			presubmit: test.presubmitType,
+			repo:      gerritPath,
+		})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}

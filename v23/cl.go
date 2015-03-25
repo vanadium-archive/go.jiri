@@ -13,6 +13,7 @@ import (
 	"v.io/x/devtools/internal/gerrit"
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -20,28 +21,30 @@ const commitMessageFile = ".gerrit_commit_message"
 
 var (
 	ccsFlag         string
+	copyrightFlag   bool
 	draftFlag       bool
 	depcopFlag      bool
+	editFlag        bool
+	forceFlag       bool
 	gofmtFlag       bool
 	presubmitFlag   string
 	reviewersFlag   string
 	uncommittedFlag bool
-	editFlag        bool
-	forceFlag       bool
 )
 
 // init carries out the package initialization.
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
-	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
-	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
-	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check_uncommitted", true, "Check that no uncommitted changes exist.")
+	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check_copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&depcopFlag, "check_depcop", true, "Check that no go-depcop violations exist.")
+	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
+	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check_gofmt", true, "Check that no go fmt violations exist.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
-	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
+	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
+	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check_uncommitted", true, "Check that no uncommitted changes exist.")
 }
 
 // cmdCL represents the "v23 cl" command.
@@ -168,6 +171,16 @@ func (s changeConflictError) Error() string {
 	return result
 }
 
+type copyrightError string
+
+func (s copyrightError) Error() string {
+	result := "changelist does not adhere to the copyright conventions\n\n"
+	result += "To resolve this problem, run 'v23 copyright fix <project>' to\n"
+	result += "fix the following violations:\n"
+	result += string(s)
+	return result
+}
+
 type emptyChangeError struct{}
 
 func (_ emptyChangeError) Error() string {
@@ -244,8 +257,14 @@ func runCLMail(command *cmdline.Command, _ []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	repo := ""
-	review, err := newReview(ctx, draftFlag, editFlag, repo, reviewersFlag, ccsFlag, gerrit.PresubmitTestType(presubmitFlag))
+	opts := reviewOpts{
+		ccs:       ccsFlag,
+		draft:     draftFlag,
+		edit:      editFlag,
+		presubmit: gerrit.PresubmitTestType(presubmitFlag),
+		reviewers: reviewersFlag,
+	}
+	review, err := newReview(ctx, opts)
 	if err != nil {
 		return err
 	}
@@ -307,25 +326,37 @@ type review struct {
 	reviewers string
 }
 
+type reviewOpts struct {
+	ccs       string
+	draft     bool
+	edit      bool
+	presubmit gerrit.PresubmitTestType
+	repo      string
+	reviewers string
+}
+
 // newReview is the review factory.
 //
 // TODO(jingjin): use optional arguments.
-func newReview(ctx *tool.Context, draft, edit bool, repo, reviewers, ccs string, presubmit gerrit.PresubmitTestType) (*review, error) {
+func newReview(ctx *tool.Context, opts reviewOpts) (*review, error) {
 	branch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
 	reviewBranch := branch + "-REVIEW"
+	if opts.presubmit == gerrit.PresubmitTestType("") {
+		opts.presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
+	}
 	return &review{
 		branch:       branch,
-		ccs:          ccs,
+		ccs:          opts.ccs,
 		ctx:          ctx,
-		draft:        draft,
-		edit:         edit,
-		presubmit:    presubmit,
-		repo:         repo,
+		draft:        opts.draft,
+		edit:         opts.edit,
+		presubmit:    opts.presubmit,
+		repo:         opts.repo,
 		reviewBranch: reviewBranch,
-		reviewers:    reviewers,
+		reviewers:    opts.reviewers,
 	}, nil
 }
 
@@ -386,6 +417,40 @@ func (r *review) checkGoFormat() (e error) {
 		if out.Len() != 0 {
 			return goFormatError(out.String())
 		}
+	}
+	return nil
+}
+
+// checkCopyright checks if the submitted code introduces source code
+// without proper copyright.
+func (r *review) checkCopyright() error {
+	path, err := r.ctx.Git().TopLevel()
+	if err != nil {
+		return err
+	}
+	projects, err := util.LocalProjects(r.ctx)
+	if err != nil {
+		return err
+	}
+	name := ""
+	for _, project := range projects {
+		if project.Path == path {
+			name = project.Name
+			break
+		}
+	}
+	if name == "" {
+		return fmt.Errorf("current project is not a 'v23' project")
+	}
+	// Check the copyright headers and licensing files.
+	var out bytes.Buffer
+	cmd := &cmdline.Command{}
+	cmd.Init(nil, &out, &out)
+	if err := runCopyrightCheck(cmd, []string{name}); err != nil {
+		return err
+	}
+	if out.Len() != 0 {
+		return copyrightError(out.String())
 	}
 	return nil
 }
@@ -544,6 +609,11 @@ func (r *review) run() (e error) {
 	}
 	if depcopFlag {
 		if err := r.checkGoDependencies(); err != nil {
+			return err
+		}
+	}
+	if copyrightFlag {
+		if err := r.checkCopyright(); err != nil {
 			return err
 		}
 	}

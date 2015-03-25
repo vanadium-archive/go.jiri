@@ -142,12 +142,19 @@ func copyrightHelper(command *cmdline.Command, args []string, fix bool) error {
 // createComment creates a copyright header comment out of the given
 // comment symbol and copyright header data.
 func createComment(comment, header string) string {
-	return comment + " " + strings.Replace(header, "\n", "\n"+comment+" ", -1) + "\n"
+	return comment + " " + strings.Replace(header, "\n", "\n"+comment+" ", -1) + "\n\n"
 }
 
 // checkFile checks that the given file contains the appropriate
 // copyright header.
 func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrightAssets, fix bool) error {
+	if info.IsDir() {
+		// Skip the .git directory.
+		if info.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		return nil
+	}
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
 	file, err := os.Open(path)
@@ -162,8 +169,12 @@ func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrig
 		if strings.HasPrefix(line, hashbang) {
 			interpreter = strings.TrimPrefix(line, hashbang)
 		}
+		break
 	}
-	for name, lang := range languages {
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	for _, lang := range languages {
 		if _, ok := lang.Interpreters[filepath.Base(interpreter)]; ok || strings.HasSuffix(path, lang.Suffix) {
 			data, err := ctx.Run().ReadFile(path)
 			if err != nil {
@@ -172,10 +183,6 @@ func checkFile(ctx *tool.Context, path string, info os.FileInfo, assets *copyrig
 			if !hasCopyright(data, lang.Comment) {
 				if fix {
 					copyright := createComment(lang.Comment, assets.Copyright)
-					// Add an extra new line for Go.
-					if name == "go" {
-						copyright += "\n"
-					}
 					// Add the copyright header to the beginning of the file.
 					if interpreter != "" {
 						// Handle the interpreter directive.

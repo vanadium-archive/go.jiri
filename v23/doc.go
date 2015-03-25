@@ -100,6 +100,8 @@ Usage:
 The v23 cl mail flags are:
  -cc=
    Comma-seperated list of emails or LDAPs to cc.
+ -check_copyright=true
+   Check copyright headers.
  -check_depcop=true
    Check that no go-depcop violations exist.
  -check_gofmt=true
