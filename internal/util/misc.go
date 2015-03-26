@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"v.io/x/lib/envutil"
+	"v.io/x/lib/host"
 )
 
 // ThirdPartyBinPath returns the path to the given third-party tool
 // taking into account the host and the target Go architecture.
 func ThirdPartyBinPath(root, name string) (string, error) {
-	machineArch, err := envutil.Arch()
+	machineArch, err := host.Arch()
 	if err != nil {
 		return "", err
 	}

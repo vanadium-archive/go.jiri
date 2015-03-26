@@ -30,6 +30,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
+	"v.io/x/lib/host"
 )
 
 type taskStatus int
@@ -1376,7 +1377,15 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...TestOpt
 func genTestNameSuffix(baseSuffix string) string {
 	suffixParts := []string{}
 	suffixParts = append(suffixParts, runtime.GOOS)
-	suffixParts = append(suffixParts, os.Getenv("GOARCH"))
+	arch := os.Getenv("GOARCH")
+	if arch == "" {
+		var err error
+		arch, err = host.Arch()
+		if err != nil {
+			arch = "amd64"
+		}
+	}
+	suffixParts = append(suffixParts, arch)
 	suffix := strings.Join(suffixParts, ",")
 
 	if baseSuffix == "" {
