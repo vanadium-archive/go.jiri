@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 
+	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -207,7 +208,7 @@ func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool
 // appropriate copyright header. If the fix option is set, the
 // function fixes up the project. Otherwise, the function reports
 // violations to standard error output.
-func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAssets, fix bool) error {
+func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAssets, fix bool) (e error) {
 	// Check the licensing files.
 	for file, want := range assets.Files {
 		path := filepath.Join(project.Path, file)
@@ -236,7 +237,15 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 			}
 		}
 	}
-	files, err := ctx.Git(tool.RootDirOpt(project.Path)).TrackedFiles()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("Getwd() failed: %v", err)
+	}
+	if err := ctx.Run().Chdir(project.Path); err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+	files, err := ctx.Git().TrackedFiles()
 	if err != nil {
 		return err
 	}
@@ -250,12 +259,12 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 
 // detectInterpret returns the interpreter directive of the given
 // file, if it contains one.
-func detectInterpreter(path string) (string, error) {
+func detectInterpreter(path string) (_ string, e error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("Open(%v) failed: %v", path, err)
 	}
-	defer file.Close()
+	defer collect.Error(func() error { return file.Close() }, &e)
 	// Only consider the first 256 bytes to account for binary files
 	// with lines too long to fit into a memory buffer.
 	data := make([]byte, 256)
