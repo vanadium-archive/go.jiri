@@ -134,7 +134,7 @@ func copyrightHelper(command *cmdline.Command, args []string, fix bool) error {
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag,
 	})
-	projects, tools, err := util.ReadManifest(ctx)
+	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,10 @@ func copyrightHelper(command *cmdline.Command, args []string, fix bool) error {
 	if err != nil {
 		return err
 	}
-	dataDir := filepath.Join(projects[tools["v23"].Project].Path, tools["v23"].Data)
+	dataDir, err := util.DataDirPath(ctx, "v23")
+	if err != nil {
+		return err
+	}
 	assets, err := loadAssets(ctx, dataDir)
 	if err != nil {
 		return err

@@ -23,11 +23,10 @@ func TestCopyright(t *testing.T) {
 	})
 
 	// Load assets.
-	projects, tools, err := util.ReadManifest(ctx)
+	dataDir, err := util.DataDirPath(ctx, "v23")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	dataDir := filepath.Join(projects[tools["v23"].Project].Path, tools["v23"].Data)
 	assets, err := loadAssets(ctx, dataDir)
 	if err != nil {
 		t.Fatalf("%v", err)

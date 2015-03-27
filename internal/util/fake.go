@@ -80,8 +80,8 @@ func NewFakeVanadiumRoot(ctx *tool.Context) (*FakeVanadiumRoot, error) {
 
 	// Add the "tools" project and a fake "v23" tool to the
 	// manifests. This is necessary to make sure that the commonly
-	// invoked ConfigPath() function, which requires every manifest
-	// contains a "v23" tool, works.
+	// invoked DataDirPath() function, which uses the "v23" tool
+	// configuration for its default, works.
 	if err := root.AddProject(ctx, Project{
 		Name:   toolsProject,
 		Path:   toolsProject,
