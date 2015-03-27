@@ -443,15 +443,14 @@ func testCopyrightHelper(t *testing.T, ok bool) error {
 		Remote: root.Projects["test"],
 	})
 	root.UpdateUniverse(ctx, false)
-	projects, tools, err := util.ReadManifest(ctx)
+	dataDir, err := util.DataDirPath(ctx, "v23")
 	if err != nil {
 		t.Fatalf("%v", err)
+
 	}
-	v23Tool := tools["v23"]
-	srcDir := filepath.Join(projects[v23Tool.Project].Path, v23Tool.Data)
-	copyAssets(t, ctx, filepath.Join(srcDir), filepath.Join(root.Dir, "tools", v23Tool.Data))
+	copyAssets(t, ctx, dataDir, filepath.Join(root.Dir, "tools", filepath.Base(dataDir)))
 	if ok {
-		copyAssets(t, ctx, filepath.Join(srcDir), filepath.Join(root.Dir, "test"))
+		copyAssets(t, ctx, dataDir, filepath.Join(root.Dir, "test"))
 	}
 	// Create a review in the "test" project and check that the
 	// copyright check fails.

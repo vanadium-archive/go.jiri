@@ -81,13 +81,12 @@ func ResolveManifestPath(name string) (string, error) {
 	return path, nil
 }
 
-// ConfigPath returns the path to the tools configuration file.
-func ConfigPath(ctx *tool.Context) (string, error) {
+// DataDirPath returns the path to the data directory of the given tool.
+func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
 	projects, tools, err := readManifest(ctx, false)
 	if err != nil {
 		return "", err
 	}
-	toolName := tool.Name
 	if toolName == "" {
 		// If the tool name is not set, use "v23" as the default. As a
 		// consequence, any manifest is assumed to specify a "v23" tool.
@@ -102,15 +101,16 @@ func ConfigPath(ctx *tool.Context) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("project %q not found in the manifest", projectName)
 	}
-	return filepath.Join(project.Path, tool.Data, "conf.json"), nil
+	return filepath.Join(project.Path, tool.Data), nil
 }
 
 // LoadConfig loads the tools configuration file into memory.
 func LoadConfig(ctx *tool.Context) (*Config, error) {
-	configPath, err := ConfigPath(ctx)
+	dataDir, err := DataDirPath(ctx, tool.Name)
 	if err != nil {
 		return nil, err
 	}
+	configPath := filepath.Join(dataDir, "conf.json")
 	configBytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("ReadFile(%v) failed: %v", configPath, err)
@@ -336,19 +336,9 @@ func setSyncbaseCgoEnv(env *envutil.Snapshot, root, arch string) error {
 
 // BuildCopRotationPath returns the path to the build cop rotation file.
 func BuildCopRotationPath(ctx *tool.Context) (string, error) {
-	projects, tools, err := readManifest(ctx, false)
+	dataDir, err := DataDirPath(ctx, tool.Name)
 	if err != nil {
 		return "", err
 	}
-	toolName := "v23"
-	tool, ok := tools[toolName]
-	if !ok {
-		return "", fmt.Errorf("tool %q not found in the manifest", toolName)
-	}
-	projectName := tool.Project
-	project, ok := projects[projectName]
-	if !ok {
-		return "", fmt.Errorf("project %q not found in the manifest", projectName)
-	}
-	return filepath.Join(project.Path, tool.Data, "buildcop.xml"), nil
+	return filepath.Join(dataDir, "buildcop.xml"), nil
 }

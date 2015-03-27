@@ -414,7 +414,11 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err := run(ctx, bin, []string{"arm-unknown-linux-gnueabi"}, nil); err != nil {
 			return err
 		}
-		configFile := filepath.Join(root, "release", "go", "src", "v.io", "tools", "conf", "crosstool.config")
+		dataPath, err := util.DataDirPath(ctx, tool.Name)
+		if err != nil {
+			return err
+		}
+		configFile := filepath.Join(dataPath, "crosstool.config")
 		config, err := ioutil.ReadFile(configFile)
 		if err != nil {
 			return fmt.Errorf("ReadFile(%v) failed: %v", configFile, err)
