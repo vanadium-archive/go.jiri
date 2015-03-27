@@ -117,8 +117,10 @@ var testFunctions = map[string]func(*tool.Context, string, ...TestOpt) (*TestRes
 	"vanadium-android-test":           vanadiumAndroidTest,
 	"vanadium-android-build":          vanadiumAndroidBuild,
 	"vanadium-bootstrap":              vanadiumBootstrap,
+	"vanadium-browser-test":           vanadiumBrowserTest,
 	"vanadium-chat-shell-test":        vanadiumChatShellTest,
 	"vanadium-chat-web-test":          vanadiumChatWebTest,
+	"vanadium-github-mirror":          vanadiumGitHubMirror,
 	"vanadium-go-bench":               vanadiumGoBench,
 	"vanadium-go-binaries":            vanadiumGoBinaries,
 	"vanadium-go-build":               vanadiumGoBuild,
@@ -138,7 +140,6 @@ var testFunctions = map[string]func(*tool.Context, string, ...TestOpt) (*TestRes
 	"vanadium-js-unit":                vanadiumJSUnit,
 	"vanadium-js-vdl":                 vanadiumJSVdl,
 	"vanadium-js-vom":                 vanadiumJSVom,
-	"vanadium-namespace-browser-test": vanadiumNamespaceBrowserTest,
 	"vanadium-pipe2browser-test":      vanadiumPipe2BrowserTest,
 	"vanadium-playground-test":        vanadiumPlaygroundTest,
 	"vanadium-postsubmit-poll":        vanadiumPostsubmitPoll,
@@ -148,7 +149,6 @@ var testFunctions = map[string]func(*tool.Context, string, ...TestOpt) (*TestRes
 	"vanadium-prod-services-test":     vanadiumProdServicesTest,
 	"vanadium-www-site":               vanadiumWWWSite,
 	"vanadium-www-tutorials":          vanadiumWWWTutorials,
-	"vanadium-github-mirror":          vanadiumGitHubMirror,
 }
 
 func newTestContext(ctx *tool.Context, env map[string]string) *tool.Context {

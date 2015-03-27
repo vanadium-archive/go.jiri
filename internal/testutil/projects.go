@@ -64,6 +64,14 @@ func runProjectTest(ctx *tool.Context, testName, projectName, target string, env
 	return &TestResult{Status: TestPassed}, nil
 }
 
+// vanadiumBrowserTest runs the tests for the Vanadium browser.
+func vanadiumBrowserTest(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
+	env := map[string]string{
+		"XUNIT_OUTPUT_FILE": xunit.ReportPath(testName),
+	}
+	return runProjectTest(ctx, testName, "browser", "test", env, []string{"web"})
+}
+
 // vanadiumChatShellTest runs the tests for the chat shell client.
 func vanadiumChatShellTest(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
 	return runProjectTest(ctx, testName, "chat", "test-shell", nil, nil)
@@ -72,15 +80,6 @@ func vanadiumChatShellTest(ctx *tool.Context, testName string, _ ...TestOpt) (*T
 // vanadiumChatWebTest runs the tests for the chat web client.
 func vanadiumChatWebTest(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
 	return runProjectTest(ctx, testName, "chat", "test-web", nil, []string{"web"})
-}
-
-// vanadiumNamespaceBrowserTest runs the tests for the Vanadium namespace browser.
-func vanadiumNamespaceBrowserTest(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	env := map[string]string{
-		"XUNIT_OUTPUT_FILE": xunit.ReportPath(testName),
-	}
-
-	return runProjectTest(ctx, testName, "namespace_browser", "test", env, []string{"web"})
 }
 
 // vanadiumPipe2BrowserTest runs the tests for pipe2browser.

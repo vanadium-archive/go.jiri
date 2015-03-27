@@ -23,9 +23,9 @@ var (
 			github:       "git@github.com:vanadium/environment.git",
 		},
 		Mirror{
-			name:         "namespace_browser",
-			googlesource: "https://vanadium.googlesource.com/namespace_browser",
-			github:       "git@github.com:vanadium/namespace_browser.git",
+			name:         "browser",
+			googlesource: "https://vanadium.googlesource.com/browser",
+			github:       "git@github.com:vanadium/browser.git",
 		},
 		Mirror{
 			name:         "go.v23",
