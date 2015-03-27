@@ -24,7 +24,7 @@ var (
 		},
 		Mirror{
 			name:         "browser",
-			googlesource: "https://vanadium.googlesource.com/browser",
+			googlesource: "https://vanadium.googlesource.com/release.projects.browser",
 			github:       "git@github.com:vanadium/browser.git",
 		},
 		Mirror{
