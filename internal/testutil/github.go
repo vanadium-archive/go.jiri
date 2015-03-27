@@ -38,11 +38,6 @@ var (
 			github:       "git@github.com:vanadium/go.devtools.git",
 		},
 		Mirror{
-			name:         "go.jni",
-			googlesource: "https://vanadium.googlesource.com/release.go.x.jni",
-			github:       "git@github.com:vanadium/go.jni.git",
-		},
-		Mirror{
 			name:         "go.lib",
 			googlesource: "https://vanadium.googlesource.com/release.go.x.lib",
 			github:       "git@github.com:vanadium/go.lib.git",
@@ -51,11 +46,6 @@ var (
 			name:         "go.ref",
 			googlesource: "https://vanadium.googlesource.com/release.go.x.ref",
 			github:       "git@github.com:vanadium/go.ref.git",
-		},
-		Mirror{
-			name:         "java",
-			googlesource: "https://vanadium.googlesource.com/release.java",
-			github:       "git@github.com:vanadium/java.git",
 		},
 		Mirror{
 			name:         "js",
