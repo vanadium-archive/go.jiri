@@ -242,7 +242,7 @@ func (r *Run) FunctionWithOpts(opts Opts, fn func() error, format string, args .
 	err := fn()
 	if err != nil {
 		if opts.Verbose {
-			r.printf(r.opts.Stdout, "FAILED")
+			r.printf(r.opts.Stdout, "FAILED: %v", err)
 		}
 	} else {
 		if opts.Verbose {

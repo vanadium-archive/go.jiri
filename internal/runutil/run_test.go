@@ -184,12 +184,15 @@ func TestFunctionFail(t *testing.T) {
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/fail_hello.go")
 		cmd.Stdout = &out
-		return cmd.Run()
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("the function failed")
+		}
+		return nil
 	}
 	if err := run.Function(fn, "%v %v %v", "go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`Function("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
-	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\nhello\n>> FAILED\n"; got != want {
+	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\nhello\n>> FAILED: the function failed\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
 }
@@ -202,7 +205,10 @@ func TestFunctionWithOptsOK(t *testing.T) {
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/ok_hello.go")
 		cmd.Stdout = &out
-		return cmd.Run()
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("the function failed")
+		}
+		return nil
 	}
 	if err := run.FunctionWithOpts(opts, fn, "%v %v %v", "go", "run", "./testdata/ok_hello.go"); err != nil {
 		t.Fatalf(`FunctionWithOpts("go run ./testdata/ok_hello.go") failed: %v`, err)
@@ -220,12 +226,15 @@ func TestFunctionWithOptsFail(t *testing.T) {
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/fail_hello.go")
 		cmd.Stdout = &out
-		return cmd.Run()
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("the function failed")
+		}
+		return nil
 	}
 	if err := run.FunctionWithOpts(opts, fn, "%v %v %v", "go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`FunctionWithOpts("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
-	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\nhello\n>> FAILED\n"; got != want {
+	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\nhello\n>> FAILED: the function failed\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
 }

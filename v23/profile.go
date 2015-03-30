@@ -107,10 +107,10 @@ func runProfileSetup(command *cmdline.Command, args []string) error {
 			var err error
 			for i := 1; i <= numRetries; i++ {
 				fmt.Fprintf(ctx.Stdout(), fmt.Sprintf("Attempt #%d\n", i))
-				err = setup(ctx, runtime.GOOS, arg)
-				if err == nil {
+				if err = setup(ctx, runtime.GOOS, arg); err == nil {
 					return nil
 				}
+				fmt.Fprintf(ctx.Stdout(), "ERROR: %v\n", err)
 			}
 			return err
 		}
@@ -433,6 +433,16 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 			return err
 		}
 		if err := run(ctx, bin, []string{"build"}, nil); err != nil {
+			return err
+		}
+		// crosstool-ng build creates the output directory with no write
+		// permissions. Change it so that atomicAction can create the
+		// "action completed" file.
+		dirinfo, err := os.Stat(xgccOutDir)
+		if err != nil {
+			return err
+		}
+		if err := os.Chmod(xgccOutDir, dirinfo.Mode()|0755); err != nil {
 			return err
 		}
 		return nil
