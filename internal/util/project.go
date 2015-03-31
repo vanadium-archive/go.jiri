@@ -864,47 +864,6 @@ type createOperation struct {
 	commonOperation
 }
 
-// preCommitHook is a git hook installed to all new projects. It
-// prevents accidental commits to the local master branch.
-
-const preCommitHook = `#!/bin/bash
-
-# Get the current branch name.
-readonly BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-if [[ "${BRANCH}" == "master" ]]
-then
-  echo "========================================================================="
-  echo "Vanadium code cannot be committed to master using the 'git commit' command."
-  echo "Please make a feature branch and commit your code there."
-  echo "========================================================================="
-  exit 1
-fi
-
-exit 0
-`
-
-// prePushHook is a git hook installed to all new projects. It
-// prevents accidental pushes to the remote master branch.
-const prePushHook = `#!/bin/bash
-
-readonly REMOTE="$1"
-
-# Get the current branch name.
-readonly BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-if [[ "${REMOTE}" == "origin" && "${BRANCH}" == "master" ]]
-then
-  echo "======================================================================="
-  echo "Vanadium code cannot be pushed to master using the 'git push' command."
-  echo "Use the 'git v23 review' command to follow the code review workflow."
-  echo "======================================================================="
-  exit 1
-fi
-
-exit 0
-`
-
 func (op createOperation) Run(ctx *tool.Context) (e error) {
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(path, perm); err != nil {
@@ -923,17 +882,8 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 			// hooks is not a good idea as developers might have customized the
 			// hooks.
 			file := filepath.Join(op.destination, ".git", "hooks", "commit-msg")
-			url := "https://gerrit-review.googlesource.com/tools/hooks/commit-msg"
-			args := []string{"-Lo", file, url}
-			var stderr bytes.Buffer
-			opts := ctx.Run().Opts()
-			opts.Stdout = ioutil.Discard
-			opts.Stderr = &stderr
-			if err := ctx.Run().CommandWithOpts(opts, "curl", args...); err != nil {
-				return fmt.Errorf("failed to download commit message hook: %v\n%v", err, stderr.String())
-			}
-			if err := os.Chmod(file, perm); err != nil {
-				return fmt.Errorf("Chmod(%v, %v) failed: %v", file, perm, err)
+			if err := ctx.Run().WriteFile(file, []byte(commitMsgHook), perm); err != nil {
+				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
 			}
 			file = filepath.Join(op.destination, ".git", "hooks", "pre-commit")
 			if err := ctx.Run().WriteFile(file, []byte(preCommitHook), perm); err != nil {
