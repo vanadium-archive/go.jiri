@@ -1299,18 +1299,6 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 //   last part will automatically include all the packages that are not found
 //   in the first N-1 parts.
 func identifyPackagesToTest(ctx *tool.Context, testName string, opts []TestOpt, allPkgs []string) (pkgsOpt, error) {
-	// Get part index from optionals.
-	index := -1
-	for _, opt := range opts {
-		switch v := opt.(type) {
-		case PartOpt:
-			index = int(v)
-		}
-	}
-	if index == -1 {
-		return pkgsOpt(allPkgs), nil
-	}
-
 	// Read config file to get the part.
 	config, err := util.LoadConfig(ctx)
 	if err != nil {
@@ -1319,6 +1307,15 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []TestOpt, 
 	parts := config.TestParts(testName)
 	if len(parts) == 0 {
 		return pkgsOpt(allPkgs), nil
+	}
+
+	// Get part index from optionals.
+	index := 0
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case PartOpt:
+			index = int(v)
+		}
 	}
 
 	if index == len(parts) {
