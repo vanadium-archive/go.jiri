@@ -361,7 +361,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		makeEnv := envutil.NewSnapshotFromOS()
 		unsetGoEnv(makeEnv)
 		makeEnv.Set("GOARCH", "arm")
-		makeEnv.Set("GOAOS", "linux")
+		makeEnv.Set("GOOS", "linux")
 		if err := run(ctx, makeBin, makeArgs, makeEnv.Map()); err != nil {
 			return err
 		}
@@ -435,14 +435,14 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err := run(ctx, bin, []string{"build"}, nil); err != nil {
 			return err
 		}
-		// crosstool-ng build creates the output directory with no write
+		// crosstool-ng build creates the tool output directory with no write
 		// permissions. Change it so that atomicAction can create the
 		// "action completed" file.
-		dirinfo, err := os.Stat(xgccOutDir)
+		dirinfo, err := os.Stat(xgccToolDir)
 		if err != nil {
 			return err
 		}
-		if err := os.Chmod(xgccOutDir, dirinfo.Mode()|0755); err != nil {
+		if err := os.Chmod(xgccToolDir, dirinfo.Mode()|0755); err != nil {
 			return err
 		}
 		return nil
