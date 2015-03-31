@@ -341,7 +341,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err := ctx.Run().MkdirAll(goDir, defaultDirPerm); err != nil {
 			return err
 		}
-		name := "go1.4.src.tar.gz"
+		name := "go1.4.2.src.tar.gz"
 		remote, local := "https://storage.googleapis.com/golang/"+name, filepath.Join(goDir, name)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
