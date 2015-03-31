@@ -280,10 +280,13 @@ func TestList() ([]string, error) {
 // runTests runs the given tests, populating the results map.
 func runTests(ctx *tool.Context, tests []string, results map[string]*TestResult, opts ...TestOpt) error {
 	path := ""
+	partIndex := 0
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case PrefixOpt:
 			path = gsPrefix + string(typedOpt)
+		case PartOpt:
+			partIndex = int(typedOpt)
 		}
 	}
 
@@ -320,7 +323,7 @@ func runTests(ctx *tool.Context, tests []string, results map[string]*TestResult,
 			result = r
 		}
 		if path != "" {
-			if err := persistTestData(ctx, result, &out, test, path); err != nil {
+			if err := persistTestData(ctx, result, &out, test, partIndex, path); err != nil {
 				fmt.Fprintf(ctx.Stderr(), "failed to store test results: %v\n", err)
 			}
 		}
@@ -396,7 +399,7 @@ func checkTestReportFile(ctx *tool.Context, testName string) error {
 }
 
 // persistTestData uploads test data to Google Storage.
-func persistTestData(ctx *tool.Context, result *TestResult, output *bytes.Buffer, test, path string) error {
+func persistTestData(ctx *tool.Context, result *TestResult, output *bytes.Buffer, test string, partIndex int, path string) error {
 	// Write test data to a temporary directory.
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
@@ -435,8 +438,9 @@ func persistTestData(ctx *tool.Context, result *TestResult, output *bytes.Buffer
 		return err
 	}
 	// Upload test data to Google Storage.
+	testDir := fmt.Sprintf("%s/%s/%d", path, test, partIndex)
 	{
-		args := []string{"-q", "-m", "cp", filepath.Join(tmpDir, "*"), path + "/" + test}
+		args := []string{"-q", "-m", "cp", filepath.Join(tmpDir, "*"), testDir}
 		if err := ctx.Run().Command("gsutil", args...); err != nil {
 			return err
 		}
@@ -444,7 +448,7 @@ func persistTestData(ctx *tool.Context, result *TestResult, output *bytes.Buffer
 	{
 		xUnitFile := xunit.ReportPath(test)
 		if _, err := os.Stat(xUnitFile); err == nil {
-			args := []string{"-q", "cp", xUnitFile, path + "/" + test + "/" + "xunit.xml"}
+			args := []string{"-q", "cp", xUnitFile, testDir + "/" + "xunit.xml"}
 			if err := ctx.Run().Command("gsutil", args...); err != nil {
 				return err
 			}
