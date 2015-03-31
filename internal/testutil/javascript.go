@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultJSTestTimeout = 10 * time.Minute
+	defaultJSTestTimeout = 15 * time.Minute
 )
 
 // runJSTest is a harness for executing javascript tests.
