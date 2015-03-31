@@ -191,6 +191,18 @@ type ShortOpt bool
 
 func (ShortOpt) TestOpt() {}
 
+// BlessingsRootOpt is an option that specifies the blessings root of the
+// services to check in VanadiumProdServicesTest.
+type BlessingsRootOpt string
+
+func (BlessingsRootOpt) TestOpt() {}
+
+// NamespaceRootOpt is an option that specifies the namespace root of the
+// services to check in VanadiumProdServicesTest.
+type NamespaceRootOpt string
+
+func (NamespaceRootOpt) TestOpt() {}
+
 // RunProjectTests runs all tests associated with the given projects.
 func RunProjectTests(ctx *tool.Context, env map[string]string, projects []string, opts ...TestOpt) (map[string]*TestResult, error) {
 	testCtx := newTestContext(ctx, env)

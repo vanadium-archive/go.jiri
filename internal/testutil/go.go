@@ -1267,9 +1267,6 @@ func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...TestOpt) (_ 
 }
 
 // vanadiumGoRace runs Go data-race tests for vanadium projects.
-//
-// TODO(jingjin): hide the paralellization from the consumers of the
-// test results data such as Jenkins and our dashboard server.
 func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
