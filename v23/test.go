@@ -15,12 +15,16 @@ import (
 )
 
 var (
-	partFlag   int
-	pkgsFlag   string
-	reportFlag bool
+	blessingsRootFlag string
+	namespaceRootFlag string
+	partFlag          int
+	pkgsFlag          string
+	reportFlag        bool
 )
 
 func init() {
+	cmdTestRun.Flags.StringVar(&blessingsRootFlag, "blessings_root", "dev.v.io", "The blessings root.")
+	cmdTestRun.Flags.StringVar(&namespaceRootFlag, "namespace_root", "/ns.dev.v.io:8101", "The namespace root.")
 	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")
 	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
 	cmdTestRun.Flags.BoolVar(&reportFlag, "report", false, "Upload test report to Vanadium servers.")
@@ -120,6 +124,7 @@ func optsFromFlags() (opts []testutil.TestOpt) {
 		}
 	}
 	opts = append(opts, testutil.PkgsOpt(pkgs))
+	opts = append(opts, testutil.BlessingsRootOpt(blessingsRootFlag), testutil.NamespaceRootOpt(namespaceRootFlag))
 	return
 }
 

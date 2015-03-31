@@ -502,6 +502,10 @@ Usage:
 <name...> is a list names identifying the tests to run.
 
 The v23 test run flags are:
+ -blessings_root=dev.v.io
+   The blessings root.
+ -namespace_root=/ns.dev.v.io:8101
+   The namespace root.
  -part=-1
    Specify which part of the test to run.
  -pkgs=

@@ -72,7 +72,7 @@ type prodService struct {
 }
 
 // vanadiumProdServicesTest runs a test of vanadium production services.
-func vanadiumProdServicesTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOpt) (_ *TestResult, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -86,7 +86,7 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, _ ...TestOpt) 
 	}
 
 	// Describe the test cases.
-	namespaceRoot := "/ns.dev.v.io:8101"
+	blessingRoot, namespaceRoot := getServiceOpts(opts)
 	allPassed, suites := true, []xunit.TestSuite{}
 	services := []prodService{
 		prodService{
@@ -106,17 +106,17 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, _ ...TestOpt) 
 		},
 		prodService{
 			name:       "macaroon service",
-			objectName: namespaceRoot + "/identity/dev.v.io/root/macaroon",
+			objectName: namespaceRoot + "/identity/" + blessingRoot + "/root/macaroon",
 			regexp:     regexp.MustCompile(`MacaroonBlesser[[:space:]]+interface`),
 		},
 		prodService{
 			name:       "google identity service",
-			objectName: namespaceRoot + "/identity/dev.v.io/root/google",
+			objectName: namespaceRoot + "/identity/" + blessingRoot + "/root/google",
 			regexp:     regexp.MustCompile(`OAuthBlesser[[:space:]]+interface`),
 		},
 		prodService{
+			objectName: namespaceRoot + "/identity/" + blessingRoot + "/root/discharger",
 			name:       "binary discharger",
-			objectName: namespaceRoot + "/identity/dev.v.io/root/discharger",
 			regexp:     regexp.MustCompile(`Discharger[[:space:]]+interface`),
 		},
 	}
@@ -138,4 +138,20 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, _ ...TestOpt) 
 		return &TestResult{Status: TestFailed}, nil
 	}
 	return &TestResult{Status: TestPassed}, nil
+}
+
+// getServiceOpts extracts blessing root and namespace root from the given
+// TestOpts.
+func getServiceOpts(opts []TestOpt) (string, string) {
+	blessingRoot := "dev.v.io"
+	namespaceRoot := "/ns.dev.v.io:8101"
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case BlessingsRootOpt:
+			blessingRoot = string(v)
+		case NamespaceRootOpt:
+			namespaceRoot = string(v)
+		}
+	}
+	return blessingRoot, namespaceRoot
 }
