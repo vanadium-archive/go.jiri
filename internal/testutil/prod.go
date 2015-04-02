@@ -6,7 +6,9 @@ package testutil
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"regexp"
 	"time"
@@ -19,7 +21,7 @@ import (
 
 // generateXUnitTestSuite generates an xUnit test suite that
 // encapsulates the given input.
-func generateXUnitTestSuite(ctx *tool.Context, success bool, pkg string, duration time.Duration, output string) *xunit.TestSuite {
+func generateXUnitTestSuite(ctx *tool.Context, failure *xunit.Failure, pkg string, duration time.Duration) *xunit.TestSuite {
 	// Generate an xUnit test suite describing the result.
 	s := xunit.TestSuite{Name: pkg}
 	c := xunit.TestCase{
@@ -27,13 +29,9 @@ func generateXUnitTestSuite(ctx *tool.Context, success bool, pkg string, duratio
 		Name:      "Test",
 		Time:      fmt.Sprintf("%.2f", duration.Seconds()),
 	}
-	if !success {
-		fmt.Fprintf(ctx.Stdout(), "%s ... failed\n%v\n", pkg, output)
-		f := xunit.Failure{
-			Message: "vrpc",
-			Data:    output,
-		}
-		c.Failures = append(c.Failures, f)
+	if failure != nil {
+		fmt.Fprintf(ctx.Stdout(), "%s ... failed\n%v\n", pkg, failure.Data)
+		c.Failures = append(c.Failures, *failure)
 		s.Failures++
 	} else {
 		fmt.Fprintf(ctx.Stdout(), "%s ... ok\n", pkg)
@@ -43,32 +41,28 @@ func generateXUnitTestSuite(ctx *tool.Context, success bool, pkg string, duratio
 	return &s
 }
 
-// testProdService test the given production service.
-func testProdService(ctx *tool.Context, service prodService) (*xunit.TestSuite, error) {
-	root, err := util.VanadiumRoot()
-	if err != nil {
-		return nil, err
-	}
-	bin := filepath.Join(root, "release", "go", "bin", "vrpc")
+// testSingleProdService test the given production service.
+func testSingleProdService(ctx *tool.Context, vroot, principalDir string, service prodService) *xunit.TestSuite {
+	bin := filepath.Join(vroot, "release", "go", "bin", "vrpc")
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
 	start := time.Now()
-	if err := ctx.Run().TimedCommandWithOpts(DefaultTestTimeout, opts, bin, "signature", service.objectName); err != nil {
-		return generateXUnitTestSuite(ctx, false, service.name, time.Now().Sub(start), out.String()), nil
+	if err := ctx.Run().TimedCommandWithOpts(DefaultTestTimeout, opts, bin, "--veyron.credentials", principalDir, "signature", service.objectName); err != nil {
+		return generateXUnitTestSuite(ctx, &xunit.Failure{"vrpc", out.String()}, service.name, time.Now().Sub(start))
 	}
 	if !service.regexp.Match(out.Bytes()) {
-		fmt.Fprintf(ctx.Stderr(), "couldn't match regexp `%s` in output:\n%v\n", service.regexp, out.String())
-		return generateXUnitTestSuite(ctx, false, service.name, time.Now().Sub(start), "mismatching signature"), nil
+		fmt.Fprintf(ctx.Stderr(), "couldn't match regexp %q in output:\n%v\n", service.regexp, out.String())
+		return generateXUnitTestSuite(ctx, &xunit.Failure{"vrpc", "mismatching signature"}, service.name, time.Now().Sub(start))
 	}
-	return generateXUnitTestSuite(ctx, true, service.name, time.Now().Sub(start), ""), nil
+	return generateXUnitTestSuite(ctx, nil, service.name, time.Now().Sub(start))
 }
 
 type prodService struct {
-	name       string
-	objectName string
-	regexp     *regexp.Regexp
+	name       string         // Name to use for the test description
+	objectName string         // Object name of the service to connect to
+	regexp     *regexp.Regexp // Regexp that should match the signature output
 }
 
 // vanadiumProdServicesTest runs a test of vanadium production services.
@@ -80,14 +74,59 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOp
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
 
+	vroot, err := util.VanadiumRoot()
+	if err != nil {
+		return nil, err
+	}
+
 	// Install the vrpc tool.
 	if err := ctx.Run().Command("v23", "go", "install", "v.io/x/ref/cmd/vrpc"); err != nil {
 		return nil, internalTestError{err, "Install VRPC"}
 	}
+	// Install the principal tool.
+	if err := ctx.Run().Command("v23", "go", "install", "v.io/x/ref/cmd/principal"); err != nil {
+		return nil, internalTestError{err, "Install Principal"}
+	}
+	tmpdir, err := ctx.Run().TempDir("", "prod-services-test")
+	if err != nil {
+		return nil, internalTestError{err, "Create temporary directory"}
+	}
+	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpdir) }, &e)
 
-	// Describe the test cases.
 	blessingRoot, namespaceRoot := getServiceOpts(opts)
 	allPassed, suites := true, []xunit.TestSuite{}
+
+	// Fetch the "root" blessing that all services are blessed by.
+	suite, pubkey, blessingNames := testIdentityProviderHTTP(ctx, blessingRoot)
+	suites = append(suites, *suite)
+
+	if suite.Failures == 0 {
+		// Setup a principal that will be used by testAllProdServices and will
+		// recognize the blessings of the prod services.
+		principalDir, err := setupPrincipal(ctx, vroot, tmpdir, pubkey, blessingNames)
+		if err != nil {
+			return nil, err
+		}
+		for _, suite := range testAllProdServices(ctx, vroot, principalDir, blessingRoot, namespaceRoot) {
+			allPassed = allPassed && (suite.Failures == 0)
+			suites = append(suites, *suite)
+		}
+	}
+
+	// Create the xUnit report.
+	if err := xunit.CreateReport(ctx, testName, suites); err != nil {
+		return nil, err
+	}
+	for _, suite := range suites {
+		if suite.Failures > 0 {
+			// At least one test failed:
+			return &TestResult{Status: TestFailed}, nil
+		}
+	}
+	return &TestResult{Status: TestPassed}, nil
+}
+
+func testAllProdServices(ctx *tool.Context, vroot, principalDir, blessingRoot, namespaceRoot string) []*xunit.TestSuite {
 	services := []prodService{
 		prodService{
 			name:       "mounttable",
@@ -121,23 +160,61 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOp
 		},
 	}
 
+	var suites []*xunit.TestSuite
 	for _, service := range services {
-		suite, err := testProdService(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		allPassed = allPassed && (suite.Failures == 0)
-		suites = append(suites, *suite)
+		suites = append(suites, testSingleProdService(ctx, vroot, principalDir, service))
 	}
+	return suites
+}
 
-	// Create the xUnit report.
-	if err := xunit.CreateReport(ctx, testName, suites); err != nil {
-		return nil, err
+// testIdentityProviderHTTP tests that the identity provider's HTTP server is
+// up and running and also fetches the set of blessing names that the provider
+// claims to be authoritative on and the public key (encoded) used by that
+// identity provider to sign certificates for blessings.
+//
+// PARANOIA ALERT:
+// This function is subject to man-in-the-middle attacks because it does not
+// verify the TLS certificates presented by the server. This does open the
+// door for an attack where a parallel universe of services could be setup
+// and fool this production services test into thinking all services are
+// up and running when they may not be.
+//
+// The attacker in this case will have to be able to mess with the routing
+// tables on the machine running this test, or the network routes of routers
+// used by the machine, or mess up DNS entries.
+func testIdentityProviderHTTP(ctx *tool.Context, blessingRoot string) (suite *xunit.TestSuite, publickey string, blessingNames []string) {
+	url := fmt.Sprintf("https://%s/auth/blessing-root", blessingRoot)
+	start := time.Now()
+	var response struct {
+		Names     []string `json:"names"`
+		PublicKey string   `json:"publicKey"`
 	}
-	if !allPassed {
-		return &TestResult{Status: TestFailed}, nil
+	resp, err := http.Get(url)
+	if err == nil {
+		defer resp.Body.Close()
+		err = json.NewDecoder(resp.Body).Decode(&response)
 	}
-	return &TestResult{Status: TestPassed}, nil
+	var failure *xunit.Failure
+	if err != nil {
+		failure = &xunit.Failure{"identityd HTTP", err.Error()}
+	}
+	return generateXUnitTestSuite(ctx, failure, url, time.Now().Sub(start)), response.PublicKey, response.Names
+}
+
+func setupPrincipal(ctx *tool.Context, vroot, tmpdir, pubkey string, blessingNames []string) (string, error) {
+	dir := filepath.Join(tmpdir, "credentials")
+	bin := filepath.Join(vroot, "release", "go", "bin", "principal")
+	if err := ctx.Run().TimedCommand(DefaultTestTimeout, bin, "create", dir, "prod-services-tester"); err != nil {
+		fmt.Fprintf(ctx.Stderr(), "principal create failed: %v\n", err)
+		return "", err
+	}
+	for _, name := range blessingNames {
+		if err := ctx.Run().TimedCommand(DefaultTestTimeout, bin, "--veyron.credentials", dir, "addtoroots", pubkey, name); err != nil {
+			fmt.Fprintf(ctx.Stderr(), "principal addtoroots %v %v failed: %v\n", pubkey, name, err)
+			return "", err
+		}
+	}
+	return dir, nil
 }
 
 // getServiceOpts extracts blessing root and namespace root from the given
