@@ -21,11 +21,13 @@ import (
 )
 
 var (
-	remoteFlag bool
+	remoteFlag     bool
+	timeFormatFlag string
 )
 
 func init() {
 	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
+	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time_format", time.RFC3339, "Time format for snapshot file name.")
 }
 
 var cmdSnapshot = &cmdline.Command{
@@ -112,7 +114,7 @@ func runSnapshotCreate(command *cmdline.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	snapshotFile := filepath.Join(snapshotDir, "labels", label, time.Now().Format(time.RFC3339))
+	snapshotFile := filepath.Join(snapshotDir, "labels", label, time.Now().Format(timeFormatFlag))
 	// Either atomically create a new snapshot that captures the
 	// state of the vanadium project and push the changes to the
 	// remote repository (if applicable), or fail with no effect.

@@ -397,9 +397,13 @@ NOTE: Unlike the v23 tool commands, the above internal organization is not an
 API. It is an implementation and can change without notice.
 
 Usage:
-   v23 snapshot create <label>
+   v23 snapshot create [flags] <label>
 
 <label> is the snapshot label.
+
+The v23 snapshot create flags are:
+ -time_format=2006-01-02T15:04:05Z07:00
+   Time format for snapshot file name.
 
 V23 Snapshot List
 
