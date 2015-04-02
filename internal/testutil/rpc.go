@@ -172,7 +172,7 @@ func startServers(ctx *tool.Context) (<-chan error, error) {
 		filepath.Join(root, binPath, "stressd"),
 		"++",
 		"./stressd",
-		"-veyron.tcp.address", fmt.Sprintf(":%d", testPort),
+		"-v23.tcp.address", fmt.Sprintf(":%d", testPort),
 		"-duration", testServerUpTime.String(),
 	}
 
