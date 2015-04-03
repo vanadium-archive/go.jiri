@@ -158,6 +158,13 @@ func testAllProdServices(ctx *tool.Context, vroot, principalDir, blessingRoot, n
 			name:       "binary discharger",
 			regexp:     regexp.MustCompile(`Discharger[[:space:]]+interface`),
 		},
+		prodService{
+			objectName: namespaceRoot + "/proxy-mon/__debug",
+			name:       "proxy service",
+			// We just check that the returned signature has the __Reserved interface since
+			// proxy-mon doesn't implement any other services.
+			regexp: regexp.MustCompile(`__Reserved[[:space:]]+interface`),
+		},
 	}
 
 	var suites []*xunit.TestSuite
