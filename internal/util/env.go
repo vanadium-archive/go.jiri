@@ -31,13 +31,13 @@ func LocalManifestFile() (string, error) {
 	return filepath.Join(root, ".local_manifest"), nil
 }
 
-// LocalSnapshotsDir returns the path to the local snapshots directory.
+// LocalSnapshotDir returns the path to the local snapshot directory.
 func LocalSnapshotDir() (string, error) {
 	root, err := VanadiumRoot()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, ".snapshots"), nil
+	return filepath.Join(root, ".snapshot"), nil
 }
 
 // ManifestDir returns the path to the manifest directory.
@@ -57,6 +57,15 @@ func ManifestFile(name string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, name), nil
+}
+
+// RemoteSnapshotDir returns the path to the remote snapshot directory.
+func RemoteSnapshotDir() (string, error) {
+	manifestDir, err := ManifestDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(manifestDir, "snapshot"), nil
 }
 
 // ResolveManifestPath resolves the given manifest name to an absolute

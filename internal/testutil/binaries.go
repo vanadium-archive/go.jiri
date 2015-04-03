@@ -26,7 +26,7 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Fetch the latest stable Go snapshot.
-	if err := ctx.Run().Command("v23", "update", "-manifest=stable-go"); err != nil {
+	if err := ctx.Run().Command("v23", "update", "-manifest=snapshot/stable-go"); err != nil {
 		return nil, internalTestError{err, "Update"}
 	}
 

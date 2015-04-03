@@ -77,11 +77,11 @@ func TestList(t *testing.T) {
 	}
 	defer os.Setenv("VANADIUM_ROOT", oldRoot)
 
-	manifestDir, err := util.ManifestDir()
+	remoteSnapshotDir, err := util.RemoteSnapshotDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	snapshotDir, err := util.LocalSnapshotDir()
+	localSnapshotDir, err := util.LocalSnapshotDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -90,11 +90,11 @@ func TestList(t *testing.T) {
 	tests := []config{
 		config{
 			remote: false,
-			dir:    snapshotDir,
+			dir:    localSnapshotDir,
 		},
 		config{
 			remote: true,
-			dir:    manifestDir,
+			dir:    remoteSnapshotDir,
 		},
 	}
 	labels := []label{
@@ -197,8 +197,9 @@ func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 }
 
 func TestCreate(t *testing.T) {
-	// Setup a fake VANADIUM_ROOT instance.
 	ctx := tool.NewDefaultContext()
+
+	// Setup a fake VANADIUM_ROOT instance.
 	root, err := util.NewFakeVanadiumRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -225,7 +226,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	// Create a fake configuration file.
-	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"remote-snapshot": []string{}}))
+	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"test-remote": []string{}}))
 	root.WriteLocalToolsConfig(ctx, config)
 
 	oldRoot, err := util.VanadiumRoot()
@@ -247,7 +248,7 @@ func TestCreate(t *testing.T) {
 	command := cmdline.Command{}
 	command.Init(nil, nil, nil)
 	remoteFlag = false
-	if err := runSnapshotCreate(&command, []string{"local-snapshot"}); err != nil {
+	if err := runSnapshotCreate(&command, []string{"test-local"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -265,7 +266,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	snapshotFile := filepath.Join(snapshotDir, "local-snapshot")
+	snapshotFile := filepath.Join(snapshotDir, "test-local")
 	localCtx := ctx.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,
 	})
@@ -279,9 +280,8 @@ func TestCreate(t *testing.T) {
 
 	// Create a remote snapshot.
 	remoteFlag = true
-	manifest := "remote-snapshot"
 	root.EnableRemoteManifestPush(ctx)
-	if err := runSnapshotCreate(&command, []string{manifest}); err != nil {
+	if err := runSnapshotCreate(&command, []string{"test-remote"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -294,6 +294,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	// Check that invoking the UpdateUniverse() with the remote snapshot.
+	manifest := "snapshot/test-remote"
 	remoteCtx := ctx.Clone(tool.ContextOpts{
 		Manifest: &manifest,
 	})

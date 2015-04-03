@@ -96,10 +96,8 @@ func runSnapshotCreate(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	if !remoteFlag {
-		if err := checkSnapshotDir(ctx); err != nil {
-			return err
-		}
+	if err := checkSnapshotDir(ctx); err != nil {
+		return err
 	}
 
 	// Run the tests associated with the given label. The creation
@@ -147,13 +145,19 @@ func runSnapshotCreate(command *cmdline.Command, args []string) error {
 // checkSnapshotDir makes sure that he local snapshot directory exists
 // and is initialized properly.
 func checkSnapshotDir(ctx *tool.Context) (e error) {
-	snapshotDir, err := util.LocalSnapshotDir()
+	snapshotDir, err := getSnapshotDir()
 	if err != nil {
 		return err
 	}
 	if _, err := os.Stat(snapshotDir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
+		}
+		if remoteFlag {
+			if err := ctx.Run().MkdirAll(snapshotDir, 0755); err != nil {
+				return err
+			}
+			return nil
 		}
 		createFn := func() (err error) {
 			if err := ctx.Run().MkdirAll(snapshotDir, 0755); err != nil {
@@ -216,7 +220,7 @@ func createSnapshot(ctx *tool.Context, snapshotDir, snapshotFile, label string) 
 // respecting the value of the "-remote" command-line flag.
 func getSnapshotDir() (string, error) {
 	if remoteFlag {
-		snapshotDir, err := util.ManifestDir()
+		snapshotDir, err := util.RemoteSnapshotDir()
 		if err != nil {
 			return "", err
 		}
@@ -306,6 +310,15 @@ command lists snapshots for all known labels.
 }
 
 func runSnapshotList(command *cmdline.Command, args []string) error {
+	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	if err := checkSnapshotDir(ctx); err != nil {
+		return err
+	}
+
 	snapshotDir, err := getSnapshotDir()
 	if err != nil {
 		return err
