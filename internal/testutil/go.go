@@ -1362,9 +1362,10 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...TestOpt
 		return nil, err
 	}
 	suffix := suffixOpt(genTestNameSuffix("V23Test"))
-	args := nonTestArgsOpt([]string{"-v23.tests"})
+	args := argsOpt([]string{"-run", "^TestV23"})
+	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
 	matcher := funcMatcherOpt{&matchV23TestFunc{}}
-	result, err := goTest(ctx, testName, suffix, args, matcher, pkgs)
+	result, err := goTest(ctx, testName, suffix, args, nonTestArgs, matcher, pkgs)
 	return result, err
 }
 
