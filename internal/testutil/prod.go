@@ -107,7 +107,7 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOp
 		if err != nil {
 			return nil, err
 		}
-		for _, suite := range testAllProdServices(ctx, vroot, principalDir, blessingRoot, namespaceRoot) {
+		for _, suite := range testAllProdServices(ctx, vroot, principalDir, namespaceRoot) {
 			allPassed = allPassed && (suite.Failures == 0)
 			suites = append(suites, *suite)
 		}
@@ -126,7 +126,7 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOp
 	return &TestResult{Status: TestPassed}, nil
 }
 
-func testAllProdServices(ctx *tool.Context, vroot, principalDir, blessingRoot, namespaceRoot string) []*xunit.TestSuite {
+func testAllProdServices(ctx *tool.Context, vroot, principalDir, namespaceRoot string) []*xunit.TestSuite {
 	services := []prodService{
 		prodService{
 			name:       "mounttable",
@@ -145,16 +145,16 @@ func testAllProdServices(ctx *tool.Context, vroot, principalDir, blessingRoot, n
 		},
 		prodService{
 			name:       "macaroon service",
-			objectName: namespaceRoot + "/identity/" + blessingRoot + "/root/macaroon",
+			objectName: namespaceRoot + "/identity/dev.v.io/root/macaroon",
 			regexp:     regexp.MustCompile(`MacaroonBlesser[[:space:]]+interface`),
 		},
 		prodService{
 			name:       "google identity service",
-			objectName: namespaceRoot + "/identity/" + blessingRoot + "/root/google",
+			objectName: namespaceRoot + "/identity/dev.v.io//root/google",
 			regexp:     regexp.MustCompile(`OAuthBlesser[[:space:]]+interface`),
 		},
 		prodService{
-			objectName: namespaceRoot + "/identity/" + blessingRoot + "/root/discharger",
+			objectName: namespaceRoot + "/identity/dev.v.io/root/discharger",
 			name:       "binary discharger",
 			regexp:     regexp.MustCompile(`Discharger[[:space:]]+interface`),
 		},
