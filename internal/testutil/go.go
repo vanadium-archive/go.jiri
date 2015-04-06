@@ -892,7 +892,8 @@ type exclusion struct {
 }
 
 var (
-	exclusions []exclusion
+	exclusions       []exclusion
+	goRaceExclusions []exclusion
 )
 
 func init() {
@@ -931,12 +932,22 @@ func init() {
 		// cmd/gc to appear, but we have v.io/x/ref/cmd/gclogs.
 		exclusion{test{pkg: "golang.org/x/tools/cmd/godoc", name: "TestWeb"}, true},
 	}
+
+	// Tests excluded only when running under --race flag.
+	goRaceExclusions = []exclusion{
+		// This test takes too long in --race mode.
+		exclusion{test{pkg: "v.io/x/devtools/v23", name: "TestV23Generate"}, true},
+	}
 }
 
 // ExcludedTests returns the set of tests to be excluded from
 // the Vanadium projects.
 func ExcludedTests() ([]test, error) {
 	return excludedTests(exclusions)
+}
+
+func goRaceExcludedTests() ([]test, error) {
+	return excludedTests(goRaceExclusions)
 }
 
 func excludedTests(exclusions []exclusion) ([]test, error) {
@@ -1064,6 +1075,11 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 	if err != nil {
 		return nil, err
 	}
+	raceExclusions, err := goRaceExcludedTests()
+	if err != nil {
+		return nil, err
+	}
+	exclusions = append(exclusions, raceExclusions...)
 	profiles := profilesOpt([]string{"syncbase"})
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
 	return goTest(ctx, testName, suffix, args, excludedTestsOpt(exclusions), validatedPkgs, profiles)
@@ -1280,6 +1296,11 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 	if err != nil {
 		return nil, err
 	}
+	raceExclusions, err := goRaceExcludedTests()
+	if err != nil {
+		return nil, err
+	}
+	exclusions = append(exclusions, raceExclusions...)
 	args := argsOpt([]string{"-race"})
 	if getShortTestsOnlyOptValue(opts) {
 		args = append(args, "-short")
