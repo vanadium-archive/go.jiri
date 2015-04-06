@@ -186,3 +186,12 @@ func Fail(ctx *tool.Context, format string, a ...interface{}) {
 	fmt.Fprintf(ctx.Stderr(), "%s ", strFail)
 	fmt.Fprintf(ctx.Stderr(), format, a...)
 }
+
+func Warn(ctx *tool.Context, format string, a ...interface{}) {
+	strWarn := "warn"
+	if ctx.Color() {
+		strWarn = util.ColorString("warn", util.Yellow)
+	}
+	fmt.Fprintf(ctx.Stderr(), "%s ", strWarn)
+	fmt.Fprintf(ctx.Stderr(), format, a...)
+}
