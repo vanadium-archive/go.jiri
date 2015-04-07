@@ -50,7 +50,7 @@ func createBuildCopFile(t *testing.T, ctx *tool.Context) {
 
 func TestBuildCop(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	root, err := NewFakeVanadiumRoot(ctx)
+	root, err := NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -59,14 +59,14 @@ func TestBuildCop(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := VanadiumRoot()
+	oldRoot, err := V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 
 	// Create a buildcop.xml file.
 	createBuildCopFile(t, ctx)

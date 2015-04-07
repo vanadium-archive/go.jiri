@@ -43,7 +43,7 @@ var (
 
 // vanadiumReleaseTest updates binaries of staging cloud services and run tests for them.
 func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...TestOpt) (_ *TestResult, e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

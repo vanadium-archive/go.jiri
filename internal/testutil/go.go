@@ -776,7 +776,7 @@ func installGoDoc(ctx *tool.Context) error {
 // installGoCoverCobertura makes sure the "gocover-cobertura" tool is
 // installed.
 func installGoCoverCobertura(ctx *tool.Context) error {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -799,7 +799,7 @@ func installGoCoverCobertura(ctx *tool.Context) error {
 
 // installGo2XUnit makes sure the "go2xunit" tool is installed.
 func installGo2XUnit(ctx *tool.Context) error {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -1088,7 +1088,7 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 // thirdPartyPkgs returns a list of Go expressions that describe all
 // third-party packages.
 func thirdPartyPkgs() ([]string, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -1139,7 +1139,7 @@ func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...TestOpt) (*T
 
 // vanadiumGoDoc (re)starts the godoc server for vanadium projects.
 func vanadiumGoDoc(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

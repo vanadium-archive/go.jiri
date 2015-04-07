@@ -29,7 +29,7 @@ func runProjectTest(ctx *tool.Context, testName, projectName, target string, env
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Navigate to project directory.
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

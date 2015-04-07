@@ -19,12 +19,12 @@ import (
 )
 
 const (
-	rootEnv = "VANADIUM_ROOT"
+	rootEnv = "V23_ROOT"
 )
 
 // LocalManifestFile returns the path to the local manifest.
 func LocalManifestFile() (string, error) {
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return "", err
 	}
@@ -33,7 +33,7 @@ func LocalManifestFile() (string, error) {
 
 // LocalSnapshotDir returns the path to the local snapshot directory.
 func LocalSnapshotDir() (string, error) {
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return "", err
 	}
@@ -42,7 +42,7 @@ func LocalSnapshotDir() (string, error) {
 
 // ManifestDir returns the path to the manifest directory.
 func ManifestDir() (string, error) {
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return "", err
 	}
@@ -138,7 +138,7 @@ func LoadConfig(ctx *tool.Context) (*Config, error) {
 // according to the current config of the v23 tool.
 func VanadiumEnvironment(ctx *tool.Context, platform Platform) (*envutil.Snapshot, error) {
 	env := envutil.NewSnapshotFromOS()
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +193,8 @@ func VanadiumGitRepoHost() string {
 	return "https://vanadium.googlesource.com/"
 }
 
-// VanadiumRoot returns the root of the vanadium universe.
-func VanadiumRoot() (string, error) {
+// V23Root returns the root of the vanadium universe.
+func V23Root() (string, error) {
 	root := os.Getenv(rootEnv)
 	if root == "" {
 		return "", fmt.Errorf("%v is not set", rootEnv)
@@ -209,7 +209,7 @@ func VanadiumRoot() (string, error) {
 // setAndroidEnv sets the environment variables used for android
 // cross-compilation.
 func setAndroidEnv(env *envutil.Snapshot, platform Platform) error {
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func setAndroidEnv(env *envutil.Snapshot, platform Platform) error {
 // setArmEnv sets the environment variables used for android
 // cross-compilation.
 func setArmEnv(env *envutil.Snapshot, platform Platform) error {
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return err
 	}

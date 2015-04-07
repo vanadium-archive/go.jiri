@@ -59,11 +59,11 @@ type Project struct {
 	// Name is the project name.
 	Name string `xml:"name,attr"`
 	// Path is the path used to store the project locally. Project
-	// manifest uses paths that are relative to the VANADIUM_ROOT
+	// manifest uses paths that are relative to the V23_ROOT
 	// environment variable. When a manifest is parsed (e.g. in
 	// RemoteProjects), the program logic converts the relative
 	// paths to an absolute paths, using the current value of the
-	// VANADIUM_ROOT environment variable as a prefix.
+	// V23_ROOT environment variable as a prefix.
 	Path string `xml:"path,attr"`
 	// Protocol is the version control protocol used by the
 	// project. If not set, "git" is used as the default.
@@ -160,7 +160,7 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 // LocalProjects scans the local filesystem to identify existing
 // projects.
 func LocalProjects(ctx *tool.Context) (Projects, error) {
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
 // from the manifest repository.
 func readManifest(ctx *tool.Context, update bool) (Projects, Tools, error) {
 	if update {
-		root, err := VanadiumRoot()
+		root, err := V23Root()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -290,7 +290,7 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 	if err := buildTools(ctx, remoteTools, tmpDir); err != nil {
 		return err
 	}
-	// 3. Install the tools into $VANADIUM_ROOT/bin.
+	// 3. Install the tools into $V23_ROOT/bin.
 	return installTools(ctx, tmpDir)
 }
 
@@ -398,7 +398,7 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 	for _, name := range names {
 		tool := remoteTools[name]
 		// Skip tools with no package specified. Besides increasing
-		// robustness, this step also allow us to create VANADIUM_ROOT
+		// robustness, this step also allow us to create V23_ROOT
 		// fakes without having to provide an implementation for the "v23"
 		// tool, which every manifest needs to specify.
 		if tool.Package == "" {
@@ -501,7 +501,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 	if err := ctx.Run().Chdir(path); err != nil {
 		return err
 	}
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return err
 	}
@@ -519,7 +519,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		if p, ok := projects[project.Name]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
-		// Root relative paths in the VANADIUM_ROOT.
+		// Root relative paths in the V23_ROOT.
 		if !filepath.IsAbs(project.Path) {
 			project.Path = filepath.Join(root, project.Path)
 		}
@@ -543,13 +543,13 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 }
 
 // installTools installs the tools from the given directory into
-// $VANADIUM_ROOT/bin.
+// $V23_ROOT/bin.
 func installTools(ctx *tool.Context, dir string) error {
 	if ctx.DryRun() {
 		// In "dry run" mode, no binaries are built.
 		return nil
 	}
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return err
 	}
@@ -628,7 +628,7 @@ func loadManifest(path string, projects Projects, tools Tools, stack map[string]
 		delete(stack, manifest.Name)
 	}
 	// Process all projects.
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return err
 	}
@@ -717,7 +717,7 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, err := VanadiumRoot()
+	root, err := V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -796,8 +796,8 @@ func writeMetadata(ctx *tool.Context, project Project) (e error) {
 		return err
 	}
 	// Replace absolute project paths with relative paths to make it
-	// possible to move VANADIUM_ROOT locally.
-	root, err := VanadiumRoot()
+	// possible to move V23_ROOT locally.
+	root, err := V23Root()
 	if err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ const (
 
 // Runs specified make target in WWW Makefile as a test.
 func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout time.Duration) (_ *TestResult, e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

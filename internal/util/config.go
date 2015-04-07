@@ -11,7 +11,7 @@ import (
 
 // Config holds configuration common to vanadium tools.
 type Config struct {
-	// goWorkspaces identifies VANADIUM_ROOT subdirectories that contain a
+	// goWorkspaces identifies V23_ROOT subdirectories that contain a
 	// Go workspace.
 	goWorkspaces []string
 	// projectTests maps vanadium projects to sets of tests that should be
@@ -31,7 +31,7 @@ type Config struct {
 	// corresponding test has n+1 parts: the first n parts are identified
 	// by L[0] to L[n-1]. The last part is whatever is left.
 	testParts map[string][]string
-	// vdlWorkspaces identifies VANADIUM_ROOT subdirectories that contain
+	// vdlWorkspaces identifies V23_ROOT subdirectories that contain
 	// a VDL workspace.
 	vdlWorkspaces []string
 }

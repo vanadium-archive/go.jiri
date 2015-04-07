@@ -32,13 +32,13 @@ var cmdUpdate = &cmdline.Command{
 	Short: "Update all vanadium tools and projects",
 	Long: `
 Updates all vanadium projects, builds the latest version of vanadium
-tools, and installs the resulting binaries into $VANADIUM_ROOT/bin. The
+tools, and installs the resulting binaries into $V23_ROOT/bin. The
 sequence in which the individual updates happen guarantees that we end
 up with a consistent set of tools and source code.
 
 The set of project and tools to update is describe by a
 manifest. Vanadium manifests are revisioned and stored in a "manifest"
-repository, that is available locally in $VANADIUM_ROOT/.manifest. The
+repository, that is available locally in $V23_ROOT/.manifest. The
 manifest uses the following XML schema:
 
  <manifest>
@@ -61,15 +61,15 @@ manifest uses the following XML schema:
 
 The <import> element can be used to share settings across multiple
 manifests. Import names are interpreted relative to the
-$VANADIUM_ROOT/.manifest/v2 directory. Import cycles are not allowed and
+$V23_ROOT/.manifest/v2 directory. Import cycles are not allowed and
 if a project or a tool is specified multiple times, the last
 specification takes effect. In particular, the elements <project
 name="foo" exclude="true"/> and <tool name="bar" exclude="true"/> can
 be used to exclude previously included projects and tools.
 
 The tool identifies which manifest to use using the following
-algorithm. If the $VANADIUM_ROOT/.local_manifest file exists, then it is
-used. Otherwise, the $VANADIUM_ROOT/.manifest/v2/<manifest>.xml file is
+algorithm. If the $V23_ROOT/.local_manifest file exists, then it is
+used. Otherwise, the $V23_ROOT/.manifest/v2/<manifest>.xml file is
 used, which <manifest> is the value of the -manifest command-line
 flag, which defaults to "default".
 
@@ -87,8 +87,8 @@ func runUpdate(command *cmdline.Command, _ []string) error {
 	})
 
 	// Create a snapshot of the current state of all projects and
-	// write it to the $VANADIUM_ROOT/.update_history folder.
-	root, err := util.VanadiumRoot()
+	// write it to the $V23_ROOT/.update_history folder.
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}

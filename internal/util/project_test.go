@@ -4,7 +4,7 @@
 
 package util
 
-// TODO(jsimsa): Switch this test to using lib/tool.FakeVanadiumRoot.
+// TODO(jsimsa): Switch this test to using lib/tool.FakeV23Root.
 
 import (
 	"bytes"
@@ -297,11 +297,11 @@ func TestUpdateUniverse(t *testing.T) {
 		remoteProjects = append(remoteProjects, remoteProject)
 	}
 	createRemoteManifest(t, ctx, remoteManifest, remoteProjects)
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", localDir); err != nil {
+	oldRoot := os.Getenv("V23_ROOT")
+	if err := os.Setenv("V23_ROOT", localDir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 
 	// Check that calling UpdateUniverse() creates local copies of
 	// the remote repositories, advancing projects to HEAD or to

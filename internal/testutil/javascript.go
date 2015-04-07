@@ -64,7 +64,7 @@ func runJSTest(ctx *tool.Context, testName, testDir, target string, cleanFn func
 
 // vanadiumJSBuildExtension tests the vanadium javascript build extension.
 func vanadiumJSBuildExtension(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func vanadiumJSBuildExtension(ctx *tool.Context, testName string, _ ...TestOpt) 
 // vanadiumJSDoc (re)generates the content of the vanadium javascript
 // documentation server.
 func vanadiumJSDoc(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func vanadiumJSDoc(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResul
 
 // vanadiumJSBrowserIntegration runs the vanadium javascript integration test in a browser environment using nacl plugin.
 func vanadiumJSBrowserIntegration(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func vanadiumJSBrowserIntegration(ctx *tool.Context, testName string, _ ...TestO
 
 // vanadiumJSNodeIntegration runs the vanadium javascript integration test in NodeJS environment using wspr.
 func vanadiumJSNodeIntegration(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func vanadiumJSNodeIntegration(ctx *tool.Context, testName string, _ ...TestOpt)
 
 // vanadiumJSUnit runs the vanadium javascript unit test.
 func vanadiumJSUnit(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func vanadiumJSUnit(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResu
 
 // vanadiumJSVdl runs the vanadium javascript vdl test.
 func vanadiumJSVdl(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func vanadiumJSVdl(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResul
 
 // vanadiumJSVom runs the vanadium javascript vom test.
 func vanadiumJSVom(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

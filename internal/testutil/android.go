@@ -84,7 +84,7 @@ func vanadiumAndroidTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *T
 		return nil, internalTestError{err, "Init"}
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
-	rootDir, err := util.VanadiumRoot()
+	rootDir, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func buildAndroidApp(ctx *tool.Context, appDir string) error {
 	if err := ctx.Run().Command("which", "ant"); err != nil {
 		return fmt.Errorf("Couldn't find 'ant' executable.")
 	}
-	rootDir, err := util.VanadiumRoot()
+	rootDir, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func buildAndroidApp(ctx *tool.Context, appDir string) error {
 }
 
 func buildAndroidLibs(ctx *tool.Context, appDir string) error {
-	rootDir, err := util.VanadiumRoot()
+	rootDir, err := util.V23Root()
 	if err != nil {
 		return err
 	}

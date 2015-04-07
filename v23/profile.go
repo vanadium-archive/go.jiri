@@ -321,7 +321,7 @@ func run(ctx *tool.Context, bin string, args []string, env map[string]string) er
 // For more on Go cross-compilation for arm/linux information see:
 // http://www.bootc.net/archives/2012/05/26/how-to-build-a-cross-compiler-for-your-raspberry-pi/
 func setupArmLinux(ctx *tool.Context) (e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -487,7 +487,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 
 // setupMobileLinux sets up the mobile profile for linux.
 func setupMobileLinux(ctx *tool.Context) (e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -646,7 +646,7 @@ func setupProximityLinux(ctx *tool.Context) error {
 
 // setupProximityArmLinux sets up the proximity componenets for for arm/linux.
 func setupProximityArmLinux(ctx *tool.Context) error {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -678,7 +678,7 @@ ac_cv_func_realloc_works=yes
 
 // setupProximityLinuxHelper sets up the proximity profile for linux.
 func setupProximityLinuxHelper(ctx *tool.Context, arch, host, path string) (e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -1046,7 +1046,7 @@ func setupWebLinux(ctx *tool.Context) error {
 
 // setupWebHelper sets up the web profile.
 func setupWebCommon(ctx *tool.Context) error {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -1156,7 +1156,7 @@ func setupSyncbaseDarwin(ctx *tool.Context) (e error) {
 }
 
 func setupSyncbaseHelper(ctx *tool.Context) (e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}

@@ -32,8 +32,8 @@ func TestCopyright(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Setup a fake VANADIUM_ROOT.
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	// Setup a fake V23_ROOT.
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -56,14 +56,14 @@ func TestCopyright(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	oldRoot, err := util.VanadiumRoot()
+	oldRoot, err := util.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("Setenv() failed: %v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 
 	// Write out test licensing files and sample source code files to a
 	// project and verify that the project checks out.

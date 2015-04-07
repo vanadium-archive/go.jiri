@@ -32,7 +32,7 @@ func requireEnv(names []string) error {
 // vanadiumPresubmitPoll polls vanadium projects for new patchsets for
 // which to run presubmit tests.
 func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

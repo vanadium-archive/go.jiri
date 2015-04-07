@@ -127,7 +127,7 @@ func initTest(ctx *tool.Context, testName string, profiles []string) (func() err
 // findTestResultFiles returns a slice of paths to test result related files.
 func findTestResultFiles(ctx *tool.Context, testName string) ([]string, error) {
 	result := []string{}
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

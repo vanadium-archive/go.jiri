@@ -61,8 +61,8 @@ type label struct {
 func TestList(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	// Setup a fake VANADIUM_ROOT.
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	// Setup a fake V23_ROOT.
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -71,11 +71,11 @@ func TestList(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := util.VanadiumRoot()
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot, err := util.V23Root()
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 
 	remoteSnapshotDir, err := util.RemoteSnapshotDir()
 	if err != nil {
@@ -199,8 +199,8 @@ func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 func TestCreate(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	// Setup a fake VANADIUM_ROOT instance.
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	// Setup a fake V23_ROOT instance.
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -229,11 +229,11 @@ func TestCreate(t *testing.T) {
 	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"test-remote": []string{}}))
 	root.WriteLocalToolsConfig(ctx, config)
 
-	oldRoot, err := util.VanadiumRoot()
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot, err := util.V23Root()
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.

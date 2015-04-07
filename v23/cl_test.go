@@ -269,8 +269,8 @@ func createTestRepos(t *testing.T, ctx *tool.Context, workingDir string) (string
 }
 
 // setup creates a set up for testing the review tool.
-func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*util.FakeVanadiumRoot, string, string, string) {
-	root, err := util.NewFakeVanadiumRoot(ctx)
+func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*util.FakeV23Root, string, string, string) {
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -287,7 +287,7 @@ func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*util.FakeVan
 }
 
 // teardownTest cleans up the set up for testing the review tool.
-func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util.FakeVanadiumRoot) {
+func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util.FakeV23Root) {
 	if err := ctx.Run().Chdir(oldWorkDir); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -426,11 +426,11 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 // testCopyrightHelper is a function that contains the logic shared by
 // TestCopyrightError and TestCopyrightOK.
 func testCopyrightHelper(t *testing.T, ok bool) error {
-	// Setup a fake VANADIUM_ROOT, copy the copyright assets into its
+	// Setup a fake V23_ROOT, copy the copyright assets into its
 	// tools/data directory, and create a "test" project that does not
 	// contain the assets.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -470,11 +470,11 @@ func testCopyrightHelper(t *testing.T, ok bool) error {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot := os.Getenv("V23_ROOT")
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 	return review.checkCopyright()
 }
 
@@ -507,11 +507,11 @@ func testGoDependencyHelper(t *testing.T, ok bool) error {
 	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
 	defer teardownTest(t, ctx, cwd, root)
 
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot := os.Getenv("V23_ROOT")
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 	oldGoPath := os.Getenv("GOPATH")
 	if err := os.Setenv("GOPATH", repoPath); err != nil {
 		t.Fatalf("%v", err)

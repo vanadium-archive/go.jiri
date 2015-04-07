@@ -103,7 +103,7 @@ func clientNodeName(n int) string {
 }
 
 func createNodes(ctx *tool.Context) error {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func createNodes(ctx *tool.Context) error {
 }
 
 func deleteNodes(ctx *tool.Context) error {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func deleteNodes(ctx *tool.Context) error {
 }
 
 func startServers(ctx *tool.Context) (<-chan error, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func startServers(ctx *tool.Context) (<-chan error, error) {
 }
 
 func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

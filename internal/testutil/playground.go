@@ -22,7 +22,7 @@ const (
 //
 // TODO(ivanpi): Port the namespace browser test logic from shell to Go. Add more tests.
 func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
-	root, err := util.VanadiumRoot()
+	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}

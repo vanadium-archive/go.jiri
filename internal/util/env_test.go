@@ -12,10 +12,10 @@ import (
 	"v.io/x/devtools/internal/tool"
 )
 
-// TestVanadiumRootSymlink checks that VanadiumRoot interprets the value
-// of the VANADIUM_ROOT environment variable as a path, evaluates any
+// TestV23RootSymlink checks that V23Root interprets the value
+// of the V23_ROOT environment variable as a path, evaluates any
 // symlinks the path might contain, and returns the result.
-func TestVanadiumRootSymlink(t *testing.T) {
+func TestV23RootSymlink(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
 	// Create a temporary directory.
@@ -41,12 +41,12 @@ func TestVanadiumRootSymlink(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Set the VANADIUM_ROOT to the symlink created above and check
-	// that VanadiumRoot() evaluates the symlink.
-	if err := os.Setenv("VANADIUM_ROOT", symRoot); err != nil {
+	// Set the V23_ROOT to the symlink created above and check
+	// that V23Root() evaluates the symlink.
+	if err := os.Setenv("V23_ROOT", symRoot); err != nil {
 		t.Fatalf("%v", err)
 	}
-	got, err := VanadiumRoot()
+	got, err := V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

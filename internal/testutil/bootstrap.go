@@ -30,9 +30,9 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Tes
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
 
-	// Create a new temporary VANADIUM_ROOT.
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	defer collect.Error(func() error { return os.Setenv("VANADIUM_ROOT", oldRoot) }, &e)
+	// Create a new temporary V23_ROOT.
+	oldRoot := os.Getenv("V23_ROOT")
+	defer collect.Error(func() error { return os.Setenv("V23_ROOT", oldRoot) }, &e)
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
 		return nil, internalTestError{err, "TempDir"}
@@ -40,7 +40,7 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Tes
 	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 
 	root := filepath.Join(tmpDir, "root")
-	if err := os.Setenv("VANADIUM_ROOT", root); err != nil {
+	if err := os.Setenv("V23_ROOT", root); err != nil {
 		return nil, internalTestError{err, "Setenv"}
 	}
 

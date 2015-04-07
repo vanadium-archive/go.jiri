@@ -17,9 +17,9 @@ import (
 )
 
 func TestTestProject(t *testing.T) {
-	// Setup a fake VANADIUM_ROOT.
+	// Setup a fake V23_ROOT.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -35,13 +35,13 @@ func TestTestProject(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Point the VANADIUM_ROOT and WORKSPACE environment variables to
+	// Point the V23_ROOT and WORKSPACE environment variables to
 	// the fake.
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot := os.Getenv("V23_ROOT")
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 	oldWorkspace := os.Getenv("WORKSPACE")
 	if err := os.Setenv("WORKSPACE", root.Dir); err != nil {
 		t.Fatalf("%v", err)
@@ -67,9 +67,9 @@ ignore-this PASSED
 }
 
 func TestTestRun(t *testing.T) {
-	// Setup a fake VANADIUM_ROOT.
+	// Setup a fake V23_ROOT.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -79,13 +79,13 @@ func TestTestRun(t *testing.T) {
 		}
 	}()
 
-	// Point the VANADIUM_ROOT and WORKSPACE environment variables to
+	// Point the V23_ROOT and WORKSPACE environment variables to
 	// the fake.
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot := os.Getenv("V23_ROOT")
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 	oldWorkspace := os.Getenv("WORKSPACE")
 	if err := os.Setenv("WORKSPACE", root.Dir); err != nil {
 		t.Fatalf("%v", err)
@@ -110,9 +110,9 @@ ignore-this PASSED
 }
 
 func TestTestList(t *testing.T) {
-	// Setup a fake VANADIUM_ROOT.
+	// Setup a fake V23_ROOT.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeVanadiumRoot(ctx)
+	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -122,13 +122,13 @@ func TestTestList(t *testing.T) {
 		}
 	}()
 
-	// Point the VANADIUM_ROOT and WORKSPACE environment variables to
+	// Point the V23_ROOT and WORKSPACE environment variables to
 	// the fake.
-	oldRoot := os.Getenv("VANADIUM_ROOT")
-	if err := os.Setenv("VANADIUM_ROOT", root.Dir); err != nil {
+	oldRoot := os.Getenv("V23_ROOT")
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("VANADIUM_ROOT", oldRoot)
+	defer os.Setenv("V23_ROOT", oldRoot)
 	oldWorkspace := os.Getenv("WORKSPACE")
 	if err := os.Setenv("WORKSPACE", root.Dir); err != nil {
 		t.Fatalf("%v", err)
