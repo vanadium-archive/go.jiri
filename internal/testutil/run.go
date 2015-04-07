@@ -147,6 +147,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...TestOpt) (*TestRes
 	"vanadium-presubmit-result":       vanadiumPresubmitResult,
 	"vanadium-presubmit-test":         vanadiumPresubmitTest,
 	"vanadium-prod-services-test":     vanadiumProdServicesTest,
+	"vanadium-release-test":           vanadiumReleaseTest,
 	"vanadium-www-site":               vanadiumWWWSite,
 	"vanadium-www-tutorials":          vanadiumWWWTutorials,
 }
@@ -167,6 +168,12 @@ func newTestContext(ctx *tool.Context, env map[string]string) *tool.Context {
 type TestOpt interface {
 	TestOpt()
 }
+
+// CredDirOpt is an option that specifies the security credentials directory
+// used in VanadiumReleaseTest.
+type CredDirOpt string
+
+func (CredDirOpt) TestOpt() {}
 
 // PartOpt is an option that specifies which part of the test to run.
 type PartOpt int

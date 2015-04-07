@@ -508,8 +508,6 @@ Usage:
 The v23 test run flags are:
  -blessings_root=dev.v.io
    The blessings root.
- -namespace_root=/ns.dev.v.io:8101
-   The namespace root.
  -part=-1
    Specify which part of the test to run.
  -pkgs=
@@ -517,6 +515,10 @@ The v23 test run flags are:
    tests to run; only relevant for Go-based tests
  -report=false
    Upload test report to Vanadium servers.
+ -v23.credentials=
+   Directory for vanadium credentials.
+ -v23.namespace.root=/ns.dev.v.io:8101
+   The namespace root.
 
 V23 Test List
 
