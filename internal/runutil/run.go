@@ -35,6 +35,7 @@ type Run struct {
 
 type Opts struct {
 	Color   bool
+	Dir     string
 	DryRun  bool
 	Env     map[string]string
 	Stdin   io.Reader
@@ -108,6 +109,7 @@ func (r *Run) command(timeout time.Duration, opts Opts, path string, args ...str
 		path = binary
 	}
 	command := exec.Command(path, args...)
+	command.Dir = opts.Dir
 	command.Stdin = opts.Stdin
 	command.Stdout = opts.Stdout
 	command.Stderr = opts.Stderr
@@ -197,7 +199,6 @@ func (r *Run) timedCommand(timeout time.Duration, opts Opts, command *exec.Cmd) 
 		}
 		return err
 	}
-	return nil
 }
 
 // terminateProcessGroup sends SIGTERM followed by SIGKILL to the
