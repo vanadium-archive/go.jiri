@@ -12,6 +12,7 @@ Usage:
    v23 [flags] <command>
 
 The v23 commands are:
+   api          Work with Vanadium's public API
    buildcop     Manage vanadium build cop schedule
    cl           Manage vanadium changelists
    contributors List vanadium project contributors
@@ -38,6 +39,43 @@ The v23 flags are:
    Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
+
+V23 Api
+
+Use this command to ensure that no unintended changes are made to Vanadium's
+public API.
+
+Usage:
+   v23 api [flags] <command>
+
+The v23 api commands are:
+   check       Check to see if any changes have been made to the public API.
+   fix         Updates the .api files to reflect your changes to the public API.
+
+The v23 api flags are:
+ -gotools_bin=
+   The path to the gotools binary to use. If empty, gotools will be built if
+   necessary.
+
+V23 Api Check
+
+Check to see if any changes have been made to the public API.
+
+Usage:
+   v23 api check <projects>
+
+<projects> is a list of Vanadium projects to check. If none are specified, all
+projects are checked.
+
+V23 Api Fix
+
+Updates the .api files to reflect your changes to the public API.
+
+Usage:
+   v23 api fix <projects>
+
+<projects> is a list of Vanadium projects to update. If none are specified, all
+project APIs are updated.
 
 V23 Buildcop
 

@@ -44,6 +44,7 @@ var cmdRoot = &cmdline.Command{
 	Short: "Tool for managing vanadium development",
 	Long:  "The v23 tool helps manage vanadium development.",
 	Children: []*cmdline.Command{
+		cmdApi,
 		cmdBuildCop,
 		cmdCL,
 		cmdContributors,
