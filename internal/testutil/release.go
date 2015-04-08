@@ -103,6 +103,7 @@ func invoker(ctx *tool.Context, msg string, fn func() error) (*TestResult, error
 				TimeoutValue: defaultReleaseTestTimeout,
 			}, nil
 		}
+		fmt.Fprintf(ctx.Stderr(), "%s\n", err.Error())
 		return nil, internalTestError{err, msg}
 	}
 	Pass(ctx, msg)
