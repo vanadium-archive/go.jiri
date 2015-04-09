@@ -942,6 +942,9 @@ func init() {
 	goRaceExclusions = []exclusion{
 		// This test takes too long in --race mode.
 		exclusion{test{pkg: "v.io/x/devtools/v23", name: "TestV23Generate"}, true},
+		// The check.v1 tests fail under --race mode because they run
+		// benchmarks which complete with unexpected times.
+		exclusion{test{pkg: "gopkg.in/check.v1", name: ".*"}, true},
 	}
 }
 
