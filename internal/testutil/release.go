@@ -169,6 +169,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 
 	// Update the envelope's title from "deviced" to "device manager".
 	{
+		applicationBin := filepath.Join(root, "release", "go", "bin", "application")
 		appName := "applications/deviced/0"
 		appProfile := "linux-amd64"
 		// Get current envelope.
@@ -183,7 +184,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 		opts := ctx.Run().Opts()
 		opts.Stdout = io.MultiWriter(opts.Stdout, &out)
 		opts.Stderr = io.MultiWriter(opts.Stderr, &out)
-		if err := ctx.Run().CommandWithOpts(opts, "application", args...); err != nil {
+		if err := ctx.Run().CommandWithOpts(opts, applicationBin, args...); err != nil {
 			return err
 		}
 
@@ -208,7 +209,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 			appProfile,
 			filename,
 		}
-		if err := ctx.Run().Command("application", args...); err != nil {
+		if err := ctx.Run().Command(applicationBin, args...); err != nil {
 			return err
 		}
 	}
