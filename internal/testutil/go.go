@@ -933,14 +933,9 @@ func init() {
 		exclusion{test{pkg: "golang.org/x/tools/cmd/godoc", name: "TestWeb"}, true},
 		// The mysql tests require a connection to a MySQL database.
 		exclusion{test{pkg: "github.com/go-sql-driver/mysql", name: ".*"}, true},
-		// The pq tests require a connection to a Postgres database.
-		exclusion{test{pkg: "github.com/lib/pq", name: ".*"}, true},
 		// The gorp tests require a connection to a SQL database, configured
 		// through various environment variables.
 		exclusion{test{pkg: "github.com/go-gorp/gorp", name: ".*"}, true},
-		// The go-sqlite3 TestSuite test causes the go2xunit reporter to crash
-		// with "orphan end".
-		exclusion{test{pkg: "github.com/mattn/go-sqlite3", name: "TestSuite"}, true},
 	}
 
 	// Tests excluded only when running under --race flag.
