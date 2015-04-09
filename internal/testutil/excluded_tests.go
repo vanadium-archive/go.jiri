@@ -18,6 +18,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
@@ -25,11 +26,15 @@ import (
 	"v.io/x/devtools/internal/testutil"
 )
 
+var raceFlag = flag.Bool("race", false, "Additionally display the tests excluded only when running under the go race detector.")
+
 func main() {
+	flag.Parse()
 	fmt.Printf("GOOS: %s\n", runtime.GOOS)
 	fmt.Printf("GOARCH: %s\n", runtime.GOARCH)
 	fmt.Printf("GOROOT: %s\n", runtime.GOROOT())
 	fmt.Printf("USER: %q\n", os.Getenv("USER"))
+
 	fmt.Println("Excluded tests:")
 	excluded, err := testutil.ExcludedTests()
 	if err != nil {
@@ -38,5 +43,17 @@ func main() {
 	}
 	for _, t := range excluded {
 		fmt.Printf("%#v\n", t)
+	}
+
+	if *raceFlag {
+		fmt.Println("Excluded race tests:")
+		raceExcluded, err := testutil.ExcludedRaceTests()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to get race exclusions: %s", err)
+			os.Exit(1)
+		}
+		for _, t := range raceExcluded {
+			fmt.Printf("%#v\n", t)
+		}
 	}
 }
