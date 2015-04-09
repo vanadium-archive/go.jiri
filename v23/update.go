@@ -32,9 +32,10 @@ var cmdUpdate = &cmdline.Command{
 	Short: "Update all vanadium tools and projects",
 	Long: `
 Updates all vanadium projects, builds the latest version of vanadium
-tools, and installs the resulting binaries into $V23_ROOT/bin. The
-sequence in which the individual updates happen guarantees that we end
-up with a consistent set of tools and source code.
+tools, and installs the resulting binaries into
+$V23_ROOT/devtools/bin. The sequence in which the individual updates
+happen guarantees that we end up with a consistent set of tools and
+source code.
 
 The set of project and tools to update is describe by a
 manifest. Vanadium manifests are revisioned and stored in a "manifest"
@@ -47,9 +48,10 @@ manifest uses the following XML schema:
      ...
    </imports>
    <projects>
-     <project name="https://vanadium.googlesource.com/release.go.v23"
+     <project name="release.go.v23"
               path="release/go/src/v.io/v23"
               protocol="git"
+              name="https://vanadium.googlesource.com/release.go.v23"
               revision="HEAD"/>
      ...
    </projects>

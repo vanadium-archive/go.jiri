@@ -568,9 +568,9 @@ Usage:
 V23 Update
 
 Updates all vanadium projects, builds the latest version of vanadium tools, and
-installs the resulting binaries into $V23_ROOT/bin. The sequence in which the
-individual updates happen guarantees that we end up with a consistent set of
-tools and source code.
+installs the resulting binaries into $V23_ROOT/devtools/bin. The sequence in
+which the individual updates happen guarantees that we end up with a consistent
+set of tools and source code.
 
 The set of project and tools to update is describe by a manifest. Vanadium
 manifests are revisioned and stored in a "manifest" repository, that is
@@ -583,9 +583,10 @@ schema:
      ...
    </imports>
    <projects>
-     <project name="https://vanadium.googlesource.com/release.go.v23"
+     <project name="release.go.v23"
               path="release/go/src/v.io/v23"
               protocol="git"
+              name="https://vanadium.googlesource.com/release.go.v23"
               revision="HEAD"/>
      ...
    </projects>

@@ -290,7 +290,7 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 	if err := buildTools(ctx, remoteTools, tmpDir); err != nil {
 		return err
 	}
-	// 3. Install the tools into $V23_ROOT/bin.
+	// 3. Install the tools into $V23_ROOT/devtools/bin.
 	return installTools(ctx, tmpDir)
 }
 
@@ -543,7 +543,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 }
 
 // installTools installs the tools from the given directory into
-// $V23_ROOT/bin.
+// $V23_ROOT/devtools/bin.
 func installTools(ctx *tool.Context, dir string) error {
 	if ctx.DryRun() {
 		// In "dry run" mode, no binaries are built.
@@ -558,10 +558,17 @@ func installTools(ctx *tool.Context, dir string) error {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
 	}
 	failed := false
+	// TODO(jsimsa): Make sure the "$V23_ROOT/devtools/bin" directory
+	// exists. This is for backwards compatibility for instances of
+	// V23_ROOT that have been created before go/vcl/9511.
+	binDir := filepath.Join(root, "devtools", "bin")
+	if err := ctx.Run().MkdirAll(binDir, os.FileMode(0755)); err != nil {
+		return err
+	}
 	for _, fi := range fis {
 		installFn := func() error {
 			src := filepath.Join(dir, fi.Name())
-			dst := filepath.Join(root, "bin", fi.Name())
+			dst := filepath.Join(binDir, fi.Name())
 			if err := ctx.Run().Rename(src, dst); err != nil {
 				return err
 			}
@@ -575,6 +582,13 @@ func installTools(ctx *tool.Context, dir string) error {
 	}
 	if failed {
 		return cmdline.ErrExitCode(2)
+	}
+	// TODO(jsimsa): Make sure the "$V23_ROOT/bin" directory is removed,
+	// forcing people to update their PATH. Remove this once all
+	// instances of V23_ROOT has been updated past go/vcl/9511.
+	oldBinDir := filepath.Join(root, "bin")
+	if err := ctx.Run().RemoveAll(oldBinDir); err != nil {
+		return err
 	}
 	return nil
 }
