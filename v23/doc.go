@@ -6,7 +6,7 @@
 // DO NOT UPDATE MANUALLY
 
 /*
-The v23 tool helps manage vanadium development.
+Command v23 is a multi-purpose tool for Vanadium development.
 
 Usage:
    v23 [flags] <command>
