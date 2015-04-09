@@ -23,8 +23,9 @@ const (
 	stagingBlessingsRoot    = "dev.staging.v.io" // TODO(jingjin): use a better name and update prod.go.
 	localMountTable         = "/ns.dev.staging.v.io:8151"
 	globalMountTable        = "/ns.dev.staging.v.io:8101"
-	objNameForAllApps       = "devmgr/apps"
+	numRetries              = 30
 	objNameForDeviceManager = "devices/vanadium-cell-master/devmgr/device"
+	retryPeriod             = 10 * time.Second
 )
 
 var (
@@ -141,6 +142,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 
 	// Push all binaries.
 	{
+		fmt.Fprintln(ctx.Stdout(), "Pushing binaries...")
 		args := []string{
 			credentialsArg,
 			nsArg,
@@ -154,82 +156,140 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 		}
 	}
 
-	// Update services (except for device manager).
-	{
+	// A helper function to update a single app.
+	updateAppFn := func(appName string) error {
 		args := []string{
 			credentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", localMountTable),
 			"updateall",
-			objNameForAllApps,
+			appName,
 		}
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
 			return err
 		}
+		return nil
 	}
 
-	// Update the envelope's title from "deviced" to "device manager".
+	// Update services except for device manager and mounttable.
 	{
-		applicationBin := filepath.Join(root, "release", "go", "bin", "application")
-		appName := "applications/deviced/0"
-		appProfile := "linux-amd64"
-		// Get current envelope.
-		args := []string{
-			credentialsArg,
-			nsArg,
-			"match",
-			appName,
-			appProfile,
+		fmt.Fprintln(ctx.Stdout(), "Updating services other than device manager and mounttable...")
+		apps := []string{
+			"devmgr/apps/applicationd",
+			"devmgr/apps/binaryd",
+			"devmgr/apps/identityd",
+			"devmgr/apps/proxyd",
+			"devmgr/apps/roled",
 		}
-		var out bytes.Buffer
-		opts := ctx.Run().Opts()
-		opts.Stdout = io.MultiWriter(opts.Stdout, &out)
-		opts.Stderr = io.MultiWriter(opts.Stderr, &out)
-		if err := ctx.Run().CommandWithOpts(opts, applicationBin, args...); err != nil {
-			return err
-		}
-
-		// Replace title.
-		strEnvelope := strings.Replace(out.String(), `"Title": "deviced"`, `"Title": "device manager"`, -1)
-		tmpDir, err := ctx.Run().TempDir("", "")
-		if err != nil {
-			return err
-		}
-		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		filename := filepath.Join(tmpDir, "envelope")
-		if err := ctx.Run().WriteFile(filename, []byte(strEnvelope), os.FileMode(0600)); err != nil {
-			return err
-		}
-
-		// Update envelope.
-		args = []string{
-			credentialsArg,
-			nsArg,
-			"put",
-			appName,
-			appProfile,
-			filename,
-		}
-		if err := ctx.Run().Command(applicationBin, args...); err != nil {
-			return err
+		for _, app := range apps {
+			if err := updateAppFn(app); err != nil {
+				return err
+			}
 		}
 	}
 
 	// Update Device Manager.
 	{
+		fmt.Fprintln(ctx.Stdout(), "Updating device manager...")
+		if err := updateDeviceManagerEnvelope(ctx, root, credentialsArg, nsArg); err != nil {
+			return err
+		}
 		args := []string{
 			credentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", globalMountTable),
 			"update",
 			objNameForDeviceManager,
 		}
-		fmt.Fprintf(ctx.Stdout(), `
-######################################################################
-Resolve errors are expected as we are waiting for mounttable to be up.
-######################################################################
-`)
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
 			return err
 		}
+		if err := waitForMounttable(ctx, root, credentialsArg, localMountTable); err != nil {
+			return err
+		}
+	}
+
+	// Update mounttable last.
+	{
+		fmt.Fprintln(ctx.Stdout(), "Updating mounttable...")
+		if err := updateAppFn("devmgr/apps/mounttabled"); err != nil {
+			return err
+		}
+		if err := waitForMounttable(ctx, root, credentialsArg, globalMountTable); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// updateDeviceManagerEnvelope updates the envelope's title from "deviced" to
+// "device manager".
+func updateDeviceManagerEnvelope(ctx *tool.Context, root, credentialsArg, nsArg string) (e error) {
+	applicationBin := filepath.Join(root, "release", "go", "bin", "application")
+	appName := "applications/deviced/0"
+	appProfile := "linux-amd64"
+	// Get current envelope.
+	args := []string{
+		credentialsArg,
+		nsArg,
+		"match",
+		appName,
+		appProfile,
+	}
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = io.MultiWriter(opts.Stdout, &out)
+	opts.Stderr = io.MultiWriter(opts.Stderr, &out)
+	if err := ctx.Run().CommandWithOpts(opts, applicationBin, args...); err != nil {
+		return err
+	}
+
+	// Replace title.
+	strEnvelope := strings.Replace(out.String(), `"Title": "deviced"`, `"Title": "device manager"`, -1)
+	tmpDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
+	filename := filepath.Join(tmpDir, "envelope")
+	if err := ctx.Run().WriteFile(filename, []byte(strEnvelope), os.FileMode(0600)); err != nil {
+		return err
+	}
+
+	// Update envelope.
+	args = []string{
+		credentialsArg,
+		nsArg,
+		"put",
+		appName,
+		appProfile,
+		filename,
+	}
+	if err := ctx.Run().Command(applicationBin, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// waitForMounttable waits for the given mounttable to be up
+// (timeout: 5 minutes).
+func waitForMounttable(ctx *tool.Context, root, credentialsArg, mounttableRoot string) error {
+	debugBin := filepath.Join(root, "release", "go", "bin", "debug")
+	args := []string{
+		credentialsArg,
+		"glob",
+		mounttableRoot + "/*",
+	}
+	up := false
+	for i := 0; i < numRetries; i++ {
+		if err := ctx.Run().Command(debugBin, args...); err != nil {
+			time.Sleep(retryPeriod)
+			continue
+		} else {
+			up = true
+			break
+		}
+	}
+	if !up {
+		return fmt.Errorf("mounttable %q not up after 5 minute", mounttableRoot)
 	}
 	return nil
 }
@@ -240,7 +300,7 @@ func checkServices(ctx *tool.Context) error {
 	args := []string{
 		"test",
 		"run",
-		fmt.Sprintf("--namespace_root=%s", globalMountTable),
+		fmt.Sprintf("--v23.namespace.root=%s", globalMountTable),
 		fmt.Sprintf("--blessings_root=%s", stagingBlessingsRoot),
 		"vanadium-prod-services-test",
 	}
