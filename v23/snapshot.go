@@ -27,7 +27,7 @@ var (
 
 func init() {
 	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
-	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time_format", time.RFC3339, "Time format for snapshot file name.")
+	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
 }
 
 var cmdSnapshot = &cmdline.Command{

@@ -24,7 +24,7 @@ var (
 )
 
 func init() {
-	cmdTestRun.Flags.StringVar(&blessingsRootFlag, "blessings_root", "dev.v.io", "The blessings root.")
+	cmdTestRun.Flags.StringVar(&blessingsRootFlag, "blessings-root", "dev.v.io", "The blessings root.")
 	cmdTestRun.Flags.StringVar(&credDirFlag, "v23.credentials", "", "Directory for vanadium credentials.")
 	cmdTestRun.Flags.StringVar(&namespaceRootFlag, "v23.namespace.root", "/ns.dev.v.io:8101", "The namespace root.")
 	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")

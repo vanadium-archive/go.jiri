@@ -28,7 +28,7 @@ var (
 )
 
 func init() {
-	cmdApi.Flags.StringVar(&gotoolsBinPathFlag, "gotools_bin", "", "The path to the gotools binary to use. If empty, gotools will be built if necessary.")
+	cmdApi.Flags.StringVar(&gotoolsBinPathFlag, "gotools-bin", "", "The path to the gotools binary to use. If empty, gotools will be built if necessary.")
 }
 
 // cmdApi represents the "v23 api" command.
