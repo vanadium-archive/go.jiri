@@ -936,15 +936,15 @@ func init() {
 		// The gorp tests require a connection to a SQL database, configured
 		// through various environment variables.
 		exclusion{test{pkg: "github.com/go-gorp/gorp", name: ".*"}, true},
+		// The check.v1 tests contain flakey benchmark tests which sometimes do
+		// not complete, and sometimes complete with unexpected times.
+		exclusion{test{pkg: "gopkg.in/check.v1", name: ".*"}, true},
 	}
 
 	// Tests excluded only when running under --race flag.
 	goRaceExclusions = []exclusion{
 		// This test takes too long in --race mode.
 		exclusion{test{pkg: "v.io/x/devtools/v23", name: "TestV23Generate"}, true},
-		// The check.v1 tests fail under --race mode because they run
-		// benchmarks which complete with unexpected times.
-		exclusion{test{pkg: "gopkg.in/check.v1", name: ".*"}, true},
 	}
 }
 
