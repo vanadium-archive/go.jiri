@@ -115,7 +115,7 @@ func createNodes(ctx *tool.Context) error {
 		"-zone", gceZone,
 	}
 
-	serverArgs := append(args, "-machine_type", gceServerMachineType)
+	serverArgs := append(args, "-machine-type", gceServerMachineType)
 	for n := 0; n < testNumServerNodes; n++ {
 		serverArgs = append(serverArgs, serverNodeName(n))
 	}
@@ -123,7 +123,7 @@ func createNodes(ctx *tool.Context) error {
 		return err
 	}
 
-	clientArgs := append(args, "-machine_type", gceClientMachineType)
+	clientArgs := append(args, "-machine-type", gceClientMachineType)
 	for n := 0; n < testNumClientNodes; n++ {
 		clientArgs = append(clientArgs, clientNodeName(n))
 	}
