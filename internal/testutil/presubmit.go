@@ -54,7 +54,7 @@ func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_ 
 		"-host", jenkinsHost,
 		"-netrc", netrcFile,
 		"query",
-		"-log_file", logfile,
+		"-log-file", logfile,
 		"-manifest", "tools",
 	)
 	if err := ctx.Run().Command("presubmit", args...); err != nil {
@@ -88,7 +88,7 @@ func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ 
 		"-host", jenkinsHost,
 		"-netrc", netrcFile,
 		"test",
-		"-build_number", os.Getenv("BUILD_NUMBER"),
+		"-build-number", os.Getenv("BUILD_NUMBER"),
 		"-manifest", "tools",
 		"-projects", os.Getenv("PROJECTS"),
 		"-refs", os.Getenv("REFS"),
