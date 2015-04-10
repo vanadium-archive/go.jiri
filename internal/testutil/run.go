@@ -210,6 +210,11 @@ type NamespaceRootOpt string
 
 func (NamespaceRootOpt) TestOpt() {}
 
+// NumWorkersOpt is an option to control the number of test workers used.
+type NumWorkersOpt int
+
+func (NumWorkersOpt) TestOpt() {}
+
 // RunProjectTests runs all tests associated with the given projects.
 func RunProjectTests(ctx *tool.Context, env map[string]string, projects []string, opts ...TestOpt) (map[string]*TestResult, error) {
 	testCtx := newTestContext(ctx, env)

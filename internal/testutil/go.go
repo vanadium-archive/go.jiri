@@ -13,6 +13,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -71,6 +72,7 @@ type timeoutOpt string
 type suffixOpt string
 type excludedTestsOpt []test
 type pkgsOpt []string
+type numWorkersOpt int
 
 func (argsOpt) goBuildOpt()    {}
 func (argsOpt) goCoverageOpt() {}
@@ -94,6 +96,8 @@ func (funcMatcherOpt) goTestOpt() {}
 func (pkgsOpt) goTestOpt()     {}
 func (pkgsOpt) goBuildOpt()    {}
 func (pkgsOpt) goCoverageOpt() {}
+
+func (numWorkersOpt) goTestOpt() {}
 
 // goBuild is a helper function for running Go builds.
 func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *TestResult, e error) {
@@ -406,8 +410,24 @@ type matchV23TestFunc struct{}
 
 func (t *matchV23TestFunc) match(fn *ast.FuncDecl) (bool, string) {
 	name := fn.Name.String()
-	// TODO(cnicolaou): match on signature, not just name.
-	return strings.HasPrefix(name, "TestV23"), name
+	if !strings.HasPrefix(name, "V23Test") {
+		return false, name
+	}
+	sig := fn.Type
+	if len(sig.Params.List) != 1 || sig.Results != nil {
+		return false, name
+	}
+	typ := sig.Params.List[0].Type
+	star, ok := typ.(*ast.StarExpr)
+	if !ok {
+		return false, name
+	}
+	sel, ok := star.X.(*ast.SelectorExpr)
+	pkgIdent, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false, name
+	}
+	return pkgIdent.Name == "v23tests" && sel.Sel.Name == "T", name
 }
 
 func (t *matchV23TestFunc) goTestOpt() {}
@@ -523,6 +543,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 	args, profiles, suffix, excludedTestRules, pkgs := []string{}, []string{}, "", []test{}, []string{}
 	var matcher funcMatcher
 	matcher = &matchGoTestFunc{}
+	numWorkers := runtime.NumCPU()
 	var nonTestArgs nonTestArgsOpt
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
@@ -542,6 +563,12 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 			matcher = typedOpt
 		case pkgsOpt:
 			pkgs = []string(typedOpt)
+		case numWorkersOpt:
+			numWorkers = int(typedOpt)
+			if numWorkers < 1 {
+				numWorkers = 1
+			}
+
 		}
 	}
 
@@ -581,8 +608,23 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 	numPkgs := len(pkgList)
 	tasks := make(chan goTestTask, numPkgs)
 	taskResults := make(chan testResult, numPkgs)
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go testWorker(ctx, timeout, args, nonTestArgs, tasks, taskResults)
+
+	fmt.Fprintf(ctx.Stdout(), "Running tests using %d workers...\n", numWorkers)
+	fmt.Fprintf(ctx.Stdout(), "Running tests concurrently...\n")
+	staggeredWorker := func() {
+		delay := time.Duration(rand.Int63n(30*1000)) * time.Millisecond
+		if ctx.Verbose() {
+			fmt.Fprintf(ctx.Stdout(), "Staggering start of test worker by %s\n", delay)
+		}
+		time.Sleep(delay)
+		testWorker(ctx, timeout, args, nonTestArgs, tasks, taskResults)
+	}
+	for i := 0; i < numWorkers; i++ {
+		if numWorkers > 1 {
+			go staggeredWorker()
+		} else {
+			go testWorker(ctx, timeout, args, nonTestArgs, tasks, taskResults)
+		}
 	}
 
 	// Distribute work to workers.
@@ -1035,6 +1077,17 @@ func getShortTestsOnlyOptValue(opts []TestOpt) bool {
 	return shortTestsOnly
 }
 
+// getNumWorkersOpt gets the NumWorkersOpt from the given TestOpt slice
+func getNumWorkersOpt(opts []TestOpt) numWorkersOpt {
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case NumWorkersOpt:
+			return numWorkersOpt(v)
+		}
+	}
+	return numWorkersOpt(runtime.NumCPU())
+}
+
 // thirdPartyGoBuild runs Go build for third-party projects.
 func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
 	pkgs, err := thirdPartyPkgs()
@@ -1394,7 +1447,7 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...TestOpt
 	args := argsOpt([]string{"-run", "^TestV23"})
 	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
 	matcher := funcMatcherOpt{&matchV23TestFunc{}}
-	result, err := goTest(ctx, testName, suffix, args, nonTestArgs, matcher, pkgs)
+	result, err := goTest(ctx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
 	return result, err
 }
 
@@ -1433,5 +1486,5 @@ func vanadiumGoTest(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 		args = append(args, "-short")
 	}
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, excludedTestsOpt(exclusions), pkgs, args)
+	return goTest(ctx, testName, suffix, excludedTestsOpt(exclusions), getNumWorkersOpt(opts), pkgs, args)
 }

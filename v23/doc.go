@@ -546,6 +546,8 @@ Usage:
 The v23 test run flags are:
  -blessings_root=dev.v.io
    The blessings root.
+ -num-test-workers=<runtime.NumCPU()>
+   Set the number of test workers to use; use 1 to serialize all tests.
  -part=-1
    Specify which part of the test to run.
  -pkgs=
