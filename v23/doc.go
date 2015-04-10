@@ -53,7 +53,7 @@ The v23 api commands are:
    fix         Updates the .api files to reflect your changes to the public API.
 
 The v23 api flags are:
- -gotools_bin=
+ -gotools-bin=
    The path to the gotools binary to use. If empty, gotools will be built if
    necessary.
 
@@ -138,13 +138,13 @@ Usage:
 The v23 cl mail flags are:
  -cc=
    Comma-seperated list of emails or LDAPs to cc.
- -check_copyright=true
+ -check-copyright=true
    Check copyright headers.
- -check_depcop=true
+ -check-depcop=true
    Check that no go-depcop violations exist.
- -check_gofmt=true
+ -check-gofmt=true
    Check that no go fmt violations exist.
- -check_uncommitted=true
+ -check-uncommitted=true
    Check that no uncommitted changes exist.
  -d=false
    Send a draft changelist.
@@ -241,9 +241,9 @@ Usage:
 <arg ...> is a list of arguments for the go tool.
 
 The v23 go flags are:
- -host_go=go
+ -host-go=go
    Go command for the host platform.
- -target_go=go
+ -target-go=go
    Go command for the target platform.
 
 V23 Goext
@@ -348,11 +348,11 @@ Usage:
    v23 project shell-prompt [flags]
 
 The v23 project shell-prompt flags are:
- -check_dirty=true
+ -check-dirty=true
    If false, don't check for uncommitted changes or untracked files. Setting
    this option to false is dangerous: dirty master branches will not appear in
    the output.
- -show_name=false
+ -show-name=false
    Show the name of the current repo.
 
 V23 Project Poll
@@ -440,7 +440,7 @@ Usage:
 <label> is the snapshot label.
 
 The v23 snapshot create flags are:
- -time_format=2006-01-02T15:04:05Z07:00
+ -time-format=2006-01-02T15:04:05Z07:00
    Time format for snapshot file name.
 
 V23 Snapshot List
@@ -544,7 +544,7 @@ Usage:
 <name...> is a list names identifying the tests to run.
 
 The v23 test run flags are:
- -blessings_root=dev.v.io
+ -blessings-root=dev.v.io
    The blessings root.
  -part=-1
    Specify which part of the test to run.
@@ -653,9 +653,9 @@ darwin) - <env> is the platform environment (e.g. gnu or android)
 <arg ...> is a list of arguments for the go tool."
 
 The v23 xgo flags are:
- -host_go=go
+ -host-go=go
    Go command for the host platform.
- -target_go=go
+ -target-go=go
    Go command for the target platform.
 
 V23 Help

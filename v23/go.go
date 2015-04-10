@@ -28,8 +28,8 @@ var (
 )
 
 func init() {
-	cmdGo.Flags.StringVar(&hostGoFlag, "host_go", "go", "Go command for the host platform.")
-	cmdGo.Flags.StringVar(&targetGoFlag, "target_go", "go", "Go command for the target platform.")
+	cmdGo.Flags.StringVar(&hostGoFlag, "host-go", "go", "Go command for the host platform.")
+	cmdGo.Flags.StringVar(&targetGoFlag, "target-go", "go", "Go command for the target platform.")
 	// The "v23 xgo" commands has the same flags as "v23 go".
 	cmdXGo.Flags = cmdGo.Flags
 }

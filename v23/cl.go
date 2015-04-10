@@ -40,15 +40,15 @@ var (
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
-	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check_copyright", true, "Check copyright headers.")
-	cmdCLMail.Flags.BoolVar(&depcopFlag, "check_depcop", true, "Check that no go-depcop violations exist.")
+	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
+	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-depcop", true, "Check that no go-depcop violations exist.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
-	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check_gofmt", true, "Check that no go fmt violations exist.")
+	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
-	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check_uncommitted", true, "Check that no uncommitted changes exist.")
+	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
 }
 
 // cmdCL represents the "v23 cl" command.
@@ -460,7 +460,7 @@ func (r *review) checkGoDependencies() error {
 		return err
 	}
 	pkgs := strings.Split(strings.TrimSpace(out.String()), "\n")
-	args := []string{"run", "go-depcop", "--include_tests", "check"}
+	args := []string{"run", "go-depcop", "--include-tests", "check"}
 	args = append(args, pkgs...)
 	out.Reset()
 	if err := r.ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
