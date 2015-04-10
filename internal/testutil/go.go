@@ -954,7 +954,7 @@ func ExcludedTests() ([]test, error) {
 	return excludedTests(exclusions)
 }
 
-func goRaceExcludedTests() ([]test, error) {
+func ExcludedRaceTests() ([]test, error) {
 	return excludedTests(goRaceExclusions)
 }
 
@@ -1083,7 +1083,7 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 	if err != nil {
 		return nil, err
 	}
-	raceExclusions, err := goRaceExcludedTests()
+	raceExclusions, err := ExcludedRaceTests()
 	if err != nil {
 		return nil, err
 	}
@@ -1304,7 +1304,7 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 	if err != nil {
 		return nil, err
 	}
-	raceExclusions, err := goRaceExcludedTests()
+	raceExclusions, err := ExcludedRaceTests()
 	if err != nil {
 		return nil, err
 	}
