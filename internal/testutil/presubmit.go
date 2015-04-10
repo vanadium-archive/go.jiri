@@ -140,7 +140,7 @@ func vanadiumPresubmitResult(ctx *tool.Context, testName string, _ ...TestOpt) (
 		"-host", jenkinsHost,
 		"-netrc", netrcFile,
 		"result",
-		"-build_number", os.Getenv("BUILD_NUMBER"),
+		"-build-number", os.Getenv("BUILD_NUMBER"),
 		"-manifest", "tools",
 		"-refs", os.Getenv("REFS"),
 		"-projects", os.Getenv("PROJECTS"),
