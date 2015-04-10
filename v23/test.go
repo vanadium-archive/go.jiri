@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ var (
 	partFlag          int
 	pkgsFlag          string
 	reportFlag        bool
+	numWorkersFlag    int
 )
 
 func init() {
@@ -29,6 +31,8 @@ func init() {
 	cmdTestRun.Flags.StringVar(&namespaceRootFlag, "v23.namespace.root", "/ns.dev.v.io:8101", "The namespace root.")
 	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")
 	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
+	cmdTestRun.Flags.IntVar(&numWorkersFlag, "num-test-workers", runtime.NumCPU(), "Set the number of test workers to use; use 1 to serialize all tests.")
+	cmdTestRun.Flags.Lookup("num-test-workers").DefValue = "<runtime.NumCPU()>"
 	cmdTestRun.Flags.BoolVar(&reportFlag, "report", false, "Upload test report to Vanadium servers.")
 }
 
@@ -126,7 +130,7 @@ func optsFromFlags() (opts []testutil.TestOpt) {
 		}
 	}
 	opts = append(opts, testutil.PkgsOpt(pkgs))
-	opts = append(opts, testutil.CredDirOpt(credDirFlag), testutil.BlessingsRootOpt(blessingsRootFlag), testutil.NamespaceRootOpt(namespaceRootFlag))
+	opts = append(opts, testutil.CredDirOpt(credDirFlag), testutil.BlessingsRootOpt(blessingsRootFlag), testutil.NamespaceRootOpt(namespaceRootFlag), testutil.NumWorkersOpt(numWorkersFlag))
 	return
 }
 
