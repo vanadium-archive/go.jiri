@@ -30,6 +30,11 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Tes
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
 
+	// Run v23 update with private manifest to pull in scripts repo.
+	if err := ctx.Run().Command("v23", "update", "-manifest=private"); err != nil {
+		return nil, internalTestError{err, "Update with private manifest"}
+	}
+
 	// Create a new temporary V23_ROOT.
 	oldRoot := os.Getenv("V23_ROOT")
 	defer collect.Error(func() error { return os.Setenv("V23_ROOT", oldRoot) }, &e)
