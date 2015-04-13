@@ -42,18 +42,22 @@ var (
 	t = true
 )
 
-var defaultOpts = ContextOpts{
-	Color:    &f,
-	DryRun:   &f,
-	Env:      map[string]string{},
-	Manifest: &e,
-	Stdin:    os.Stdin,
-	Stdout:   os.Stdout,
-	Stderr:   os.Stdout,
-	Verbose:  &t,
+// newContextOpts is the ContextOpts factory.
+func newContextOpts() *ContextOpts {
+	return &ContextOpts{
+		Color:    &f,
+		DryRun:   &f,
+		Env:      map[string]string{},
+		Manifest: &e,
+		Stdin:    os.Stdin,
+		Stdout:   os.Stdout,
+		Stderr:   os.Stderr,
+		Verbose:  &t,
+	}
 }
 
-func processOpts(defaultOpts, opts *ContextOpts) {
+// initOpts initializes all unset options to the given defaults.
+func initOpts(defaultOpts, opts *ContextOpts) {
 	if opts.Color == nil {
 		opts.Color = defaultOpts.Color
 	}
@@ -82,7 +86,7 @@ func processOpts(defaultOpts, opts *ContextOpts) {
 
 // NewContext is the Context factory.
 func NewContext(opts ContextOpts) *Context {
-	processOpts(&defaultOpts, &opts)
+	initOpts(newContextOpts(), &opts)
 	run := runutil.New(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
 	return &Context{
 		opts: opts,
@@ -93,7 +97,7 @@ func NewContext(opts ContextOpts) *Context {
 // NewContextFromCommand returns a new context instance based on the
 // given command.
 func NewContextFromCommand(command *cmdline.Command, opts ContextOpts) *Context {
-	processOpts(&defaultOpts, &opts)
+	initOpts(newContextOpts(), &opts)
 	opts.Stdout = command.Stdout()
 	opts.Stderr = command.Stderr()
 	return NewContext(opts)
@@ -101,13 +105,13 @@ func NewContextFromCommand(command *cmdline.Command, opts ContextOpts) *Context 
 
 // NewDefaultContext returns a new default context.
 func NewDefaultContext() *Context {
-	return NewContext(defaultOpts)
+	return NewContext(ContextOpts{})
 }
 
 // Clone creates a clone of the given context, overriding select
 // settings using the given options.
 func (ctx Context) Clone(opts ContextOpts) *Context {
-	processOpts(&ctx.opts, &opts)
+	initOpts(&ctx.opts, &opts)
 	return NewContext(opts)
 }
 
