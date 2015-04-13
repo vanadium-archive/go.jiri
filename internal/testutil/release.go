@@ -301,7 +301,7 @@ func checkServices(ctx *tool.Context) error {
 		"test",
 		"run",
 		fmt.Sprintf("--v23.namespace.root=%s", globalMountTable),
-		fmt.Sprintf("--blessings_root=%s", stagingBlessingsRoot),
+		fmt.Sprintf("--blessings-root=%s", stagingBlessingsRoot),
 		"vanadium-prod-services-test",
 	}
 	if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, "v23", args...); err != nil {
@@ -316,7 +316,7 @@ func createSnapshot(ctx *tool.Context) (e error) {
 		"snapshot",
 		"--remote",
 		"create",
-		"--time_format=2006-01-02", // Only include date in label names
+		"--time-format=2006-01-02", // Only include date in label names
 		"release",
 	}
 	if err := ctx.Run().Command("v23", args...); err != nil {
