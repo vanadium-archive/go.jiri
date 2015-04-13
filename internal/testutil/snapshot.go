@@ -5,6 +5,8 @@
 package testutil
 
 import (
+	"fmt"
+
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/tool"
 )
@@ -19,9 +21,16 @@ func vanadiumGoSnapshot(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Create a new snapshot.
-	if err := ctx.Run().Command("v23", "snapshot", "-remote", "create", "stable-go"); err != nil {
-		return nil, internalTestError{err, "Snapshot"}
+	const numAttempts = 3
+	for i := 1; i <= numAttempts; i++ {
+		if i > 1 {
+			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, numAttempts)
+		}
+		if err = ctx.Run().Command("v23", "snapshot", "-remote", "create", "stable-go"); err == nil {
+			return &TestResult{Status: TestPassed}, nil
+		} else {
+			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
+		}
 	}
-
-	return &TestResult{Status: TestPassed}, nil
+	return nil, internalTestError{err, "Snapshot"}
 }
