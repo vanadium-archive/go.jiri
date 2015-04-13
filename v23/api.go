@@ -87,19 +87,34 @@ type packageChange struct {
 // If the gotools_bin flag is specified, that path, a no-op cleanup and a
 // nil error are returned.
 func buildGotools(ctx *tool.Context) (string, func() error, error) {
+	nopCleanup := func() error { return nil }
 	if gotoolsBinPathFlag != "" {
-		return gotoolsBinPathFlag, func() error { return nil }, nil
+		return gotoolsBinPathFlag, nopCleanup, nil
 	}
+
+	// Determine the location of the gotools source.
+	projects, _, err := util.ReadManifest(ctx)
+	if err != nil {
+		return "", nopCleanup, err
+	}
+
+	project, ok := projects["third_party"]
+	if !ok {
+		return "", nopCleanup, fmt.Errorf(`project "third_party" not found`)
+	}
+	newGoPath := filepath.Join(project.Path, "go")
 
 	// Build the gotools binary.
 	tempDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
-		return "", func() error { return nil }, err
+		return "", nopCleanup, err
 	}
 	cleanup := func() error { return ctx.Run().RemoveAll(tempDir) }
 
 	gotoolsBin := filepath.Join(tempDir, "gotools")
-	if err := ctx.Run().Command("go", "build", "-o", gotoolsBin, "github.com/visualfc/gotools"); err != nil {
+	opts := ctx.Run().Opts()
+	opts.Env["GOPATH"] = newGoPath
+	if err := ctx.Run().CommandWithOpts(opts, "go", "build", "-o", gotoolsBin, "github.com/visualfc/gotools"); err != nil {
 		return "", cleanup, err
 	}
 
