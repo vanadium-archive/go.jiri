@@ -34,6 +34,34 @@ var CustomMetricDescriptors = map[string]*cloudmonitoring.MetricDescriptor{
 			},
 		},
 	},
+	// Custom metric for recording GCE instances stats.
+	"gce-instance-cpu":     createGCEInstanceMetric("cpu/usage", "The cpu usage (0-1) of this GCE instance.", "double"),
+	"gce-instance-memory":  createGCEInstanceMetric("memory/usage", "The memory usage (0-1) of this GCE instance.", "double"),
+	"gce-instance-disk":    createGCEInstanceMetric("disk/usage", "The disk usage (0-1) of this GCE instance.", "double"),
+	"gce-instance-ping":    createGCEInstanceMetric("ping", "The ping latency (ms) of this GCE instance.", "double"),
+	"gce-instance-tcpconn": createGCEInstanceMetric("tcpconn/count", "The number of open tcp connections of this GCE instance.", "int64"),
+}
+
+func createGCEInstanceMetric(metricName, description, valueType string) *cloudmonitoring.MetricDescriptor {
+	return &cloudmonitoring.MetricDescriptor{
+		Name:        fmt.Sprintf("%s/v/gceinstance/%s", customMetricPrefix, metricName),
+		Description: description,
+		TypeDescriptor: &cloudmonitoring.MetricDescriptorTypeDescriptor{
+			MetricType: "gauge",
+			ValueType:  valueType,
+		},
+		Labels: []*cloudmonitoring.MetricDescriptorLabelDescriptor{
+			&cloudmonitoring.MetricDescriptorLabelDescriptor{
+				Key:         fmt.Sprintf("%s/name", customMetricPrefix),
+				Description: "The name of the GCE instance.",
+			},
+			&cloudmonitoring.MetricDescriptorLabelDescriptor{
+				Key:         fmt.Sprintf("%s/zone", customMetricPrefix),
+				Description: "The zone of the GCE instance.",
+			},
+		},
+	}
+
 }
 
 // Authenticate authenticates the given service account's email with the given
