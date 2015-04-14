@@ -1392,12 +1392,15 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []TestOpt, 
 	}
 
 	// Get part index from optionals.
-	index := 0
+	index := -1
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case PartOpt:
 			index = int(v)
 		}
+	}
+	if index == -1 {
+		return pkgsOpt(allPkgs), nil
 	}
 
 	if index == len(parts) {
