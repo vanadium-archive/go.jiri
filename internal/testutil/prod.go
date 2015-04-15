@@ -49,7 +49,7 @@ func testSingleProdService(ctx *tool.Context, vroot, principalDir string, servic
 	opts.Stdout = &out
 	opts.Stderr = &out
 	start := time.Now()
-	if err := ctx.Run().TimedCommandWithOpts(DefaultTestTimeout, opts, bin, "--v23.credentials", principalDir, "signature", service.objectName); err != nil {
+	if err := ctx.Run().TimedCommandWithOpts(DefaultTestTimeout, opts, bin, "--v23.credentials", principalDir, "signature", "--show-reserved", service.objectName); err != nil {
 		return generateXUnitTestSuite(ctx, &xunit.Failure{"vrpc", out.String()}, service.name, time.Now().Sub(start))
 	}
 	if !service.regexp.Match(out.Bytes()) {
