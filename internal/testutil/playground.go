@@ -35,7 +35,7 @@ func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...TestOpt) (_
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	playgroundDir := filepath.Join(root, "release", "projects", "playground")
-	backendDir := filepath.Join(playgroundDir, "go", "src", "playground")
+	backendDir := filepath.Join(playgroundDir, "go", "src", "v.io", "x", "playground")
 	clientDir := filepath.Join(playgroundDir, "client")
 
 	// Clean the playground client build.
