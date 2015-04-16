@@ -795,9 +795,10 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	return nil
 }
 
-// writeMetadata writes the given project metadata to the disk.
-func writeMetadata(ctx *tool.Context, project Project) (e error) {
-	metadataDir := filepath.Join(project.Path, ".v23")
+// writeMetadata stores the given project metadata in the directory
+// identified by the given path.
+func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
+	metadataDir := filepath.Join(dir, ".v23")
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -883,9 +884,17 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 	if err := ctx.Run().MkdirAll(path, perm); err != nil {
 		return err
 	}
+	// Create a temporary directory for the initial setup of the
+	// project to prevent an untimely termination from leaving the
+	// V23_ROOT in an inconsistent state.
+	tmpDir, err := ctx.Run().TempDir(path, "")
+	if err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 	switch op.project.Protocol {
 	case "git":
-		if err := ctx.Git().Clone(op.project.Remote, op.destination); err != nil {
+		if err := ctx.Git().Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
 		if strings.HasPrefix(op.project.Remote, VanadiumGitRepoHost()) {
@@ -895,15 +904,15 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 			// commit hooks for existing repositories. Overwriting the existing
 			// hooks is not a good idea as developers might have customized the
 			// hooks.
-			file := filepath.Join(op.destination, ".git", "hooks", "commit-msg")
+			file := filepath.Join(tmpDir, ".git", "hooks", "commit-msg")
 			if err := ctx.Run().WriteFile(file, []byte(commitMsgHook), perm); err != nil {
 				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
 			}
-			file = filepath.Join(op.destination, ".git", "hooks", "pre-commit")
+			file = filepath.Join(tmpDir, ".git", "hooks", "pre-commit")
 			if err := ctx.Run().WriteFile(file, []byte(preCommitHook), perm); err != nil {
 				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
 			}
-			file = filepath.Join(op.destination, ".git", "hooks", "pre-push")
+			file = filepath.Join(tmpDir, ".git", "hooks", "pre-push")
 			if err := ctx.Run().WriteFile(file, []byte(prePushHook), perm); err != nil {
 				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
 			}
@@ -913,14 +922,14 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 			return err
 		}
 		defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-		if err := ctx.Run().Chdir(op.destination); err != nil {
+		if err := ctx.Run().Chdir(tmpDir); err != nil {
 			return err
 		}
 		if err := ctx.Git().Reset(op.project.Revision); err != nil {
 			return err
 		}
 	case "hg":
-		if err := ctx.Hg().Clone(op.project.Remote, op.destination); err != nil {
+		if err := ctx.Hg().Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
 		cwd, err := os.Getwd()
@@ -928,7 +937,7 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 			return err
 		}
 		defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-		if err := ctx.Run().Chdir(op.destination); err != nil {
+		if err := ctx.Run().Chdir(tmpDir); err != nil {
 			return err
 		}
 		if err := ctx.Hg().CheckoutRevision(op.project.Revision); err != nil {
@@ -937,7 +946,10 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 	default:
 		return UnsupportedProtocolErr(op.project.Protocol)
 	}
-	if err := writeMetadata(ctx, op.project); err != nil {
+	if err := writeMetadata(ctx, op.project, tmpDir); err != nil {
+		return err
+	}
+	if err := ctx.Run().Rename(tmpDir, op.destination); err != nil {
 		return err
 	}
 	return nil
@@ -1015,7 +1027,7 @@ func (op moveOperation) Run(ctx *tool.Context) error {
 	if err := pullProject(ctx, op.project); err != nil {
 		return err
 	}
-	if err := writeMetadata(ctx, op.project); err != nil {
+	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
 		return err
 	}
 	return nil
@@ -1054,7 +1066,7 @@ func (op updateOperation) Run(ctx *tool.Context) error {
 	if err := pullProject(ctx, op.project); err != nil {
 		return err
 	}
-	if err := writeMetadata(ctx, op.project); err != nil {
+	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
 		return err
 	}
 	return nil
