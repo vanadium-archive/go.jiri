@@ -109,7 +109,7 @@ var cmdCopyrightCheck = &cmdline.Command{
 }
 
 func runCopyrightCheck(command *cmdline.Command, args []string) error {
-	return copyrightHelper(command, args, false)
+	return copyrightHelper(command.Stdout(), command.Stderr(), args, false)
 }
 
 // cmdCopyrightFix represents the "v23 copyright fix" command.
@@ -123,16 +123,18 @@ var cmdCopyrightFix = &cmdline.Command{
 }
 
 func runCopyrightFix(command *cmdline.Command, args []string) error {
-	return copyrightHelper(command, args, true)
+	return copyrightHelper(command.Stdout(), command.Stderr(), args, true)
 }
 
 // copyrightHelper implements the logic of "v23 copyright {check,fix}".
-func copyrightHelper(command *cmdline.Command, args []string, fix bool) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func copyrightHelper(stdout, stderr io.Writer, args []string, fix bool) error {
+	ctx := tool.NewContext(tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag,
+		Stdout:   stdout,
+		Stderr:   stderr,
 	})
 	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
