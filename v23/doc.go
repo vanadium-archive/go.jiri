@@ -138,6 +138,8 @@ Usage:
 The v23 cl mail flags are:
  -cc=
    Comma-seperated list of emails or LDAPs to cc.
+ -check-api=false
+   Check for changes in the public Go API.
  -check-copyright=true
    Check copyright headers.
  -check-depcop=true

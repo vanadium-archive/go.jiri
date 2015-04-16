@@ -121,7 +121,7 @@ func buildGotools(ctx *tool.Context) (string, func() error, error) {
 	return gotoolsBin, cleanup, nil
 }
 
-func getPackageChanges(ctx *tool.Context, command *cmdline.Command, args []string) (changes []packageChange, e error) {
+func getPackageChanges(ctx *tool.Context, args []string) (changes []packageChange, e error) {
 	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
 		return nil, err
@@ -183,12 +183,19 @@ func getPackageChanges(ctx *tool.Context, command *cmdline.Command, args []strin
 }
 
 func runApiCheck(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	return doApiCheck(command.Stdout(), command.Stderr(), args)
+}
+
+func doApiCheck(stdout, stderr io.Writer, args []string) error {
+	ctx := tool.NewContext(tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag})
-	changes, err := getPackageChanges(ctx, command, args)
+		Verbose:  &verboseFlag,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	})
+	changes, err := getPackageChanges(ctx, args)
 	if err != nil {
 		return err
 	} else if len(changes) > 0 {
@@ -232,7 +239,7 @@ func runApiFix(command *cmdline.Command, args []string) error {
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag})
-	changes, err := getPackageChanges(ctx, command, args)
+	changes, err := getPackageChanges(ctx, args)
 	if err != nil {
 		return err
 	}

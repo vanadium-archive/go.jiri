@@ -24,6 +24,7 @@ import (
 const commitMessageFile = ".gerrit_commit_message"
 
 var (
+	apiFlag         bool
 	ccsFlag         string
 	copyrightFlag   bool
 	draftFlag       bool
@@ -39,6 +40,7 @@ var (
 // init carries out the package initialization.
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
+	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", false, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-depcop", true, "Check that no go-depcop violations exist.")
@@ -163,6 +165,20 @@ is appended to the commit message. Consecutive invocations of the
 command use the same Change-Id by default, informing Gerrit that the
 incomming commit is an update of an existing changelist.
 `,
+}
+
+type apiError struct {
+	apiCheckOutput string
+	project        string
+}
+
+func (a apiError) Error() string {
+	result := "changelist changes the public Go API without updating the corresponding .api file(s)\n\n"
+	result += "If this change is intentional, run 'v23 api fix " + a.project + "'\n"
+	result += "to update the corresponding .api files. Then add the updated .api files to\n"
+	result += "your change and re-run the mail command.\n"
+	result += a.apiCheckOutput
+	return result
 }
 
 type changeConflictError string
@@ -467,6 +483,28 @@ func (r *review) checkGoDependencies() error {
 	return nil
 }
 
+// checkGoApi checks if the public Go API has changed.
+func (r *review) checkGoApi() error {
+	name, err := util.CurrentProjectName(r.ctx)
+	if err != nil {
+		return err
+	}
+	if name == "" {
+		return fmt.Errorf("current project is not a 'v23' project")
+	}
+	var out bytes.Buffer
+	if err := doApiCheck(&out, os.Stderr, []string{name}); err != nil {
+		return err
+	}
+	if out.Len() != 0 {
+		return apiError{
+			apiCheckOutput: out.String(),
+			project:        name,
+		}
+	}
+	return nil
+}
+
 // cleanup cleans up after the review.
 func (r *review) cleanup(stashed bool) error {
 	if err := r.ctx.Git().CheckoutBranch(r.branch, !gitutil.Force); err != nil {
@@ -595,6 +633,11 @@ func (r *review) run() (e error) {
 	}
 	if gofmtFlag {
 		if err := r.checkGoFormat(); err != nil {
+			return err
+		}
+	}
+	if apiFlag {
+		if err := r.checkGoApi(); err != nil {
 			return err
 		}
 	}
