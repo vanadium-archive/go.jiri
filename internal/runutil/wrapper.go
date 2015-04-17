@@ -41,6 +41,12 @@ func (r *Run) Chdir(dir string) error {
 	return r.FunctionWithOpts(opts, func() error { return os.Chdir(dir) }, fmt.Sprintf("cd %q", dir))
 }
 
+// Chmod is a wrapper around os.Chmod that handles options such as
+// "verbose" or "dry run".
+func (r *Run) Chmod(dir string, mode os.FileMode) error {
+	return r.helper(func() error { return os.Chmod(dir, mode) }, fmt.Sprintf("chmod %v %q", mode, dir))
+}
+
 // MkdirAll is a wrapper around os.MkdirAll that handles options such
 // as "verbose" or "dry run".
 func (r *Run) MkdirAll(dir string, mode os.FileMode) error {
