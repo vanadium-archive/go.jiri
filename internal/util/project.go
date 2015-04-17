@@ -949,6 +949,9 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 	if err := writeMetadata(ctx, op.project, tmpDir); err != nil {
 		return err
 	}
+	if err := ctx.Run().Chmod(tmpDir, os.FileMode(0755)); err != nil {
+		return err
+	}
 	if err := ctx.Run().Rename(tmpDir, op.destination); err != nil {
 		return err
 	}
