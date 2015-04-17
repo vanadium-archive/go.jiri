@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/runutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
@@ -43,7 +44,7 @@ var (
 )
 
 // vanadiumReleaseTest updates binaries of staging cloud services and run tests for them.
-func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...TestOpt) (_ *TestResult, e error) {
+func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
@@ -90,30 +91,30 @@ func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...TestOpt) (_
 			return result, err
 		}
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
-// invoker invokes the given function and returns TestResult and/or errors based
-// on function's results.
-func invoker(ctx *tool.Context, msg string, fn func() error) (*TestResult, error) {
+// invoker invokes the given function and returns test.Result and/or
+// errors based on function's results.
+func invoker(ctx *tool.Context, msg string, fn func() error) (*test.Result, error) {
 	if err := fn(); err != nil {
-		Fail(ctx, msg)
+		test.Fail(ctx, msg)
 		if err == runutil.CommandTimedOutErr {
-			return &TestResult{
-				Status:       TestTimedOut,
+			return &test.Result{
+				Status:       test.TimedOut,
 				TimeoutValue: defaultReleaseTestTimeout,
 			}, nil
 		}
 		fmt.Fprintf(ctx.Stderr(), "%s\n", err.Error())
 		return nil, internalTestError{err, msg}
 	}
-	Pass(ctx, msg)
+	test.Pass(ctx, msg)
 	return nil, nil
 }
 
-// getCredDirOptValue returns the value of credentials dir from the given
-// TestOpt slice.
-func getCredDirOptValue(opts []TestOpt) string {
+// getCredDirOptValue returns the value of credentials dir from the
+// given Opt slice.
+func getCredDirOptValue(opts []Opt) string {
 	credDir := ""
 	for _, opt := range opts {
 		switch v := opt.(type) {

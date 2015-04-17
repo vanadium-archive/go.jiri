@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"encoding/xml"
@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/xunit"
 )
@@ -129,10 +130,10 @@ var (
 	wantBuild = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Build",
 					},
 				},
@@ -143,22 +144,22 @@ var (
 	wantTest = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test1",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test2",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test3",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23",
 					},
 				},
@@ -170,10 +171,10 @@ var (
 	wantV23Test = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23",
 					},
 				},
@@ -185,22 +186,22 @@ var (
 	wantTestWithSuffix = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test1 [Suffix]",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test2 [Suffix]",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test3 [Suffix]",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23 [Suffix]",
 					},
 				},
@@ -212,14 +213,14 @@ var (
 	wantTestWithExcludedTests = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
-				Name: "v.io/x/devtools/internal/testutil/testdata/foo",
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
 				Cases: []xunit.TestCase{
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "Test1",
 					},
 					xunit.TestCase{
-						Classname: "v.io/x/devtools/internal/testutil/testdata/foo",
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23",
 					},
 				},
@@ -236,14 +237,14 @@ var (
 		BranchRate: 0,
 		Packages: []testCoveragePkg{
 			testCoveragePkg{
-				Name:       "v.io/x/devtools/internal/testutil/testdata/foo",
+				Name:       "v.io/x/devtools/v23/internal/test/testdata/foo",
 				LineRate:   0,
 				BranchRate: 0,
 				Complexity: 0,
 				Classes: []testCoverageClass{
 					testCoverageClass{
 						Name:       "-",
-						Filename:   "v.io/x/devtools/internal/testutil/testdata/foo/foo.go",
+						Filename:   "v.io/x/devtools/v23/internal/test/testdata/foo/foo.go",
 						LineRate:   0,
 						BranchRate: 0,
 						Complexity: 0,
@@ -271,12 +272,12 @@ var (
 func TestGoBuild(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	testName, pkgName := "test-go-build", "v.io/x/devtools/internal/testutil/testdata/foo"
+	testName, pkgName := "test-go-build", "v.io/x/devtools/v23/internal/test/testdata/foo"
 	result, err := goBuild(ctx, testName, pkgsOpt([]string{pkgName}))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if got, want := result.Status, TestPassed; got != want {
+	if got, want := result.Status, test.Passed; got != want {
 		t.Fatalf("unexpected result: got %s, want %s", got, want)
 	}
 
@@ -300,12 +301,12 @@ func TestGoBuild(t *testing.T) {
 func TestGoCoverage(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	testName, pkgName := "test-go-coverage", "v.io/x/devtools/internal/testutil/testdata/foo"
+	testName, pkgName := "test-go-coverage", "v.io/x/devtools/v23/internal/test/testdata/foo"
 	result, err := goCoverage(ctx, testName, pkgsOpt([]string{pkgName}))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if got, want := result.Status, TestPassed; got != want {
+	if got, want := result.Status, test.Passed; got != want {
 		t.Fatalf("unexpected result: got %s, want %s", got, want)
 	}
 
@@ -353,35 +354,23 @@ func TestGoTestWithSuffix(t *testing.T) {
 // TestGoTestWithExcludedTests checks the excluded test mode of Go
 // test based test logic.
 func TestGoTestWithExcludedTests(t *testing.T) {
-	tests := []exclusion{
-		exclusion{test{pkg: "v.io/x/devtools/internal/testutil/testdata/foo", name: "Test2"}, true},
-		exclusion{test{pkg: "v.io/x/devtools/internal/testutil/testdata/foo", name: "Test3"}, true},
-	}
-	exclusions, err := excludedTests(tests)
-	if err != nil {
-		t.Fatalf("%v", err)
+	exclusions := []exclusion{
+		newExclusion("v.io/x/devtools/v23/internal/test/testdata/foo", "Test2", true),
+		newExclusion("v.io/x/devtools/v23/internal/test/testdata/foo", "Test3", true),
 	}
 	runGoTest(t, "", exclusions, wantTestWithExcludedTests)
 }
 
 func TestGoTestWithExcludedTestsWithWildcards(t *testing.T) {
-	tests := []exclusion{
-		exclusion{test{pkg: "v.io/x/devtools/internal/testutil/testdata/foo", name: "Test[23]$"}, true},
-	}
-	exclusions, err := excludedTests(tests)
-	if err != nil {
-		t.Fatalf("%v", err)
+	exclusions := []exclusion{
+		newExclusion("v.io/x/devtools/v23/internal/test/testdata/foo", "Test[23]$", true),
 	}
 	runGoTest(t, "", exclusions, wantTestWithExcludedTests)
 }
 
 func TestGoTestExcludedPackage(t *testing.T) {
-	tests := []exclusion{
-		exclusion{test{pkg: "v.io/x/devtools/internal/testutil/testdata/foo", name: ".*"}, true},
-	}
-	exclusions, err := excludedTests(tests)
-	if err != nil {
-		t.Fatalf("%v", err)
+	exclusions := []exclusion{
+		newExclusion("v.io/x/devtools/v23/internal/test/testdata/foo", ".*", true),
 	}
 	runGoTest(t, "", exclusions, wantExcludedPackage)
 }
@@ -390,22 +379,22 @@ func TestGoTestV23(t *testing.T) {
 	runGoTest(t, "", nil, wantV23Test, argsOpt{"--run=TestV23"}, nonTestArgsOpt([]string{"--v23.tests"}))
 }
 
-func runGoTest(t *testing.T, suffix string, excludedTests []test, expectedTestSuite xunit.TestSuites, testOpts ...goTestOpt) {
+func runGoTest(t *testing.T, suffix string, exclusions []exclusion, expectedTestSuite xunit.TestSuites, testOpts ...goTestOpt) {
 	ctx := tool.NewDefaultContext()
 
-	testName, pkgName := "test-go-test", "v.io/x/devtools/internal/testutil/testdata/foo"
+	testName, pkgName := "test-go-test", "v.io/x/devtools/v23/internal/test/testdata/foo"
 
 	opts := []goTestOpt{
 		pkgsOpt([]string{pkgName}),
 		suffixOpt(suffix),
-		excludedTestsOpt(excludedTests)}
+		exclusionsOpt(exclusions)}
 	opts = append(opts, testOpts...)
 
 	result, err := goTest(ctx, testName, opts...)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if got, want := result.Status, TestPassed; got != want {
+	if got, want := result.Status, test.Passed; got != want {
 		t.Fatalf("unexpected result: got %s, want %s", got, want)
 	}
 

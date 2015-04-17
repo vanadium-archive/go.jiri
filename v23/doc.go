@@ -550,13 +550,13 @@ The v23 test run flags are:
    The blessings root.
  -num-test-workers=<runtime.NumCPU()>
    Set the number of test workers to use; use 1 to serialize all tests.
+ -output-dir=
+   Directory to output test results into.
  -part=-1
    Specify which part of the test to run.
  -pkgs=
    Comma-separated list of Go package expressions that identify a subset of
    tests to run; only relevant for Go-based tests
- -report=false
-   Upload test report to Vanadium servers.
  -v23.credentials=
    Directory for vanadium credentials.
  -v23.namespace.root=/ns.dev.v.io:8101

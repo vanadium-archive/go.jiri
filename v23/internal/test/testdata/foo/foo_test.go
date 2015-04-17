@@ -7,7 +7,7 @@ package foo_test
 import (
 	"testing"
 
-	"v.io/x/devtools/internal/testutil/testdata/foo"
+	"v.io/x/devtools/v23/internal/test/testdata/foo"
 )
 
 func Test1(t *testing.T) {

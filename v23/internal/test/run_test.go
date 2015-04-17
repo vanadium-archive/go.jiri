@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"encoding/xml"
@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"testing"
 
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
@@ -163,14 +164,14 @@ func TestGenXUnitReportForError(t *testing.T) {
 
 	xUnitFileName := xunit.ReportPath("vanadium-go-test")
 	internalErr := internalTestError{fmt.Errorf("something is wrong"), "Init"}
-	for _, test := range testCases {
+	for _, testCase := range testCases {
 		if err := os.RemoveAll(xUnitFileName); err != nil {
 			t.Fatalf("RemoveAll(%s) failed: %v", xUnitFileName, err)
 		}
-		if test.createXUnitFile && test.existingSuites != nil {
-			bytes, err := xml.MarshalIndent(test.existingSuites, "", "  ")
+		if testCase.createXUnitFile && testCase.existingSuites != nil {
+			bytes, err := xml.MarshalIndent(testCase.existingSuites, "", "  ")
 			if err != nil {
-				t.Fatalf("MarshalIndent(%v) failed: %v", test.existingSuites, err)
+				t.Fatalf("MarshalIndent(%v) failed: %v", testCase.existingSuites, err)
 			}
 			if err := ioutil.WriteFile(xUnitFileName, bytes, os.FileMode(0644)); err != nil {
 				t.Fatalf("WriteFile(%v) failed: %v", xUnitFileName, err)
@@ -184,10 +185,10 @@ func TestGenXUnitReportForError(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if !reflect.DeepEqual(gotSuites, test.expectedSuites) {
-			t.Fatalf("want\n%#v\n\ngot\n%#v", test.expectedSuites, gotSuites)
+		if !reflect.DeepEqual(gotSuites, testCase.expectedSuites) {
+			t.Fatalf("want\n%#v\n\ngot\n%#v", testCase.expectedSuites, gotSuites)
 		}
-		if got, expected := testResult.Status, TestFailed; got != expected {
+		if got, expected := testResult.Status, test.Failed; got != expected {
 			t.Fatalf("want %v, got %v", expected, got)
 		}
 	}

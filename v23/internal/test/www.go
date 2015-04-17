@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"path/filepath"
@@ -10,6 +10,7 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/runutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
@@ -19,7 +20,7 @@ const (
 )
 
 // Runs specified make target in WWW Makefile as a test.
-func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout time.Duration) (_ *TestResult, e error) {
+func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout time.Duration) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
@@ -44,8 +45,8 @@ func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout t
 	// Invoke the make target.
 	if err := ctx.Run().TimedCommand(timeout, "make", makeTarget); err != nil {
 		if err == runutil.CommandTimedOutErr {
-			return &TestResult{
-				Status:       TestTimedOut,
+			return &test.Result{
+				Status:       test.TimedOut,
 				TimeoutValue: timeout,
 			}, nil
 		} else {
@@ -53,13 +54,13 @@ func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout t
 		}
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
-func vanadiumWWWSite(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
+func vanadiumWWWSite(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return commonVanadiumWWW(ctx, testName, "test-site", defaultWWWTestTimeout)
 }
 
-func vanadiumWWWTutorials(ctx *tool.Context, testName string, _ ...TestOpt) (*TestResult, error) {
+func vanadiumWWWTutorials(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return commonVanadiumWWW(ctx, testName, "test-tutorials", defaultWWWTestTimeout)
 }

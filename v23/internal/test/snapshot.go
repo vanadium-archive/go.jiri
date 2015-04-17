@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"fmt"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 )
 
 // vanadiumGoSnapshot create a snapshot of Vanadium Go code base.
-func vanadiumGoSnapshot(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGoSnapshot(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -27,7 +28,7 @@ func vanadiumGoSnapshot(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, numAttempts)
 		}
 		if err = ctx.Run().Command("v23", "snapshot", "-remote", "create", "stable-go"); err == nil {
-			return &TestResult{Status: TestPassed}, nil
+			return &test.Result{Status: test.Passed}, nil
 		} else {
 			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
 		}

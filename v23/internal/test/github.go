@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
@@ -91,7 +92,7 @@ type Mirror struct {
 
 // vanadiumGitHubMirror mirrors googlesource.com vanadium projects to
 // github.com.
-func vanadiumGitHubMirror(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGitHubMirror(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test/task.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -127,10 +128,10 @@ func vanadiumGitHubMirror(ctx *tool.Context, testName string, _ ...TestOpt) (_ *
 	}
 
 	if !allPassed {
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 func sync(ctx *tool.Context, mirror Mirror, projects string) (*xunit.TestSuite, error) {

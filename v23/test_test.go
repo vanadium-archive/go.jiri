@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/x/devtools/internal/testutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
+	"v.io/x/devtools/v23/internal/test"
 	"v.io/x/lib/cmdline"
 )
 
@@ -142,7 +142,7 @@ func TestTestList(t *testing.T) {
 	if err := runTestList(&command, []string{}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	testList, err := testutil.TestList()
+	testList, err := test.ListTests()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

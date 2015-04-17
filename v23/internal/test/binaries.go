@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"fmt"
@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
 
 // vanadiumGoBinaries uploads Vanadium binaries to Google Storage.
-func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -70,5 +71,5 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Te
 		return nil, internalTestError{err, "Upload"}
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }

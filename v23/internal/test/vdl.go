@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
@@ -18,7 +19,7 @@ import (
 
 // vanadiumGoVDL checks that all VDL-based Go source files are
 // up-to-date.
-func vanadiumGoVDL(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGoVDL(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	fmt.Fprintf(ctx.Stdout(), "NOTE: This test checks that all VDL-based Go source files are up-to-date.\nIf it fails, you probably just need to run 'v23 run vdl generate --lang=go all'.\n")
 
 	root, err := util.V23Root()
@@ -62,7 +63,7 @@ func vanadiumGoVDL(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestRes
 		if err := xunit.CreateReport(ctx, testName, suites); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }

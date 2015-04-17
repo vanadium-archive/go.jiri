@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
@@ -49,7 +50,7 @@ func testSingleProdService(ctx *tool.Context, vroot, principalDir string, servic
 	opts.Stdout = &out
 	opts.Stderr = &out
 	start := time.Now()
-	if err := ctx.Run().TimedCommandWithOpts(DefaultTestTimeout, opts, bin, "--v23.credentials", principalDir, "signature", "--show-reserved", service.objectName); err != nil {
+	if err := ctx.Run().TimedCommandWithOpts(test.DefaultTimeout, opts, bin, "--v23.credentials", principalDir, "signature", "--show-reserved", service.objectName); err != nil {
 		return generateXUnitTestSuite(ctx, &xunit.Failure{"vrpc", out.String()}, service.name, time.Now().Sub(start))
 	}
 	if !service.regexp.Match(out.Bytes()) {
@@ -66,7 +67,7 @@ type prodService struct {
 }
 
 // vanadiumProdServicesTest runs a test of vanadium production services.
-func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOpt) (_ *TestResult, e error) {
+func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -120,10 +121,10 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...TestOp
 	for _, suite := range suites {
 		if suite.Failures > 0 {
 			// At least one test failed:
-			return &TestResult{Status: TestFailed}, nil
+			return &test.Result{Status: test.Failed}, nil
 		}
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 func testAllProdServices(ctx *tool.Context, vroot, principalDir, namespaceRoot string) []*xunit.TestSuite {
@@ -211,12 +212,12 @@ func testIdentityProviderHTTP(ctx *tool.Context, blessingRoot string) (suite *xu
 func setupPrincipal(ctx *tool.Context, vroot, tmpdir, pubkey string, blessingNames []string) (string, error) {
 	dir := filepath.Join(tmpdir, "credentials")
 	bin := filepath.Join(vroot, "release", "go", "bin", "principal")
-	if err := ctx.Run().TimedCommand(DefaultTestTimeout, bin, "create", dir, "prod-services-tester"); err != nil {
+	if err := ctx.Run().TimedCommand(test.DefaultTimeout, bin, "create", dir, "prod-services-tester"); err != nil {
 		fmt.Fprintf(ctx.Stderr(), "principal create failed: %v\n", err)
 		return "", err
 	}
 	for _, name := range blessingNames {
-		if err := ctx.Run().TimedCommand(DefaultTestTimeout, bin, "--v23.credentials", dir, "addtoroots", pubkey, name); err != nil {
+		if err := ctx.Run().TimedCommand(test.DefaultTimeout, bin, "--v23.credentials", dir, "addtoroots", pubkey, name); err != nil {
 			fmt.Fprintf(ctx.Stderr(), "principal addtoroots %v %v failed: %v\n", pubkey, name, err)
 			return "", err
 		}
@@ -224,9 +225,9 @@ func setupPrincipal(ctx *tool.Context, vroot, tmpdir, pubkey string, blessingNam
 	return dir, nil
 }
 
-// getServiceOpts extracts blessing root and namespace root from the given
-// TestOpts.
-func getServiceOpts(opts []TestOpt) (string, string) {
+// getServiceOpts extracts blessing root and namespace root from the
+// given Opts.
+func getServiceOpts(opts []Opt) (string, string) {
 	blessingRoot := "dev.v.io"
 	namespaceRoot := "/ns.dev.v.io:8101"
 	for _, opt := range opts {

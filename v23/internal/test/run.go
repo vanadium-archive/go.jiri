@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -14,43 +14,21 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
-	"time"
 
+	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/runutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
-)
-
-type TestStatus int
-
-type TestResult struct {
-	Status          TestStatus
-	TimeoutValue    time.Duration       // Used when Status == TestTimedOut
-	MergeConflictCL string              // Used when Status == TestFailedMergeConflict
-	ExcludedTests   map[string][]string // Tests that are excluded within packages keyed by package name
-	SkippedTests    map[string][]string // Tests that are skipped within packages keyed by package name
-}
-
-const (
-	TestPending TestStatus = iota
-	TestSkipped
-	TestPassed
-	TestFailed
-	TestFailedMergeConflict
-	TestTimedOut
 )
 
 const (
 	// numLinesToOutput identifies the number of lines to be included in
 	// the error messsage of an xUnit report.
 	numLinesToOutput = 50
-	// gsPrefix identifies the prefix of a Google Storage location where
-	// test results are stored.
-	gsPrefix = "gs://vanadium-test-results/v0/"
 )
 
 const (
@@ -68,23 +46,6 @@ const (
 `
 )
 
-func (s TestStatus) String() string {
-	switch s {
-	case TestSkipped:
-		return "SKIPPED"
-	case TestPassed:
-		return "PASSED"
-	case TestFailed:
-		return "FAILED"
-	case TestFailedMergeConflict:
-		return "MERGE CONFLICT"
-	case TestTimedOut:
-		return "TIMED OUT"
-	default:
-		return "UNKNOWN"
-	}
-}
-
 // testNode represents a node of a test dependency graph.
 type testNode struct {
 	// deps is a list of its dependencies.
@@ -100,15 +61,11 @@ type testNode struct {
 // testDepGraph captures the test dependency graph.
 type testDepGraph map[string]*testNode
 
-// DefaultTestTimeout identified the maximum time each test is allowed
-// to run before being forcefully terminated.
-var DefaultTestTimeout = 10 * time.Minute
-
-var testMock = func(*tool.Context, string, ...TestOpt) (*TestResult, error) {
-	return &TestResult{Status: TestPassed}, nil
+var testMock = func(*tool.Context, string, ...Opt) (*test.Result, error) {
+	return &test.Result{Status: test.Passed}, nil
 }
 
-var testFunctions = map[string]func(*tool.Context, string, ...TestOpt) (*TestResult, error){
+var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result, error){
 	// TODO(jsimsa,cnicolaou): consider getting rid of the vanadium- prefix.
 	"ignore-this":                     testMock,
 	"third_party-go-build":            thirdPartyGoBuild,
@@ -165,58 +122,64 @@ func newTestContext(ctx *tool.Context, env map[string]string) *tool.Context {
 	})
 }
 
-type TestOpt interface {
-	TestOpt()
+type Opt interface {
+	Opt()
 }
-
-// CredDirOpt is an option that specifies the security credentials directory
-// used in VanadiumReleaseTest.
-type CredDirOpt string
-
-func (CredDirOpt) TestOpt() {}
-
-// PartOpt is an option that specifies which part of the test to run.
-type PartOpt int
-
-func (PartOpt) TestOpt() {}
-
-// PrefixOpt is an option that specifies the location where to
-// store test results.
-type PrefixOpt string
-
-func (PrefixOpt) TestOpt() {}
-
-// PkgsOpt is an option that specifies which Go tests to run using a
-// list of Go package expressions.
-type PkgsOpt []string
-
-func (PkgsOpt) TestOpt() {}
-
-// ShortOpt is an option that specifies whether to run short tests
-// only in VanadiumGoTest and VanadiumGoRace.
-type ShortOpt bool
-
-func (ShortOpt) TestOpt() {}
 
 // BlessingsRootOpt is an option that specifies the blessings root of the
 // services to check in VanadiumProdServicesTest.
 type BlessingsRootOpt string
 
-func (BlessingsRootOpt) TestOpt() {}
+func (BlessingsRootOpt) Opt() {}
+
+// CredDirOpt is an option that specifies the security credentials directory
+// used in VanadiumReleaseTest.
+type CredDirOpt string
+
+func (CredDirOpt) Opt() {}
 
 // NamespaceRootOpt is an option that specifies the namespace root of the
 // services to check in VanadiumProdServicesTest.
 type NamespaceRootOpt string
 
-func (NamespaceRootOpt) TestOpt() {}
+func (NamespaceRootOpt) Opt() {}
 
 // NumWorkersOpt is an option to control the number of test workers used.
 type NumWorkersOpt int
 
-func (NumWorkersOpt) TestOpt() {}
+func (NumWorkersOpt) Opt() {}
+
+// OutputDirOpt is an option that specifies where to output the test
+// results.
+type OutputDirOpt string
+
+func (OutputDirOpt) Opt() {}
+
+// PartOpt is an option that specifies which part of the test to run.
+type PartOpt int
+
+func (PartOpt) Opt() {}
+
+// PkgsOpt is an option that specifies which Go tests to run using a
+// list of Go package expressions.
+type PkgsOpt []string
+
+func (PkgsOpt) Opt() {}
+
+// ListTests returns a list of all tests known by the test package.
+func ListTests() ([]string, error) {
+	result := []string{}
+	for name := range testFunctions {
+		if !strings.HasPrefix(name, "ignore") {
+			result = append(result, name)
+		}
+	}
+	sort.Strings(result)
+	return result, nil
+}
 
 // RunProjectTests runs all tests associated with the given projects.
-func RunProjectTests(ctx *tool.Context, env map[string]string, projects []string, opts ...TestOpt) (map[string]*TestResult, error) {
+func RunProjectTests(ctx *tool.Context, env map[string]string, projects []string, opts ...Opt) (map[string]*test.Result, error) {
 	testCtx := newTestContext(ctx, env)
 
 	// Parse tests and dependencies from config file.
@@ -238,25 +201,25 @@ func RunProjectTests(ctx *tool.Context, env map[string]string, projects []string
 	//
 	// TODO(jingjin) parallelize the top-level scheduling loop so
 	// that tests do not need to run serially.
-	results := make(map[string]*TestResult, len(tests))
-	for _, test := range tests {
-		results[test] = &TestResult{}
+	results := make(map[string]*test.Result, len(tests))
+	for _, t := range tests {
+		results[t] = &test.Result{}
 	}
 run:
 	for i := 0; i < len(graph); i++ {
 		// Find a test that can execute.
-		for _, test := range tests {
-			result, node := results[test], graph[test]
-			if result.Status != TestPending {
+		for _, t := range tests {
+			result, node := results[t], graph[t]
+			if result.Status != test.Pending {
 				continue
 			}
 			ready := true
 			for _, dep := range node.deps {
 				switch results[dep].Status {
-				case TestSkipped, TestFailed, TestTimedOut:
-					results[test].Status = TestSkipped
+				case test.Skipped, test.Failed, test.TimedOut:
+					results[t].Status = test.Skipped
 					continue run
-				case TestPending:
+				case test.Pending:
 					ready = false
 					break
 				}
@@ -264,7 +227,7 @@ run:
 			if !ready {
 				continue
 			}
-			if err := runTests(testCtx, []string{test}, results, opts...); err != nil {
+			if err := runTests(testCtx, []string{t}, results, opts...); err != nil {
 				return nil, err
 			}
 			continue run
@@ -277,10 +240,10 @@ run:
 }
 
 // RunTests executes the given tests and reports the test results.
-func RunTests(ctx *tool.Context, env map[string]string, tests []string, opts ...TestOpt) (map[string]*TestResult, error) {
-	results := make(map[string]*TestResult, len(tests))
-	for _, test := range tests {
-		results[test] = &TestResult{}
+func RunTests(ctx *tool.Context, env map[string]string, tests []string, opts ...Opt) (map[string]*test.Result, error) {
+	results := make(map[string]*test.Result, len(tests))
+	for _, t := range tests {
+		results[t] = &test.Result{}
 	}
 	testCtx := newTestContext(ctx, env)
 	if err := runTests(testCtx, tests, results, opts...); err != nil {
@@ -289,37 +252,44 @@ func RunTests(ctx *tool.Context, env map[string]string, tests []string, opts ...
 	return results, nil
 }
 
-// TestList returns a list of all tests known by the testutil package.
-func TestList() ([]string, error) {
-	result := []string{}
-	for name := range testFunctions {
-		if !strings.HasPrefix(name, "ignore") {
-			result = append(result, name)
-		}
-	}
-	sort.Strings(result)
-	return result, nil
+type nopWriteCloser struct{}
+
+func (nopWriteCloser) Close() error {
+	return nil
+}
+
+func (nopWriteCloser) Write([]byte) (int, error) {
+	return 0, nil
 }
 
 // runTests runs the given tests, populating the results map.
-func runTests(ctx *tool.Context, tests []string, results map[string]*TestResult, opts ...TestOpt) error {
-	path := ""
-	partIndex := 0
+func runTests(ctx *tool.Context, tests []string, results map[string]*test.Result, opts ...Opt) (e error) {
+	outputDir := ""
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
-		case PrefixOpt:
-			path = gsPrefix + string(typedOpt)
-		case PartOpt:
-			partIndex = int(typedOpt)
+		case OutputDirOpt:
+			outputDir = string(typedOpt)
 		}
 	}
 
-	for _, test := range tests {
-		testFn, ok := testFunctions[test]
-		if !ok {
-			return fmt.Errorf("test %v does not exist", test)
+	var outputFile io.WriteCloser = &nopWriteCloser{}
+	if outputDir != "" {
+		var err error
+		// Create a file for aggregating all of the test output.
+		fileName := filepath.Join(outputDir, "output")
+		outputFile, err = os.Create(fileName)
+		if err != nil {
+			return fmt.Errorf("Create(%v) failed: %v", fileName, err)
 		}
-		fmt.Fprintf(ctx.Stdout(), "##### Running test %q #####\n", test)
+		defer collect.Error(func() error { return outputFile.Close() }, &e)
+	}
+
+	for _, t := range tests {
+		testFn, ok := testFunctions[t]
+		if !ok {
+			return fmt.Errorf("test %v does not exist", t)
+		}
+		fmt.Fprintf(ctx.Stdout(), "##### Running test %q #####\n", t)
 
 		// Create a 1MB buffer to capture the test function output.
 		var out bytes.Buffer
@@ -328,38 +298,49 @@ func runTests(ctx *tool.Context, tests []string, results map[string]*TestResult,
 		runOpts := ctx.Run().Opts()
 		newCtx := ctx.Clone(tool.ContextOpts{
 			Stdout: io.MultiWriter(&out, runOpts.Stdout),
-			Stderr: io.MultiWriter(&out, runOpts.Stdout),
+			Stderr: io.MultiWriter(&out, runOpts.Stderr),
 		})
 
 		// Run the test and collect the test results.
-		result, err := testFn(newCtx, test, opts...)
-		if result != nil && result.Status == TestTimedOut {
-			writeTimedOutTestReport(newCtx, test, *result)
+		result, err := testFn(newCtx, t, opts...)
+		if result != nil && result.Status == test.TimedOut {
+			writeTimedOutTestReport(newCtx, t, *result)
 		}
 		if err == nil {
-			err = checkTestReportFile(newCtx, test)
+			err = checkTestReportFile(newCtx, t)
 		}
 		if err != nil {
-			r, err := generateXUnitReportForError(newCtx, test, err, out.String())
+			r, err := generateXUnitReportForError(newCtx, t, err, out.String())
 			if err != nil {
 				return err
 			}
 			result = r
 		}
-		if path != "" {
-			if err := persistTestData(ctx, result, &out, test, partIndex, path); err != nil {
-				fmt.Fprintf(ctx.Stderr(), "failed to store test results: %v\n", err)
-			}
+		results[t] = result
+		if _, err := outputFile.Write(out.Bytes()); err != nil {
+			return err
 		}
-		results[test] = result
-		fmt.Fprintf(ctx.Stdout(), "##### %s #####\n", results[test].Status)
+		fmt.Fprintf(ctx.Stdout(), "##### %s #####\n", results[t].Status)
 	}
+
+	if outputDir != "" {
+		// Write the test results to the given output directory.
+		bytes, err := json.Marshal(results)
+		if err != nil {
+			return fmt.Errorf("Marshal(%v) failed: %v", results, err)
+		}
+		resultsFile := filepath.Join(outputDir, "results")
+		if err := ctx.Run().WriteFile(resultsFile, bytes, os.FileMode(0644)); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // writeTimedOutTestReport writes a xUnit test report for the given timed-out test.
-func writeTimedOutTestReport(ctx *tool.Context, testName string, result TestResult) {
-	timeoutValue := DefaultTestTimeout
+func writeTimedOutTestReport(ctx *tool.Context, testName string, result test.Result) {
+	timeoutValue := test.DefaultTimeout
 	if result.TimeoutValue != 0 {
 		timeoutValue = result.TimeoutValue
 	}
@@ -422,78 +403,15 @@ func checkTestReportFile(ctx *tool.Context, testName string) error {
 	return nil
 }
 
-// persistTestData uploads test data to Google Storage.
-func persistTestData(ctx *tool.Context, result *TestResult, output *bytes.Buffer, test string, partIndex int, path string) error {
-	// Write test data to a temporary directory.
-	tmpDir, err := ctx.Run().TempDir("", "")
-	if err != nil {
-		return err
-	}
-	defer ctx.Run().RemoveAll(tmpDir)
-	conf := struct {
-		Arch string
-		OS   string
-	}{
-		Arch: runtime.GOARCH,
-		OS:   runtime.GOOS,
-	}
-	{
-		bytes, err := json.Marshal(conf)
-		if err != nil {
-			return fmt.Errorf("Marshal(%v) failed: %v", err)
-		}
-		confFile := filepath.Join(tmpDir, "conf")
-		if err := ctx.Run().WriteFile(confFile, bytes, os.FileMode(0600)); err != nil {
-			return err
-		}
-	}
-	{
-		bytes, err := json.Marshal(result)
-		if err != nil {
-			return fmt.Errorf("Marshal(%v) failed: %v", err)
-		}
-		resultFile := filepath.Join(tmpDir, "result")
-		if err := ctx.Run().WriteFile(resultFile, bytes, os.FileMode(0600)); err != nil {
-			return err
-		}
-	}
-	outputFile := filepath.Join(tmpDir, "output")
-	if err := ctx.Run().WriteFile(outputFile, output.Bytes(), os.FileMode(0600)); err != nil {
-		return err
-	}
-	// Upload test data to Google Storage.
-	testDir := fmt.Sprintf("%s/%s/%d", path, test, partIndex)
-	{
-		args := []string{"-q", "-m", "cp", filepath.Join(tmpDir, "*"), testDir}
-		if err := ctx.Run().Command("gsutil", args...); err != nil {
-			return err
-		}
-	}
-	{
-		xUnitFile := xunit.ReportPath(test)
-		if _, err := os.Stat(xUnitFile); err == nil {
-			args := []string{"-q", "cp", xUnitFile, testDir + "/" + "xunit.xml"}
-			if err := ctx.Run().Command("gsutil", args...); err != nil {
-				return err
-			}
-		} else {
-			if !os.IsNotExist(err) {
-				return fmt.Errorf("Stat(%v) failed: %v", xUnitFile, err)
-			}
-		}
-	}
-	return nil
-}
-
 // generateXUnitReportForError generates an xUnit test report for the
 // given (internal) error.
-func generateXUnitReportForError(ctx *tool.Context, test string, err error, output string) (*TestResult, error) {
+func generateXUnitReportForError(ctx *tool.Context, testName string, err error, output string) (*test.Result, error) {
 	// Skip the report generation for presubmit-test itself.
-	if test == "vanadium-presubmit-test" {
-		return &TestResult{Status: TestPassed}, nil
+	if testName == "vanadium-presubmit-test" {
+		return &test.Result{Status: test.Passed}, nil
 	}
 
-	xUnitFilePath := xunit.ReportPath(test)
+	xUnitFilePath := xunit.ReportPath(testName)
 
 	// Only create the report when the xUnit file doesn't exist, is
 	// invalid, or exist but doesn't have failed test cases.
@@ -535,15 +453,15 @@ func generateXUnitReportForError(ctx *tool.Context, test string, err error, outp
 		startLine := int(math.Max(0, float64(len(lines)-numLinesToOutput)))
 		consoleOutput := "......\n" + strings.Join(lines[startLine:], "\n")
 		errMsg := fmt.Sprintf("Error message:\n%s:\n%s\n\n\nConsole output:\n%s\n", errType, err.Error(), consoleOutput)
-		if err := xunit.CreateFailureReport(ctx, test, test, errType, errType, errMsg); err != nil {
+		if err := xunit.CreateFailureReport(ctx, testName, testName, errType, errType, errMsg); err != nil {
 			return nil, err
 		}
 
 		if err == runutil.CommandTimedOutErr {
-			return &TestResult{Status: TestTimedOut}, nil
+			return &test.Result{Status: test.TimedOut}, nil
 		}
 	}
-	return &TestResult{Status: TestFailed}, nil
+	return &test.Result{Status: test.Failed}, nil
 }
 
 // createTestDepGraph creates a test dependency graph given a map of

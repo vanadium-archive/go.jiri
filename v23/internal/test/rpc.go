@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
@@ -47,7 +48,7 @@ var (
 )
 
 // vanadiumGoRPCStress runs an RPC stress test with multiple GCE instances.
-func vanadiumGoRPCStress(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGoRPCStress(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
@@ -194,7 +195,7 @@ func startServers(ctx *tool.Context) (<-chan error, error) {
 	return done, nil
 }
 
-func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
+func runTest(ctx *tool.Context, testName string) (*test.Result, error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
@@ -256,7 +257,7 @@ func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
 		if err := xunit.CreateFailureReport(ctx, testName, "StressTest", "ReadStats", "Failure", err.Error()); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
 
 	fmt.Fprint(ctx.Stdout(), "\nRESULT:\n")
@@ -269,10 +270,10 @@ func runTest(ctx *tool.Context, testName string) (*TestResult, error) {
 		if err := xunit.CreateFailureReport(ctx, testName, "StressTest", "VerifyStats", "Mismatched", output); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 type stressStats struct {

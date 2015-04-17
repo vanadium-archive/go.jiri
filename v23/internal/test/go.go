@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bufio"
@@ -28,6 +28,7 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/goutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
@@ -70,7 +71,7 @@ type argsOpt []string
 type profilesOpt []string
 type timeoutOpt string
 type suffixOpt string
-type excludedTestsOpt []test
+type exclusionsOpt []exclusion
 type pkgsOpt []string
 type numWorkersOpt int
 
@@ -89,7 +90,7 @@ func (timeoutOpt) goTestOpt()     {}
 
 func (suffixOpt) goTestOpt() {}
 
-func (excludedTestsOpt) goTestOpt() {}
+func (exclusionsOpt) goTestOpt() {}
 
 func (funcMatcherOpt) goTestOpt() {}
 
@@ -100,7 +101,7 @@ func (pkgsOpt) goCoverageOpt() {}
 func (numWorkersOpt) goTestOpt() {}
 
 // goBuild is a helper function for running Go builds.
-func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *TestResult, e error) {
+func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *test.Result, e error) {
 	args, profiles, pkgs := []string{}, []string{}, []string{}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
@@ -151,7 +152,7 @@ func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *TestRes
 			Time:      fmt.Sprintf("%.2f", result.time.Seconds()),
 		}
 		if result.status != buildPassed {
-			Fail(ctx, "%s\n%v\n", result.pkg, result.output)
+			test.Fail(ctx, "%s\n%v\n", result.pkg, result.output)
 			f := xunit.Failure{
 				Message: "build",
 				Data:    result.output,
@@ -160,7 +161,7 @@ func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *TestRes
 			allPassed = false
 			s.Failures++
 		} else {
-			Pass(ctx, "%s\n", result.pkg)
+			test.Pass(ctx, "%s\n", result.pkg)
 		}
 		s.Tests++
 		s.Cases = append(s.Cases, c)
@@ -173,9 +174,9 @@ func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *TestRes
 		return nil, err
 	}
 	if !allPassed {
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // buildWorker builds packages.
@@ -216,7 +217,7 @@ type coverageResult struct {
 const defaultTestCoverageTimeout = "5m"
 
 // goCoverage is a helper function for running Go coverage tests.
-func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *TestResult, e error) {
+func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *test.Result, e error) {
 	timeout := defaultTestCoverageTimeout
 	pkgs := []string{}
 	args, profiles := []string{}, []string{}
@@ -256,7 +257,7 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *T
 		if err := xunit.CreateFailureReport(ctx, testName, "BuildTestDependencies", "TestCoverage", "dependencies build failure", err.Error()); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
 
 	// Enumerate the packages for which coverage is to be computed.
@@ -326,9 +327,9 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *T
 		if s != nil {
 			if s.Failures > 0 {
 				allPassed = false
-				Fail(ctx, "%s\n%v\n", result.pkg, result.output)
+				test.Fail(ctx, "%s\n%v\n", result.pkg, result.output)
 			} else {
-				Pass(ctx, "%s\n", result.pkg)
+				test.Pass(ctx, "%s\n", result.pkg)
 			}
 			suites = append(suites, *s)
 		}
@@ -347,9 +348,9 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *T
 		return nil, err
 	}
 	if !allPassed {
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // coverageWorker generates test coverage.
@@ -485,11 +486,11 @@ func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatche
 // indication of whether this package should be included in test runs
 // and a list of the specific tests that should be run (which if nil
 // means running all of the tests), and a list of the skipped tests.
-func filterExcludedTests(pkg string, testNames []string, excludedTests []test) (bool, []string, []string) {
+func filterExcludedTests(pkg string, testNames []string, exclusions []exclusion) (bool, []string, []string) {
 	excluded := []string{}
 	for _, name := range testNames {
-		for _, exclude := range excludedTests {
-			if exclude.pkgRE.MatchString(pkg) && exclude.nameRE.MatchString(name) {
+		for _, exclusion := range exclusions {
+			if exclusion.pkgRE.MatchString(pkg) && exclusion.nameRE.MatchString(name) {
 				excluded = append(excluded, name)
 				break
 			}
@@ -538,9 +539,9 @@ type goTestTask struct {
 }
 
 // goTest is a helper function for running Go tests.
-func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResult, e error) {
+func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Result, e error) {
 	timeout := defaultTestTimeout
-	args, profiles, suffix, excludedTestRules, pkgs := []string{}, []string{}, "", []test{}, []string{}
+	args, profiles, suffix, exclusions, pkgs := []string{}, []string{}, "", []exclusion{}, []string{}
 	var matcher funcMatcher
 	matcher = &matchGoTestFunc{}
 	numWorkers := runtime.NumCPU()
@@ -555,8 +556,8 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 			profiles = []string(typedOpt)
 		case suffixOpt:
 			suffix = string(typedOpt)
-		case excludedTestsOpt:
-			excludedTestRules = []test(typedOpt)
+		case exclusionsOpt:
+			exclusions = []exclusion(typedOpt)
 		case nonTestArgsOpt:
 			nonTestArgs = typedOpt
 		case funcMatcherOpt:
@@ -595,7 +596,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 		if err := xunit.CreateFailureReport(ctx, originalTestName, "BuildTestDependencies", testName, "dependencies build failure", err.Error()); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
 
 	// Enumerate the packages and tests to be built.
@@ -629,7 +630,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 
 	// Distribute work to workers.
 	for _, pkg := range pkgList {
-		testThisPkg, specificTests, excludedTests := filterExcludedTests(pkg, pkgAndFuncList[pkg], excludedTestRules)
+		testThisPkg, specificTests, excludedTests := filterExcludedTests(pkg, pkgAndFuncList[pkg], exclusions)
 		if testThisPkg {
 			tasks <- goTestTask{pkg, specificTests, excludedTests}
 		} else {
@@ -684,12 +685,12 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 		if s != nil {
 			if s.Failures > 0 {
 				allPassed = false
-				Fail(ctx, "%s\n%v\n", result.pkg, result.output)
+				test.Fail(ctx, "%s\n%v\n", result.pkg, result.output)
 			} else {
-				Pass(ctx, "%s\n", result.pkg)
+				test.Pass(ctx, "%s\n", result.pkg)
 			}
 			if s.Skip > 0 {
-				Pass(ctx, "%s (skipped tests: %v)\n", result.pkg, skippedTests[result.pkg])
+				test.Pass(ctx, "%s (skipped tests: %v)\n", result.pkg, skippedTests[result.pkg])
 			}
 
 			newCases := []xunit.TestCase{}
@@ -703,7 +704,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 			suites = append(suites, *s)
 		}
 		if excluded := excludedTests[result.pkg]; excluded != nil {
-			Pass(ctx, "%s (excluded tests: %v)\n", result.pkg, excluded)
+			test.Pass(ctx, "%s (excluded tests: %v)\n", result.pkg, excluded)
 		}
 	}
 	close(taskResults)
@@ -712,13 +713,13 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *TestResul
 	if err := xunit.CreateReport(ctx, testName, suites); err != nil {
 		return nil, err
 	}
-	testResult := &TestResult{
-		Status:        TestPassed,
+	testResult := &test.Result{
+		Status:        test.Passed,
 		ExcludedTests: excludedTests,
 		SkippedTests:  skippedTests,
 	}
 	if !allPassed {
-		testResult.Status = TestFailed
+		testResult.Status = test.Failed
 	}
 	return testResult, nil
 }
@@ -921,100 +922,101 @@ func getListenerPID(ctx *tool.Context, port string) (int, error) {
 	return pid, nil
 }
 
-type test struct {
-	pkg    string
-	name   string
-	pkgRE  *regexp.Regexp
-	nameRE *regexp.Regexp
+type exclusion struct {
+	exclude bool
+	nameRE  *regexp.Regexp
+	pkgRE   *regexp.Regexp
 }
 
-type exclusion struct {
-	desc    test
-	exclude bool
+// newExclusion is the exclusion factory.
+func newExclusion(pkg, name string, exclude bool) exclusion {
+	return exclusion{
+		exclude: exclude,
+		nameRE:  regexp.MustCompile(name),
+		pkgRE:   regexp.MustCompile(pkg),
+	}
 }
 
 var (
-	exclusions       []exclusion
+	goExclusions     []exclusion
 	goRaceExclusions []exclusion
 )
 
 func init() {
-	exclusions = []exclusion{
+	goExclusions = []exclusion{
 		// This test triggers a bug in go 1.4.1 garbage collector.
 		//
 		// https://github.com/veyron/release-issues/issues/1494
-		exclusion{test{pkg: "v.io/x/ref/profiles/internal/rpc/stream/vc", name: "TestConcurrentFlows"}, isDarwin() && is386()},
+		newExclusion("v.io/x/ref/profiles/internal/rpc/stream/vc", "TestConcurrentFlows", isDarwin() && is386()),
 		// The fsnotify package tests are flaky on darwin. This begs the
 		// question of whether we should be relying on this library at
 		// all.
-		exclusion{test{pkg: "github.com/howeyc/fsnotify", name: ".*"}, isDarwin()},
+		newExclusion("github.com/howeyc/fsnotify", ".*", isDarwin()),
 		// These tests are not maintained very well and are broken on all
 		// platforms.
+		//
 		// TODO(spetrovic): Put these back in once the owners fixes them.
-		exclusion{test{pkg: "golang.org/x/mobile", name: ".*"}, true},
+		newExclusion("golang.org/x/mobile", ".*", true),
 		// The following test requires IPv6, which is not available on
 		// some of our continuous integration instances.
-		exclusion{test{pkg: "golang.org/x/net/icmp", name: "TestPingGoogle"}, isCI()},
+		newExclusion("golang.org/x/net/icmp", "TestPingGoogle", isCI()),
 		// Don't run this test on mac systems prior to Yosemite since it
 		// can crash some machines.
-		exclusion{test{pkg: "golang.org/x/net/ipv6", name: ".*"}, !isYosemite()},
+		newExclusion("golang.org/x/net/ipv6", ".*", !isYosemite()),
 		// The following test is way out of date and doesn't work any more.
-		exclusion{test{pkg: "golang.org/x/tools", name: "TestCheck"}, true},
+		newExclusion("golang.org/x/tools", "TestCheck", true),
 		// The following two tests use too much memory.
-		exclusion{test{pkg: "golang.org/x/tools/go/loader", name: "TestStdlib"}, true},
-		exclusion{test{pkg: "golang.org/x/tools/go/ssa", name: "TestStdlib"}, true},
+		newExclusion("golang.org/x/tools/go/loader", "TestStdlib", true),
+		newExclusion("golang.org/x/tools/go/ssa", "TestStdlib", true),
 		// The following test expects to see "FAIL: TestBar" which causes
 		// go2xunit to fail.
-		exclusion{test{pkg: "golang.org/x/tools/go/ssa/interp", name: "TestTestmainPackage"}, true},
+		newExclusion("golang.org/x/tools/go/ssa/interp", "TestTestmainPackage", true),
 		// More broken tests.
-		exclusion{test{pkg: "golang.org/x/tools/go/types", name: "TestCheck"}, true},
-		exclusion{test{pkg: "golang.org/x/tools/refactor/lexical", name: "TestStdlib"}, true},
-		exclusion{test{pkg: "golang.org/x/tools/refactor/importgraph", name: "TestBuild"}, true},
+		//
+		// TODO(jsimsa): Provide more descriptive message.
+		newExclusion("golang.org/x/tools/go/types", "TestCheck", true),
+		newExclusion("golang.org/x/tools/refactor/lexical", "TestStdlib", true),
+		newExclusion("golang.org/x/tools/refactor/importgraph", "TestBuild", true),
 		// The godoc test does some really stupid string matching where it doesn't want
 		// cmd/gc to appear, but we have v.io/x/ref/cmd/gclogs.
-		exclusion{test{pkg: "golang.org/x/tools/cmd/godoc", name: "TestWeb"}, true},
+		newExclusion("golang.org/x/tools/cmd/godoc", "TestWeb", true),
 		// The mysql tests require a connection to a MySQL database.
-		exclusion{test{pkg: "github.com/go-sql-driver/mysql", name: ".*"}, true},
+		newExclusion("github.com/go-sql-driver/mysql", ".*", true),
 		// The gorp tests require a connection to a SQL database, configured
 		// through various environment variables.
-		exclusion{test{pkg: "github.com/go-gorp/gorp", name: ".*"}, true},
+		newExclusion("github.com/go-gorp/gorp", ".*", true),
 		// The check.v1 tests contain flakey benchmark tests which sometimes do
 		// not complete, and sometimes complete with unexpected times.
-		exclusion{test{pkg: "gopkg.in/check.v1", name: ".*"}, true},
+		newExclusion("gopkg.in/check.v1", ".*", true),
 	}
 
 	// Tests excluded only when running under --race flag.
 	goRaceExclusions = []exclusion{
 		// This test takes too long in --race mode.
-		exclusion{test{pkg: "v.io/x/devtools/v23", name: "TestV23Generate"}, true},
+		newExclusion("v.io/x/devtools/v23", "TestV23Generate", true),
 	}
 }
 
-// ExcludedTests returns the set of tests to be excluded from
-// the Vanadium projects.
-func ExcludedTests() ([]test, error) {
-	return excludedTests(exclusions)
+// ExcludedTests returns the set of tests to be excluded from the
+// tests executed when testing the Vanadium project.
+func ExcludedTests() []string {
+	return excludedTests(goExclusions)
 }
 
-func ExcludedRaceTests() ([]test, error) {
+// ExcludedRaceTests returns the set of race tests to be excluded from
+// the tests executed when testing the Vanadium project.
+func ExcludedRaceTests() []string {
 	return excludedTests(goRaceExclusions)
 }
 
-func excludedTests(exclusions []exclusion) ([]test, error) {
-	excluded := make([]test, 0, len(exclusions))
+func excludedTests(exclusions []exclusion) []string {
+	excluded := make([]string, 0, len(exclusions))
 	for _, e := range exclusions {
 		if e.exclude {
-			var err error
-			if e.desc.pkgRE, err = regexp.Compile(e.desc.pkg); err != nil {
-				return nil, err
-			}
-			if e.desc.nameRE, err = regexp.Compile(e.desc.name); err != nil {
-				return nil, err
-			}
-			excluded = append(excluded, e.desc)
+			excluded = append(excluded, fmt.Sprintf("pkg: %v, name: %v", e.pkgRE.String(), e.nameRE.String()))
 		}
 	}
-	return excluded, nil
+	return excluded
 }
 
 // validateAgainstDefaultPackages makes sure that the packages requested
@@ -1024,7 +1026,7 @@ func excludedTests(exclusions []exclusion) ([]test, error) {
 // If no packages are requested, the defaults are returned.
 // TODO(cnicolaou): ideally there'd be one piece of code that understands
 //   go package specifications that could be used here.
-func validateAgainstDefaultPackages(ctx *tool.Context, opts []TestOpt, defaults []string) (pkgsOpt, error) {
+func validateAgainstDefaultPackages(ctx *tool.Context, opts []Opt, defaults []string) (pkgsOpt, error) {
 
 	optPkgs := []string{}
 	for _, opt := range opts {
@@ -1064,21 +1066,8 @@ func validateAgainstDefaultPackages(ctx *tool.Context, opts []TestOpt, defaults 
 	return po, nil
 }
 
-// getShortTestsOnlyOptValue gets the value of ShortTestsOnlyOpt from the given
-// TestOpt slice.
-func getShortTestsOnlyOptValue(opts []TestOpt) bool {
-	shortTestsOnly := false
-	for _, opt := range opts {
-		switch v := opt.(type) {
-		case ShortOpt:
-			shortTestsOnly = bool(v)
-		}
-	}
-	return shortTestsOnly
-}
-
-// getNumWorkersOpt gets the NumWorkersOpt from the given TestOpt slice
-func getNumWorkersOpt(opts []TestOpt) numWorkersOpt {
+// getNumWorkersOpt gets the NumWorkersOpt from the given Opt slice
+func getNumWorkersOpt(opts []Opt) numWorkersOpt {
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case NumWorkersOpt:
@@ -1089,7 +1078,7 @@ func getNumWorkersOpt(opts []TestOpt) numWorkersOpt {
 }
 
 // thirdPartyGoBuild runs Go build for third-party projects.
-func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := thirdPartyPkgs()
 	if err != nil {
 		return nil, err
@@ -1103,7 +1092,7 @@ func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...TestOpt) (*Te
 }
 
 // thirdPartyGoTest runs Go tests for the third-party projects.
-func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := thirdPartyPkgs()
 	if err != nil {
 		return nil, err
@@ -1112,17 +1101,13 @@ func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 	if err != nil {
 		return nil, err
 	}
-	exclusions, err := ExcludedTests()
-	if err != nil {
-		return nil, err
-	}
 	profiles := profilesOpt([]string{"syncbase"})
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, excludedTestsOpt(exclusions), validatedPkgs, profiles)
+	return goTest(ctx, testName, suffix, exclusionsOpt(goExclusions), validatedPkgs, profiles)
 }
 
 // thirdPartyGoRace runs Go data-race tests for third-party projects.
-func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := thirdPartyPkgs()
 	if err != nil {
 		return nil, err
@@ -1132,18 +1117,10 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*Tes
 		return nil, err
 	}
 	args := argsOpt([]string{"-race"})
-	exclusions, err := ExcludedTests()
-	if err != nil {
-		return nil, err
-	}
-	raceExclusions, err := ExcludedRaceTests()
-	if err != nil {
-		return nil, err
-	}
-	exclusions = append(exclusions, raceExclusions...)
+	exclusions := append(goExclusions, goRaceExclusions...)
 	profiles := profilesOpt([]string{"syncbase"})
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
-	return goTest(ctx, testName, suffix, args, excludedTestsOpt(exclusions), validatedPkgs, profiles)
+	return goTest(ctx, testName, suffix, args, exclusionsOpt(exclusions), validatedPkgs, profiles)
 }
 
 // thirdPartyPkgs returns a list of Go expressions that describe all
@@ -1170,7 +1147,7 @@ func thirdPartyPkgs() ([]string, error) {
 }
 
 // vanadiumGoBench runs Go benchmarks for vanadium projects.
-func vanadiumGoBench(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1180,7 +1157,7 @@ func vanadiumGoBench(ctx *tool.Context, testName string, opts ...TestOpt) (*Test
 }
 
 // vanadiumGoBuild runs Go build for the vanadium projects.
-func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1189,7 +1166,7 @@ func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...TestOpt) (*Test
 }
 
 // vanadiumGoCoverage runs Go coverage tests for vanadium projects.
-func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
@@ -1199,7 +1176,7 @@ func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...TestOpt) (*T
 }
 
 // vanadiumGoDoc (re)starts the godoc server for vanadium projects.
-func vanadiumGoDoc(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGoDoc(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
@@ -1265,12 +1242,12 @@ func vanadiumGoDoc(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestRes
 		return nil, err
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // vanadiumGoGenerate checks that files created by 'go generate' are
 // up-to-date.
-func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...TestOpt) (_ *TestResult, e error) {
+func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
@@ -1338,13 +1315,13 @@ func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...TestOpt) (_ 
 		if err := xunit.CreateReport(ctx, testName, suites); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // vanadiumGoRace runs Go data-race tests for vanadium projects.
-func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func vanadiumGoRace(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1353,22 +1330,11 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 	if err != nil {
 		return nil, err
 	}
-	exclusions, err := ExcludedTests()
-	if err != nil {
-		return nil, err
-	}
-	raceExclusions, err := ExcludedRaceTests()
-	if err != nil {
-		return nil, err
-	}
-	exclusions = append(exclusions, raceExclusions...)
+	exclusions := append(goExclusions, goRaceExclusions...)
 	args := argsOpt([]string{"-race"})
-	if getShortTestsOnlyOptValue(opts) {
-		args = append(args, "-short")
-	}
 	timeout := timeoutOpt("15m")
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
-	return goTest(ctx, testName, args, timeout, suffix, excludedTestsOpt(exclusions), partPkgs)
+	return goTest(ctx, testName, args, timeout, suffix, exclusionsOpt(exclusions), partPkgs)
 }
 
 // identifyPackagesToTest returns a slice of packages to test using the
@@ -1380,7 +1346,7 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...TestOpt) (*TestR
 //   only specify the packages for the first N-1 parts in the config file. The
 //   last part will automatically include all the packages that are not found
 //   in the first N-1 parts.
-func identifyPackagesToTest(ctx *tool.Context, testName string, opts []TestOpt, allPkgs []string) (pkgsOpt, error) {
+func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allPkgs []string) (pkgsOpt, error) {
 	// Read config file to get the part.
 	config, err := util.LoadConfig(ctx)
 	if err != nil {
@@ -1441,7 +1407,7 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []TestOpt, 
 	return nil, fmt.Errorf("invalid part index: %d/%d", index, len(parts)-1)
 }
 
-func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1475,19 +1441,12 @@ func genTestNameSuffix(baseSuffix string) string {
 }
 
 // vanadiumGoTest runs Go tests for vanadium projects.
-func vanadiumGoTest(ctx *tool.Context, testName string, opts ...TestOpt) (*TestResult, error) {
+func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
 	}
-	exclusions, err := ExcludedTests()
-	if err != nil {
-		return nil, err
-	}
 	args := argsOpt([]string{})
-	if getShortTestsOnlyOptValue(opts) {
-		args = append(args, "-short")
-	}
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, excludedTestsOpt(exclusions), getNumWorkersOpt(opts), pkgs, args)
+	return goTest(ctx, testName, suffix, exclusionsOpt(goExclusions), getNumWorkersOpt(opts), pkgs, args)
 }

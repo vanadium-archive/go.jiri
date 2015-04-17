@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"fmt"
@@ -167,31 +167,4 @@ func findTestResultFiles(ctx *tool.Context, testName string) ([]string, error) {
 		}
 	}
 	return result, nil
-}
-
-func Pass(ctx *tool.Context, format string, a ...interface{}) {
-	strOK := "ok"
-	if ctx.Color() {
-		strOK = util.ColorString("ok", util.Green)
-	}
-	fmt.Fprintf(ctx.Stdout(), "%s   ", strOK)
-	fmt.Fprintf(ctx.Stdout(), format, a...)
-}
-
-func Fail(ctx *tool.Context, format string, a ...interface{}) {
-	strFail := "fail"
-	if ctx.Color() {
-		strFail = util.ColorString("fail", util.Red)
-	}
-	fmt.Fprintf(ctx.Stderr(), "%s ", strFail)
-	fmt.Fprintf(ctx.Stderr(), format, a...)
-}
-
-func Warn(ctx *tool.Context, format string, a ...interface{}) {
-	strWarn := "warn"
-	if ctx.Color() {
-		strWarn = util.ColorString("warn", util.Yellow)
-	}
-	fmt.Fprintf(ctx.Stderr(), "%s ", strWarn)
-	fmt.Fprintf(ctx.Stderr(), format, a...)
 }

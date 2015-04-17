@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/xunit"
 )
@@ -22,7 +23,7 @@ const (
 )
 
 // vanadiumBootstrap runs a test of Vanadium bootstrapping.
-func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -63,7 +64,7 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...TestOpt) (_ *Tes
 		if err := xunit.CreateFailureReport(ctx, testName, "VanadiumGo", "bootstrap", "Vanadium bootstrapping failed", out.String()); err != nil {
 			return nil, err
 		}
-		return &TestResult{Status: TestFailed}, nil
+		return &test.Result{Status: test.Failed}, nil
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }

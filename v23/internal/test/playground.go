@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"path/filepath"
@@ -10,6 +10,7 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/runutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
@@ -21,7 +22,7 @@ const (
 // vanadiumPlaygroundTest runs integration tests for the Vanadium playground.
 //
 // TODO(ivanpi): Port the namespace browser test logic from shell to Go. Add more tests.
-func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
@@ -56,19 +57,19 @@ func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...TestOpt) (_
 		return testResult, err
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // Runs specified make target in the specified directory as a test case.
 // On success, both return values are nil.
-func vanadiumPlaygroundSubtest(ctx *tool.Context, testName, caseName, casePath, caseTarget string) (tr *TestResult, err error) {
+func vanadiumPlaygroundSubtest(ctx *tool.Context, testName, caseName, casePath, caseTarget string) (tr *test.Result, err error) {
 	if err = ctx.Run().Chdir(casePath); err != nil {
 		return
 	}
 	if err := ctx.Run().TimedCommand(defaultPlaygroundTestTimeout, "make", caseTarget); err != nil {
 		if err == runutil.CommandTimedOutErr {
-			return &TestResult{
-				Status:       TestTimedOut,
+			return &test.Result{
+				Status:       test.TimedOut,
 				TimeoutValue: defaultPlaygroundTestTimeout,
 			}, nil
 		} else {

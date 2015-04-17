@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
@@ -31,7 +32,7 @@ func requireEnv(names []string) error {
 
 // vanadiumPresubmitPoll polls vanadium projects for new patchsets for
 // which to run presubmit tests.
-func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
@@ -61,12 +62,12 @@ func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_ 
 		return nil, err
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // vanadiumPresubmitTest runs presubmit tests for a given project specified
 // in TEST environment variable.
-func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	if err := requireEnv([]string{"BUILD_NUMBER", "REFS", "PROJECTS", "TEST", "WORKSPACE"}); err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ 
 	if ctx.Verbose() {
 		args = append(args, "-v")
 	}
-	test := os.Getenv("TEST")
+	name := os.Getenv("TEST")
 	args = append(args,
 		"-host", jenkinsHost,
 		"-netrc", netrcFile,
@@ -92,14 +93,14 @@ func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ 
 		"-manifest", "tools",
 		"-projects", os.Getenv("PROJECTS"),
 		"-refs", os.Getenv("REFS"),
-		"-test", test,
+		"-test", name,
 	)
 	if err := ctx.Run().Command("presubmit", args...); err != nil {
 		return nil, err
 	}
 
 	// Remove any test result files that are empty.
-	testResultFiles, err := findTestResultFiles(ctx, test)
+	testResultFiles, err := findTestResultFiles(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -115,11 +116,11 @@ func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ 
 		}
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // vanadiumPresubmitResult runs "presubmit result" command to process and post test resutls.
-func vanadiumPresubmitResult(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumPresubmitResult(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	if err := requireEnv([]string{"BUILD_NUMBER", "REFS", "PROJECTS", "WORKSPACE"}); err != nil {
 		return nil, err
 	}
@@ -149,5 +150,5 @@ func vanadiumPresubmitResult(ctx *tool.Context, testName string, _ ...TestOpt) (
 		return nil, err
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }

@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
-	"time"
 
-	"v.io/x/devtools/internal/testutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
+	v23test "v.io/x/devtools/v23/internal/test"
 	"v.io/x/lib/cmdline"
 )
 
@@ -19,21 +19,21 @@ var (
 	blessingsRootFlag string
 	credDirFlag       string
 	namespaceRootFlag string
+	numWorkersFlag    int
+	outputDirFlag     string
 	partFlag          int
 	pkgsFlag          string
-	reportFlag        bool
-	numWorkersFlag    int
 )
 
 func init() {
 	cmdTestRun.Flags.StringVar(&blessingsRootFlag, "blessings-root", "dev.v.io", "The blessings root.")
 	cmdTestRun.Flags.StringVar(&credDirFlag, "v23.credentials", "", "Directory for vanadium credentials.")
 	cmdTestRun.Flags.StringVar(&namespaceRootFlag, "v23.namespace.root", "/ns.dev.v.io:8101", "The namespace root.")
-	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")
-	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
 	cmdTestRun.Flags.IntVar(&numWorkersFlag, "num-test-workers", runtime.NumCPU(), "Set the number of test workers to use; use 1 to serialize all tests.")
 	cmdTestRun.Flags.Lookup("num-test-workers").DefValue = "<runtime.NumCPU()>"
-	cmdTestRun.Flags.BoolVar(&reportFlag, "report", false, "Upload test report to Vanadium servers.")
+	cmdTestRun.Flags.StringVar(&outputDirFlag, "output-dir", "", "Directory to output test results into.")
+	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")
+	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
 }
 
 // cmdTest represents the "v23 test" command.
@@ -69,14 +69,14 @@ func runTestProject(command *cmdline.Command, args []string) error {
 		Verbose: &verboseFlag,
 	})
 	project := args[0]
-	results, err := testutil.RunProjectTests(ctx, nil, []string{project}, optsFromFlags()...)
+	results, err := v23test.RunProjectTests(ctx, nil, []string{project}, optsFromFlags()...)
 	if err != nil {
 		return err
 	}
 	printSummary(ctx, results)
 	for _, result := range results {
-		if result.Status != testutil.TestPassed {
-			return cmdline.ErrExitCode(2)
+		if result.Status != test.Passed {
+			return cmdline.ErrExitCode(test.FailedExitCode)
 		}
 	}
 	return nil
@@ -101,26 +101,22 @@ func runTestRun(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	results, err := testutil.RunTests(ctx, nil, args, optsFromFlags()...)
+	results, err := v23test.RunTests(ctx, nil, args, optsFromFlags()...)
 	if err != nil {
 		return err
 	}
 	printSummary(ctx, results)
 	for _, result := range results {
-		if result.Status != testutil.TestPassed {
-			return cmdline.ErrExitCode(2)
+		if result.Status != test.Passed {
+			return cmdline.ErrExitCode(test.FailedExitCode)
 		}
 	}
 	return nil
 }
 
-func optsFromFlags() (opts []testutil.TestOpt) {
+func optsFromFlags() (opts []v23test.Opt) {
 	if partFlag >= 0 {
-		opt := testutil.PartOpt(partFlag)
-		opts = append(opts, opt)
-	}
-	if reportFlag {
-		opt := testutil.PrefixOpt(time.Now().Format(time.RFC3339))
+		opt := v23test.PartOpt(partFlag)
 		opts = append(opts, opt)
 	}
 	pkgs := []string{}
@@ -129,12 +125,18 @@ func optsFromFlags() (opts []testutil.TestOpt) {
 			pkgs = append(pkgs, pkg)
 		}
 	}
-	opts = append(opts, testutil.PkgsOpt(pkgs))
-	opts = append(opts, testutil.CredDirOpt(credDirFlag), testutil.BlessingsRootOpt(blessingsRootFlag), testutil.NamespaceRootOpt(namespaceRootFlag), testutil.NumWorkersOpt(numWorkersFlag))
+	opts = append(opts, v23test.PkgsOpt(pkgs))
+	opts = append(opts,
+		v23test.BlessingsRootOpt(blessingsRootFlag),
+		v23test.CredDirOpt(credDirFlag),
+		v23test.NamespaceRootOpt(namespaceRootFlag),
+		v23test.NumWorkersOpt(numWorkersFlag),
+		v23test.OutputDirOpt(outputDirFlag),
+	)
 	return
 }
 
-func printSummary(ctx *tool.Context, results map[string]*testutil.TestResult) {
+func printSummary(ctx *tool.Context, results map[string]*test.Result) {
 	fmt.Fprintf(ctx.Stdout(), "SUMMARY:\n")
 	for name, result := range results {
 		fmt.Fprintf(ctx.Stdout(), "%v %s\n", name, result.Status)
@@ -166,7 +168,7 @@ func runTestList(command *cmdline.Command, _ []string) error {
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag,
 	})
-	testList, err := testutil.TestList()
+	testList, err := v23test.ListTests()
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr(), "%v\n", err)
 		return err

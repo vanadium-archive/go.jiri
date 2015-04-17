@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/testutil"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
+	v23test "v.io/x/devtools/v23/internal/test"
 	"v.io/x/lib/cmdline"
 )
 
@@ -284,11 +285,11 @@ func runTests(ctx *tool.Context, label string) error {
 		return nil
 	}
 	for _, t := range config.SnapshotLabelTests(label) {
-		result, err := testutil.RunTests(ctx, nil, []string{t})
+		result, err := v23test.RunTests(ctx, nil, []string{t})
 		if err != nil {
 			return err
 		}
-		if result[t].Status != testutil.TestPassed {
+		if result[t].Status != test.Passed {
 			return fmt.Errorf("%v failed", t)
 		}
 	}

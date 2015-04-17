@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
@@ -50,7 +51,7 @@ type androidAntProperties struct {
 }
 
 // vanadiumAndroidBuild tests that all Java and Go JNI files build.
-func vanadiumAndroidBuild(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumAndroidBuild(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, []string{"mobile"})
 	if err != nil {
@@ -73,11 +74,11 @@ func vanadiumAndroidBuild(ctx *tool.Context, testName string, _ ...TestOpt) (_ *
 	if err := ctx.Run().TimedCommand(defaultAndroidTestTimeout, "ant", "debug"); err != nil {
 		return nil, err
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 // vanadiumAndroidTest runs all Android tests.
-func vanadiumAndroidTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumAndroidTest(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, []string{"mobile"})
 	if err != nil {
@@ -121,7 +122,7 @@ func vanadiumAndroidTest(ctx *tool.Context, testName string, _ ...TestOpt) (_ *T
 	if err := ctx.Run().TimedCommand(defaultAndroidTestTimeout, "ant", "debug", "install", "test"); err != nil {
 		return nil, err
 	}
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
 func buildAndroidApp(ctx *tool.Context, appDir string) error {

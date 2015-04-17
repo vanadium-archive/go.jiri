@@ -209,7 +209,7 @@ func doApiCheck(stdout, stderr io.Writer, args []string) error {
 				// detected
 				if exiterr, ok := err.(*exec.ExitError); ok {
 					if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-						if status != 1 {
+						if status.ExitStatus() != 1 {
 							continue
 						}
 					}

@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package testutil
+package test
 
 import (
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 )
 
 // vanadiumPostsubmitPoll polls for new changes in all projects' master branches,
 // and starts the corresponding Jenkins targets based on the changes.
-func vanadiumPostsubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_ *TestResult, e error) {
+func vanadiumPostsubmitPoll(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, nil)
 	if err != nil {
@@ -33,5 +34,5 @@ func vanadiumPostsubmitPoll(ctx *tool.Context, testName string, _ ...TestOpt) (_
 		return nil, err
 	}
 
-	return &TestResult{Status: TestPassed}, nil
+	return &test.Result{Status: test.Passed}, nil
 }

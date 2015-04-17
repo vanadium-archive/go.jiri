@@ -12,9 +12,10 @@
 // contained in a single file within a related package:
 //
 // 1) if you obtained the code using 'go get':
-// "go run $(go list -f {{.Dir}} v.io/x/devtools/internal/testutil)/excluded_tests.go"
+// "go run $(go list -f {{.Dir}} v.io/x/devtools/v23/internal/test)/excluded_tests.go"
+//
 // 2) if you are using the v23 tool and "V23_ROOT" setup.
-// "v23 go run $(v23 go list -f {{.Dir}} v.io/x/devtools/internal/testutil)/excluded_tests.go"
+// "v23 go run $(v23 go list -f {{.Dir}} v.io/x/devtools/v23/internal/test)/excluded_tests.go"
 package main
 
 import (
@@ -23,7 +24,7 @@ import (
 	"os"
 	"runtime"
 
-	"v.io/x/devtools/internal/testutil"
+	"v.io/x/devtools/v23/internal/test"
 )
 
 var raceFlag = flag.Bool("race", false, "Additionally display the tests excluded only when running under the go race detector.")
@@ -36,7 +37,7 @@ func main() {
 	fmt.Printf("USER: %q\n", os.Getenv("USER"))
 
 	fmt.Println("Excluded tests:")
-	excluded, err := testutil.ExcludedTests()
+	excluded, err := test.ExcludedTests()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get exclusions: %s", err)
 		os.Exit(1)
@@ -47,7 +48,7 @@ func main() {
 
 	if *raceFlag {
 		fmt.Println("Excluded race tests:")
-		raceExcluded, err := testutil.ExcludedRaceTests()
+		raceExcluded, err := test.ExcludedRaceTests()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to get race exclusions: %s", err)
 			os.Exit(1)
