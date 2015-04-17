@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -50,7 +51,12 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Re
 	opts := ctx.Run().Opts()
 	opts.Stdout = io.MultiWriter(opts.Stdout, &out)
 	opts.Stderr = io.MultiWriter(opts.Stderr, &out)
-	opts.Env["PATH"] = strings.Replace(os.Getenv("PATH"), filepath.Join(oldRoot, "devtools", "bin"), "", -1)
+	// Find the PATH element containing the "v23" binary and remove it.
+	v23Path, err := exec.LookPath("v23")
+	if err != nil {
+		return nil, internalTestError{err, "LookPath"}
+	}
+	opts.Env["PATH"] = strings.Replace(os.Getenv("PATH"), filepath.Dir(v23Path), "", -1)
 	for i := 1; i <= numAttempts; i++ {
 		if i > 1 {
 			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, numAttempts)
