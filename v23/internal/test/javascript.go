@@ -148,6 +148,20 @@ func vanadiumJSVdl(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 	return runJSTest(ctx, testName, testDir, target, nil, env)
 }
 
+// vanadiumJSVDLAudit checks that all VDL-based JS source files are up-to-date.
+func vanadiumJSVdlAudit(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, err
+	}
+	testDir := filepath.Join(root, "release", "javascript", "core")
+	target := "test-vdl-audit"
+	env := map[string]string{}
+	setCommonJSEnv(env)
+	env["NODE_OUTPUT"] = xunit.ReportPath(testName)
+	return runJSTest(ctx, testName, testDir, target, nil, env)
+}
+
 // vanadiumJSVom runs the vanadium javascript vom test.
 func vanadiumJSVom(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	root, err := util.V23Root()

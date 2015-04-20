@@ -96,6 +96,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-js-node-integration":    vanadiumJSNodeIntegration,
 	"vanadium-js-unit":                vanadiumJSUnit,
 	"vanadium-js-vdl":                 vanadiumJSVdl,
+	"vanadium-js-vdl-audit":           vanadiumJSVdlAudit,
 	"vanadium-js-vom":                 vanadiumJSVom,
 	"vanadium-pipe2browser-test":      vanadiumPipe2BrowserTest,
 	"vanadium-playground-test":        vanadiumPlaygroundTest,
