@@ -398,12 +398,8 @@ func (r *review) checkGoFormat() (e error) {
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
-	defer collect.Error(func() error { return r.ctx.Run().Chdir(wd) }, &e)
 	topLevel, err := r.ctx.Git().TopLevel()
 	if err != nil {
-		return err
-	}
-	if err := r.ctx.Run().Chdir(topLevel); err != nil {
 		return err
 	}
 	goFiles := []string{}
@@ -420,6 +416,12 @@ func (r *review) checkGoFormat() (e error) {
 		// Skip Go files with a "testdata" component in the path.
 		if strings.Contains(path, "testdata"+string(filepath.Separator)) {
 			continue
+		}
+		relativeFile, err := filepath.Rel(wd, path)
+		if err == nil {
+			file = relativeFile
+		} else {
+			file = path
 		}
 		goFiles = append(goFiles, file)
 	}
