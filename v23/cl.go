@@ -453,7 +453,7 @@ func (r *review) checkCopyright() error {
 	}
 	// Check the copyright headers and licensing files.
 	var out bytes.Buffer
-	if err := copyrightHelper(&out, &out, []string{name}, false); err != nil {
+	if err := copyrightHelper(r.ctx.Stdout(), &out, []string{name}, false); err != nil {
 		return err
 	}
 	if out.Len() != 0 {
