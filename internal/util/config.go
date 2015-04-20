@@ -34,6 +34,9 @@ type Config struct {
 	// vdlWorkspaces identifies V23_ROOT subdirectories that contain
 	// a VDL workspace.
 	vdlWorkspaces []string
+	// apiCheckRequiredProjects identifies the set of project names for
+	// which an API check is required.
+	apiCheckRequiredProjects map[string]bool
 }
 
 // ConfigOpt is an interface for Config factory options.
@@ -83,6 +86,26 @@ type VDLWorkspacesOpt []string
 
 func (VDLWorkspacesOpt) configOpt() {}
 
+type ApiCheckRequiredProjectsOpt []string
+
+func (ApiCheckRequiredProjectsOpt) configOpt() {}
+
+func listToSet(keys []string) map[string]bool {
+	result := make(map[string]bool)
+	for _, key := range keys {
+		result[key] = true
+	}
+	return result
+}
+
+func keys(set map[string]bool) []string {
+	var result []string
+	for key, _ := range set {
+		result = append(result, key)
+	}
+	return result
+}
+
 // NewConfig is the Config factory.
 func NewConfig(opts ...ConfigOpt) *Config {
 	var c Config
@@ -102,6 +125,8 @@ func NewConfig(opts ...ConfigOpt) *Config {
 			c.testParts = map[string][]string(typedOpt)
 		case VDLWorkspacesOpt:
 			c.vdlWorkspaces = []string(typedOpt)
+		case ApiCheckRequiredProjectsOpt:
+			c.apiCheckRequiredProjects = listToSet([]string(typedOpt))
 		}
 	}
 	return &c
@@ -185,27 +210,35 @@ func (c Config) VDLWorkspaces() []string {
 	return c.vdlWorkspaces
 }
 
+// ApiCheckRequiredProjects returns the set of project names for which an API
+// check is required.
+func (c Config) ApiCheckRequiredProjects() map[string]bool {
+	return c.apiCheckRequiredProjects
+}
+
 type config struct {
-	GoWorkspaces       []string            `json:"go-workspaces-new"`
-	ProjectTests       map[string][]string `json:"project-tests"`
-	SnapshotLabelTests map[string][]string `json:"snapshot-label-tests"`
-	TestDependencies   map[string][]string `json:"test-dependencies"`
-	TestGroups         map[string][]string `json:"test-groups"`
-	TestParts          map[string][]string `json:"test-parts"`
-	VDLWorkspaces      []string            `json:"vdl-workspaces-new"`
+	GoWorkspaces             []string            `json:"go-workspaces-new"`
+	ProjectTests             map[string][]string `json:"project-tests"`
+	SnapshotLabelTests       map[string][]string `json:"snapshot-label-tests"`
+	TestDependencies         map[string][]string `json:"test-dependencies"`
+	TestGroups               map[string][]string `json:"test-groups"`
+	TestParts                map[string][]string `json:"test-parts"`
+	VDLWorkspaces            []string            `json:"vdl-workspaces-new"`
+	ApiCheckRequiredProjects []string            `json:"api-check-required-projects"`
 }
 
 var _ json.Marshaler = (*Config)(nil)
 
 func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(config{
-		GoWorkspaces:       c.goWorkspaces,
-		ProjectTests:       c.projectTests,
-		SnapshotLabelTests: c.snapshotLabelTests,
-		TestDependencies:   c.testDependencies,
-		TestGroups:         c.testGroups,
-		TestParts:          c.testParts,
-		VDLWorkspaces:      c.vdlWorkspaces,
+		GoWorkspaces:             c.goWorkspaces,
+		ProjectTests:             c.projectTests,
+		SnapshotLabelTests:       c.snapshotLabelTests,
+		TestDependencies:         c.testDependencies,
+		TestGroups:               c.testGroups,
+		TestParts:                c.testParts,
+		VDLWorkspaces:            c.vdlWorkspaces,
+		ApiCheckRequiredProjects: keys(c.apiCheckRequiredProjects),
 	})
 }
 
@@ -223,5 +256,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	c.testGroups = conf.TestGroups
 	c.testParts = conf.TestParts
 	c.vdlWorkspaces = conf.VDLWorkspaces
+	c.apiCheckRequiredProjects = listToSet(conf.ApiCheckRequiredProjects)
 	return nil
 }

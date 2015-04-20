@@ -298,10 +298,15 @@ func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util
 
 // testApiHelper is a function that contains the logic shared
 // by TestApiError and TestApiOK.
-func testGoApiHelper(t *testing.T, ok bool) error {
+func testGoApiHelper(t *testing.T, ok bool, check bool) error {
 	ctx := tool.NewDefaultContext()
 	env := setupApiTest(t, ctx)
 	defer teardownApiTest(t, env)
+
+	if check {
+		config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+		env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -350,7 +355,7 @@ func PublicFunction() {}`
 }
 
 func TestApiError(t *testing.T) {
-	if err := testGoApiHelper(t, false); err == nil {
+	if err := testGoApiHelper(t, false, true); err == nil {
 		t.Fatalf("go api check did not fail when it should")
 	} else if _, ok := err.(apiError); !ok {
 		t.Fatalf("unexpected error: %v", err)
@@ -358,7 +363,15 @@ func TestApiError(t *testing.T) {
 }
 
 func TestApiOK(t *testing.T) {
-	if err := testGoApiHelper(t, true); err != nil {
+	if err := testGoApiHelper(t, true, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApiSkip(t *testing.T) {
+	// Run the API helper in a failure mode. However, no failure should be
+	// reported because this check is skipped.
+	if err := testGoApiHelper(t, false, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

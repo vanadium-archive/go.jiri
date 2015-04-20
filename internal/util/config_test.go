@@ -7,6 +7,7 @@ package util
 import (
 	"encoding/json"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -29,7 +30,11 @@ var (
 	testParts = map[string][]string{
 		"test-test-A": []string{"p1", "p2"},
 	}
-	vdlWorkspaces = []string{"test-vdl-workspace"}
+	vdlWorkspaces            = []string{"test-vdl-workspace"}
+	apiCheckRequiredProjects = []string{
+		"projectA",
+		"projectB",
+	}
 )
 
 func testConfigAPI(t *testing.T, c *Config) {
@@ -63,6 +68,11 @@ func testConfigAPI(t *testing.T, c *Config) {
 	if got, want := c.VDLWorkspaces(), vdlWorkspaces; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
+	got, want := keys(c.ApiCheckRequiredProjects()), apiCheckRequiredProjects
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected results: got %v, want %v", got, want)
+	}
 }
 
 func TestConfig(t *testing.T) {
@@ -74,6 +84,7 @@ func TestConfig(t *testing.T) {
 		TestGroupsOpt(testGroups),
 		TestPartsOpt(testParts),
 		VDLWorkspacesOpt(vdlWorkspaces),
+		ApiCheckRequiredProjectsOpt(apiCheckRequiredProjects),
 	)
 
 	testConfigAPI(t, config)
@@ -88,6 +99,7 @@ func TestConfigMarshal(t *testing.T) {
 		TestGroupsOpt(testGroups),
 		TestPartsOpt(testParts),
 		VDLWorkspacesOpt(vdlWorkspaces),
+		ApiCheckRequiredProjectsOpt(apiCheckRequiredProjects),
 	)
 
 	data, err := json.Marshal(config)

@@ -6,9 +6,9 @@ package main
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
@@ -88,6 +88,8 @@ func TestPublicApiCheckError(t *testing.T) {
 	env := setupApiTest(t, ctx)
 	defer teardownApiTest(t, env)
 
+	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -111,12 +113,10 @@ func testFunction() {
 	}
 
 	var buf bytes.Buffer
-	command := cmdline.Command{}
-	command.Init(nil, io.MultiWriter(ctx.Stdout(), &buf), ctx.Stderr())
-	if err := runApiCheck(&command, []string{"test"}); err != nil {
-		t.Fatalf("runApiCheck failed: %v", err)
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+		t.Fatalf("doApiCheck failed: %v", err)
 	} else if buf.String() == "" {
-		t.Fatalf("runApiCheck detected no changes, but some were expected")
+		t.Fatalf("doApiCheck detected no changes, but some were expected")
 	}
 }
 
@@ -127,6 +127,8 @@ func TestPublicApiCheckOk(t *testing.T) {
 	env := setupApiTest(t, ctx)
 	defer teardownApiTest(t, env)
 
+	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -150,12 +152,46 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	command := cmdline.Command{}
-	command.Init(nil, io.MultiWriter(ctx.Stdout(), &buf), ctx.Stderr())
-	if err := runApiCheck(&command, []string{"test"}); err != nil {
-		t.Fatalf("runApiCheck failed: %v", err)
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+		t.Fatalf("doApiCheck failed: %v", err)
 	} else if buf.String() != "" {
-		t.Fatalf("runApiCheck detected changes, but none were expected: %s", buf.String())
+		t.Fatalf("doApiCheck detected changes, but none were expected: %s", buf.String())
+	}
+}
+
+// TestPublicApiMissingApiFile ensures that the check will fail if a 'required
+// check' project has a missing .api file.
+func TestPublicApiMissingApiFile(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	env := setupApiTest(t, ctx)
+	defer teardownApiTest(t, env)
+
+	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	branch := "my-branch"
+	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Write a go file with a public API and no corresponding .api file.
+	writeFileOrDie(t, ctx, filepath.Join(projectPath, "file.go"), `package main
+
+func TestFunction() {
+}`)
+
+	commitMessage := "Commit file.go"
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CommitFile("file.go", commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+		t.Fatalf("doApiCheck failed: %v", err)
+	} else if buf.String() == "" {
+		t.Fatalf("doApiCheck should have failed, but did not")
+	} else if !strings.Contains(buf.String(), "ERROR: could not read the package's .api file") {
+		t.Fatalf("doApiCheck failed, but not for the expected reason: %s", buf.String())
 	}
 }
 

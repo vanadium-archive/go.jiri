@@ -492,8 +492,16 @@ func (r *review) checkGoApi() error {
 	if name == "" {
 		return fmt.Errorf("current project is not a 'v23' project")
 	}
+	config, err := util.LoadConfig(r.ctx)
+	if err != nil {
+		return err
+	}
+	if _, ok := config.ApiCheckRequiredProjects()[name]; !ok {
+		// Skip the check for this project, it's not required.
+		return nil
+	}
 	var out bytes.Buffer
-	if err := doApiCheck(&out, os.Stderr, []string{name}); err != nil {
+	if err := doApiCheck(&out, r.ctx.Stderr(), []string{name}); err != nil {
 		return err
 	}
 	if out.Len() != 0 {

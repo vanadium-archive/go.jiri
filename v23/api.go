@@ -75,8 +75,12 @@ func readApiFileContents(path string, buf *bytes.Buffer) (e error) {
 
 type packageChange struct {
 	name        string
+	projectName string
 	apiFilePath string
 	newApi      string
+
+	// If true, indicates that there was a problem reading the old API file.
+	apiFileError error
 }
 
 // buildGotools builds the gotools binary and returns the path to the built
@@ -121,7 +125,19 @@ func buildGotools(ctx *tool.Context) (string, func() error, error) {
 	return gotoolsBin, cleanup, nil
 }
 
-func getPackageChanges(ctx *tool.Context, args []string) (changes []packageChange, e error) {
+func isFailedApiCheckFatal(projectName string, apiCheckRequiredProjects map[string]bool, apiFileError error) bool {
+	if pathError, ok := apiFileError.(*os.PathError); ok {
+		if pathError.Err == os.ErrNotExist {
+			if _, ok := apiCheckRequiredProjects[projectName]; !ok {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bool, args []string) (changes []packageChange, e error) {
 	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
 		return nil, err
@@ -161,11 +177,16 @@ func getPackageChanges(ctx *tool.Context, args []string) (changes []packageChang
 			// Read the existing public API file.
 			apiFilePath := filepath.Join(dir, ".api")
 			var apiFileContents bytes.Buffer
-			err := readApiFileContents(apiFilePath, &apiFileContents)
-			if err != nil {
-				fmt.Fprintf(ctx.Stderr(), "WARNING: could not read public API from %s: %v\n", apiFilePath, err)
-				fmt.Fprintf(ctx.Stderr(), "WARNING: skipping public API check for %s\n", dir)
-				continue
+			apiFileError := readApiFileContents(apiFilePath, &apiFileContents)
+			if apiFileError != nil {
+				if !isFailedApiCheckFatal(projectName, apiCheckRequiredProjects, apiFileError) {
+					// We couldn't read the API file, but
+					// this project doesn't require one.
+					// Just warn the user.
+					fmt.Fprintf(ctx.Stderr(), "WARNING: could not read public API from %s: %v\n", apiFilePath, err)
+					fmt.Fprintf(ctx.Stderr(), "WARNING: skipping public API check for %s\n", dir)
+					continue
+				}
 			}
 			var out bytes.Buffer
 			opts := ctx.Run().Opts()
@@ -173,9 +194,11 @@ func getPackageChanges(ctx *tool.Context, args []string) (changes []packageChang
 			if err := ctx.Run().CommandWithOpts(opts, gotoolsBin, "goapi", dir); err != nil {
 				return nil, err
 			}
-			if out.String() != apiFileContents.String() {
-				// The user has changed the public API.
-				changes = append(changes, packageChange{name: dir, apiFilePath: apiFilePath, newApi: out.String()})
+			if apiFileError != nil || out.String() != apiFileContents.String() {
+				// The user has changed the public API or we
+				// couldn't read the public API in the first
+				// place.
+				changes = append(changes, packageChange{name: dir, projectName: projectName, apiFilePath: apiFilePath, newApi: out.String(), apiFileError: apiFileError})
 			}
 		}
 	}
@@ -195,15 +218,25 @@ func doApiCheck(stdout, stderr io.Writer, args []string) error {
 		Stdout:   stdout,
 		Stderr:   stderr,
 	})
-	changes, err := getPackageChanges(ctx, args)
+	config, err := util.LoadConfig(ctx)
+	if err != nil {
+		return err
+	}
+	changes, err := getPackageChanges(ctx, config.ApiCheckRequiredProjects(), args)
 	if err != nil {
 		return err
 	} else if len(changes) > 0 {
-		fmt.Fprintf(ctx.Stdout(), "Detected changes in the following %d package(s):\n", len(changes))
+		fmt.Fprintf(stdout, "Detected changes in the following %d package(s):\n", len(changes))
 		for _, change := range changes {
-			fmt.Fprintf(ctx.Stdout(), "\t%s\n", change.name)
+			fmt.Fprintf(stdout, "For package %s\n", change.name)
 			opts := ctx.Run().Opts()
+			if change.apiFileError != nil {
+				fmt.Fprintf(stdout, "ERROR: could not read the package's .api file: %v\n", change.apiFileError)
+				fmt.Fprintf(stdout, "ERROR: a readable .api file is required for all packages in project %s", change.projectName)
+				continue
+			}
 			opts.Stdin = strings.NewReader(change.newApi)
+			opts.Stdout = stdout
 			if err := ctx.Run().CommandWithOpts(opts, "diff", "-u", change.apiFilePath, "-"); err != nil {
 				// We expect diff to return 1 if changes are
 				// detected
@@ -239,7 +272,11 @@ func runApiFix(command *cmdline.Command, args []string) error {
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag})
-	changes, err := getPackageChanges(ctx, args)
+	config, err := util.LoadConfig(ctx)
+	if err != nil {
+		return err
+	}
+	changes, err := getPackageChanges(ctx, config.ApiCheckRequiredProjects(), args)
 	if err != nil {
 		return err
 	}
