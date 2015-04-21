@@ -78,7 +78,7 @@ reports the difference and stops. Otherwise, it deletes the branch.
 }
 
 func cleanup(ctx *tool.Context, branches []string) (e error) {
-	currentBranch, err := ctx.Git().CurrentBranchName()
+	originalBranch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,13 @@ func cleanup(ctx *tool.Context, branches []string) (e error) {
 	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Git().CheckoutBranch(currentBranch, !gitutil.Force) }, &e)
+	checkoutOriginalBranch := true
+	defer collect.Error(func() error {
+		if checkoutOriginalBranch {
+			return ctx.Git().CheckoutBranch(originalBranch, !gitutil.Force)
+		}
+		return nil
+	}, &e)
 	if err := ctx.Git().Pull("origin", "master"); err != nil {
 		return err
 	}
@@ -100,6 +106,9 @@ func cleanup(ctx *tool.Context, branches []string) (e error) {
 		cleanupFn := func() error { return cleanupBranch(ctx, branch) }
 		if err := ctx.Run().Function(cleanupFn, "Cleaning up branch %q", branch); err != nil {
 			return err
+		}
+		if branch == originalBranch {
+			checkoutOriginalBranch = false
 		}
 	}
 	return nil
