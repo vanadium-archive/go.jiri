@@ -496,7 +496,7 @@ func setupMobileLinux(ctx *tool.Context) (e error) {
 	}
 
 	// Download Java 7 JRE.
-	androidRoot := filepath.Join(root, "environment", "android")
+	androidRoot := filepath.Join(root, "third_party", "android")
 	javaDir := filepath.Join(androidRoot, "java")
 	jreDir := filepath.Join(javaDir, "jre1.7.0_65")
 	installJreFn := func() error {

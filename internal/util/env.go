@@ -211,7 +211,7 @@ func setAndroidEnv(env *envutil.Snapshot, platform Platform) error {
 	// Add the paths to vanadium cross-compilation tools to the PATH.
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{
-		filepath.Join(root, "environment", "android", "go", "bin"),
+		filepath.Join(root, "third_party", "android", "go", "bin"),
 	}, path...)
 	env.SetTokens("PATH", path, ":")
 	return nil
