@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -148,16 +147,6 @@ func VanadiumEnvironment(ctx *tool.Context, platform Platform) (*envutil.Snapsho
 	}
 	setGoPath(env, root, config)
 	setVdlPath(env, root, config)
-	archCmd := exec.Command("uname", "-m")
-	arch, err := archCmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get host architecture: %v\n%v\n%s", err, strings.Join(archCmd.Args, " "))
-	}
-	if platform.OS == "linux" {
-		if err := setBluetoothCgoEnv(env, root, strings.TrimSpace(string(arch))); err != nil {
-			return nil, err
-		}
-	}
 	if platform.OS == "darwin" || platform.OS == "linux" {
 		if err := setSyncbaseCgoEnv(env, root, platform.OS); err != nil {
 			return nil, err
@@ -243,8 +232,8 @@ func setArmEnv(env *envutil.Snapshot, platform Platform) error {
 	// Add the paths to vanadium cross-compilation tools to the PATH.
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{
-		filepath.Join(root, "environment", "cout", "xgcc", "cross_arm"),
-		filepath.Join(root, "environment", "go", "linux", "arm", "go", "bin"),
+		filepath.Join(root, "third_party", "cout", "xgcc", "cross_arm"),
+		filepath.Join(root, "third_party", "repos", "go_arm", "bin"),
 	}, path...)
 	env.SetTokens("PATH", path, ":")
 	return nil
@@ -273,41 +262,6 @@ func setVdlPath(env *envutil.Snapshot, root string, config *Config) {
 		vdlpath = append(vdlpath, filepath.Join(root, workspace))
 	}
 	env.SetTokens("VDLPATH", vdlpath, ":")
-}
-
-// setBluetoothCgoEnv sets the CGO_ENABLED variable and adds the
-// bluetooth third-party C libraries vanadium Go code depends on to the
-// CGO_CFLAGS and CGO_LDFLAGS variables.
-func setBluetoothCgoEnv(env *envutil.Snapshot, root, arch string) error {
-	// Set the CGO_* variables for the vanadium proximity component.
-	env.Set("CGO_ENABLED", "1")
-	libs := []string{
-		"dbus-1.6.14",
-		"expat-2.1.0",
-		"bluez-4.101",
-		"libusb-1.0.16-rc10",
-		"libusb-compat-0.1.5",
-	}
-	cflags := env.GetTokens("CGO_CFLAGS", " ")
-	ldflags := env.GetTokens("CGO_LDFLAGS", " ")
-	for _, lib := range libs {
-		dir := filepath.Join(root, "environment", "cout", lib, arch)
-		if _, err := os.Stat(dir); err != nil {
-			if !os.IsNotExist(err) {
-				return fmt.Errorf("Stat(%v) failed: %v", dir, err)
-			}
-		} else {
-			if lib == "dbus-1.6.14" {
-				cflags = append(cflags, filepath.Join("-I"+dir, "include", "dbus-1.0", "dbus"))
-			} else {
-				cflags = append(cflags, filepath.Join("-I"+dir, "include"))
-			}
-			ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"), "-Wl,-rpath", filepath.Join(dir, "lib"))
-		}
-	}
-	env.SetTokens("CGO_CFLAGS", cflags, " ")
-	env.SetTokens("CGO_LDFLAGS", ldflags, " ")
-	return nil
 }
 
 // setNaclEnv sets the environment variables used for nacl
