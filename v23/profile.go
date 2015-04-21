@@ -329,23 +329,27 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 	}
 
 	// Download and build arm/linux cross-compiler for Go.
-	goDir := filepath.Join(root, "environment", "go", "linux", "arm")
+	repoDir := filepath.Join(root, "third_party", "repos")
+	goDir := filepath.Join(repoDir, "go_arm")
 	installGoFn := func() error {
-		if err := ctx.Run().MkdirAll(goDir, defaultDirPerm); err != nil {
+		if err := ctx.Run().MkdirAll(repoDir, defaultDirPerm); err != nil {
 			return err
 		}
 		name := "go1.4.2.src.tar.gz"
-		remote, local := "https://storage.googleapis.com/golang/"+name, filepath.Join(goDir, name)
+		remote, local := "https://storage.googleapis.com/golang/"+name, filepath.Join(repoDir, name)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
 		}
-		if err := run(ctx, "tar", []string{"-C", goDir, "-xzf", local}, nil); err != nil {
+		if err := run(ctx, "tar", []string{"-C", repoDir, "-xzf", local}, nil); err != nil {
 			return err
 		}
 		if err := ctx.Run().RemoveAll(local); err != nil {
 			return err
 		}
-		goSrcDir := filepath.Join(goDir, "go", "src")
+		if err := ctx.Run().Rename(filepath.Join(repoDir, "go"), goDir); err != nil {
+			return err
+		}
+		goSrcDir := filepath.Join(goDir, "src")
 		if err := ctx.Run().Chdir(goSrcDir); err != nil {
 			return err
 		}
@@ -365,9 +369,9 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 	}
 
 	// Build and install crosstool-ng.
-	xgccOutDir := filepath.Join(root, "environment", "cout", "xgcc")
+	xgccOutDir := filepath.Join(root, "third_party", "cout", "xgcc")
 	installNgFn := func() error {
-		xgccSrcDir := filepath.Join(root, "environment", "csrc", "crosstool-ng-1.19.0")
+		xgccSrcDir := filepath.Join(root, "third_party", "csrc", "crosstool-ng-1.19.0")
 		if err := ctx.Run().Chdir(xgccSrcDir); err != nil {
 			return err
 		}
@@ -416,7 +420,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err != nil {
 			return fmt.Errorf("ReadFile(%v) failed: %v", configFile, err)
 		}
-		old, new := "/usr/local/vanadium", filepath.Join(root, "environment", "cout")
+		old, new := "/usr/local/vanadium", filepath.Join(root, "third_party", "cout")
 		newConfig := strings.Replace(string(config), old, new, -1)
 		newConfigFile := filepath.Join(tmpDir, ".config")
 		if err := ctx.Run().WriteFile(newConfigFile, []byte(newConfig), defaultFilePerm); err != nil {
@@ -677,9 +681,9 @@ func setupWebCommon(ctx *tool.Context) error {
 	}
 
 	// Build and install NodeJS.
-	nodeOutDir := filepath.Join(root, "environment", "cout", "node")
+	nodeOutDir := filepath.Join(root, "third_party", "cout", "node")
 	installNodeFn := func() error {
-		nodeSrcDir := filepath.Join(root, "environment", "csrc", "node-v0.10.24")
+		nodeSrcDir := filepath.Join(root, "third_party", "csrc", "node-v0.10.24")
 		if err := ctx.Run().Chdir(nodeSrcDir); err != nil {
 			return err
 		}
@@ -722,9 +726,13 @@ codegoogle.password=YOUR_GOOGLECODE_PASSWORD
 	}
 
 	// Clone the Go Ppapi compiler.
-	goPpapiRepoDir := filepath.Join(root, "environment", "go_ppapi")
+	repoDir := filepath.Join(root, "third_party", "repos")
+	goPpapiRepoDir := filepath.Join(repoDir, "go_ppapi")
 	revision := "d6a826a31648"
 	cloneGoPpapiFn := func() error {
+		if err := ctx.Run().MkdirAll(repoDir, defaultDirPerm); err != nil {
+			return err
+		}
 		if err := ensureHgrcExists(); err != nil {
 			return err
 		}
@@ -738,12 +746,13 @@ codegoogle.password=YOUR_GOOGLECODE_PASSWORD
 		return err
 	}
 
-	// Make sure we are on the right revision. If the goPpapiRepoDir
-	// already exists, but is on an older revision, the above atomicAction
-	// will have no effect. Thus, we must manually pull the desired revison
+	// Make sure we are on the right revision. If the goDir already
+	// exists, but is on an older revision, the above atomicAction will
+	// have no effect. Thus, we must manually pull the desired revison
 	// and update the repo.
-	// TODO(nlacasse): Figure out how to ensure we get a specific revision
-	// as part of the above atomicAction.
+	//
+	// TODO(nlacasse): Figure out how to ensure we get a specific
+	// revision as part of the above atomicAction.
 	if err := ctx.Run().Chdir(goPpapiRepoDir); err != nil {
 		return err
 	}
