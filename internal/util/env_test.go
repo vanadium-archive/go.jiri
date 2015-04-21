@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 )
 
@@ -53,4 +54,75 @@ func TestV23RootSymlink(t *testing.T) {
 	if want := root; got != want {
 		t.Fatalf("unexpected output: got %v, want %v", got, want)
 	}
+}
+
+func testSetPathHelper(t *testing.T, name string) {
+	ctx := tool.NewDefaultContext()
+
+	// Setup a fake V23_ROOT.
+	root, err := NewFakeV23Root(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+
+	// Create a test project and identify it as a Go workspace.
+	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := root.AddProject(ctx, Project{
+		Name:   "test",
+		Path:   "test",
+		Remote: root.Projects["test"],
+	}); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := root.UpdateUniverse(ctx, false); err != nil {
+		t.Fatalf("%v", err)
+	}
+	var config *Config
+	switch name {
+	case "GOPATH":
+		config = NewConfig(GoWorkspacesOpt([]string{"test", "does/not/exist"}))
+	case "VDLPATH":
+		config = NewConfig(VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
+	}
+
+	oldRoot, err := V23Root()
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("V23_ROOT", oldRoot)
+
+	// Retrieve V23_ROOT through V23Root() to account for symlinks.
+	v23Root, err := V23Root()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	env := envutil.NewSnapshot(nil)
+	switch name {
+	case "GOPATH":
+		if err := setGoPath(ctx, env, v23Root, config); err != nil {
+			t.Fatalf("%v", err)
+		}
+	case "VDLPATH":
+		if err := setVdlPath(ctx, env, v23Root, config); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}
+	if got, want := env.Get(name), filepath.Join(v23Root, "test"); got != want {
+		t.Fatalf("unexpected value: got %v, want %v", got, want)
+	}
+}
+
+func TestSetGoPath(t *testing.T) {
+	testSetPathHelper(t, "GOPATH")
+}
+
+func TestSetVdlPath(t *testing.T) {
+	testSetPathHelper(t, "VDLPATH")
 }

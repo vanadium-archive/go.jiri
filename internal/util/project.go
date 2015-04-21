@@ -141,9 +141,9 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 	if err != nil {
 		return "", nil
 	}
-	v23Dir := filepath.Join(topLevel, ".v23")
-	if _, err := os.Stat(v23Dir); err == nil {
-		metadataFile := filepath.Join(v23Dir, metadataFileName)
+	metadataDir := filepath.Join(topLevel, metadataDirName)
+	if _, err := os.Stat(metadataDir); err == nil {
+		metadataFile := filepath.Join(metadataDir, metadataFileName)
 		bytes, err := ctx.Run().ReadFile(metadataFile)
 		if err != nil {
 			return "", err
@@ -489,8 +489,6 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 	return nil
 }
 
-const metadataFileName = "metadata.v2"
-
 // findLocalProjects implements LocalProjects.
 func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e error) {
 	cwd, err := os.Getwd()
@@ -505,9 +503,9 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 	if err != nil {
 		return err
 	}
-	v23Dir := filepath.Join(path, ".v23")
-	if _, err := os.Stat(v23Dir); err == nil {
-		metadataFile := filepath.Join(v23Dir, metadataFileName)
+	metadataDir := filepath.Join(path, metadataDirName)
+	if _, err := os.Stat(metadataDir); err == nil {
+		metadataFile := filepath.Join(metadataDir, metadataFileName)
 		bytes, err := ctx.Run().ReadFile(metadataFile)
 		if err != nil {
 			return err
@@ -526,7 +524,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		projects[project.Name] = project
 		return nil
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("Stat(%v) failed: %v", v23Dir, err)
+		return fmt.Errorf("Stat(%v) failed: %v", metadataDir, err)
 	}
 	fileInfos, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -798,7 +796,7 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 // writeMetadata stores the given project metadata in the directory
 // identified by the given path.
 func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
-	metadataDir := filepath.Join(dir, ".v23")
+	metadataDir := filepath.Join(dir, metadataDirName)
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err

@@ -238,7 +238,7 @@ func writeEmptyMetadata(t *testing.T, ctx *tool.Context, projectDir string) {
 	if err := ctx.Run().Chdir(projectDir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	metadataDir := filepath.Join(projectDir, ".v23")
+	metadataDir := filepath.Join(projectDir, metadataDirName)
 	if err := ctx.Run().MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -246,7 +246,7 @@ func writeEmptyMetadata(t *testing.T, ctx *tool.Context, projectDir string) {
 	if err != nil {
 		t.Fatalf("Marshal() failed: %v", err)
 	}
-	metadataFile := filepath.Join(metadataDir, "metadata.v2")
+	metadataFile := filepath.Join(metadataDir, metadataFileName)
 	if err := ctx.Run().WriteFile(metadataFile, bytes, os.FileMode(0644)); err != nil {
 		t.Fatalf("%v", err)
 	}

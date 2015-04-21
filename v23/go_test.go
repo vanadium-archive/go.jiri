@@ -23,9 +23,11 @@ func TestGoVanadiumEnvironment(t *testing.T) {
 	ctx, testCmd := tool.NewDefaultContext(), *cmdGo
 	var stdout, stderr bytes.Buffer
 	testCmd.Init(nil, &stdout, &stderr)
+	oldGoPath := os.Getenv("GOPATH")
 	if err := os.Setenv("GOPATH", ""); err != nil {
 		t.Fatalf("%v", err)
 	}
+	defer os.Setenv("GOPATH", oldGoPath)
 	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -73,8 +75,16 @@ func TestGoVDLGeneration(t *testing.T) {
 	// we'll be able to find testpkg.  We need GOPATH for the "go
 	// list" call when computing dependencies, and VDLPATH for the
 	// "vdl generate" call.
-	os.Setenv("GOPATH", tmpDir+":"+os.Getenv("GOPATH"))
-	os.Setenv("VDLPATH", tmpDir+":"+os.Getenv("VDLPATH"))
+	oldGoPath := os.Getenv("GOPATH")
+	if err := os.Setenv("GOPATH", tmpDir+":"+oldGoPath); err != nil {
+		t.Fatalf("Setenv() failed: %v", err)
+	}
+	defer os.Setenv("GOPATH", oldGoPath)
+	oldVdlPath := os.Getenv("VDLPATH")
+	if err := os.Setenv("VDLPATH", tmpDir+":"+oldVdlPath); err != nil {
+		t.Fatalf("Setenv() failed: %v", err)
+	}
+	defer os.Setenv("VDLPATH", oldVdlPath)
 	// Check that the 'env' go command does not generate the test VDL file.
 	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())

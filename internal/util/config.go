@@ -44,11 +44,11 @@ type ConfigOpt interface {
 	configOpt()
 }
 
-// GoWorkspaceOpt is the type that can be used to pass the Config
+// GoWorkspacesOpt is the type that can be used to pass the Config
 // factory a Go workspace option.
-type GoWorkspaceOpt []string
+type GoWorkspacesOpt []string
 
-func (GoWorkspaceOpt) configOpt() {}
+func (GoWorkspacesOpt) configOpt() {}
 
 // ProjectTestsOpt is the type that can be used to pass the Config
 // factory a project tests option.
@@ -111,7 +111,7 @@ func NewConfig(opts ...ConfigOpt) *Config {
 	var c Config
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
-		case GoWorkspaceOpt:
+		case GoWorkspacesOpt:
 			c.goWorkspaces = []string(typedOpt)
 		case ProjectTestsOpt:
 			c.projectTests = map[string][]string(typedOpt)

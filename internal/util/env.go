@@ -18,7 +18,9 @@ import (
 )
 
 const (
-	rootEnv = "V23_ROOT"
+	rootEnv          = "V23_ROOT"
+	metadataDirName  = ".v23"
+	metadataFileName = "metadata.v2"
 )
 
 // LocalManifestFile returns the path to the local manifest.
@@ -145,8 +147,12 @@ func VanadiumEnvironment(ctx *tool.Context, platform Platform) (*envutil.Snapsho
 	if err != nil {
 		return nil, err
 	}
-	setGoPath(env, root, config)
-	setVdlPath(env, root, config)
+	if err := setGoPath(ctx, env, root, config); err != nil {
+		return nil, err
+	}
+	if err := setVdlPath(ctx, env, root, config); err != nil {
+		return nil, err
+	}
 	if platform.OS == "darwin" || platform.OS == "linux" {
 		if err := setSyncbaseCgoEnv(env, root, platform.OS); err != nil {
 			return nil, err
@@ -241,27 +247,46 @@ func setArmEnv(env *envutil.Snapshot, platform Platform) error {
 
 // setGoPath adds the paths to vanadium Go workspaces to the GOPATH
 // variable.
-func setGoPath(env *envutil.Snapshot, root string, config *Config) {
-	gopath := env.GetTokens("GOPATH", ":")
-	// Append an entry to gopath for each vanadium go workspace.
-	for _, workspace := range config.GoWorkspaces() {
-		gopath = append(gopath, filepath.Join(root, workspace))
-	}
-	env.SetTokens("GOPATH", gopath, ":")
+func setGoPath(ctx *tool.Context, env *envutil.Snapshot, root string, config *Config) error {
+	return setPathHelper(ctx, env, "GOPATH", root, config.GoWorkspaces())
 }
 
 // setVdlPath adds the paths to vanadium VDL workspaces to the VDLPATH
 // variable.
-func setVdlPath(env *envutil.Snapshot, root string, config *Config) {
-	vdlpath := env.GetTokens("VDLPATH", ":")
-	// Append an entry to vdlpath for each vanadium vdl workspace.
-	//
-	// TODO(toddw): This logic will change when we pull vdl into a
-	// separate repo.
-	for _, workspace := range config.VDLWorkspaces() {
-		vdlpath = append(vdlpath, filepath.Join(root, workspace))
+func setVdlPath(ctx *tool.Context, env *envutil.Snapshot, root string, config *Config) error {
+	return setPathHelper(ctx, env, "VDLPATH", root, config.VDLWorkspaces())
+}
+
+// setPathHelper is a utility function for setting path environment
+// variables for different types of workspaces.
+func setPathHelper(ctx *tool.Context, env *envutil.Snapshot, name, root string, workspaces []string) error {
+	path := env.GetTokens(name, ":")
+	projects, _, err := readManifest(ctx, false)
+	if err != nil {
+		return err
 	}
-	env.SetTokens("VDLPATH", vdlpath, ":")
+	for _, workspace := range workspaces {
+		absWorkspace := filepath.Join(root, workspace)
+		// Only append an entry to the path if the workspace is rooted
+		// under a v23 project that exists locally or vice versa.
+		for _, project := range projects {
+			// We check if <project.Path> is a prefix of <absWorkspace> to
+			// account for Go workspaces nested under a single v23 project,
+			// such as: $V23_ROOT/release/projects/chat/go.
+			//
+			// We check if <absWorkspace> is a prefix of <project.Path> to
+			// account for Go workspaces that span multiple v23 projects,
+			// such as: $V23_ROOT/release/go.
+			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
+				if _, err := os.Stat(filepath.Join(project.Path)); err == nil {
+					path = append(path, absWorkspace)
+					break
+				}
+			}
+		}
+	}
+	env.SetTokens(name, path, ":")
+	return nil
 }
 
 // setNaclEnv sets the environment variables used for nacl

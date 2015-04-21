@@ -77,7 +77,7 @@ func testConfigAPI(t *testing.T, c *Config) {
 
 func TestConfig(t *testing.T) {
 	config := NewConfig(
-		GoWorkspaceOpt(goWorkspaces),
+		GoWorkspacesOpt(goWorkspaces),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
 		TestDependenciesOpt(testDependencies),
@@ -92,7 +92,7 @@ func TestConfig(t *testing.T) {
 
 func TestConfigMarshal(t *testing.T) {
 	config := NewConfig(
-		GoWorkspaceOpt(goWorkspaces),
+		GoWorkspacesOpt(goWorkspaces),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
 		TestDependenciesOpt(testDependencies),
