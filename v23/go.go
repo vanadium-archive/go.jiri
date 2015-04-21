@@ -194,8 +194,8 @@ func generateVDL(ctx *tool.Context, cmdArgs []string) error {
 	}
 
 	// Compute which VDL-based Go packages might need to be regenerated.
-	goPkgs, goFiles := extractGoPackagesOrFiles(cmdArgs[0], cmdArgs[1:])
-	goDeps, err := computeGoDeps(ctx, hostEnv, append(goPkgs, goFiles...))
+	goPkgs, goFiles, goTags := processGoCmdAndArgs(cmdArgs[0], cmdArgs[1:])
+	goDeps, err := computeGoDeps(ctx, hostEnv, append(goPkgs, goFiles...), goTags)
 	if err != nil {
 		return err
 	}
@@ -263,9 +263,10 @@ func reportOutdatedBranches(ctx *tool.Context) (e error) {
 	return nil
 }
 
-// extractGoPackagesOrFiles is given the cmd and args for the go tool, filters
-// out flags, and returns the PACKAGES or GOFILES that were specified in args.
-// Note that all commands that accept PACKAGES also accept GOFILES.
+// processGoCmdAndArgs is given the cmd and args for the go tool, filters out
+// flags, and returns the PACKAGES or GOFILES that were specified in args, as
+// well as "foo" if -tags=foo was specified in the args.  Note that all commands
+// that accept PACKAGES also accept GOFILES.
 //
 //   go build    [build flags]              [-o out]      [PACKAGES]
 //   go generate                            [-run regexp] [PACKAGES]
@@ -280,7 +281,8 @@ func reportOutdatedBranches(ctx *tool.Context) (e error) {
 // with - or --, and also skip the next token if the flag is in F and isn't of
 // the form -flag=x.  If we forget to update F, we'll still handle the -flag and
 // -flag=x cases correctly, but we'll get "-flag x" wrong.
-func extractGoPackagesOrFiles(cmd string, args []string) ([]string, []string) {
+func processGoCmdAndArgs(cmd string, args []string) ([]string, []string, string) {
+	var goTags string
 	var nonBool map[string]bool
 	switch cmd {
 	case "build":
@@ -314,6 +316,14 @@ func extractGoPackagesOrFiles(cmd string, args []string) ([]string, []string) {
 		if nonBool[match[1]] && match[2] == "" {
 			start++
 		}
+		// Grab the value of -tags, if it is specified.
+		if match[1] == "tags" {
+			if match[2] == "=" {
+				goTags = match[3]
+			} else {
+				goTags = args[start-1]
+			}
+		}
 	}
 
 	// Move end to the end of PACKAGES or GOFILES.
@@ -342,16 +352,16 @@ func extractGoPackagesOrFiles(cmd string, args []string) ([]string, []string) {
 	// Decide whether these are packages or files.
 	switch {
 	case start == end:
-		return nil, nil
+		return nil, nil, goTags
 	case (start < len(args) && strings.HasSuffix(args[start], ".go")):
-		return nil, args[start:end]
+		return nil, args[start:end], goTags
 	default:
-		return args[start:end], nil
+		return args[start:end], nil, goTags
 	}
 }
 
 var (
-	goFlagRE     = regexp.MustCompile(`^--?([^=]+)(=?)`)
+	goFlagRE     = regexp.MustCompile(`^--?([^=]+)(=?)(.*)`)
 	nonBoolBuild = []string{
 		"p", "ccflags", "compiler", "gccgoflags", "gcflags", "installsuffix", "ldflags", "tags",
 	}
@@ -378,8 +388,11 @@ func makeStringSet(values []string) map[string]bool {
 // string that dumps the specified pkgs and all deps as space / newline
 // separated tokens.  The pkgs may be in any format recognized by "go list"; dir
 // paths, import paths, or go files.
-func computeGoDeps(ctx *tool.Context, env *envutil.Snapshot, pkgs []string) ([]string, error) {
+func computeGoDeps(ctx *tool.Context, env *envutil.Snapshot, pkgs []string, goTags string) ([]string, error) {
 	goListArgs := []string{`list`, `-f`, `{{.ImportPath}} {{join .Deps " "}}`}
+	if goTags != "" {
+		goListArgs = append(goListArgs, "-tags="+goTags)
+	}
 	goListArgs = append(goListArgs, pkgs...)
 	var stdout, stderr bytes.Buffer
 	// TODO(jsimsa): Avoid buffering all of the output in memory

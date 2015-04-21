@@ -95,9 +95,9 @@ func TestGoVDLGeneration(t *testing.T) {
 	}
 }
 
-// TestExtractGoPackagesOrFiles tests the internal function that parses and
-// filters out flags from the go tool command line.
-func TestExtractGoPackagesOrFiles(t *testing.T) {
+// TestProcessGoCmdAndArgs tests the internal function that parses and filters
+// out flags from the go tool command line.
+func TestProcessGoCmdAndArgs(t *testing.T) {
 	const (
 		buildcmds = "build install test"
 		allcmds   = "build generate install run test"
@@ -106,122 +106,167 @@ func TestExtractGoPackagesOrFiles(t *testing.T) {
 		Cmds        string
 		Args        []string
 		Pkgs, Files []string
+		Tags        string
 	}{
-		{allcmds, nil, nil, nil},
-		{allcmds, []string{}, nil, nil},
+		{allcmds, nil, nil, nil, ""},
+		{allcmds, []string{}, nil, nil, ""},
 
 		// PACKAGES
-		{buildcmds, []string{"pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil},
+		{buildcmds, []string{"pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil, ""},
 		// Single dash
-		{buildcmds, []string{"-a"}, nil, nil},
-		{buildcmds, []string{"-a", "pkg"}, []string{"pkg"}, nil},
+		{buildcmds, []string{"-a"}, nil, nil, ""},
+		{buildcmds, []string{"-a", "pkg"}, []string{"pkg"}, nil, ""},
 		// Single dash with equals
-		{buildcmds, []string{"-p=99"}, nil, nil},
-		{buildcmds, []string{"-p=99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"-a", "-p=99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"-p=99", "-a", "pkg"}, []string{"pkg"}, nil},
+		{buildcmds, []string{"-p=99"}, nil, nil, ""},
+		{buildcmds, []string{"-p=99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"-a", "-p=99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"-p=99", "-a", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"-tags=foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"-tags=foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"-a", "-tags=foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"-tags=foo", "-a", "pkg"}, []string{"pkg"}, nil, "foo"},
 		// Single dash with space
-		{buildcmds, []string{"-p", "99"}, nil, nil},
-		{buildcmds, []string{"-p", "99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"-a", "-p", "99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"-p", "99", "-a", "pkg"}, []string{"pkg"}, nil},
+		{buildcmds, []string{"-p", "99"}, nil, nil, ""},
+		{buildcmds, []string{"-p", "99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"-a", "-p", "99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"-p", "99", "-a", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"-tags", "foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"-tags", "foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"-a", "-tags", "foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"-tags", "foo", "-a", "pkg"}, []string{"pkg"}, nil, "foo"},
 		// Double dash
-		{buildcmds, []string{"--a"}, nil, nil},
-		{buildcmds, []string{"--a", "pkg"}, []string{"pkg"}, nil},
+		{buildcmds, []string{"--a"}, nil, nil, ""},
+		{buildcmds, []string{"--a", "pkg"}, []string{"pkg"}, nil, ""},
 		// Double dash with equals
-		{buildcmds, []string{"--p=99"}, nil, nil},
-		{buildcmds, []string{"--p=99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"--a", "--p=99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"--p=99", "--a", "pkg"}, []string{"pkg"}, nil},
+		{buildcmds, []string{"--p=99"}, nil, nil, ""},
+		{buildcmds, []string{"--p=99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"--a", "--p=99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"--p=99", "--a", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"--tags=foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"--tags=foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"--a", "--tags=foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"--tags=foo", "--a", "pkg"}, []string{"pkg"}, nil, "foo"},
 		// Double dash with space
-		{buildcmds, []string{"--p", "99"}, nil, nil},
-		{buildcmds, []string{"--p", "99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"--a", "--p", "99", "pkg"}, []string{"pkg"}, nil},
-		{buildcmds, []string{"--p", "99", "--a", "pkg"}, []string{"pkg"}, nil},
+		{buildcmds, []string{"--p", "99"}, nil, nil, ""},
+		{buildcmds, []string{"--p", "99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"--a", "--p", "99", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"--p", "99", "--a", "pkg"}, []string{"pkg"}, nil, ""},
+		{buildcmds, []string{"--tags", "foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"--tags", "foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"--a", "--tags", "foo", "pkg"}, []string{"pkg"}, nil, "foo"},
+		{buildcmds, []string{"--tags", "foo", "--a", "pkg"}, []string{"pkg"}, nil, "foo"},
 		// Mixed
-		{buildcmds, []string{"--p", "99", "-a", "-ccflags", "-I inc -X", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil},
+		{buildcmds, []string{"--p", "99", "-a", "-ccflags", "-I inc -X", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil, ""},
+		{buildcmds, []string{"--p", "99", "-tags=foo", "-a", "-ccflags", "-I inc -X", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil, "foo"},
 
 		// FILES
-		{buildcmds, []string{"1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"1.go", "2.go"}, nil, []string{"1.go", "2.go"}},
+		{buildcmds, []string{"1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"1.go", "2.go"}, nil, []string{"1.go", "2.go"}, ""},
 		// Single dash
-		{buildcmds, []string{"-a"}, nil, nil},
-		{buildcmds, []string{"-a", "1.go"}, nil, []string{"1.go"}},
+		{buildcmds, []string{"-a"}, nil, nil, ""},
+		{buildcmds, []string{"-a", "1.go"}, nil, []string{"1.go"}, ""},
 		// Single dash with equals
-		{buildcmds, []string{"-p=99"}, nil, nil},
-		{buildcmds, []string{"-p=99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"-a", "-p=99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"-p=99", "-a", "1.go"}, nil, []string{"1.go"}},
+		{buildcmds, []string{"-p=99"}, nil, nil, ""},
+		{buildcmds, []string{"-p=99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"-a", "-p=99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"-p=99", "-a", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"-tags=foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"-tags=foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"-a", "-tags=foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"-tags=foo", "-a", "1.go"}, nil, []string{"1.go"}, "foo"},
 		// Single dash with space
-		{buildcmds, []string{"-p", "99"}, nil, nil},
-		{buildcmds, []string{"-p", "99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"-a", "-p", "99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"-p", "99", "-a", "1.go"}, nil, []string{"1.go"}},
+		{buildcmds, []string{"-p", "99"}, nil, nil, ""},
+		{buildcmds, []string{"-p", "99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"-a", "-p", "99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"-p", "99", "-a", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"-tags", "foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"-tags", "foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"-a", "-tags", "foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"-tags", "foo", "-a", "1.go"}, nil, []string{"1.go"}, "foo"},
 		// Double dash
-		{buildcmds, []string{"--a"}, nil, nil},
-		{buildcmds, []string{"--a", "1.go"}, nil, []string{"1.go"}},
+		{buildcmds, []string{"--a"}, nil, nil, ""},
+		{buildcmds, []string{"--a", "1.go"}, nil, []string{"1.go"}, ""},
 		// Double dash with equals
-		{buildcmds, []string{"--p=99"}, nil, nil},
-		{buildcmds, []string{"--p=99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"--a", "--p=99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"--p=99", "--a", "1.go"}, nil, []string{"1.go"}},
+		{buildcmds, []string{"--p=99"}, nil, nil, ""},
+		{buildcmds, []string{"--p=99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"--a", "--p=99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"--p=99", "--a", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"--tags=foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"--tags=foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"--a", "--tags=foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"--tags=foo", "--a", "1.go"}, nil, []string{"1.go"}, "foo"},
 		// Double dash with space
-		{buildcmds, []string{"--p", "99"}, nil, nil},
-		{buildcmds, []string{"--p", "99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"--a", "--p", "99", "1.go"}, nil, []string{"1.go"}},
-		{buildcmds, []string{"--p", "99", "--a", "1.go"}, nil, []string{"1.go"}},
+		{buildcmds, []string{"--p", "99"}, nil, nil, ""},
+		{buildcmds, []string{"--p", "99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"--a", "--p", "99", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"--p", "99", "--a", "1.go"}, nil, []string{"1.go"}, ""},
+		{buildcmds, []string{"--tags", "foo"}, nil, nil, "foo"},
+		{buildcmds, []string{"--tags", "foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"--a", "--tags", "foo", "1.go"}, nil, []string{"1.go"}, "foo"},
+		{buildcmds, []string{"--tags", "foo", "--a", "1.go"}, nil, []string{"1.go"}, "foo"},
 		// Mixed
-		{buildcmds, []string{"--p", "99", "-a", "-ccflags", "-I inc -X", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}},
+		{buildcmds, []string{"--p", "99", "-a", "-ccflags", "-I inc -X", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}, ""},
+		{buildcmds, []string{"--p", "99", "-tags=foo", "-a", "-ccflags", "-I inc -X", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}, "foo"},
 
 		// Go run requires gofiles, and treats every non-gofile as an arg.
-		{"run", []string{"-a"}, nil, nil},
-		{"run", []string{"--a"}, nil, nil},
-		{"run", []string{"-p=99"}, nil, nil},
-		{"run", []string{"--p=99"}, nil, nil},
-		{"run", []string{"-p", "99"}, nil, nil},
-		{"run", []string{"--p", "99"}, nil, nil},
-		{"run", []string{"arg"}, nil, nil},
-		{"run", []string{"1.go"}, nil, []string{"1.go"}},
-		{"run", []string{"1.go", "2.go"}, nil, []string{"1.go", "2.go"}},
-		{"run", []string{"1.go", "2.go", "arg"}, nil, []string{"1.go", "2.go"}},
-		{"run", []string{"-a", "--p", "99", "1.go", "2.go", "arg"}, nil, []string{"1.go", "2.go"}},
+		{"run", []string{"-a"}, nil, nil, ""},
+		{"run", []string{"--a"}, nil, nil, ""},
+		{"run", []string{"-p=99"}, nil, nil, ""},
+		{"run", []string{"--p=99"}, nil, nil, ""},
+		{"run", []string{"-p", "99"}, nil, nil, ""},
+		{"run", []string{"--p", "99"}, nil, nil, ""},
+		{"run", []string{"-tags=foo"}, nil, nil, "foo"},
+		{"run", []string{"--tags=foo"}, nil, nil, "foo"},
+		{"run", []string{"-tags", "foo"}, nil, nil, "foo"},
+		{"run", []string{"--tags", "foo"}, nil, nil, "foo"},
+		{"run", []string{"arg"}, nil, nil, ""},
+		{"run", []string{"1.go"}, nil, []string{"1.go"}, ""},
+		{"run", []string{"1.go", "2.go"}, nil, []string{"1.go", "2.go"}, ""},
+		{"run", []string{"1.go", "2.go", "arg"}, nil, []string{"1.go", "2.go"}, ""},
+		{"run", []string{"-a", "--p", "99", "1.go", "2.go", "arg"}, nil, []string{"1.go", "2.go"}, ""},
+		{"run", []string{"-a", "--tags", "foo", "1.go", "2.go", "arg"}, nil, []string{"1.go", "2.go"}, "foo"},
 
 		// Go test treats the first dash-prefix as the start of the testbin flags.
-		{"test", []string{"pkg", "-t"}, []string{"pkg"}, nil},
-		{"test", []string{"pkg", "-t1", "-t2"}, []string{"pkg"}, nil},
-		{"test", []string{"pkg1", "pkg2", "-t1", "-t2"}, []string{"pkg1", "pkg2"}, nil},
-		{"test", []string{"--a", "-p", "99", "pkg1", "pkg2", "-t1", "-t2"}, []string{"pkg1", "pkg2"}, nil},
-		{"test", []string{"1.go", "-t"}, nil, []string{"1.go"}},
-		{"test", []string{"1.go", "-t1", "-t2"}, nil, []string{"1.go"}},
-		{"test", []string{"1.go", "2.go", "-t1", "-t2"}, nil, []string{"1.go", "2.go"}},
-		{"test", []string{"--a", "-p", "99", "1.go", "2.go", "-t1", "-t2"}, nil, []string{"1.go", "2.go"}},
+		{"test", []string{"pkg", "-t"}, []string{"pkg"}, nil, ""},
+		{"test", []string{"pkg", "-t1", "-t2"}, []string{"pkg"}, nil, ""},
+		{"test", []string{"pkg1", "pkg2", "-t1", "-t2"}, []string{"pkg1", "pkg2"}, nil, ""},
+		{"test", []string{"--a", "-p", "99", "pkg1", "pkg2", "-t1", "-t2"}, []string{"pkg1", "pkg2"}, nil, ""},
+		{"test", []string{"--a", "-tags", "foo", "pkg1", "pkg2", "-t1", "-t2"}, []string{"pkg1", "pkg2"}, nil, "foo"},
+		{"test", []string{"1.go", "-t"}, nil, []string{"1.go"}, ""},
+		{"test", []string{"1.go", "-t1", "-t2"}, nil, []string{"1.go"}, ""},
+		{"test", []string{"1.go", "2.go", "-t1", "-t2"}, nil, []string{"1.go", "2.go"}, ""},
+		{"test", []string{"--a", "-p", "99", "1.go", "2.go", "-t1", "-t2"}, nil, []string{"1.go", "2.go"}, ""},
+		{"test", []string{"--a", "-tags", "foo", "1.go", "2.go", "-t1", "-t2"}, nil, []string{"1.go", "2.go"}, "foo"},
 
 		// Go generate only supports the -run non-bool flag.
-		{"generate", []string{"-a"}, nil, nil},
-		{"generate", []string{"--a"}, nil, nil},
-		{"generate", []string{"-run=XX"}, nil, nil},
-		{"generate", []string{"--run=XX"}, nil, nil},
-		{"generate", []string{"-run", "XX"}, nil, nil},
-		{"generate", []string{"--run", "XX"}, nil, nil},
-		{"generate", []string{"pkg"}, []string{"pkg"}, nil},
-		{"generate", []string{"pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil},
-		{"generate", []string{"-a", "--run", "XX", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil},
-		{"generate", []string{"--run", "XX", "-a", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil},
+		{"generate", []string{"-a"}, nil, nil, ""},
+		{"generate", []string{"--a"}, nil, nil, ""},
+		{"generate", []string{"-run=XX"}, nil, nil, ""},
+		{"generate", []string{"--run=XX"}, nil, nil, ""},
+		{"generate", []string{"-run", "XX"}, nil, nil, ""},
+		{"generate", []string{"--run", "XX"}, nil, nil, ""},
+		{"generate", []string{"pkg"}, []string{"pkg"}, nil, ""},
+		{"generate", []string{"pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil, ""},
+		{"generate", []string{"-a", "--run", "XX", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil, ""},
+		{"generate", []string{"--run", "XX", "-a", "pkg1", "pkg2"}, []string{"pkg1", "pkg2"}, nil, ""},
 
-		{"generate", []string{"1.go"}, nil, []string{"1.go"}},
-		{"generate", []string{"1.go", "2.go"}, nil, []string{"1.go", "2.go"}},
-		{"generate", []string{"-a", "--run", "XX", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}},
-		{"generate", []string{"--run", "XX", "-a", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}},
+		{"generate", []string{"1.go"}, nil, []string{"1.go"}, ""},
+		{"generate", []string{"1.go", "2.go"}, nil, []string{"1.go", "2.go"}, ""},
+		{"generate", []string{"-a", "--run", "XX", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}, ""},
+		{"generate", []string{"--run", "XX", "-a", "1.go", "2.go"}, nil, []string{"1.go", "2.go"}, ""},
 	}
 	for _, test := range tests {
 		for _, cmd := range strings.Split(test.Cmds, " ") {
-			pkgs, files := extractGoPackagesOrFiles(cmd, test.Args)
+			pkgs, files, tags := processGoCmdAndArgs(cmd, test.Args)
 			if got, want := pkgs, test.Pkgs; !reflect.DeepEqual(got, want) {
 				t.Errorf("%s %v got pkgs %#v, want %#v", cmd, test.Args, got, want)
 			}
 			if got, want := files, test.Files; !reflect.DeepEqual(got, want) {
 				t.Errorf("%s %v got files %#v, want %#v", cmd, test.Args, got, want)
+			}
+			if got, want := tags, test.Tags; got != want {
+				t.Errorf("%s %v got tags %#v, want %#v", cmd, test.Args, got, want)
 			}
 		}
 	}
@@ -248,7 +293,7 @@ func TestComputeGoDeps(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Logf("%v\n", test.Pkgs)
-		got, err := computeGoDeps(ctx, hostEnv, test.Pkgs)
+		got, err := computeGoDeps(ctx, hostEnv, test.Pkgs, "")
 		if err != nil {
 			t.Errorf("%v failed: %v", test.Pkgs, err)
 		}
