@@ -45,9 +45,18 @@ var testTmpDir = ""
 // binaries.
 func binDirPath() string {
 	if len(testTmpDir) == 0 {
-		panic("binDirPath shouldn't be called before initTest")
+		panic("binDirPath() shouldn't be called before initTest()")
 	}
 	return filepath.Join(testTmpDir, "bin")
+}
+
+// regTestBinDirPath returns the path to the directory for storing
+// regression test binaries.
+func regTestBinDirPath() string {
+	if len(testTmpDir) == 0 {
+		panic("regTestBinDirPath() shouldn't be called before initTest()")
+	}
+	return filepath.Join(testTmpDir, "regtest")
 }
 
 // initTest carries out the initial actions for the given test.
@@ -76,8 +85,13 @@ func initTest(ctx *tool.Context, testName string, profiles []string) (func() err
 	fmt.Fprintf(ctx.Stdout(), "workdir = %q\n", workDir)
 	fmt.Fprintf(ctx.Stdout(), "bin dir = %q\n", binDirPath())
 
-	// Create a temporary directory for storing binaries.
+	// Create a directory for storing built binaries.
 	if err := ctx.Run().MkdirAll(binDirPath(), os.FileMode(0755)); err != nil {
+		return nil, err
+	}
+
+	// Create a directory for storing regression test binaries.
+	if err := ctx.Run().MkdirAll(regTestBinDirPath(), os.FileMode(0755)); err != nil {
 		return nil, err
 	}
 

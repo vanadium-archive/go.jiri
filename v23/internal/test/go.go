@@ -20,13 +20,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/goutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
@@ -68,7 +68,6 @@ type funcMatcherOpt struct{ funcMatcher }
 
 type nonTestArgsOpt []string
 type argsOpt []string
-type profilesOpt []string
 type timeoutOpt string
 type suffixOpt string
 type exclusionsOpt []exclusion
@@ -80,10 +79,6 @@ func (argsOpt) goCoverageOpt() {}
 func (argsOpt) goTestOpt()     {}
 
 func (nonTestArgsOpt) goTestOpt() {}
-
-func (profilesOpt) goBuildOpt()    {}
-func (profilesOpt) goCoverageOpt() {}
-func (profilesOpt) goTestOpt()     {}
 
 func (timeoutOpt) goCoverageOpt() {}
 func (timeoutOpt) goTestOpt()     {}
@@ -102,24 +97,15 @@ func (numWorkersOpt) goTestOpt() {}
 
 // goBuild is a helper function for running Go builds.
 func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *test.Result, e error) {
-	args, profiles, pkgs := []string{}, []string{}, []string{}
+	args, pkgs := []string{}, []string{}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case argsOpt:
 			args = []string(typedOpt)
-		case profilesOpt:
-			profiles = []string(typedOpt)
 		case pkgsOpt:
 			pkgs = []string(typedOpt)
 		}
 	}
-
-	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, profiles)
-	if err != nil {
-		return nil, internalTestError{err, "Init"}
-	}
-	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Enumerate the packages to be built.
 	pkgList, err := goutil.List(ctx, pkgs)
@@ -219,27 +205,17 @@ const defaultTestCoverageTimeout = "5m"
 // goCoverage is a helper function for running Go coverage tests.
 func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *test.Result, e error) {
 	timeout := defaultTestCoverageTimeout
-	pkgs := []string{}
-	args, profiles := []string{}, []string{}
+	args, pkgs := []string{}, []string{}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case timeoutOpt:
 			timeout = string(typedOpt)
 		case argsOpt:
 			args = []string(typedOpt)
-		case profilesOpt:
-			profiles = []string(typedOpt)
 		case pkgsOpt:
 			pkgs = []string(typedOpt)
 		}
 	}
-
-	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, profiles)
-	if err != nil {
-		return nil, internalTestError{err, "Init"}
-	}
-	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Install dependencies.
 	if err := installGoCover(ctx); err != nil {
@@ -541,7 +517,7 @@ type goTestTask struct {
 // goTest is a helper function for running Go tests.
 func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Result, e error) {
 	timeout := defaultTestTimeout
-	args, profiles, suffix, exclusions, pkgs := []string{}, []string{}, "", []exclusion{}, []string{}
+	args, suffix, exclusions, pkgs := []string{}, "", []exclusion{}, []string{}
 	var matcher funcMatcher
 	matcher = &matchGoTestFunc{}
 	numWorkers := runtime.NumCPU()
@@ -552,8 +528,6 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 			timeout = string(typedOpt)
 		case argsOpt:
 			args = []string(typedOpt)
-		case profilesOpt:
-			profiles = []string(typedOpt)
 		case suffixOpt:
 			suffix = string(typedOpt)
 		case exclusionsOpt:
@@ -572,15 +546,6 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 
 		}
 	}
-
-	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, profiles)
-	if err != nil {
-		return nil, internalTestError{err, "Init"}
-	}
-	defer collect.Error(func() error { return cleanup() }, &e)
-
-	ctx.Run().Opts().Env["V23_BIN_DIR"] = binDirPath()
 
 	// Install dependencies.
 	if err := installGo2XUnit(ctx); err != nil {
@@ -801,17 +766,6 @@ func installGoCover(ctx *tool.Context) error {
 	}
 	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/cover"); err != nil {
 		return err
-	}
-	return nil
-}
-
-// installGoDoc makes sure the "go doc" tool is installed.
-func installGoDoc(ctx *tool.Context) error {
-	// Check if the tool exists.
-	if _, err := exec.LookPath("godoc"); err != nil {
-		if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/godoc"); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -1078,7 +1032,15 @@ func getNumWorkersOpt(opts []Opt) numWorkersOpt {
 }
 
 // thirdPartyGoBuild runs Go build for third-party projects.
-func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Build the third-party Go packages.
 	pkgs, err := thirdPartyPkgs()
 	if err != nil {
 		return nil, err
@@ -1087,12 +1049,19 @@ func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...Opt) (*test.R
 	if err != nil {
 		return nil, err
 	}
-	profiles := profilesOpt([]string{"syncbase"})
-	return goBuild(ctx, testName, validatedPkgs, profiles)
+	return goBuild(ctx, testName, validatedPkgs)
 }
 
 // thirdPartyGoTest runs Go tests for the third-party projects.
-func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Test the third-party Go packages.
 	pkgs, err := thirdPartyPkgs()
 	if err != nil {
 		return nil, err
@@ -1101,13 +1070,20 @@ func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Re
 	if err != nil {
 		return nil, err
 	}
-	profiles := profilesOpt([]string{"syncbase"})
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, exclusionsOpt(goExclusions), validatedPkgs, profiles)
+	return goTest(ctx, testName, suffix, exclusionsOpt(goExclusions), validatedPkgs)
 }
 
 // thirdPartyGoRace runs Go data-race tests for third-party projects.
-func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Test the third-party Go packages for data races.
 	pkgs, err := thirdPartyPkgs()
 	if err != nil {
 		return nil, err
@@ -1118,9 +1094,8 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (*test.Re
 	}
 	args := argsOpt([]string{"-race"})
 	exclusions := append(goExclusions, goRaceExclusions...)
-	profiles := profilesOpt([]string{"syncbase"})
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
-	return goTest(ctx, testName, suffix, args, exclusionsOpt(exclusions), validatedPkgs, profiles)
+	return goTest(ctx, testName, suffix, args, exclusionsOpt(exclusions), validatedPkgs)
 }
 
 // thirdPartyPkgs returns a list of Go expressions that describe all
@@ -1147,7 +1122,15 @@ func thirdPartyPkgs() ([]string, error) {
 }
 
 // vanadiumGoBench runs Go benchmarks for vanadium projects.
-func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Benchmark the Vanadium Go packages.
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1157,7 +1140,15 @@ func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (*test.Res
 }
 
 // vanadiumGoBuild runs Go build for the vanadium projects.
-func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+
+	// Build the Vanadium Go packages.
+	defer collect.Error(func() error { return cleanup() }, &e)
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1166,8 +1157,15 @@ func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...Opt) (*test.Res
 }
 
 // vanadiumGoCoverage runs Go coverage tests for vanadium projects.
-func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
 
+	// Compute coverage for Vanadium Go packages.
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1175,79 +1173,10 @@ func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...Opt) (*test.
 	return goCoverage(ctx, testName, pkgs)
 }
 
-// vanadiumGoDoc (re)starts the godoc server for vanadium projects.
-func vanadiumGoDoc(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, nil)
-	if err != nil {
-		return nil, internalTestError{err, "Init"}
-	}
-	defer collect.Error(func() error { return cleanup() }, &e)
-
-	// Install dependencies.
-	if err := installGoDoc(ctx); err != nil {
-		return nil, err
-	}
-
-	// Terminate previous instance of godoc if it is still running.
-	godocPort := "8002"
-	pid, err := getListenerPID(ctx, godocPort)
-	if err != nil {
-		return nil, err
-	}
-	if pid != -1 {
-		p, err := os.FindProcess(pid)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Fprintf(ctx.Stdout(), "kill %d\n", pid)
-		if err := p.Kill(); err != nil {
-			return nil, err
-		}
-	}
-
-	// Start a new instance of godoc.
-	//
-	// Jenkins kills all background processes started by a shell
-	// when the shell exits. To prevent Jenkins from doing that,
-	// use nil as standard input, redirect output to a file, and
-	// set the BUILD_ID environment variable to "dontKillMe".
-	assetsPath := filepath.Join(os.Getenv("HOME"), "godoc")
-	godocCmd := exec.Command(
-		"godoc",
-		"-analysis=type",
-		"-goroot="+assetsPath,
-		"-http=127.0.0.1:"+godocPort,
-		"-index",
-		"-templates="+assetsPath,
-	)
-	godocCmd.Stdin = nil
-	fd, err := os.Create(filepath.Join(root, "godoc.out"))
-	if err != nil {
-		return nil, err
-	}
-	godocCmd.Stdout = fd
-	godocCmd.Stderr = fd
-	env := envutil.NewSnapshotFromOS()
-	env.Set("BUILD_ID", "dontKillMe")
-	env.Set("GOPATH", fmt.Sprintf("%v:%v", filepath.Join(root, "release", "go"), filepath.Join(root, "roadmap", "go")))
-	godocCmd.Env = env.Slice()
-	fmt.Fprintf(ctx.Stdout(), "%v %v\n", godocCmd.Env, strings.Join(godocCmd.Args, " "))
-	if err := godocCmd.Start(); err != nil {
-		return nil, err
-	}
-
-	return &test.Result{Status: test.Passed}, nil
-}
-
 // vanadiumGoGenerate checks that files created by 'go generate' are
 // up-to-date.
 func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
@@ -1321,7 +1250,14 @@ func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...Opt) (_ *tes
 }
 
 // vanadiumGoRace runs Go data-race tests for vanadium projects.
-func vanadiumGoRace(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func vanadiumGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1407,7 +1343,16 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 	return nil, fmt.Errorf("invalid part index: %d/%d", index, len(parts)-1)
 }
 
-func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+// vanadiumIntegrationTest runs integration tests for Vanadium
+// projects.
+func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
@@ -1416,8 +1361,166 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (*
 	args := argsOpt([]string{"-run", "^TestV23"})
 	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
 	matcher := funcMatcherOpt{&matchV23TestFunc{}}
-	result, err := goTest(ctx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
-	return result, err
+	env := ctx.Env()
+	env["V23_BIN_DIR"] = binDirPath()
+	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
+	return goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+}
+
+// vanadiumRegressionTest runs integration tests for Vanadium projects
+// using different versions of Vanadium binaries.
+func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
+	if err != nil {
+		return nil, err
+	}
+	suffix := suffixOpt(genTestNameSuffix("V23Test"))
+	args := argsOpt([]string{"-run", "^TestV23"})
+	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
+	matcher := funcMatcherOpt{&matchV23TestFunc{}}
+	if err := prepareVanadiumBinaries(ctx); err != nil {
+		return nil, err
+	}
+	env := ctx.Env()
+	env["V23_BIN_DIR"] = filepath.Join(regTestBinDirPath(), "bin")
+	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
+	return goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+}
+
+// newRand creates a new pseudo-random number generator, the seed may
+// be supplied by V23_RNG_SEED to allow for reproducing a previous
+// sequence.
+func newRand(ctx *tool.Context) (*rand.Rand, error) {
+	seed := time.Now().UnixNano()
+	seedString := os.Getenv("V23_RNG_SEED")
+	if seedString != "" {
+		var err error
+		base, bitSize := 0, 64
+		seed, err = strconv.ParseInt(seedString, base, bitSize)
+		if err != nil {
+			return nil, fmt.Errorf("ParseInt(%v, %v, %v) failed: %v", seedString, base, bitSize, err)
+		}
+	}
+	fmt.Fprintf(ctx.Stdout(), "seeding pseudo-random number generator with %v\n", seed)
+	return rand.New(rand.NewSource(seed)), nil
+}
+
+// prepareVanadiumBinaries uses the vbinary tool to download Vanadium
+// binaries generated by daily builds and creates a directory
+// populated with a random combination of these binaries.
+//
+// TODO(jsimsa): Add support for a config file which can specify the
+// combination of binaries to prepare.
+func prepareVanadiumBinaries(ctx *tool.Context) (e error) {
+	// Build the vbinary tool.
+	tmpDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
+	vbinaryBin := filepath.Join(tmpDir, "vbinary")
+	if err := ctx.Run().Command("v23", "go", "build", "-o", vbinaryBin, "v.io/x/devtools/vbinary"); err != nil {
+		return err
+	}
+
+	// Download <maxDays> days worth of Vanadium binaries.
+	//
+	// TODO(jsimsa): Move the logic that collects n days worth of
+	// Vanadium binaries to the vbinary tool.
+	const maxDays = 5
+	dates := []string{}
+	binaries := map[string]struct{}{}
+	t := time.Now()
+	for i := 0; i < maxDays; i++ {
+		t = t.AddDate(0, 0, -1)
+		date := t.Format("2006-01-02")
+		binDir := filepath.Join(regTestBinDirPath(), date)
+		if _, err := os.Stat(binDir); err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("Stat() failed: %v", err)
+			}
+			if err := ctx.Run().Command(vbinaryBin,
+				"-date-prefix", date,
+				"-key-file", os.Getenv("V23_KEY_FILE"),
+				"download",
+				"-output-dir", binDir); err != nil {
+				// If the vbinary tool failed because the requested snapshot
+				// does not exist, try a different date. If the vbinary tool
+				// failed for a different reason, report the error.
+				exiterr, ok := err.(*exec.ExitError)
+				if !ok {
+					return err
+				}
+				status, ok := exiterr.Sys().(syscall.WaitStatus)
+				if !ok {
+					return err
+				}
+				if status.ExitStatus() != util.NoSnapshotExitCode {
+					return err
+				}
+			}
+		}
+		dates = append(dates, date)
+		fileInfos, err := ioutil.ReadDir(binDir)
+		if err != nil {
+			return fmt.Errorf("ReadDir(%v) failed: %v", binDir, err)
+		}
+		for _, fileInfo := range fileInfos {
+			if fileInfo.Name() != ".done" {
+				binaries[fileInfo.Name()] = struct{}{}
+			}
+		}
+	}
+
+	// Populate the regression test binary directory with a random
+	// combination of Vanadium binaries.
+	sortedBinaries := []string{}
+	for binary, _ := range binaries {
+		sortedBinaries = append(sortedBinaries, binary)
+	}
+	sort.Strings(sortedBinaries)
+	binDir := filepath.Join(regTestBinDirPath(), "bin")
+	if err := ctx.Run().RemoveAll(binDir); err != nil {
+		return err
+	}
+	if err := ctx.Run().MkdirAll(binDir, os.FileMode(0755)); err != nil {
+		return err
+	}
+	rand, err := newRand(ctx)
+	if err != nil {
+		return err
+	}
+	for _, binary := range sortedBinaries {
+		for {
+			n := rand.Intn(maxDays)
+			src := filepath.Join(regTestBinDirPath(), dates[n], binary)
+			if _, err := os.Stat(src); err != nil {
+				if !os.IsNotExist(err) {
+					return fmt.Errorf("Stat() failed: %v", err)
+				}
+				// If the binary does not exist in the randomly selected daily
+				// build, try again.
+				continue
+			}
+			// If the binary does exist, create a symlink to it in the
+			// binary directory.
+			dst := filepath.Join(binDir, binary)
+			if err := ctx.Run().Symlink(src, dst); err != nil {
+				return err
+			}
+			fmt.Fprintf(ctx.Stdout(), "using %v from %v\n", binary, dates[n])
+			break
+		}
+	}
+
+	return nil
 }
 
 func genTestNameSuffix(baseSuffix string) string {
@@ -1441,7 +1544,15 @@ func genTestNameSuffix(baseSuffix string) string {
 }
 
 // vanadiumGoTest runs Go tests for vanadium projects.
-func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (*test.Result, error) {
+func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Test the Vanadium Go packages.
 	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
 	if err != nil {
 		return nil, err
