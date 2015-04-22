@@ -271,8 +271,14 @@ var (
 // TestGoBuild checks the Go build based test logic.
 func TestGoBuild(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-
 	testName, pkgName := "test-go-build", "v.io/x/devtools/v23/internal/test/testdata/foo"
+
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer cleanup()
+
 	result, err := goBuild(ctx, testName, pkgsOpt([]string{pkgName}))
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -300,8 +306,14 @@ func TestGoBuild(t *testing.T) {
 // TestGoCoverage checks the Go test coverage based test logic.
 func TestGoCoverage(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-
 	testName, pkgName := "test-go-coverage", "v.io/x/devtools/v23/internal/test/testdata/foo"
+
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer cleanup()
+
 	result, err := goCoverage(ctx, testName, pkgsOpt([]string{pkgName}))
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -381,8 +393,13 @@ func TestGoTestV23(t *testing.T) {
 
 func runGoTest(t *testing.T, suffix string, exclusions []exclusion, expectedTestSuite xunit.TestSuites, testOpts ...goTestOpt) {
 	ctx := tool.NewDefaultContext()
-
 	testName, pkgName := "test-go-test", "v.io/x/devtools/v23/internal/test/testdata/foo"
+
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer cleanup()
 
 	opts := []goTestOpt{
 		pkgsOpt([]string{pkgName}),
