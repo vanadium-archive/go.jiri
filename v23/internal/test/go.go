@@ -1034,7 +1034,7 @@ func getNumWorkersOpt(opts []Opt) numWorkersOpt {
 // thirdPartyGoBuild runs Go build for third-party projects.
 func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1055,7 +1055,7 @@ func thirdPartyGoBuild(ctx *tool.Context, testName string, opts ...Opt) (_ *test
 // thirdPartyGoTest runs Go tests for the third-party projects.
 func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1077,7 +1077,7 @@ func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 // thirdPartyGoRace runs Go data-race tests for third-party projects.
 func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
