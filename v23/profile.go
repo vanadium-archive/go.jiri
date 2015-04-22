@@ -94,10 +94,11 @@ func runProfileSetup(command *cmdline.Command, args []string) error {
 	}
 
 	// Setup the profiles.
+	t := true
 	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
+		Verbose: &t,
 	})
 	for _, arg := range args {
 		setupFn := func() error {
