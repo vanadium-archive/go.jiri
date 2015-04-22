@@ -6,9 +6,13 @@ package test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,21 +26,32 @@ import (
 )
 
 const (
-	testNumServerNodes      = 5
-	testNumClientNodes      = 10
-	testNumWorkersPerClient = 15
-	testMaxChunkCnt         = 100
-	testMaxPayloadSize      = 10000
-	testDuration            = 1 * time.Hour
-	testServerUpTime        = testDuration + 10*time.Minute
-	testWaitTimeForServerUp = 3 * time.Minute
-	testPort                = 10000
+	testStressNodeName            = "stress"
+	testStressNumServerNodes      = 3
+	testStressNumClientNodes      = 6
+	testStressNumWorkersPerClient = 8
+	testStressMaxChunkCnt         = 100
+	testStressMaxPayloadSize      = 10000
+	testStressDuration            = 1 * time.Hour
+
+	testLoadNodeName       = "load"
+	testLoadNumServerNodes = 1
+	testLoadNumClientNodes = 1
+	testLoadCPUs           = testLoadNumServerNodes
+	testLoadPayloadSize    = 1000
+	testLoadDuration       = 15 * time.Minute
+
+	loadStatsOutputFile = "load_stats.json"
+
+	serverPort          = 10000
+	serverMaxUpTime     = 2 * time.Hour
+	waitTimeForServerUp = 1 * time.Minute
 
 	gceProject           = "vanadium-internal"
 	gceZone              = "asia-east1-b"
 	gceServerMachineType = "n1-highcpu-8"
 	gceClientMachineType = "n1-highcpu-4"
-	gceNodePrefix        = "tmpnode-rpc-stress"
+	gceNodePrefix        = "tmpnode-rpc"
 
 	vcloudPkg = "v.io/x/devtools/vcloud"
 	serverPkg = "v.io/x/ref/profiles/internal/rpc/stress/stressd"
@@ -48,7 +63,16 @@ var (
 )
 
 // vanadiumGoRPCStress runs an RPC stress test with multiple GCE instances.
-func vanadiumGoRPCStress(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+func vanadiumGoRPCStress(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return runRPCTest(ctx, testName, testStressNodeName, testStressNumServerNodes, testStressNumClientNodes, runStressTest)
+}
+
+// vanadiumGoRPCLoad runs an RPC load test with multiple GCE instances.
+func vanadiumGoRPCLoad(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return runRPCTest(ctx, testName, testLoadNodeName, testLoadNumServerNodes, testLoadNumClientNodes, runLoadTest)
+}
+
+func runRPCTest(ctx *tool.Context, testName, nodeName string, numServerNodes, numClientNodes int, testFunc func(*tool.Context, string) (*test.Result, error)) (_ *test.Result, e error) {
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
@@ -61,49 +85,57 @@ func vanadiumGoRPCStress(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	}
 
 	// Cleanup old nodes if any.
-	if err := deleteNodes(ctx); err != nil {
+	fmt.Fprint(ctx.Stdout(), "Deleting old nodes...\n")
+	if err := deleteNodes(ctx, nodeName, numServerNodes, numClientNodes); err != nil {
 		fmt.Fprintf(ctx.Stdout(), "IGNORED: %v\n", err)
 	}
 
 	// Create nodes.
-	if err := createNodes(ctx); err != nil {
+	fmt.Fprint(ctx.Stdout(), "Creating nodes...\n")
+	if err := createNodes(ctx, nodeName, numServerNodes, numClientNodes); err != nil {
 		return nil, internalTestError{err, "Create Nodes"}
 	}
 
 	// Start servers.
-	serverDone, err := startServers(ctx)
+	fmt.Fprint(ctx.Stdout(), "Starting servers...\n")
+	serverDone, err := startServers(ctx, nodeName, numServerNodes)
 	if err != nil {
-		return nil, internalTestError{err, "Run Servers"}
+		return nil, internalTestError{err, "Start Servers"}
 	}
 
 	// Run the test.
-	result, err := runTest(ctx, testName)
+	fmt.Fprint(ctx.Stdout(), "Running test...\n")
+	result, err := testFunc(ctx, testName)
 	if err != nil {
 		return nil, internalTestError{err, "Run Test"}
 	}
 
-	// Wait for servers to stop.
+	// Stop servers.
+	fmt.Fprint(ctx.Stdout(), "Stopping servers...\n")
+	if err := stopServers(ctx, nodeName, numServerNodes); err != nil {
+		return nil, internalTestError{err, "Stop Servers"}
+	}
 	if err := <-serverDone; err != nil {
 		return nil, internalTestError{err, "Stop Servers"}
 	}
 
 	// Delete nodes.
-	if err := deleteNodes(ctx); err != nil {
+	fmt.Fprint(ctx.Stdout(), "Deleting nodes...\n")
+	if err := deleteNodes(ctx, nodeName, numServerNodes, numClientNodes); err != nil {
 		return nil, internalTestError{err, "Delete Nodes"}
 	}
-
 	return result, nil
 }
 
-func serverNodeName(n int) string {
-	return fmt.Sprintf("%s-server-%02d", gceNodePrefix, n)
+func serverNodeName(nodeName string, n int) string {
+	return fmt.Sprintf("%s-%s-server-%02d", gceNodePrefix, nodeName, n)
 }
 
-func clientNodeName(n int) string {
-	return fmt.Sprintf("%s-client-%02d", gceNodePrefix, n)
+func clientNodeName(nodeName string, n int) string {
+	return fmt.Sprintf("%s-%s-client-%02d", gceNodePrefix, nodeName, n)
 }
 
-func createNodes(ctx *tool.Context) error {
+func createNodes(ctx *tool.Context, nodeName string, numServerNodes, numClientNodes int) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -115,23 +147,21 @@ func createNodes(ctx *tool.Context) error {
 		"-project", gceProject,
 		"-zone", gceZone,
 	}
-
 	serverArgs := append(args, "-machine-type", gceServerMachineType)
-	for n := 0; n < testNumServerNodes; n++ {
-		serverArgs = append(serverArgs, serverNodeName(n))
+	for n := 0; n < numServerNodes; n++ {
+		serverArgs = append(serverArgs, serverNodeName(nodeName, n))
 	}
 	if err := ctx.Run().Command(cmd, serverArgs...); err != nil {
 		return err
 	}
-
 	clientArgs := append(args, "-machine-type", gceClientMachineType)
-	for n := 0; n < testNumClientNodes; n++ {
-		clientArgs = append(clientArgs, clientNodeName(n))
+	for n := 0; n < numClientNodes; n++ {
+		clientArgs = append(clientArgs, clientNodeName(nodeName, n))
 	}
 	return ctx.Run().Command(cmd, clientArgs...)
 }
 
-func deleteNodes(ctx *tool.Context) error {
+func deleteNodes(ctx *tool.Context, nodeName string, numServerNodes, numClientNodes int) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -143,27 +173,25 @@ func deleteNodes(ctx *tool.Context) error {
 		"-project", gceProject,
 		"-zone", gceZone,
 	}
-	for n := 0; n < testNumServerNodes; n++ {
-		args = append(args, serverNodeName(n))
+	for n := 0; n < numServerNodes; n++ {
+		args = append(args, serverNodeName(nodeName, n))
 	}
-	for n := 0; n < testNumClientNodes; n++ {
-		args = append(args, clientNodeName(n))
+	for n := 0; n < numClientNodes; n++ {
+		args = append(args, clientNodeName(nodeName, n))
 	}
-
 	return ctx.Run().Command(cmd, args...)
 }
 
-func startServers(ctx *tool.Context) (<-chan error, error) {
+func startServers(ctx *tool.Context, nodeName string, numServerNodes int) (<-chan error, error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
 
 	var servers []string
-	for n := 0; n < testNumServerNodes; n++ {
-		servers = append(servers, serverNodeName(n))
+	for n := 0; n < numServerNodes; n++ {
+		servers = append(servers, serverNodeName(nodeName, n))
 	}
-
 	cmd := filepath.Join(root, binPath, "vcloud")
 	args := []string{
 		"run",
@@ -173,8 +201,8 @@ func startServers(ctx *tool.Context) (<-chan error, error) {
 		filepath.Join(root, binPath, "stressd"),
 		"++",
 		"./stressd",
-		"-v23.tcp.address", fmt.Sprintf(":%d", testPort),
-		"-duration", testServerUpTime.String(),
+		"-v23.tcp.address", fmt.Sprintf(":%d", serverPort),
+		"-duration", serverMaxUpTime.String(),
 	}
 
 	done := make(chan error)
@@ -183,7 +211,7 @@ func startServers(ctx *tool.Context) (<-chan error, error) {
 	}()
 
 	// Wait until for a few minute while servers are brought up.
-	timeout := time.After(testWaitTimeForServerUp)
+	timeout := time.After(waitTimeForServerUp)
 	select {
 	case err := <-done:
 		if err != nil {
@@ -195,18 +223,40 @@ func startServers(ctx *tool.Context) (<-chan error, error) {
 	return done, nil
 }
 
-func runTest(ctx *tool.Context, testName string) (*test.Result, error) {
+func stopServers(ctx *tool.Context, nodeName string, numServerNodes int) error {
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+
+	cmd := filepath.Join(root, binPath, "vcloud")
+	args := []string{
+		"run",
+		"-failfast",
+		"-project", gceProject,
+		clientNodeName(nodeName, 0),
+		filepath.Join(root, binPath, "stress"),
+		"++",
+		"./stress", "stop",
+	}
+	for n := 0; n < numServerNodes; n++ {
+		args = append(args, fmt.Sprintf("/%s:%d", serverNodeName(nodeName, n), serverPort))
+	}
+	return ctx.Run().Command(cmd, args...)
+}
+
+func runStressTest(ctx *tool.Context, testName string) (*test.Result, error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
 
 	var servers, clients []string
-	for n := 0; n < testNumServerNodes; n++ {
-		servers = append(servers, fmt.Sprintf("/%s:%d", serverNodeName(n), testPort))
+	for n := 0; n < testStressNumServerNodes; n++ {
+		servers = append(servers, fmt.Sprintf("/%s:%d", serverNodeName(testStressNodeName, n), serverPort))
 	}
-	for n := 0; n < testNumClientNodes; n++ {
-		clients = append(clients, clientNodeName(n))
+	for n := 0; n < testStressNumClientNodes; n++ {
+		clients = append(clients, clientNodeName(testStressNodeName, n))
 	}
 
 	var out bytes.Buffer
@@ -221,18 +271,19 @@ func runTest(ctx *tool.Context, testName string) (*test.Result, error) {
 		strings.Join(clients, ","),
 		filepath.Join(root, binPath, "stress"),
 		"++",
-		"./stress",
-		"-servers", strings.Join(servers, ","),
-		"-workers", strconv.Itoa(testNumWorkersPerClient),
-		"-max_chunk_count", strconv.Itoa(testMaxChunkCnt),
-		"-max_payload_size", strconv.Itoa(testMaxPayloadSize),
-		"-duration", testDuration.String(),
+		"./stress", "stress",
+		"-workers", strconv.Itoa(testStressNumWorkersPerClient),
+		"-max-chunk-count", strconv.Itoa(testStressMaxChunkCnt),
+		"-max-payload-size", strconv.Itoa(testStressMaxPayloadSize),
+		"-duration", testStressDuration.String(),
+		"-format", "json",
 	}
+	args = append(args, servers...)
 	if err = ctx.Run().CommandWithOpts(opts, cmd, args...); err != nil {
 		return nil, err
 	}
 
-	// Get the rpc stats from the servers and stop them.
+	// Get the stats from the servers and stop them.
 	args = []string{
 		"run",
 		"-failfast",
@@ -240,91 +291,202 @@ func runTest(ctx *tool.Context, testName string) (*test.Result, error) {
 		clients[0],
 		filepath.Join(root, binPath, "stress"),
 		"++",
-		"./stress",
-		"-servers", strings.Join(servers, ","),
-		"-workers", "0",
-		"-duration", "0",
-		"-server_stats",
-		"-server_stop",
+		"./stress", "stats",
+		"-format", "json",
 	}
+	args = append(args, servers...)
 	if err = ctx.Run().CommandWithOpts(opts, cmd, args...); err != nil {
 		return nil, err
 	}
 
-	// Verify the rpc stats.
-	cStats, sStats, err := readStats(out.String())
+	// Read the stats.
+	cStats, sStats, err := readStressStats(out.String())
 	if err != nil {
 		if err := xunit.CreateFailureReport(ctx, testName, "StressTest", "ReadStats", "Failure", err.Error()); err != nil {
 			return nil, err
 		}
 		return &test.Result{Status: test.Failed}, nil
 	}
-
 	fmt.Fprint(ctx.Stdout(), "\nRESULT:\n")
-	fmt.Fprintf(ctx.Stdout(), "client rpc stats: %+v\n", *cStats)
-	fmt.Fprintf(ctx.Stdout(), "server rpc stats: %+v\n", *sStats)
+	writeStressStats(ctx.Stdout(), "Client Stats:", cStats)
+	writeStressStats(ctx.Stdout(), "Server Stats:", sStats)
 	fmt.Fprint(ctx.Stdout(), "\n")
 
-	if cStats.sumCount != sStats.sumCount || cStats.sumStreamCount != sStats.sumStreamCount {
-		output := fmt.Sprintf("%v != %v", cStats, sStats)
+	// Verify the stats.
+	sStats.BytesRecv, sStats.BytesSent = sStats.BytesSent, sStats.BytesRecv
+	if !reflect.DeepEqual(cStats, sStats) {
+		output := fmt.Sprintf("%+v != %+v", cStats, sStats)
 		if err := xunit.CreateFailureReport(ctx, testName, "StressTest", "VerifyStats", "Mismatched", output); err != nil {
 			return nil, err
 		}
 		return &test.Result{Status: test.Failed}, nil
 	}
-
 	return &test.Result{Status: test.Passed}, nil
 }
 
 type stressStats struct {
-	sumCount       uint64
-	sumStreamCount uint64
+	SumCount       uint64
+	SumStreamCount uint64
+	BytesRecv      uint64
+	BytesSent      uint64
 }
 
-func readStats(out string) (*stressStats, *stressStats, error) {
-	re := regexp.MustCompile(`client stats: {SumCount:(\d+) SumStreamCount:(\d+)}`)
-	n, cStats, err := readOneStats(re, out)
+func readStressStats(out string) (*stressStats, *stressStats, error) {
+	re := regexp.MustCompile(`client stats:({.*})`)
+	cStats, err := readStressStatsHelper(re, out, testStressNumClientNodes)
 	if err != nil {
 		return nil, nil, err
 	}
-	if n != testNumClientNodes {
-		return nil, nil, fmt.Errorf("invalid number of client stats: %d", n)
-	}
-
-	re = regexp.MustCompile(`server stats: ".+":{SumCount:(\d+) SumStreamCount:(\d+)}`)
-	n, sStats, err := readOneStats(re, out)
+	re = regexp.MustCompile(`server stats\(.*\):({.*})`)
+	sStats, err := readStressStatsHelper(re, out, testStressNumServerNodes)
 	if err != nil {
 		return nil, nil, err
 	}
-	if n != testNumServerNodes {
-		return nil, nil, fmt.Errorf("invalid number of server stats: %d", n)
-	}
-
 	return cStats, sStats, nil
 }
 
-func readOneStats(re *regexp.Regexp, out string) (int, *stressStats, error) {
-	var stats stressStats
-	matches := re.FindAllStringSubmatch(out, -1)
+func readStressStatsHelper(re *regexp.Regexp, out string, numStats int) (*stressStats, error) {
+	matches := re.FindAllSubmatch([]byte(out), -1)
+	if len(matches) != numStats {
+		return nil, fmt.Errorf("invalid number of stats: %d != $d", len(matches), numStats)
+	}
+	var merged stressStats
 	for _, match := range matches {
-		if len(match) != 3 {
-			return 0, nil, fmt.Errorf("invalid stats: %v", match)
+		if len(match) != 2 {
+			return nil, fmt.Errorf("invalid stats: %q", match)
 		}
-		sumCount, err := strconv.ParseUint(match[1], 10, 64)
-		if err != nil {
-			return 0, nil, fmt.Errorf("%v: %v", err, match)
+		var stats stressStats
+		if err := json.Unmarshal(match[1], &stats); err != nil {
+			return nil, fmt.Errorf("invalid stats: %q", match)
 		}
-		sumStreamCount, err := strconv.ParseUint(match[2], 10, 64)
-		if err != nil {
-			return 0, nil, fmt.Errorf("%v: %v", err, match)
-		}
-		if sumCount == 0 || sumStreamCount == 0 {
+		if stats.SumCount == 0 || stats.SumStreamCount == 0 {
 			// Although clients choose servers and RPC methods randomly, we report
 			// this as a failure since it is very unlikely.
-			return 0, nil, fmt.Errorf("zero count: %v", match)
+			return nil, fmt.Errorf("zero count: %q", match)
 		}
-		stats.sumCount += sumCount
-		stats.sumStreamCount += sumStreamCount
+		merged.SumCount += stats.SumCount
+		merged.SumStreamCount += stats.SumStreamCount
+		merged.BytesRecv += stats.BytesRecv
+		merged.BytesSent += stats.BytesSent
 	}
-	return len(matches), &stats, nil
+	return &merged, nil
+}
+
+func writeStressStats(w io.Writer, title string, stats *stressStats) {
+	fmt.Fprintf(w, "%s\n", title)
+	fmt.Fprintf(w, "\tNumber of non-streaming RPCs:\t%d\n", stats.SumCount)
+	fmt.Fprintf(w, "\tNumber of streaming RPCs:\t%d\n", stats.SumStreamCount)
+	fmt.Fprintf(w, "\tNumber of bytes received:\t%d\n", stats.BytesRecv)
+	fmt.Fprintf(w, "\tNumber of bytes sent:\t\t%d\n", stats.BytesSent)
+}
+
+func runLoadTest(ctx *tool.Context, testName string) (*test.Result, error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, err
+	}
+
+	var servers, clients []string
+	for n := 0; n < testLoadNumServerNodes; n++ {
+		servers = append(servers, fmt.Sprintf("/%s:%d", serverNodeName(testLoadNodeName, n), serverPort))
+	}
+	for n := 0; n < testLoadNumClientNodes; n++ {
+		clients = append(clients, clientNodeName(testLoadNodeName, n))
+	}
+
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = io.MultiWriter(opts.Stdout, &out)
+	opts.Stderr = io.MultiWriter(opts.Stderr, &out)
+	cmd := filepath.Join(root, binPath, "vcloud")
+	args := []string{
+		"run",
+		"-failfast",
+		"-project", gceProject,
+		strings.Join(clients, ","),
+		filepath.Join(root, binPath, "stress"),
+		"++",
+		"./stress", "load",
+		"-cpu", strconv.Itoa(testLoadCPUs),
+		"-payload-size", strconv.Itoa(testLoadPayloadSize),
+		"-duration", testLoadDuration.String(),
+		"-format", "json",
+	}
+	args = append(args, servers...)
+	if err = ctx.Run().CommandWithOpts(opts, cmd, args...); err != nil {
+		return nil, err
+	}
+
+	// Read the stats.
+	stats, err := readLoadStats(out.String(), testLoadNumClientNodes)
+	if err != nil {
+		if err := xunit.CreateFailureReport(ctx, testName, "LoadTest", "ReadStats", "Failure", err.Error()); err != nil {
+			return nil, err
+		}
+		return &test.Result{Status: test.Failed}, nil
+	}
+
+	fmt.Fprint(ctx.Stdout(), "\nRESULT:\n")
+	fmt.Fprint(ctx.Stdout(), "Load Stats\n")
+	fmt.Fprintf(ctx.Stdout(), "\tNumber of RPCs:\t\t%.2f\n", stats.Iterations)
+	fmt.Fprintf(ctx.Stdout(), "\tLatency (msec/rpc):\t%.2f\n", stats.MsecPerRpc)
+	fmt.Fprintf(ctx.Stdout(), "\tQPS:\t\t\t%.2f\n", stats.Qps)
+	fmt.Fprintf(ctx.Stdout(), "\tQPS/core:\t\t%.2f\n", stats.QpsPerCore)
+	fmt.Fprint(ctx.Stdout(), "\n")
+
+	// Write the test stats in json format for vmon.
+	filename := filepath.Join(os.Getenv("WORKSPACE"), loadStatsOutputFile)
+	if err := writeLoadStatsJSON(filename, stats); err != nil {
+		if err := xunit.CreateFailureReport(ctx, testName, "LoadTest", "WriteLoadStats", "Failure", err.Error()); err != nil {
+			return nil, err
+		}
+		return &test.Result{Status: test.Failed}, nil
+	}
+	fmt.Fprintf(ctx.Stdout(), "Wrote load stats to %q\n", filename)
+	return &test.Result{Status: test.Passed}, nil
+}
+
+type loadStats struct {
+	Iterations float64
+	MsecPerRpc float64
+	Qps        float64
+	QpsPerCore float64
+}
+
+func readLoadStats(out string, numStats int) (*loadStats, error) {
+	re := regexp.MustCompile(`load stats:({.*})`)
+	matches := re.FindAllSubmatch([]byte(out), -1)
+	if len(matches) != numStats {
+		return nil, fmt.Errorf("invalid number of stats: %d != $d", len(matches), numStats)
+	}
+	var merged loadStats
+	for _, match := range matches {
+		if len(match) != 2 {
+			return nil, fmt.Errorf("invalid stats: %q", match)
+		}
+		var stats loadStats
+		if err := json.Unmarshal(match[1], &stats); err != nil {
+			return nil, fmt.Errorf("invalid stats: %q", match)
+		}
+		if stats.Iterations == 0 {
+			return nil, fmt.Errorf("zero count: %q", match)
+		}
+		merged.Iterations += stats.Iterations
+		merged.MsecPerRpc += stats.MsecPerRpc
+		merged.Qps += stats.Qps
+		merged.QpsPerCore += stats.QpsPerCore
+	}
+	merged.Iterations /= float64(numStats)
+	merged.MsecPerRpc /= float64(numStats)
+	merged.Qps /= float64(numStats)
+	merged.QpsPerCore /= float64(numStats)
+	return &merged, nil
+}
+
+func writeLoadStatsJSON(filename string, stats *loadStats) error {
+	b, err := json.Marshal(stats)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filename, b, 0644)
 }
