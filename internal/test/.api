@@ -1,0 +1,19 @@
+pkg test, const Failed Status
+pkg test, const FailedExitCode ideal-int
+pkg test, const MergeConflict Status
+pkg test, const Passed Status
+pkg test, const Pending Status
+pkg test, const Skipped Status
+pkg test, const TimedOut Status
+pkg test, func Fail(*tool.Context, string, ...interface{})
+pkg test, func Pass(*tool.Context, string, ...interface{})
+pkg test, func Warn(*tool.Context, string, ...interface{})
+pkg test, method (Status) String() string
+pkg test, type Result struct
+pkg test, type Result struct, ExcludedTests map[string][]string
+pkg test, type Result struct, MergeConflictCL string
+pkg test, type Result struct, SkippedTests map[string][]string
+pkg test, type Result struct, Status Status
+pkg test, type Result struct, TimeoutValue time.Duration
+pkg test, type Status int
+pkg test, var DefaultTimeout unknown-type

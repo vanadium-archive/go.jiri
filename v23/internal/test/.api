@@ -1,0 +1,22 @@
+pkg test, func ExcludedRaceTests() []string
+pkg test, func ExcludedTests() []string
+pkg test, func ListTests() ([]string, error)
+pkg test, func RunProjectTests(*tool.Context, map[string]string, []string, ...Opt) (map[string]*test.Result, error)
+pkg test, func RunTests(*tool.Context, map[string]string, []string, ...Opt) (map[string]*test.Result, error)
+pkg test, method (BlessingsRootOpt) Opt()
+pkg test, method (CredDirOpt) Opt()
+pkg test, method (NamespaceRootOpt) Opt()
+pkg test, method (NumWorkersOpt) Opt()
+pkg test, method (OutputDirOpt) Opt()
+pkg test, method (PartOpt) Opt()
+pkg test, method (PkgsOpt) Opt()
+pkg test, type BlessingsRootOpt string
+pkg test, type CredDirOpt string
+pkg test, type Mirror struct
+pkg test, type NamespaceRootOpt string
+pkg test, type NumWorkersOpt int
+pkg test, type Opt interface { Opt }
+pkg test, type Opt interface, Opt()
+pkg test, type OutputDirOpt string
+pkg test, type PartOpt int
+pkg test, type PkgsOpt []string
