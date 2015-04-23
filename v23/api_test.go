@@ -195,6 +195,45 @@ func TestFunction() {
 	}
 }
 
+// TestPublicApiMissingApiFileNotRequired ensures that the check will not fail
+// if a 'required check' project has a missing .api file but that API file is
+// in an 'internal' package.
+func TestPublicApiMissingApiFileNotRequired(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	env := setupApiTest(t, ctx)
+	defer teardownApiTest(t, env)
+
+	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	branch := "my-branch"
+	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Write a go file with a public API and no corresponding .api file.
+	if err := os.Mkdir(filepath.Join(projectPath, "internal"), 0744); err != nil {
+		t.Fatalf("Mkdir failed: %v", err)
+	}
+	testFilePath := filepath.Join(projectPath, "internal", "file.go")
+	writeFileOrDie(t, ctx, testFilePath, `package main
+
+func TestFunction() {
+}`)
+
+	commitMessage := "Commit file.go"
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CommitFile(testFilePath, commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+		t.Fatalf("doApiCheck failed: %v", err)
+	} else if buf.String() != "" {
+		t.Fatalf("doApiCheck should have passed, but did not: %s", buf.String())
+	}
+}
+
 // TestPublicApiUpdate checks that the api update command correctly updates the
 // API definition.
 func TestPublicApiUpdate(t *testing.T) {

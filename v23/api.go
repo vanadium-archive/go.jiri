@@ -137,6 +137,19 @@ func isFailedApiCheckFatal(projectName string, apiCheckRequiredProjects map[stri
 	return true
 }
 
+func shouldIgnoreFile(file string) bool {
+	if !strings.HasSuffix(file, ".go") {
+		return true
+	}
+	pathComponents := strings.Split(file, string(os.PathSeparator))
+	for _, component := range pathComponents {
+		if component == "testdata" || component == "internal" {
+			return true
+		}
+	}
+	return false
+}
+
 func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bool, args []string) (changes []packageChange, e error) {
 	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
@@ -166,7 +179,7 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 		// Extract the directories for these files.
 		dirs := make(map[string]bool) // set
 		for _, file := range files {
-			if strings.HasSuffix(file, ".go") {
+			if !shouldIgnoreFile(file) {
 				dirs[filepath.Join(path, filepath.Dir(file))] = true
 			}
 		}
