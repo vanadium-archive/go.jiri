@@ -20,19 +20,38 @@ const (
 // MetricDescriptor definitions.
 var CustomMetricDescriptors = map[string]*cloudmonitoring.MetricDescriptor{
 	// Custom metric for recording check latency of vanadium production services.
-	"service-latency": createMetric("service/latency", "The check latency (ms) of vanadium production services.", "double"),
+	"service-latency": createMetric("service/latency", "The check latency (ms) of vanadium production services.", "double", true),
 
 	// Custom metric for recording various counters of vanadium production services.
-	"service-counters": createMetric("service/counters", "Various counters of vanadium production services.", "double"),
+	"service-counters": createMetric("service/counters", "Various counters of vanadium production services.", "double", true),
 
 	// Custom metric for recording gce instance stats.
-	"gce-instance": createMetric("gce-instance/stats", "Various stats for GCE instances.", "double"),
+	"gce-instance": createMetric("gce-instance/stats", "Various stats for GCE instances.", "double", true),
 
 	// Custom metric for recording nginx stats.
-	"nginx": createMetric("nginx/stats", "Various stats for Nginx server.", "double"),
+	"nginx": createMetric("nginx/stats", "Various stats for Nginx server.", "double", true),
+
+	// Custom metric for rpc load tests.
+	"rpc-load-test": createMetric("rpc-load-test", "Results of rpc load test", "double", false),
 }
 
-func createMetric(metricType, description, valueType string) *cloudmonitoring.MetricDescriptor {
+func createMetric(metricType, description, valueType string, includeGCELabels bool) *cloudmonitoring.MetricDescriptor {
+	labels := []*cloudmonitoring.MetricDescriptorLabelDescriptor{
+		&cloudmonitoring.MetricDescriptorLabelDescriptor{
+			Key:         fmt.Sprintf("%s/metric-name", customMetricPrefix),
+			Description: "The name of the metric.",
+		},
+	}
+	if includeGCELabels {
+		labels = append(labels, &cloudmonitoring.MetricDescriptorLabelDescriptor{
+			Key:         fmt.Sprintf("%s/gce-instance", customMetricPrefix),
+			Description: "The name of the GCE instance associated with this metric.",
+		}, &cloudmonitoring.MetricDescriptorLabelDescriptor{
+			Key:         fmt.Sprintf("%s/gce-zone", customMetricPrefix),
+			Description: "The zone of the GCE instance associated with this metric.",
+		})
+	}
+
 	return &cloudmonitoring.MetricDescriptor{
 		Name:        fmt.Sprintf("%s/v/%s", customMetricPrefix, metricType),
 		Description: description,
@@ -40,20 +59,7 @@ func createMetric(metricType, description, valueType string) *cloudmonitoring.Me
 			MetricType: "gauge",
 			ValueType:  valueType,
 		},
-		Labels: []*cloudmonitoring.MetricDescriptorLabelDescriptor{
-			&cloudmonitoring.MetricDescriptorLabelDescriptor{
-				Key:         fmt.Sprintf("%s/gce-instance", customMetricPrefix),
-				Description: "The name of the GCE instance associated with this metric.",
-			},
-			&cloudmonitoring.MetricDescriptorLabelDescriptor{
-				Key:         fmt.Sprintf("%s/gce-zone", customMetricPrefix),
-				Description: "The zone of the GCE instance associated with this metric.",
-			},
-			&cloudmonitoring.MetricDescriptorLabelDescriptor{
-				Key:         fmt.Sprintf("%s/metric-name", customMetricPrefix),
-				Description: "The name of the metric.",
-			},
-		},
+		Labels: labels,
 	}
 }
 
