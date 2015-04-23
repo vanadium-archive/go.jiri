@@ -204,7 +204,7 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 			var out bytes.Buffer
 			opts := ctx.Run().Opts()
 			opts.Stdout = &out
-			if err := ctx.Run().CommandWithOpts(opts, gotoolsBin, "goapi", dir); err != nil {
+			if err := ctx.Run().CommandWithOpts(opts, "v23", "run", gotoolsBin, "goapi", dir); err != nil {
 				return nil, err
 			}
 			if apiFileError != nil || out.String() != apiFileContents.String() {
@@ -255,14 +255,14 @@ func doApiCheck(stdout, stderr io.Writer, args []string) error {
 				// detected
 				if exiterr, ok := err.(*exec.ExitError); ok {
 					if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-						if status.ExitStatus() != 1 {
+						if status.ExitStatus() == 1 {
 							continue
 						}
 					}
 				}
 				// If we got here, diff returned a non-nil err
 				// other than an ExitError with status code=1
-				fmt.Fprintf(ctx.Stderr(), "WARNING: got an error while running diff: %v", err)
+				fmt.Fprintf(ctx.Stderr(), "WARNING: got an error while running diff: %v\n", err)
 			}
 		}
 	}
