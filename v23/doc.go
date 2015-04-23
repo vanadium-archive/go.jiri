@@ -64,7 +64,7 @@ Usage:
    v23 api check <projects>
 
 <projects> is a list of Vanadium projects to check. If none are specified, all
-projects are checked.
+projects that require a public API check upon presubmit are checked.
 
 V23 api fix
 
