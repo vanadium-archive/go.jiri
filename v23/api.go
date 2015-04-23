@@ -49,7 +49,7 @@ var cmdApiCheck = &cmdline.Command{
 	Short:    "Check to see if any changes have been made to the public API.",
 	Long:     "Check to see if any changes have been made to the public API.",
 	ArgsName: "<projects>",
-	ArgsLong: "<projects> is a list of Vanadium projects to check. If none are specified, all projects are checked.",
+	ArgsLong: "<projects> is a list of Vanadium projects to check. If none are specified, all projects that require a public API check upon presubmit are checked.",
 }
 
 func readApiFileContents(path string, buf *bytes.Buffer) (e error) {
@@ -150,12 +150,31 @@ func shouldIgnoreFile(file string) bool {
 	return false
 }
 
+// parseProjectNames identifies the set of projects that the "v23 api
+// ..." command should be applied to.
+func parseProjectNames(args []string, projects map[string]util.Project, apiCheckRequiredProjects map[string]bool) ([]string, error) {
+	names := args
+	if len(names) == 0 {
+		// Use all projects for which an API check is required.
+		for name, _ := range apiCheckRequiredProjects {
+			names = append(names, name)
+		}
+	} else {
+		for _, name := range names {
+			if _, ok := projects[name]; !ok {
+				return nil, fmt.Errorf("project %q does not exist in the project manifest", name)
+			}
+		}
+	}
+	return names, nil
+}
+
 func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bool, args []string) (changes []packageChange, e error) {
 	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
 		return nil, err
 	}
-	projectNames, err := parseArgs(args, projects)
+	projectNames, err := parseProjectNames(args, projects, apiCheckRequiredProjects)
 	if err != nil {
 		return nil, err
 	}
