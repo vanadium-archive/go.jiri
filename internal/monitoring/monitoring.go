@@ -20,31 +20,21 @@ const (
 // MetricDescriptor definitions.
 var CustomMetricDescriptors = map[string]*cloudmonitoring.MetricDescriptor{
 	// Custom metric for recording check latency of vanadium production services.
-	"service-latency": &cloudmonitoring.MetricDescriptor{
-		Name:        fmt.Sprintf("%s/v/service/latency", customMetricPrefix),
-		Description: "The check latency (ms) of vanadium production services.",
-		TypeDescriptor: &cloudmonitoring.MetricDescriptorTypeDescriptor{
-			MetricType: "gauge",
-			ValueType:  "double",
-		},
-		Labels: []*cloudmonitoring.MetricDescriptorLabelDescriptor{
-			&cloudmonitoring.MetricDescriptorLabelDescriptor{
-				Key:         fmt.Sprintf("%s/name", customMetricPrefix),
-				Description: "The name of the vanadium service.",
-			},
-		},
-	},
-	// Custom metric for recording GCE instances stats.
-	"gce-instance-cpu":     createGCEInstanceMetric("cpu/usage", "The cpu usage (0-1) of this GCE instance.", "double"),
-	"gce-instance-memory":  createGCEInstanceMetric("memory/usage", "The memory usage (0-1) of this GCE instance.", "double"),
-	"gce-instance-disk":    createGCEInstanceMetric("disk/usage", "The disk usage (0-1) of this GCE instance.", "double"),
-	"gce-instance-ping":    createGCEInstanceMetric("ping", "The ping latency (ms) of this GCE instance.", "double"),
-	"gce-instance-tcpconn": createGCEInstanceMetric("tcpconn/count", "The number of open tcp connections of this GCE instance.", "int64"),
+	"service-latency": createMetric("service/latency", "The check latency (ms) of vanadium production services.", "double"),
+
+	// Custom metric for recording various counters of vanadium production services.
+	"service-counters": createMetric("service/counters", "Various counters of vanadium production services.", "double"),
+
+	// Custom metric for recording gce instance stats.
+	"gce-instance": createMetric("gce-instance/stats", "Various stats for GCE instances.", "double"),
+
+	// Custom metric for recording nginx stats.
+	"nginx": createMetric("nginx/stats", "Various stats for Nginx server.", "double"),
 }
 
-func createGCEInstanceMetric(metricName, description, valueType string) *cloudmonitoring.MetricDescriptor {
+func createMetric(metricType, description, valueType string) *cloudmonitoring.MetricDescriptor {
 	return &cloudmonitoring.MetricDescriptor{
-		Name:        fmt.Sprintf("%s/v/gceinstance/%s", customMetricPrefix, metricName),
+		Name:        fmt.Sprintf("%s/v/%s", customMetricPrefix, metricType),
 		Description: description,
 		TypeDescriptor: &cloudmonitoring.MetricDescriptorTypeDescriptor{
 			MetricType: "gauge",
@@ -52,16 +42,19 @@ func createGCEInstanceMetric(metricName, description, valueType string) *cloudmo
 		},
 		Labels: []*cloudmonitoring.MetricDescriptorLabelDescriptor{
 			&cloudmonitoring.MetricDescriptorLabelDescriptor{
-				Key:         fmt.Sprintf("%s/name", customMetricPrefix),
-				Description: "The name of the GCE instance.",
+				Key:         fmt.Sprintf("%s/gce-instance", customMetricPrefix),
+				Description: "The name of the GCE instance associated with this metric.",
 			},
 			&cloudmonitoring.MetricDescriptorLabelDescriptor{
-				Key:         fmt.Sprintf("%s/zone", customMetricPrefix),
-				Description: "The zone of the GCE instance.",
+				Key:         fmt.Sprintf("%s/gce-zone", customMetricPrefix),
+				Description: "The zone of the GCE instance associated with this metric.",
+			},
+			&cloudmonitoring.MetricDescriptorLabelDescriptor{
+				Key:         fmt.Sprintf("%s/metric-name", customMetricPrefix),
+				Description: "The name of the metric.",
 			},
 		},
 	}
-
 }
 
 // Authenticate authenticates the given service account's email with the given
