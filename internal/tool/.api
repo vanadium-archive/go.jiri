@@ -1,0 +1,32 @@
+pkg tool, func NewContext(ContextOpts) *Context
+pkg tool, func NewContextFromCommand(*cmdline.Command, ContextOpts) *Context
+pkg tool, func NewDefaultContext() *Context
+pkg tool, method (Context) Clone(ContextOpts) *Context
+pkg tool, method (Context) Color() bool
+pkg tool, method (Context) DryRun() bool
+pkg tool, method (Context) Env() map[string]string
+pkg tool, method (Context) Gerrit(string, string, string) *gerrit.Gerrit
+pkg tool, method (Context) Git(...gitOpt) *gitutil.Git
+pkg tool, method (Context) Hg(...hgOpt) *hgutil.Hg
+pkg tool, method (Context) Jenkins(string) (*jenkins.Jenkins, error)
+pkg tool, method (Context) Manifest() string
+pkg tool, method (Context) Run() *runutil.Run
+pkg tool, method (Context) Stderr() io.Writer
+pkg tool, method (Context) Stdin() io.Reader
+pkg tool, method (Context) Stdout() io.Writer
+pkg tool, method (Context) Verbose() bool
+pkg tool, type Context struct
+pkg tool, type ContextOpts struct
+pkg tool, type ContextOpts struct, Color *bool
+pkg tool, type ContextOpts struct, DryRun *bool
+pkg tool, type ContextOpts struct, Env map[string]string
+pkg tool, type ContextOpts struct, Manifest *string
+pkg tool, type ContextOpts struct, Stderr io.Writer
+pkg tool, type ContextOpts struct, Stdin io.Reader
+pkg tool, type ContextOpts struct, Stdout io.Writer
+pkg tool, type ContextOpts struct, Verbose *bool
+pkg tool, type HgOpts struct
+pkg tool, type HgOpts struct, Root string
+pkg tool, type RootDirOpt string
+pkg tool, var Name string
+pkg tool, var Version string

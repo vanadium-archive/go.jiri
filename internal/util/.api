@@ -1,0 +1,118 @@
+pkg util, const Black Color
+pkg util, const Blue Color
+pkg util, const Cyan Color
+pkg util, const Green Color
+pkg util, const Magenta Color
+pkg util, const NoSnapshotExitCode ideal-int
+pkg util, const Red Color
+pkg util, const White Color
+pkg util, const Yellow Color
+pkg util, func ApplyToLocalMaster(*tool.Context, Project, func() error) error
+pkg util, func BuildCop(*tool.Context, time.Time) (string, error)
+pkg util, func BuildCopRotationPath(*tool.Context) (string, error)
+pkg util, func BuildTool(*tool.Context, string, string, string, Project) error
+pkg util, func CleanupProjects(*tool.Context, Projects, bool) error
+pkg util, func ColorString(string, Color) string
+pkg util, func CreateSnapshot(*tool.Context, string) error
+pkg util, func CurrentProjectName(*tool.Context) (string, error)
+pkg util, func DataDirPath(*tool.Context, string) (string, error)
+pkg util, func HostPlatform() Platform
+pkg util, func LoadBuildCopRotation(*tool.Context) (*BuildCopRotation, error)
+pkg util, func LoadConfig(*tool.Context) (*Config, error)
+pkg util, func LocalManifestFile() (string, error)
+pkg util, func LocalProjects(*tool.Context) (Projects, error)
+pkg util, func LocalSnapshotDir() (string, error)
+pkg util, func ManifestDir() (string, error)
+pkg util, func ManifestFile(string) (string, error)
+pkg util, func NewConfig(...ConfigOpt) *Config
+pkg util, func NewFakeV23Root(*tool.Context) (*FakeV23Root, error)
+pkg util, func ParsePlatform(string) (Platform, error)
+pkg util, func PollProjects(*tool.Context, string, map[string]struct{}) (Update, error)
+pkg util, func ReadManifest(*tool.Context) (Projects, Tools, error)
+pkg util, func RemoteSnapshotDir() (string, error)
+pkg util, func ResolveManifestPath(string) (string, error)
+pkg util, func ThirdPartyBinPath(string, string) (string, error)
+pkg util, func UpdateUniverse(*tool.Context, bool) error
+pkg util, func V23Root() (string, error)
+pkg util, func VanadiumEnvironment(*tool.Context, Platform) (*envutil.Snapshot, error)
+pkg util, func VanadiumGitRepoHost() string
+pkg util, method (*Config) UnmarshalJSON([]byte) error
+pkg util, method (Config) ApiCheckRequiredProjects() map[string]bool
+pkg util, method (Config) GoWorkspaces() []string
+pkg util, method (Config) MarshalJSON() ([]byte, error)
+pkg util, method (Config) ProjectTests([]string) []string
+pkg util, method (Config) Projects() []string
+pkg util, method (Config) SnapshotLabelTests(string) []string
+pkg util, method (Config) SnapshotLabels() []string
+pkg util, method (Config) TestDependencies(string) []string
+pkg util, method (Config) TestParts(string) []string
+pkg util, method (Config) VDLWorkspaces() []string
+pkg util, method (FakeV23Root) AddProject(*tool.Context, Project) error
+pkg util, method (FakeV23Root) AddTool(*tool.Context, Tool) error
+pkg util, method (FakeV23Root) Cleanup(*tool.Context) error
+pkg util, method (FakeV23Root) CreateRemoteProject(*tool.Context, string) error
+pkg util, method (FakeV23Root) DisableRemoteManifestPush(*tool.Context) error
+pkg util, method (FakeV23Root) EnableRemoteManifestPush(*tool.Context) error
+pkg util, method (FakeV23Root) ReadLocalManifest(*tool.Context) (*Manifest, error)
+pkg util, method (FakeV23Root) ReadLocalToolsConfig(*tool.Context) (*Config, error)
+pkg util, method (FakeV23Root) ReadRemoteManifest(*tool.Context) (*Manifest, error)
+pkg util, method (FakeV23Root) ReadRemoteToolsConfig(*tool.Context) (*Config, error)
+pkg util, method (FakeV23Root) UpdateUniverse(*tool.Context, bool) error
+pkg util, method (FakeV23Root) WriteLocalManifest(*tool.Context, *Manifest) error
+pkg util, method (FakeV23Root) WriteLocalToolsConfig(*tool.Context, *Config) error
+pkg util, method (FakeV23Root) WriteRemoteManifest(*tool.Context, *Manifest) error
+pkg util, method (FakeV23Root) WriteRemoteToolsConfig(*tool.Context, *Config) error
+pkg util, method (Platform) String() string
+pkg util, method (UnsupportedPlatformErr) Error() string
+pkg util, method (UnsupportedProtocolErr) Error() string
+pkg util, type ApiCheckRequiredProjectsOpt []string
+pkg util, type BuildCopRotation struct
+pkg util, type BuildCopRotation struct, Shifts []struct {  Primary string `xml:"primary"`; Date string `xml:"startDate"`;}
+pkg util, type CL struct
+pkg util, type CL struct, Author string
+pkg util, type CL struct, Description string
+pkg util, type CL struct, Email string
+pkg util, type Color int
+pkg util, type Config struct
+pkg util, type ConfigOpt interface, unexported methods
+pkg util, type FakeV23Root struct
+pkg util, type FakeV23Root struct, Dir string
+pkg util, type FakeV23Root struct, Projects map[string]string
+pkg util, type GoWorkspacesOpt []string
+pkg util, type Import struct
+pkg util, type Import struct, Name string
+pkg util, type Imports map[string]Import
+pkg util, type Manifest struct
+pkg util, type Manifest struct, Imports []Import
+pkg util, type Manifest struct, Projects []Project
+pkg util, type Manifest struct, Tools []Tool
+pkg util, type Manifest struct, XMLName struct{}
+pkg util, type Platform struct
+pkg util, type Platform struct, Arch string
+pkg util, type Platform struct, Environment string
+pkg util, type Platform struct, OS string
+pkg util, type Platform struct, SubArch string
+pkg util, type Project struct
+pkg util, type Project struct, Exclude bool
+pkg util, type Project struct, Name string
+pkg util, type Project struct, Path string
+pkg util, type Project struct, Protocol string
+pkg util, type Project struct, Remote string
+pkg util, type Project struct, Revision string
+pkg util, type ProjectTestsOpt map[string][]string
+pkg util, type Projects map[string]Project
+pkg util, type SnapshotLabelTestsOpt map[string][]string
+pkg util, type TestDependenciesOpt map[string][]string
+pkg util, type TestGroupsOpt map[string][]string
+pkg util, type TestPartsOpt map[string][]string
+pkg util, type Tool struct
+pkg util, type Tool struct, Data string
+pkg util, type Tool struct, Exclude bool
+pkg util, type Tool struct, Name string
+pkg util, type Tool struct, Package string
+pkg util, type Tool struct, Project string
+pkg util, type Tools map[string]Tool
+pkg util, type UnsupportedPlatformErr struct
+pkg util, type UnsupportedProtocolErr string
+pkg util, type Update map[string][]CL
+pkg util, type VDLWorkspacesOpt []string

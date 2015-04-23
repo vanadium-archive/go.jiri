@@ -1,0 +1,12 @@
+pkg hgutil, func Error(string, string, ...string) HgError
+pkg hgutil, func New(*runutil.Run, string) *Hg
+pkg hgutil, method (*Hg) CheckoutBranch(string) error
+pkg hgutil, method (*Hg) CheckoutRevision(string) error
+pkg hgutil, method (*Hg) Clone(string, string) error
+pkg hgutil, method (*Hg) CurrentBranchName() (string, error)
+pkg hgutil, method (*Hg) GetBranches() ([]string, string, error)
+pkg hgutil, method (*Hg) Pull() error
+pkg hgutil, method (*Hg) RepoName() (string, error)
+pkg hgutil, method (HgError) Error() string
+pkg hgutil, type Hg struct
+pkg hgutil, type HgError struct

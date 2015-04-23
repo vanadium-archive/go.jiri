@@ -1,0 +1,1 @@
+pkg cache, func StoreGoogleStorageFile(*tool.Context, string, string, string) (string, error)

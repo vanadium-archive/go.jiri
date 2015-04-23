@@ -40,7 +40,7 @@ var (
 // init carries out the package initialization.
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
-	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", false, "Check for changes in the public Go API.")
+	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", true, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-depcop", true, "Check that no go-depcop violations exist.")

@@ -232,7 +232,7 @@ func doApiCheck(stdout, stderr io.Writer, args []string) error {
 			opts := ctx.Run().Opts()
 			if change.apiFileError != nil {
 				fmt.Fprintf(stdout, "ERROR: could not read the package's .api file: %v\n", change.apiFileError)
-				fmt.Fprintf(stdout, "ERROR: a readable .api file is required for all packages in project %s", change.projectName)
+				fmt.Fprintf(stdout, "ERROR: a readable .api file is required for all packages in project %s\n", change.projectName)
 				continue
 			}
 			opts.Stdin = strings.NewReader(change.newApi)

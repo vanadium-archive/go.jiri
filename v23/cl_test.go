@@ -818,7 +818,7 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag = false, false
+	copyrightFlag, depcopFlag, apiFlag = false, false, false
 	review.run()
 	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
@@ -849,7 +849,7 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag = false, false
+	copyrightFlag, depcopFlag, apiFlag = false, false, false
 	review.run()
 	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
@@ -939,7 +939,7 @@ func TestDirtyBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag = false, false
+	copyrightFlag, depcopFlag, apiFlag = false, false, false
 	review.run()
 	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
@@ -986,7 +986,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag = false, false
+	copyrightFlag, depcopFlag, apiFlag = false, false, false
 	review.run()
 	path := path.Join(repoPath, subdir)
 	want, err := filepath.EvalSymlinks(path)
