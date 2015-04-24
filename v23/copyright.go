@@ -169,6 +169,11 @@ func createComment(prefix, suffix, header string) string {
 // checkFile checks that the given file contains the appropriate
 // copyright header.
 func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool) error {
+	// Some projects contain third-party files in a "third_party" subdir.
+	// Skip such files for the same reason that we skip the third_party project.
+	if strings.Contains(path, string(filepath.Separator)+"third_party"+string(filepath.Separator)) {
+		return nil
+	}
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
 	interpreter, err := detectInterpreter(path)
@@ -250,6 +255,7 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 		return err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+	// Check the source code files.
 	files, err := ctx.Git().TrackedFiles()
 	if err != nil {
 		return err

@@ -214,4 +214,30 @@ func TestCopyright(t *testing.T) {
 			t.Fatalf("unexpected error message: got %q, want %q", got, want)
 		}
 	}
+
+	// Check that third-party files are skipped when checking for copyright
+	// headers.
+	errOut.Reset()
+	if err := checkProject(ctx, project, assets, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	path := filepath.Join(projectPath, "third_party")
+	if err := ctx.Run().MkdirAll(path, 0700); err != nil {
+		t.Fatalf("%v", err)
+	}
+	path = filepath.Join(path, "test.go")
+	if err := ctx.Run().WriteFile(path, []byte("garbage"), os.FileMode(0600)); err != nil {
+		t.Fatalf("%v", err)
+	}
+	// Since this file is in a subdir, we must run "git add" to have git track it.
+	// Without this, the test passes regardless of the subdir name.
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).Add(path); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := checkProject(ctx, project, assets, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("unexpected error message: %q", errOut.String())
+	}
 }
