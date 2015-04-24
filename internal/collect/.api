@@ -1,2 +1,0 @@
-pkg collect, func Error(func() error, *error)
-pkg collect, func Errors(func() error, *[]error)
