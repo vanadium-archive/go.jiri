@@ -36,12 +36,7 @@ var CustomMetricDescriptors = map[string]*cloudmonitoring.MetricDescriptor{
 }
 
 func createMetric(metricType, description, valueType string, includeGCELabels bool) *cloudmonitoring.MetricDescriptor {
-	labels := []*cloudmonitoring.MetricDescriptorLabelDescriptor{
-		&cloudmonitoring.MetricDescriptorLabelDescriptor{
-			Key:         fmt.Sprintf("%s/metric-name", customMetricPrefix),
-			Description: "The name of the metric.",
-		},
-	}
+	labels := []*cloudmonitoring.MetricDescriptorLabelDescriptor{}
 	if includeGCELabels {
 		labels = append(labels, &cloudmonitoring.MetricDescriptorLabelDescriptor{
 			Key:         fmt.Sprintf("%s/gce-instance", customMetricPrefix),
@@ -51,6 +46,10 @@ func createMetric(metricType, description, valueType string, includeGCELabels bo
 			Description: "The zone of the GCE instance associated with this metric.",
 		})
 	}
+	labels = append(labels, &cloudmonitoring.MetricDescriptorLabelDescriptor{
+		Key:         fmt.Sprintf("%s/metric-name", customMetricPrefix),
+		Description: "The name of the metric.",
+	})
 
 	return &cloudmonitoring.MetricDescriptor{
 		Name:        fmt.Sprintf("%s/v/%s", customMetricPrefix, metricType),
