@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultProjectTestTimeout = 5 * time.Minute
+	defaultProjectTestTimeout = 10 * time.Minute
 )
 
 // runProjectTest is a helper for running project tests.
