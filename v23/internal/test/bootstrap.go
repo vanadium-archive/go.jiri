@@ -61,7 +61,7 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Re
 		if i > 1 {
 			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, numAttempts)
 		}
-		if err = ctx.Run().CommandWithOpts(opts, filepath.Join(oldRoot, "scripts", "bootstrap")); err == nil {
+		if err = ctx.Run().CommandWithOpts(opts, filepath.Join(oldRoot, "www", "public", "bootstrap")); err == nil {
 			break
 		}
 	}
