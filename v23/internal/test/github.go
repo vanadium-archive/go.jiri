@@ -19,11 +19,6 @@ import (
 var (
 	mirrors = []Mirror{
 		Mirror{
-			name:         "environment",
-			googlesource: "https://vanadium.googlesource.com/environment",
-			github:       "git@github.com:vanadium/environment.git",
-		},
-		Mirror{
 			name:         "browser",
 			googlesource: "https://vanadium.googlesource.com/release.projects.browser",
 			github:       "git@github.com:vanadium/browser.git",
@@ -67,11 +62,6 @@ var (
 			name:         "playground",
 			googlesource: "https://vanadium.googlesource.com/release.projects.playground",
 			github:       "git@github.com:vanadium/playground.git",
-		},
-		Mirror{
-			name:         "scripts",
-			googlesource: "https://vanadium.googlesource.com/scripts",
-			github:       "git@github.com:vanadium/scripts.git",
 		},
 		Mirror{
 			name:         "third_party",
