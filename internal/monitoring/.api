@@ -1,2 +1,0 @@
-pkg monitoring, func Authenticate(string, string) (*cloudmonitoring.Service, error)
-pkg monitoring, var CustomMetricDescriptors map[string]*cloudmonitoring.MetricDescriptor

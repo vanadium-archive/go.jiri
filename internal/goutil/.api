@@ -1,1 +1,0 @@
-pkg goutil, func List(*tool.Context, []string) ([]string, error)
