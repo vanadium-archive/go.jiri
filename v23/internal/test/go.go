@@ -28,6 +28,7 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/goutil"
+	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
@@ -705,7 +706,17 @@ func testWorker(ctx *tool.Context, timeout string, args, nonTestArgs []string, t
 		opts.Stdout = &out
 		opts.Stderr = &out
 		start := time.Now()
-		err := ctx.Run().CommandWithOpts(opts, "v23", taskArgs...)
+		timeoutDuration, err := time.ParseDuration(timeout)
+		if err != nil {
+			results <- testResult{
+				status:   testFailed,
+				pkg:      task.pkg,
+				output:   fmt.Sprintf("time.ParseDuration(%s) failed: %v", timeout, err),
+				excluded: task.excludedTests,
+			}
+			continue
+		}
+		err = ctx.Run().TimedCommandWithOpts(timeoutDuration, opts, "v23", taskArgs...)
 		result := testResult{
 			pkg:      task.pkg,
 			time:     time.Now().Sub(start),
@@ -715,6 +726,8 @@ func testWorker(ctx *tool.Context, timeout string, args, nonTestArgs []string, t
 		if err != nil {
 			if isBuildFailure(err, out.String(), task.pkg) {
 				result.status = buildFailed
+			} else if err == runutil.CommandTimedOutErr {
+				result.status = testTimedout
 			} else {
 				result.status = testFailed
 			}
