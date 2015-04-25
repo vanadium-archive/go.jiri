@@ -52,7 +52,7 @@ func createMetric(metricType, description, valueType string, includeGCELabels bo
 	})
 
 	return &cloudmonitoring.MetricDescriptor{
-		Name:        fmt.Sprintf("%s/v/%s", customMetricPrefix, metricType),
+		Name:        fmt.Sprintf("%s/vanadium/%s", customMetricPrefix, metricType),
 		Description: description,
 		TypeDescriptor: &cloudmonitoring.MetricDescriptorTypeDescriptor{
 			MetricType: "gauge",
