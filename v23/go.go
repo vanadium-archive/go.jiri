@@ -456,12 +456,20 @@ func runGoExtDistClean(command *cmdline.Command, _ []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
 	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
 	if err != nil {
 		return err
 	}
 	failed := false
+
 	for _, workspace := range env.GetTokens("GOPATH", ":") {
+		if !strings.HasPrefix(workspace, root) {
+			continue
+		}
 		for _, name := range []string{"bin", "pkg"} {
 			dir := filepath.Join(workspace, name)
 			if err := ctx.Run().RemoveAll(dir); err != nil {
