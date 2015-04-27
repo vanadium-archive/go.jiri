@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/test"
@@ -36,8 +35,18 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 		return nil, internalTestError{err, "Install"}
 	}
 
+	// Compute the timestamp for the build snapshot.
+	labelFile, err := util.ManifestFile("snapshot/stable-go")
+	if err != nil {
+		return nil, internalTestError{err, "ManifestFile"}
+	}
+	snapshotFile, err := filepath.EvalSymlinks(labelFile)
+	if err != nil {
+		return nil, internalTestError{err, "EvalSymlinks"}
+	}
+	timestamp := filepath.Base(snapshotFile)
+
 	// Upload all v.io binaries to Google Storage.
-	timestamp := time.Now().Format(time.RFC3339)
 	bucket := fmt.Sprintf("gs://vanadium-binaries/%s_%s/", runtime.GOOS, runtime.GOARCH)
 	root, err := util.V23Root()
 	if err != nil {
