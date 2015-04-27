@@ -61,10 +61,15 @@ V23 api check
 Check to see if any changes have been made to the public API.
 
 Usage:
-   v23 api check <projects>
+   v23 api check [flags] <projects>
 
 <projects> is a list of Vanadium projects to check. If none are specified, all
 projects that require a public API check upon presubmit are checked.
+
+The v23 api check flags are:
+ -detailed=true
+   If true, shows each API change in an expanded form. Otherwise, only a summary
+   is shown.
 
 V23 api fix
 

@@ -183,9 +183,10 @@ type apiError struct {
 
 func (a apiError) Error() string {
 	result := "changelist changes the public Go API without updating the corresponding .api file(s)\n\n"
-	result += "If this change is intentional, run 'v23 api fix " + a.project + "'\n"
+	result += "For a detailed account of these changes, run 'v23 api check " + a.project + "'\n"
+	result += "If these changes are intentional, run 'v23 api fix " + a.project + "'\n"
 	result += "to update the corresponding .api files. Then add the updated .api files to\n"
-	result += "your change and re-run the mail command.\n"
+	result += "your changelist and re-run the mail command.\n\n"
 	result += a.apiCheckOutput
 	return result
 }
@@ -512,7 +513,7 @@ func (r *review) checkGoApi() error {
 		return nil
 	}
 	var out bytes.Buffer
-	if err := doApiCheck(&out, r.ctx.Stderr(), []string{name}); err != nil {
+	if err := doApiCheck(&out, r.ctx.Stderr(), []string{name}, false); err != nil {
 		return err
 	}
 	if out.Len() != 0 {

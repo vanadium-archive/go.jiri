@@ -113,7 +113,7 @@ func testFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
 		t.Fatalf("doApiCheck failed: %v", err)
 	} else if buf.String() == "" {
 		t.Fatalf("doApiCheck detected no changes, but some were expected")
@@ -152,7 +152,7 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
 		t.Fatalf("doApiCheck failed: %v", err)
 	} else if buf.String() != "" {
 		t.Fatalf("doApiCheck detected changes, but none were expected: %s", buf.String())
@@ -186,11 +186,11 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
 		t.Fatalf("doApiCheck failed: %v", err)
 	} else if buf.String() == "" {
 		t.Fatalf("doApiCheck should have failed, but did not")
-	} else if !strings.Contains(buf.String(), "ERROR: could not read the package's .api file") {
+	} else if !strings.Contains(buf.String(), "could not read the package's .api file") {
 		t.Fatalf("doApiCheck failed, but not for the expected reason: %s", buf.String())
 	}
 }
@@ -227,7 +227,7 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}); err != nil {
+	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
 		t.Fatalf("doApiCheck failed: %v", err)
 	} else if buf.String() != "" {
 		t.Fatalf("doApiCheck should have passed, but did not: %s", buf.String())
