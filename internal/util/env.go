@@ -300,7 +300,7 @@ func setPathHelper(ctx *tool.Context, env *envutil.Snapshot, name, root string, 
 			// account for Go workspaces that span multiple v23 projects,
 			// such as: $V23_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := os.Stat(filepath.Join(project.Path)); err == nil {
+				if _, err := os.Stat(filepath.Join(absWorkspace)); err == nil {
 					path = append(path, absWorkspace)
 					break
 				}
