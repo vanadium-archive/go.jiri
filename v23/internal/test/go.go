@@ -1380,9 +1380,93 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_
 	return goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
 }
 
+// regressionTestsToRun are regexp patters of tests to run in the regression
+// test.  Right now we run all v23 tests.  I think we will need to define
+// a more specific set of tests to run in reality.  This tests too much, it
+// failes when binaries add/remove flags and so on.
+var regressionTestsToRun = []string{
+	"TestV23.*",
+}
+
+type binSet map[string]struct{}
+
+// regressionBinSets are sets of binaries to test against older or newer binaries.
+// These correspond to typical upgrade scenarios.  For example it is somewhat
+// common to upgrade an agent against old binaries, or to upgrade other binaries
+// while keeping an agent old, therefore it's nice to see how just a new/old
+// agent does against other binaries.
+var regressionBinSets = map[string]binSet{
+	"agentonly": {
+		"agentd": struct{}{},
+	},
+	"agentdevice": {
+		"agentd":  struct{}{},
+		"deviced": struct{}{},
+	},
+	"prodservices": {
+		"agentd":       struct{}{},
+		"deviced":      struct{}{},
+		"applicationd": struct{}{},
+		"binaryd":      struct{}{},
+		"identityd":    struct{}{},
+		"proxyd":       struct{}{},
+		"mounttabled":  struct{}{},
+	},
+}
+
+// regressionDirection determines if the regression tests uses
+// new binaries for the selected binSet and old binaries for
+// everything else, or the opposite.
+type regressionDirection string
+
+const (
+	newBinSet = regressionDirection("new")
+	oldBinSet = regressionDirection("old")
+)
+
 // vanadiumRegressionTest runs integration tests for Vanadium projects
 // using different versions of Vanadium binaries.
 func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	var againstDate time.Time
+	if dateStr := os.Getenv("V23_REGTEST_DATE"); dateStr != "" {
+		if againstDate, e = time.Parse("2006-01-02", dateStr); e != nil {
+			return nil, fmt.Errorf("time.Parse(%q) failed: %v", dateStr, e)
+		}
+	} else {
+		var days uint64 = 1
+		if daysStr := os.Getenv("V23_REGTEST_DAYS"); daysStr != "" {
+			if days, e = strconv.ParseUint(daysStr, 10, 32); e != nil {
+				return nil, fmt.Errorf("ParseUint(%q) failed: %v", daysStr, e)
+			}
+		}
+		againstDate = time.Now().AddDate(0, 0, -int(days))
+	}
+
+	var set map[string]struct{}
+	if binSetStr := os.Getenv("V23_REGTEST_BINSET"); binSetStr != "" {
+		if set = regressionBinSets[binSetStr]; set == nil {
+			return nil, fmt.Errorf("specified binset %q is not valid", binSetStr)
+		}
+	} else if binariesStr := os.Getenv("V23_REGTEST_BINARIES"); binariesStr != "" {
+		set = binSet{}
+		for _, name := range strings.Split(binariesStr, ",") {
+			set[name] = struct{}{}
+		}
+	} else {
+		set = regressionBinSets["prodservices"]
+	}
+
+	var directions []regressionDirection
+	if directionStr := os.Getenv("V23_REGTEST_DIR"); directionStr != "" {
+		dir := regressionDirection(directionStr)
+		if dir != newBinSet && dir != oldBinSet {
+			return nil, fmt.Errorf("specified direction %q is not valid", directionStr)
+		}
+		directions = []regressionDirection{dir}
+	} else {
+		directions = []regressionDirection{oldBinSet, newBinSet}
+	}
+
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
@@ -1395,141 +1479,153 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 		return nil, err
 	}
 	suffix := suffixOpt(genTestNameSuffix("V23Test"))
-	args := argsOpt([]string{"-run", "^TestV23"})
+	testPattern := "^" + strings.Join(regressionTestsToRun, "$|^") + "$"
+	args := argsOpt([]string{"-run", testPattern})
 	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
 	matcher := funcMatcherOpt{&matchV23TestFunc{}}
-	if err := prepareVanadiumBinaries(ctx); err != nil {
+
+	// Build all v.io binaries.  We are going to check the binaries at head
+	// against those from a previous date.
+	if err := ctx.Run().Command("v23", "go", "install", "v.io/..."); err != nil {
+		return nil, internalTestError{err, "Install"}
+	}
+	root, err := util.V23Root()
+	if err != nil {
 		return nil, err
 	}
-	env := ctx.Env()
-	env["V23_BIN_DIR"] = filepath.Join(regTestBinDirPath(), "bin")
-	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
-	return goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
-}
+	newBinDir := filepath.Join(root, "release", "go", "bin")
 
-// newRand creates a new pseudo-random number generator, the seed may
-// be supplied by V23_RNG_SEED to allow for reproducing a previous
-// sequence.
-func newRand(ctx *tool.Context) (*rand.Rand, error) {
-	seed := time.Now().UnixNano()
-	seedString := os.Getenv("V23_RNG_SEED")
-	if seedString != "" {
-		var err error
-		base, bitSize := 0, 64
-		seed, err = strconv.ParseInt(seedString, base, bitSize)
-		if err != nil {
-			return nil, fmt.Errorf("ParseInt(%v, %v, %v) failed: %v", seedString, base, bitSize, err)
+	// Now download all the binaries for a previous date.
+	oldBinDir, err := downloadVanadiumBinaries(ctx, againstDate)
+	if err == noSnapshotErr {
+		return &test.Result{Status: test.Skipped}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	outBinDir := filepath.Join(regTestBinDirPath(), "bin")
+	env := ctx.Env()
+	env["V23_BIN_DIR"] = outBinDir
+	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
+	// Now we run tests with various sets of new/old binaries.
+	for _, dir := range directions {
+		in1, in2 := oldBinDir, newBinDir
+		if dir == newBinSet {
+			in1, in2 = in2, in1
+		}
+		if err := prepareVanadiumBinaries(ctx, in1, in2, outBinDir, set); err != nil {
+			return nil, err
+		}
+		result, err := goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+		if err != nil || (result.Status != test.Passed && result.Status != test.Skipped) {
+			return result, err
 		}
 	}
-	fmt.Fprintf(ctx.Stdout(), "seeding pseudo-random number generator with %v\n", seed)
-	return rand.New(rand.NewSource(seed)), nil
+	return &test.Result{Status: test.Passed}, nil
 }
 
-// prepareVanadiumBinaries uses the vbinary tool to download Vanadium
-// binaries generated by daily builds and creates a directory
-// populated with a random combination of these binaries.
-//
-// TODO(jsimsa): Add support for a config file which can specify the
-// combination of binaries to prepare.
-func prepareVanadiumBinaries(ctx *tool.Context) (e error) {
-	// Build the vbinary tool.
+// noSnapshotErr is returned from downloadVanadiumBinaries when there were no
+// binaries for the given date.
+var noSnapshotErr = fmt.Errorf("no snapshots for specified date.")
+
+func downloadVanadiumBinaries(ctx *tool.Context, date time.Time) (binDir string, e error) {
+	dateStr := date.Format("2006-01-02")
+	binDir = filepath.Join(regTestBinDirPath(), dateStr)
+	_, err := os.Stat(binDir)
+	if err == nil {
+		return binDir, nil
+	}
+	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("Stat() failed: %v", err)
+	}
+
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 	vbinaryBin := filepath.Join(tmpDir, "vbinary")
 	if err := ctx.Run().Command("v23", "go", "build", "-o", vbinaryBin, "v.io/x/devtools/vbinary"); err != nil {
+		return "", err
+	}
+	if err := ctx.Run().Command(vbinaryBin,
+		"-date-prefix", dateStr,
+		"-key-file", os.Getenv("V23_KEY_FILE"),
+		"download",
+		"-output-dir", binDir); err != nil {
+		exiterr, ok := err.(*exec.ExitError)
+		if !ok {
+			return "", err
+		}
+		status, ok := exiterr.Sys().(syscall.WaitStatus)
+		if !ok {
+			return "", err
+		}
+		if status.ExitStatus() == util.NoSnapshotExitCode {
+			return "", noSnapshotErr
+		}
+	}
+	return binDir, nil
+}
+
+// prepareRegressionBinaries assembles binaries into the directory out by taking
+// binaries from in1 and in2.  Binaries in the list take1 will be taken
+// from 1, other will be taken from 2.
+func prepareVanadiumBinaries(ctx *tool.Context, in1, in2, out string, take1 binSet) error {
+	if err := ctx.Run().RemoveAll(out); err != nil {
+		return err
+	}
+	if err := ctx.Run().MkdirAll(out, os.FileMode(0755)); err != nil {
 		return err
 	}
 
-	// Download <maxDays> days worth of Vanadium binaries.
-	//
-	// TODO(jsimsa): Move the logic that collects n days worth of
-	// Vanadium binaries to the vbinary tool.
-	const maxDays = 5
-	dates := []string{}
-	binaries := map[string]struct{}{}
-	t := time.Now()
-	for i := 0; i < maxDays; i++ {
-		t = t.AddDate(0, 0, -1)
-		date := t.Format("2006-01-02")
-		binDir := filepath.Join(regTestBinDirPath(), date)
-		if _, err := os.Stat(binDir); err != nil {
-			if !os.IsNotExist(err) {
-				return fmt.Errorf("Stat() failed: %v", err)
-			}
-			if err := ctx.Run().Command(vbinaryBin,
-				"-date-prefix", date,
-				"-key-file", os.Getenv("V23_KEY_FILE"),
-				"download",
-				"-output-dir", binDir); err != nil {
-				// If the vbinary tool failed because the requested snapshot
-				// does not exist, try a different date. If the vbinary tool
-				// failed for a different reason, report the error.
-				exiterr, ok := err.(*exec.ExitError)
-				if !ok {
-					return err
-				}
-				status, ok := exiterr.Sys().(syscall.WaitStatus)
-				if !ok {
-					return err
-				}
-				if status.ExitStatus() != util.NoSnapshotExitCode {
-					return err
-				}
-			}
-		}
-		dates = append(dates, date)
-		fileInfos, err := ioutil.ReadDir(binDir)
-		if err != nil {
-			return fmt.Errorf("ReadDir(%v) failed: %v", binDir, err)
-		}
-		for _, fileInfo := range fileInfos {
-			if fileInfo.Name() != ".done" {
-				binaries[fileInfo.Name()] = struct{}{}
-			}
+	binaries := make(map[string]string)
+
+	// First take everything from in2.
+	fileInfos, err := ioutil.ReadDir(in2)
+	if err != nil {
+		return fmt.Errorf("ReadDir(%v) failed: %v", in2, err)
+	}
+	for _, fileInfo := range fileInfos {
+		name := fileInfo.Name()
+		binaries[name] = filepath.Join(in2, name)
+	}
+
+	// Now take things from in1 if they are in take1, or were missing from in2.
+	fileInfos, err = ioutil.ReadDir(in1)
+	if err != nil {
+		return fmt.Errorf("ReadDir(%v) failed: %v", in1, err)
+	}
+	for _, fileInfo := range fileInfos {
+		name := fileInfo.Name()
+		_, inSet := take1[name]
+		if inSet || binaries[name] == "" {
+			binaries[name] = filepath.Join(in1, name)
 		}
 	}
 
-	// Populate the regression test binary directory with a random
-	// combination of Vanadium binaries.
-	sortedBinaries := []string{}
-	for binary, _ := range binaries {
-		sortedBinaries = append(sortedBinaries, binary)
+	// We want to print some info in sorted order for easy reading.
+	sortedBinaries := make([]string, 0, len(binaries))
+	for name := range binaries {
+		sortedBinaries = append(sortedBinaries, name)
 	}
 	sort.Strings(sortedBinaries)
-	binDir := filepath.Join(regTestBinDirPath(), "bin")
-	if err := ctx.Run().RemoveAll(binDir); err != nil {
-		return err
-	}
-	if err := ctx.Run().MkdirAll(binDir, os.FileMode(0755)); err != nil {
-		return err
-	}
-	rand, err := newRand(ctx)
-	if err != nil {
-		return err
-	}
-	for _, binary := range sortedBinaries {
-		for {
-			n := rand.Intn(maxDays)
-			src := filepath.Join(regTestBinDirPath(), dates[n], binary)
-			if _, err := os.Stat(src); err != nil {
-				if !os.IsNotExist(err) {
-					return fmt.Errorf("Stat() failed: %v", err)
-				}
-				// If the binary does not exist in the randomly selected daily
-				// build, try again.
+
+	// We go through the sorted list twice.  The first time we print
+	// the hold-out binaries, the second time the rest.  This just
+	// makes it easier to read the debug output.
+	for _, holdout := range []bool{true, false} {
+		for _, name := range sortedBinaries {
+			if _, ok := take1[name]; ok != holdout {
 				continue
 			}
-			// If the binary does exist, create a symlink to it in the
-			// binary directory.
-			dst := filepath.Join(binDir, binary)
+			src := binaries[name]
+			dst := filepath.Join(out, name)
 			if err := ctx.Run().Symlink(src, dst); err != nil {
 				return err
 			}
-			fmt.Fprintf(ctx.Stdout(), "using %v from %v\n", binary, dates[n])
-			break
+			fmt.Fprintf(ctx.Stdout(), "using %s from %s\n", name, src)
 		}
 	}
 
