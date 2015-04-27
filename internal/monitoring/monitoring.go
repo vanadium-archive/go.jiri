@@ -16,26 +16,42 @@ const (
 	customMetricPrefix = "custom.cloudmonitoring.googleapis.com"
 )
 
+type labelData struct {
+	key         string
+	description string
+}
+
 // CustomMetricDescriptors is a map from metric's short names to their
 // MetricDescriptor definitions.
 var CustomMetricDescriptors = map[string]*cloudmonitoring.MetricDescriptor{
 	// Custom metric for recording check latency of vanadium production services.
-	"service-latency": createMetric("service/latency", "The check latency (ms) of vanadium production services.", "double", true),
+	"service-latency": createMetric("service/latency", "The check latency (ms) of vanadium production services.", "double", true, nil),
 
 	// Custom metric for recording various counters of vanadium production services.
-	"service-counters": createMetric("service/counters", "Various counters of vanadium production services.", "double", true),
+	"service-counters": createMetric("service/counters", "Various counters of vanadium production services.", "double", true, nil),
+
+	// Custom metric for recording total rpc qps for a service.
+	"service-qps-total": createMetric("service/qps/total", "Total service QPS.", "double", true, nil),
+
+	// Custom metric for recording per-method rpc qps for a service.
+	"service-qps-method": createMetric("service/qps/method", "Service QPS per method.", "double", true, []labelData{
+		labelData{
+			key:         "method-name",
+			description: "The method name",
+		},
+	}),
 
 	// Custom metric for recording gce instance stats.
-	"gce-instance": createMetric("gce-instance/stats", "Various stats for GCE instances.", "double", true),
+	"gce-instance": createMetric("gce-instance/stats", "Various stats for GCE instances.", "double", true, nil),
 
 	// Custom metric for recording nginx stats.
-	"nginx": createMetric("nginx/stats", "Various stats for Nginx server.", "double", true),
+	"nginx": createMetric("nginx/stats", "Various stats for Nginx server.", "double", true, nil),
 
 	// Custom metric for rpc load tests.
-	"rpc-load-test": createMetric("rpc-load-test", "Results of rpc load test", "double", false),
+	"rpc-load-test": createMetric("rpc-load-test", "Results of rpc load test.", "double", false, nil),
 }
 
-func createMetric(metricType, description, valueType string, includeGCELabels bool) *cloudmonitoring.MetricDescriptor {
+func createMetric(metricType, description, valueType string, includeGCELabels bool, extraLabels []labelData) *cloudmonitoring.MetricDescriptor {
 	labels := []*cloudmonitoring.MetricDescriptorLabelDescriptor{}
 	if includeGCELabels {
 		labels = append(labels, &cloudmonitoring.MetricDescriptorLabelDescriptor{
@@ -50,6 +66,14 @@ func createMetric(metricType, description, valueType string, includeGCELabels bo
 		Key:         fmt.Sprintf("%s/metric-name", customMetricPrefix),
 		Description: "The name of the metric.",
 	})
+	if extraLabels != nil {
+		for _, data := range extraLabels {
+			labels = append(labels, &cloudmonitoring.MetricDescriptorLabelDescriptor{
+				Key:         fmt.Sprintf("%s/%s", customMetricPrefix, data.key),
+				Description: data.description,
+			})
+		}
+	}
 
 	return &cloudmonitoring.MetricDescriptor{
 		Name:        fmt.Sprintf("%s/vanadium/%s", customMetricPrefix, metricType),
