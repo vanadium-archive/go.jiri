@@ -217,8 +217,8 @@ func setupPrincipal(ctx *tool.Context, vroot, tmpdir, pubkey string, blessingNam
 		return "", err
 	}
 	for _, name := range blessingNames {
-		if err := ctx.Run().TimedCommand(test.DefaultTimeout, bin, "--v23.credentials", dir, "addtoroots", pubkey, name); err != nil {
-			fmt.Fprintf(ctx.Stderr(), "principal addtoroots %v %v failed: %v\n", pubkey, name, err)
+		if err := ctx.Run().TimedCommand(test.DefaultTimeout, bin, "--v23.credentials", dir, "recognize", name, pubkey); err != nil {
+			fmt.Fprintf(ctx.Stderr(), "principal recognize %v %v failed: %v\n", name, pubkey, err)
 			return "", err
 		}
 	}
