@@ -1380,14 +1380,6 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_
 	return goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
 }
 
-// regressionTestsToRun are regexp patters of tests to run in the regression
-// test.  Right now we run all v23 tests.  I think we will need to define
-// a more specific set of tests to run in reality.  This tests too much, it
-// failes when binaries add/remove flags and so on.
-var regressionTestsToRun = []string{
-	"TestV23.*",
-}
-
 type binSet map[string]struct{}
 
 // regressionBinSets are sets of binaries to test against older or newer binaries.
@@ -1467,6 +1459,15 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 		directions = []regressionDirection{oldBinSet, newBinSet}
 	}
 
+	// By default we only run TestV23Hello.* because there are often
+	// changes to flags command line interfaces that often break other
+	// tests.  In the future we may be more strict about compatibility
+	// for command line utilities and add more tests here.
+	var testsToRun = "^TestV23Hello.*"
+	if testsStr := os.Getenv("V23_REGTEST_TESTS"); testsStr != "" {
+		testsToRun = testsStr
+	}
+
 	// Initialize the test.
 	cleanup, err := initTest(ctx, testName, []string{})
 	if err != nil {
@@ -1479,8 +1480,7 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 		return nil, err
 	}
 	suffix := suffixOpt(genTestNameSuffix("V23Test"))
-	testPattern := "^" + strings.Join(regressionTestsToRun, "$|^") + "$"
-	args := argsOpt([]string{"-run", testPattern})
+	args := argsOpt([]string{"-run", testsToRun})
 	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
 	matcher := funcMatcherOpt{&matchV23TestFunc{}}
 
