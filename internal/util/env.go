@@ -19,6 +19,7 @@ import (
 
 const (
 	rootEnv          = "V23_ROOT"
+	javaEnv          = "JDK_HOME"
 	metadataDirName  = ".v23"
 	metadataFileName = "metadata.v2"
 )
@@ -160,7 +161,9 @@ func VanadiumEnvironment(ctx *tool.Context, platform Platform) (*envutil.Snapsho
 	}
 	switch {
 	case platform.Arch == runtime.GOARCH && platform.OS == runtime.GOOS:
-		// If setting up the environment for the host, we are done.
+		// Set environment variables needed to build a Go shared library used
+		// by Java.
+		setJavaEnv(env, platform)
 	case platform.Arch == "arm" && platform.OS == "linux":
 		// Set up cross-compilation for arm / linux.
 		if err := setArmEnv(env, platform); err != nil {
@@ -201,9 +204,28 @@ func V23Root() (string, error) {
 	return result, nil
 }
 
+// setJavaEnv sets the environment variables used for building a Go shared
+// library that is invoked from Java code.
+// Note that we set these variables for all builds, Java-related or not, but
+// for non-Java cases they will be a noop.
+func setJavaEnv(env *envutil.Snapshot, platform Platform) {
+	if platform.OS != "linux" { // Java-related builds only supported on Linux
+		return
+	}
+	jdkHome := os.Getenv(javaEnv)
+	if jdkHome == "" {
+		return
+	}
+	cflags := env.GetTokens("CGO_CFLAGS", " ")
+	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", "linux"))
+	env.SetTokens("CGO_CFLAGS", cflags, " ")
+}
+
 // setAndroidEnv sets the environment variables used for android
 // cross-compilation.
 func setAndroidEnv(env *envutil.Snapshot, platform Platform) error {
+	setJavaEnv(env, platform)
+
 	root, err := V23Root()
 	if err != nil {
 		return err

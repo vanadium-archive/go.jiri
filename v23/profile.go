@@ -29,7 +29,8 @@ var (
 	defaultFilePerm = os.FileMode(0644)
 	knownProfiles   = map[string]struct{}{
 		"arm":         struct{}{},
-		"mobile":      struct{}{},
+		"android":     struct{}{},
+		"java":        struct{}{},
 		"syncbase":    struct{}{},
 		"third-party": struct{}{},
 		"web":         struct{}{},
@@ -144,10 +145,12 @@ func setup(ctx *tool.Context, os, profile string) error {
 		}
 	case "linux":
 		switch profile {
+		case "android":
+			return setupAndroidLinux(ctx)
 		case "arm":
 			return setupArmLinux(ctx)
-		case "mobile":
-			return setupMobileLinux(ctx)
+		case "java":
+			return setupJavaLinux(ctx)
 		case "syncbase":
 			return setupSyncbaseLinux(ctx)
 		case "web":
@@ -206,7 +209,7 @@ func installAndroidPkg(ctx *tool.Context, sdkRoot string, pkg androidPkg) error 
 		// Identify all indexes that match the given package.
 		var out bytes.Buffer
 		androidBin := filepath.Join(sdkRoot, "tools", "android")
-		androidArgs := []string{"list", "sdk", "--all"}
+		androidArgs := []string{"list", "sdk", "--all", "--no-https"}
 		opts := ctx.Run().Opts()
 		opts.Stdout = &out
 		opts.Stderr = &out
@@ -244,7 +247,7 @@ func installAndroidPkg(ctx *tool.Context, sdkRoot string, pkg androidPkg) error 
 		}
 
 		// Install the target package.
-		androidArgs = []string{"update", "sdk", "--no-ui", "--all", "--filter", fmt.Sprintf("%d", indexes[0])}
+		androidArgs = []string{"update", "sdk", "--no-ui", "--all", "--no-https", "--filter", fmt.Sprintf("%d", indexes[0])}
 		var stdin, stdout bytes.Buffer
 		stdin.WriteString("y") // pasing "y" to accept Android's license agreement
 		opts = ctx.Run().Opts()
@@ -336,34 +339,11 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err := ctx.Run().MkdirAll(repoDir, defaultDirPerm); err != nil {
 			return err
 		}
-		name := "go1.4.2.src.tar.gz"
-		remote, local := "https://storage.googleapis.com/golang/"+name, filepath.Join(repoDir, name)
-		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
-			return err
-		}
-		if err := run(ctx, "tar", []string{"-C", repoDir, "-xzf", local}, nil); err != nil {
-			return err
-		}
-		if err := ctx.Run().RemoveAll(local); err != nil {
-			return err
-		}
-		if err := ctx.Run().Rename(filepath.Join(repoDir, "go"), goDir); err != nil {
-			return err
-		}
-		goSrcDir := filepath.Join(goDir, "src")
-		if err := ctx.Run().Chdir(goSrcDir); err != nil {
-			return err
-		}
-		makeBin := filepath.Join(goSrcDir, "make.bash")
-		makeArgs := []string{"--no-clean"}
 		makeEnv := envutil.NewSnapshotFromOS()
 		unsetGoEnv(makeEnv)
 		makeEnv.Set("GOARCH", "arm")
 		makeEnv.Set("GOOS", "linux")
-		if err := run(ctx, makeBin, makeArgs, makeEnv.Map()); err != nil {
-			return err
-		}
-		return nil
+		return installGo14(ctx, goDir, makeEnv)
 	}
 	if err := atomicAction(ctx, installGoFn, goDir, "Download and build Go for arm/linux"); err != nil {
 		return err
@@ -483,8 +463,8 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 	return nil
 }
 
-// setupMobileLinux sets up the mobile profile for linux.
-func setupMobileLinux(ctx *tool.Context) (e error) {
+// setupAndroidLinux sets up the android profile for linux.
+func setupAndroidLinux(ctx *tool.Context) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -496,36 +476,14 @@ func setupMobileLinux(ctx *tool.Context) (e error) {
 		return err
 	}
 
-	// Download Java 7 JRE.
 	androidRoot := filepath.Join(root, "third_party", "android")
-	javaDir := filepath.Join(androidRoot, "java")
-	jreDir := filepath.Join(javaDir, "jre1.7.0_65")
-	installJreFn := func() error {
-		if err := ctx.Run().MkdirAll(javaDir, defaultDirPerm); err != nil {
-			return err
-		}
-		tmpDir, err := ctx.Run().TempDir("", "")
-		if err != nil {
-			fmt.Errorf("TempDir() failed: %v", err)
-		}
-		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		remote := "http://javadl.sun.com/webapps/download/AutoDL?BundleId=92494"
-		local := filepath.Join(tmpDir, "jre.tar.gz")
-		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
-			return err
-		}
-		if err := run(ctx, "tar", []string{"-C", javaDir, "-xzf", local}, nil); err != nil {
-			return err
-		}
-		return nil
-	}
-	if err := atomicAction(ctx, installJreFn, jreDir, "Download Java 7 JRE"); err != nil {
-		return err
-	}
 
 	// Download Android SDK.
 	sdkRoot := filepath.Join(androidRoot, "android-sdk-linux")
 	installSdkFn := func() error {
+		if err := ctx.Run().MkdirAll(sdkRoot, defaultDirPerm); err != nil {
+			return err
+		}
 		tmpDir, err := ctx.Run().TempDir("", "")
 		if err != nil {
 			fmt.Errorf("TempDir() failed: %v", err)
@@ -591,45 +549,32 @@ func setupMobileLinux(ctx *tool.Context) (e error) {
 		return err
 	}
 
-	// Download and build Android Go.
+	// Install Android Go.
 	androidGo := filepath.Join(androidRoot, "go")
 	installGoFn := func() error {
-		if err := ctx.Run().Chdir(androidRoot); err != nil {
-			return err
-		}
-		// Download Go at a fixed revision.
-		remote, revision := "https://github.com/golang/go.git", "324f38a222cc48439a11a5545c85cb8614385987"
-		if err := run(ctx, "git", []string{"clone", remote}, nil); err != nil {
-			return err
-		}
-		if err := ctx.Run().Chdir(androidGo); err != nil {
-			return err
-		}
-		if err := run(ctx, "git", []string{"reset", "--hard", revision}, nil); err != nil {
-			return err
-		}
-		// Build.
-		srcDir := filepath.Join(androidGo, "src")
-		if err := ctx.Run().Chdir(srcDir); err != nil {
-			return err
-		}
 		makeEnv := envutil.NewSnapshotFromOS()
 		unsetGoEnv(makeEnv)
 		makeEnv.Set("CC_FOR_TARGET", filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-gcc"))
 		makeEnv.Set("GOOS", "android")
 		makeEnv.Set("GOARCH", "arm")
 		makeEnv.Set("GOARM", "7")
-		makeBin := filepath.Join(srcDir, "make.bash")
-		if err := run(ctx, makeBin, nil, makeEnv.Map()); err != nil {
-			return err
-		}
-		return nil
+		return installGo15(ctx, androidGo, makeEnv)
 	}
-	if err := atomicAction(ctx, installGoFn, androidGo, "Download and build Android Go"); err != nil {
+	return atomicAction(ctx, installGoFn, androidGo, "Download and build Android Go")
+}
+
+// setupJavaLinux sets up the java profile for linux.
+func setupJavaLinux(ctx *tool.Context) error {
+	root, err := util.V23Root()
+	if err != nil {
 		return err
 	}
-
-	return nil
+	javaRoot := filepath.Join(root, "third_party", "java")
+	javaGo := filepath.Join(javaRoot, "go")
+	installGoFn := func() error {
+		return installGo15(ctx, javaGo, envutil.NewSnapshotFromOS())
+	}
+	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
 }
 
 // setupThirdPartyDarwin sets up the third-party profile for darwin.
@@ -827,6 +772,81 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 		return err
 	}
 
+	return nil
+}
+
+// installGo14 installs Go 1.4 at a given location, using the provided
+// environment during compilation.
+func installGo14(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
+	tmpDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		return err
+	}
+	name := "go1.4.2.src.tar.gz"
+	remote, local := "https://storage.googleapis.com/golang/"+name, filepath.Join(tmpDir, name)
+	if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
+		return err
+	}
+	if err := run(ctx, "tar", []string{"-C", tmpDir, "-xzf", local}, nil); err != nil {
+		return err
+	}
+	if err := ctx.Run().RemoveAll(local); err != nil {
+		return err
+	}
+	if err := ctx.Run().Rename(filepath.Join(tmpDir, "go"), goDir); err != nil {
+		return err
+	}
+	goSrcDir := filepath.Join(goDir, "src")
+	if err := ctx.Run().Chdir(goSrcDir); err != nil {
+		return err
+	}
+	makeBin := filepath.Join(goSrcDir, "make.bash")
+	makeArgs := []string{"--no-clean"}
+	if err := run(ctx, makeBin, makeArgs, env.Map()); err != nil {
+		return err
+	}
+	return nil
+}
+
+// installGo15 installs Go 1.5 at a given location, using the provided
+// environment during compilation.
+func installGo15(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
+	// First install bootstrap Go 1.4 for the host.
+	tmpDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		return err
+	}
+	goBootstrapDir := filepath.Join(tmpDir, "go")
+	if err := installGo14(ctx, goBootstrapDir, envutil.NewSnapshotFromOS()); err != nil {
+		return err
+	}
+
+	// Install Go 1.5.
+	if tmpDir, err = ctx.Run().TempDir("", ""); err != nil {
+		return err
+	}
+	if err := ctx.Run().Chdir(tmpDir); err != nil {
+		return err
+	}
+	remote, revision := "https://github.com/golang/go.git", "6ad33be2d9d6b24aa741b3007a4bcd52db222c41"
+	if err := run(ctx, "git", []string{"clone", remote}, nil); err != nil {
+		return err
+	}
+	if err := ctx.Run().Rename(filepath.Join(tmpDir, "go"), goDir); err != nil {
+		return err
+	}
+	goSrcDir := filepath.Join(goDir, "src")
+	if err := ctx.Run().Chdir(goSrcDir); err != nil {
+		return err
+	}
+	if err := run(ctx, "git", []string{"reset", "--hard", revision}, nil); err != nil {
+		return err
+	}
+	makeBin := filepath.Join(goSrcDir, "make.bash")
+	env.Set("GOROOT_BOOTSTRAP", goBootstrapDir)
+	if err := run(ctx, makeBin, nil, env.Map()); err != nil {
+		return err
+	}
 	return nil
 }
 
