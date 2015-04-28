@@ -89,7 +89,7 @@ var cmdProjectList = &cmdline.Command{
 	Long:  "Inspect the local filesystem and list the existing projects and branches.",
 }
 
-type repoState struct {
+type projectState struct {
 	project        util.Project
 	branches       []string
 	currentBranch  string
@@ -97,32 +97,32 @@ type repoState struct {
 	hasUntracked   bool
 }
 
-func fillRepoState(ctx *tool.Context, rs *repoState, checkDirty bool, ch chan<- error) {
+func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch chan<- error) {
 	// TODO(sadovsky): Create a common interface for Git and Hg.
 	var err error
-	switch rs.project.Protocol {
+	switch state.project.Protocol {
 	case "git":
-		scm := ctx.Git(tool.RootDirOpt(rs.project.Path))
-		rs.branches, rs.currentBranch, err = scm.GetBranches()
+		scm := ctx.Git(tool.RootDirOpt(state.project.Path))
+		state.branches, state.currentBranch, err = scm.GetBranches()
 		if err != nil {
 			ch <- err
 			return
 		}
 		if checkDirty {
-			rs.hasUncommitted, err = scm.HasUncommittedChanges()
+			state.hasUncommitted, err = scm.HasUncommittedChanges()
 			if err != nil {
 				ch <- err
 				return
 			}
-			rs.hasUntracked, err = scm.HasUntrackedFiles()
+			state.hasUntracked, err = scm.HasUntrackedFiles()
 			if err != nil {
 				ch <- err
 				return
 			}
 		}
 	case "hg":
-		scm := ctx.Hg(tool.RootDirOpt(rs.project.Path))
-		rs.branches, rs.currentBranch, err = scm.GetBranches()
+		scm := ctx.Hg(tool.RootDirOpt(state.project.Path))
+		state.branches, state.currentBranch, err = scm.GetBranches()
 		if err != nil {
 			ch <- err
 			return
@@ -130,14 +130,37 @@ func fillRepoState(ctx *tool.Context, rs *repoState, checkDirty bool, ch chan<- 
 		if checkDirty {
 			// TODO(sadovsky): Extend hgutil so that we can populate these fields
 			// correctly.
-			rs.hasUncommitted = false
-			rs.hasUntracked = false
+			state.hasUncommitted = false
+			state.hasUntracked = false
 		}
 	default:
-		ch <- util.UnsupportedProtocolErr(rs.project.Protocol)
+		ch <- util.UnsupportedProtocolErr(state.project.Protocol)
 		return
 	}
 	ch <- nil
+}
+
+func getProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*projectState, error) {
+	projects, err := util.LocalProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
+	states := make(map[string]*projectState, len(projects))
+	sem := make(chan error, len(projects))
+	for name, project := range projects {
+		state := &projectState{
+			project: project,
+		}
+		states[name] = state
+		go setProjectState(ctx, state, checkDirty, sem)
+	}
+	for _ = range projects {
+		err := <-sem
+		if err != nil {
+			return nil, err
+		}
+	}
+	return states, nil
 }
 
 // runProjectList generates a listing of local projects.
@@ -148,43 +171,29 @@ func runProjectList(command *cmdline.Command, _ []string) error {
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag,
 	})
-	projects, err := util.LocalProjects(ctx)
+
+	states, err := getProjectStates(ctx, noPristineFlag)
 	if err != nil {
 		return err
 	}
 	names := []string{}
-	for name := range projects {
+	for name := range states {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
-	// Note, goroutine-based parallel forEach is clumsy. :(
-	repoStates := make([]repoState, len(names))
-	sem := make(chan error, len(names))
-	for i, name := range names {
-		rs := &repoStates[i]
-		rs.project = projects[name]
-		go fillRepoState(ctx, rs, noPristineFlag, sem)
-	}
-	for _ = range names {
-		err := <-sem
-		if err != nil {
-			return err
-		}
-	}
-
-	for i, name := range names {
-		rs := &repoStates[i]
+	for _, name := range names {
+		state := states[name]
 		if noPristineFlag {
-			pristine := len(rs.branches) == 1 && rs.currentBranch == "master" && !rs.hasUncommitted && !rs.hasUntracked
+			pristine := len(state.branches) == 1 && state.currentBranch == "master" && !state.hasUncommitted && !state.hasUntracked
 			if pristine {
 				continue
 			}
 		}
-		fmt.Fprintf(ctx.Stdout(), "project=%q path=%q\n", path.Base(name), rs.project.Path)
+		fmt.Fprintf(ctx.Stdout(), "project=%q path=%q\n", path.Base(name), state.project.Path)
 		if branchesFlag {
-			for _, branch := range rs.branches {
-				if branch == rs.currentBranch {
+			for _, branch := range state.branches {
+				if branch == state.currentBranch {
 					fmt.Fprintf(ctx.Stdout(), "  * %v\n", branch)
 				} else {
 					fmt.Fprintf(ctx.Stdout(), "  %v\n", branch)
@@ -215,30 +224,16 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag,
 	})
-	projects, err := util.LocalProjects(ctx)
+
+	states, err := getProjectStates(ctx, checkDirtyFlag)
 	if err != nil {
 		return err
 	}
 	names := []string{}
-	for name := range projects {
+	for name := range states {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-
-	// Note, goroutine-based parallel forEach is clumsy. :(
-	repoStates := make([]repoState, len(names))
-	sem := make(chan error, len(names))
-	for i, name := range names {
-		rs := &repoStates[i]
-		rs.project = projects[name]
-		go fillRepoState(ctx, rs, checkDirtyFlag, sem)
-	}
-	for _ = range names {
-		err := <-sem
-		if err != nil {
-			return err
-		}
-	}
 
 	// Get the name of the current project.
 	currentProjectName, err := util.CurrentProjectName(ctx)
@@ -246,18 +241,18 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 		return err
 	}
 	var statuses []string
-	for i, name := range names {
-		rs := &repoStates[i]
+	for _, name := range names {
+		state := states[name]
 		status := ""
 		if checkDirtyFlag {
-			if rs.hasUncommitted {
+			if state.hasUncommitted {
 				status += "*"
 			}
-			if rs.hasUntracked {
+			if state.hasUntracked {
 				status += "%"
 			}
 		}
-		short := rs.currentBranch + status
+		short := state.currentBranch + status
 		long := filepath.Base(name) + ":" + short
 		if name == currentProjectName {
 			if showNameFlag {
@@ -266,9 +261,9 @@ func runProjectShellPrompt(command *cmdline.Command, args []string) error {
 				statuses = append([]string{short}, statuses...)
 			}
 		} else {
-			pristine := rs.currentBranch == "master"
+			pristine := state.currentBranch == "master"
 			if checkDirtyFlag {
-				pristine = pristine && !rs.hasUncommitted && !rs.hasUntracked
+				pristine = pristine && !state.hasUncommitted && !state.hasUntracked
 			}
 			if !pristine {
 				statuses = append(statuses, long)

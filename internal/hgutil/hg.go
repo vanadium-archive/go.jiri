@@ -78,6 +78,18 @@ func (h *Hg) CurrentBranchName() (string, error) {
 	return strings.Join(out, "\n"), nil
 }
 
+// CurrentRevision returns the current revision.
+func (h *Hg) CurrentRevision() (string, error) {
+	out, err := h.runOutputWithOpts(h.disableDryRun(), "id", "-i")
+	if err != nil {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+	}
+	return out[0], nil
+}
+
 // GetBranches returns a slice of the local branches of the current
 // repository, followed by the name of the current branch.
 func (h *Hg) GetBranches() ([]string, string, error) {

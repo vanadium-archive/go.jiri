@@ -7,6 +7,8 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"os/user"
@@ -112,9 +114,33 @@ func runXGo(command *cmdline.Command, args []string) error {
 	return runGoForPlatform(ctx, platform, command, args[1:])
 }
 
-func setBuildInfoFlags(args []string, platform util.Platform) []string {
+func setBuildInfoFlags(ctx *tool.Context, args []string, platform util.Platform) ([]string, error) {
 	const buildInfoPackage = "v.io/x/lib/buildinfo"
 
+	// Compute the "manifest" value.
+	manifest, err := util.CurrentManifest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	manifestBytes, err := xml.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
+	}
+
+	// Compute the "pristine" value.
+	states, err := getProjectStates(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	pristine := true
+	for _, state := range states {
+		if state.currentBranch != "master" || state.hasUncommitted || state.hasUntracked {
+			pristine = false
+			break
+		}
+	}
+
+	// Compute the "user" value.
 	userName := ""
 	if currUser, err := user.Current(); err == nil {
 		userName = currUser.Name
@@ -123,16 +149,18 @@ func setBuildInfoFlags(args []string, platform util.Platform) []string {
 	settings := []struct {
 		variable, value string
 	}{
+		{"manifest", base64.StdEncoding.EncodeToString(manifestBytes)},
 		{"platform", platform.String()},
-		{"username", userName},
+		{"pristine", fmt.Sprintf("%v", pristine)},
 		{"timestamp", time.Now().UTC().Format(time.RFC3339)},
+		{"username", userName},
 	}
 	flags := []string{}
 	for _, s := range settings {
 		flags = append(flags, "-X", buildInfoPackage+"."+s.variable, fmt.Sprintf("%q", s.value))
 	}
 	ldflags := "-ldflags=" + strings.Join(flags, " ")
-	return append([]string{args[0], ldflags}, args[1:]...)
+	return append([]string{args[0], ldflags}, args[1:]...), nil
 }
 
 func runGoForPlatform(ctx *tool.Context, platform util.Platform, command *cmdline.Command, args []string) error {
@@ -142,7 +170,11 @@ func runGoForPlatform(ctx *tool.Context, platform util.Platform, command *cmdlin
 		// Provide default ldflags to populate build info metadata in
 		// the binary.  Any manual specification of ldflags already in
 		// the args will override this.
-		args = setBuildInfoFlags(args, platform)
+		var err error
+		args, err = setBuildInfoFlags(ctx, args, platform)
+		if err != nil {
+			return err
+		}
 		fallthrough
 	case "generate", "run", "test":
 		// Check that all non-master branches have merged the

@@ -149,7 +149,7 @@ func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project strin
 	if err := ctx.Run().Chdir(project); err != nil {
 		t.Fatalf("%v", err)
 	}
-	revision, err := ctx.Git().LatestCommitID()
+	revision, err := ctx.Git().CurrentRevision()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
