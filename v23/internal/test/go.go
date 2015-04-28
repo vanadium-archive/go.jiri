@@ -1484,6 +1484,15 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
 	matcher := funcMatcherOpt{&matchV23TestFunc{}}
 
+	// Now download all the binaries for a previous date.
+	oldBinDir, err := downloadVanadiumBinaries(ctx, againstDate)
+	if err == noSnapshotErr {
+		return &test.Result{Status: test.Passed}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	// Build all v.io binaries.  We are going to check the binaries at head
 	// against those from a previous date.
 	if err := ctx.Run().Command("v23", "go", "install", "v.io/..."); err != nil {
@@ -1495,20 +1504,12 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 	}
 	newBinDir := filepath.Join(root, "release", "go", "bin")
 
-	// Now download all the binaries for a previous date.
-	oldBinDir, err := downloadVanadiumBinaries(ctx, againstDate)
-	if err == noSnapshotErr {
-		return &test.Result{Status: test.Skipped}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	outBinDir := filepath.Join(regTestBinDirPath(), "bin")
 	env := ctx.Env()
 	env["V23_BIN_DIR"] = outBinDir
 	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
 	// Now we run tests with various sets of new/old binaries.
+	var lastResult *test.Result
 	for _, dir := range directions {
 		in1, in2 := oldBinDir, newBinDir
 		if dir == newBinSet {
@@ -1517,12 +1518,12 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 		if err := prepareVanadiumBinaries(ctx, in1, in2, outBinDir, set); err != nil {
 			return nil, err
 		}
-		result, err := goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
-		if err != nil || (result.Status != test.Passed && result.Status != test.Skipped) {
-			return result, err
+		lastResult, err = goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+		if err != nil || (lastResult.Status != test.Passed && lastResult.Status != test.Skipped) {
+			break
 		}
 	}
-	return &test.Result{Status: test.Passed}, nil
+	return lastResult, err
 }
 
 // noSnapshotErr is returned from downloadVanadiumBinaries when there were no
