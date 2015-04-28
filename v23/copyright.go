@@ -41,8 +41,9 @@ $`)
 )
 
 type copyrightAssets struct {
-	Copyright string
-	Files     map[string]string
+	Copyright        string
+	MatchFiles       map[string]string
+	MatchPrefixFiles map[string]string
 }
 
 type languageSpec struct {
@@ -219,34 +220,48 @@ func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool
 // function fixes up the project. Otherwise, the function reports
 // violations to standard error output.
 func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAssets, fix bool) (e error) {
-	// Check the licensing files.
-	for file, want := range assets.Files {
-		path := filepath.Join(project.Path, file)
-		got, err := ctx.Run().ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) {
+	check := func(fileMap map[string]string, isValid func([]byte, []byte) bool) error {
+		for file, want := range fileMap {
+			path := filepath.Join(project.Path, file)
+			got, err := ctx.Run().ReadFile(path)
+			if err != nil {
+				if os.IsNotExist(err) {
+					if fix {
+						if err := ctx.Run().WriteFile(path, []byte(want), defaultFileMode); err != nil {
+							return err
+						}
+					} else {
+						fmt.Fprintf(ctx.Stderr(), "%v is missing\n", path)
+					}
+					continue
+				} else {
+					return err
+				}
+			}
+			if !isValid(got, []byte(want)) {
 				if fix {
 					if err := ctx.Run().WriteFile(path, []byte(want), defaultFileMode); err != nil {
 						return err
 					}
 				} else {
-					fmt.Fprintf(ctx.Stderr(), "%v is missing\n", path)
+					fmt.Fprintf(ctx.Stderr(), "%v is not up-to-date\n", path)
 				}
-				continue
-			} else {
-				return err
 			}
 		}
-		if want != string(got) {
-			if fix {
-				if err := ctx.Run().WriteFile(path, []byte(want), defaultFileMode); err != nil {
-					return err
-				}
-			} else {
-				fmt.Fprintf(ctx.Stderr(), "%v is not up-to-date\n", path)
-			}
-		}
+		return nil
 	}
+
+	// Check the licensing files that require an exact match.
+	if err := check(assets.MatchFiles, bytes.Equal); err != nil {
+		return err
+	}
+
+	// Check the licensing files that require a prefix match.
+	if err := check(assets.MatchPrefixFiles, bytes.HasPrefix); err != nil {
+		return err
+	}
+
+	// Check the source code files.
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
@@ -255,7 +270,6 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 		return err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	// Check the source code files.
 	files, err := ctx.Git().TrackedFiles()
 	if err != nil {
 		return err
@@ -319,16 +333,25 @@ func hasCopyright(data []byte, prefix, suffix string) bool {
 // assets.
 func loadAssets(ctx *tool.Context, dir string) (*copyrightAssets, error) {
 	result := copyrightAssets{
-		Files: map[string]string{},
+		MatchFiles:       map[string]string{},
+		MatchPrefixFiles: map[string]string{},
 	}
-	files := []string{"AUTHORS", "CONTRIBUTORS", "LICENSE", "PATENTS", "VERSION"}
-	for _, file := range files {
-		path := filepath.Join(dir, file)
-		bytes, err := ctx.Run().ReadFile(path)
-		if err != nil {
-			return nil, err
+	load := func(files []string, fileMap map[string]string) error {
+		for _, file := range files {
+			path := filepath.Join(dir, file)
+			bytes, err := ctx.Run().ReadFile(path)
+			if err != nil {
+				return err
+			}
+			fileMap[file] = string(bytes)
 		}
-		result.Files[file] = string(bytes)
+		return nil
+	}
+	if err := load([]string{"LICENSE", "PATENTS", "VERSION"}, result.MatchFiles); err != nil {
+		return nil, err
+	}
+	if err := load([]string{"AUTHORS", "CONTRIBUTORS"}, result.MatchPrefixFiles); err != nil {
+		return nil, err
 	}
 	path := filepath.Join(dir, "COPYRIGHT")
 	bytes, err := ctx.Run().ReadFile(path)

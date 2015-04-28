@@ -125,7 +125,13 @@ func copyAssets(t *testing.T, ctx *tool.Context, srcDir, dstDir string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	for name, data := range assets.Files {
+	for name, data := range assets.MatchFiles {
+		path := filepath.Join(dstDir, name)
+		if err := ctx.Run().WriteFile(path, []byte(data), os.FileMode(0644)); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}
+	for name, data := range assets.MatchPrefixFiles {
 		path := filepath.Join(dstDir, name)
 		if err := ctx.Run().WriteFile(path, []byte(data), os.FileMode(0644)); err != nil {
 			t.Fatalf("%v", err)

@@ -65,6 +65,14 @@ func TestCopyright(t *testing.T) {
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
 
+	allFiles := map[string]string{}
+	for file, data := range assets.MatchFiles {
+		allFiles[file] = data
+	}
+	for file, data := range assets.MatchPrefixFiles {
+		allFiles[file] = data
+	}
+
 	// Write out test licensing files and sample source code files to a
 	// project and verify that the project checks out.
 	projectPath := filepath.Join(root.Dir, "test")
@@ -81,7 +89,7 @@ func TestCopyright(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}
-	for file, data := range assets.Files {
+	for file, data := range allFiles {
 		if err := ctx.Run().WriteFile(filepath.Join(projectPath, file), []byte(data), os.FileMode(0600)); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -97,7 +105,7 @@ func TestCopyright(t *testing.T) {
 	}
 
 	// Check that missing licensing files are reported correctly.
-	for file, _ := range assets.Files {
+	for file, _ := range allFiles {
 		errOut.Reset()
 		if err := checkProject(ctx, project, assets, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -115,7 +123,7 @@ func TestCopyright(t *testing.T) {
 	}
 
 	// Check that out-of-date licensing files are reported correctly.
-	for file, _ := range assets.Files {
+	for file, _ := range allFiles {
 		errOut.Reset()
 		if err := checkProject(ctx, project, assets, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -152,7 +160,7 @@ func TestCopyright(t *testing.T) {
 	}
 
 	// Check that missing licensing files are fixed up correctly.
-	for file, _ := range assets.Files {
+	for file, _ := range allFiles {
 		errOut.Reset()
 		if err := checkProject(ctx, project, assets, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -173,7 +181,7 @@ func TestCopyright(t *testing.T) {
 	}
 
 	// Check that out-of-date licensing files are fixed up correctly.
-	for file, _ := range assets.Files {
+	for file, _ := range allFiles {
 		errOut.Reset()
 		if err := checkProject(ctx, project, assets, true); err != nil {
 			t.Fatalf("unexpected error: %v", err)
