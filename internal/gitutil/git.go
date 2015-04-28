@@ -224,6 +224,27 @@ func (g *Git) CurrentBranchName() (string, error) {
 	return out[0], nil
 }
 
+// CurrentRevision returns the current revision.
+func (g *Git) CurrentRevision() (string, error) {
+	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+	}
+	return out[0], nil
+}
+
+// DeleteBranch deletes the given branch.
+func (g *Git) DeleteBranch(branchName string, force bool) error {
+	if force {
+		return g.run("branch", "-D", branchName)
+	} else {
+		return g.run("branch", "-d", branchName)
+	}
+}
+
 // Fetch fetches refs and tags from the given remote.
 func (g *Git) Fetch(remote, branch string) error {
 	return g.run("fetch", remote, branch)
@@ -237,15 +258,6 @@ func (g *Git) FilesWithUncommittedChanges() ([]string, error) {
 		return nil, err
 	}
 	return out, nil
-}
-
-// DeleteBranch deletes the given branch.
-func (g *Git) DeleteBranch(branchName string, force bool) error {
-	if force {
-		return g.run("branch", "-D", branchName)
-	} else {
-		return g.run("branch", "-d", branchName)
-	}
 }
 
 // GetBranches returns a slice of the local branches of the current
@@ -306,18 +318,6 @@ func (g *Git) IsFileCommitted(file string) bool {
 		return false
 	}
 	return true
-}
-
-// LatestCommitID returns the latest commit identifier for the current branch.
-func (g *Git) LatestCommitID() (string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", "HEAD")
-	if err != nil {
-		return "", err
-	}
-	if got, want := len(out), 1; got != want {
-		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
-	}
-	return out[0], nil
 }
 
 // LatestCommitMessage returns the latest commit message on the current branch.

@@ -34,6 +34,7 @@ type CL struct {
 // Manifest represents a setting used for updating the vanadium universe.
 type Manifest struct {
 	Imports  []Import  `xml:"imports>import"`
+	Label    string    `xml:"label,attr"`
 	Projects []Project `xml:"projects>project"`
 	Tools    []Tool    `xml:"tools>tool"`
 	XMLName  struct{}  `xml:"manifest"`
@@ -124,18 +125,58 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	}
 	data, err := xml.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
 	}
 	perm = os.FileMode(0644)
 	if err := ctx.Run().WriteFile(path, data, perm); err != nil {
-		return fmt.Errorf("WriteFile(%v, %v) failed: %v", path, err, perm)
+		return err
+	}
+	return nil
+}
+
+const currentManifestFileName = ".current_manifest"
+
+// CurrentManifest returns a manifest that identifies the result of
+// the most recent "v23 update" invocation.
+func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
+	root, err := V23Root()
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := ctx.Run().ReadFile(filepath.Join(root, currentManifestFileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var m Manifest
+	if err := xml.Unmarshal(bytes, &m); err != nil {
+		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(bytes), err)
+	}
+	return &m, nil
+}
+
+// writeCurrentManifest writes the given manifest to a file that
+// stores the result of the most recent "v23 update" invocation.
+func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
+	root, err := V23Root()
+	if err != nil {
+		return err
+	}
+	bytes, err := xml.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
+	}
+	if err := ctx.Run().WriteFile(filepath.Join(root, currentManifestFileName), bytes, os.FileMode(0644)); err != nil {
+		return err
 	}
 	return nil
 }
 
 // CurrentProjectName gets the name of the current project from the
-// current directory by reading the .v23/metadata.v2 file located at
-// the root of the current repository.
+// current directory by reading the v23 project metadata located in a
+// directory at the root of the current repository.
 func CurrentProjectName(ctx *tool.Context) (string, error) {
 	topLevel, err := ctx.Git().TopLevel()
 	if err != nil {
@@ -262,7 +303,7 @@ func readManifest(ctx *tool.Context, update bool) (Projects, Tools, error) {
 		return nil, nil, err
 	}
 	projects, tools, stack := Projects{}, Tools{}, map[string]struct{}{}
-	if err := loadManifest(path, projects, tools, stack); err != nil {
+	if err := loadManifest(ctx, path, projects, tools, stack); err != nil {
 		return nil, nil, err
 	}
 	return projects, tools, nil
@@ -615,10 +656,10 @@ func pullProject(ctx *tool.Context, project Project) error {
 
 // loadManifest loads the given manifest, processing all of its
 // imports, projects and tools settings.
-func loadManifest(path string, projects Projects, tools Tools, stack map[string]struct{}) error {
-	data, err := ioutil.ReadFile(path)
+func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools, stack map[string]struct{}) error {
+	data, err := ctx.Run().ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("ReadFile(%v) failed: %v", path, err)
+		return err
 	}
 	m := &Manifest{}
 	if err := xml.Unmarshal(data, m); err != nil {
@@ -634,7 +675,7 @@ func loadManifest(path string, projects Projects, tools Tools, stack map[string]
 			return err
 		}
 		stack[manifest.Name] = struct{}{}
-		if err := loadManifest(path, projects, tools, stack); err != nil {
+		if err := loadManifest(ctx, path, projects, tools, stack); err != nil {
 			return err
 		}
 		delete(stack, manifest.Name)
@@ -739,7 +780,7 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 		revisionFn := func() error {
 			switch project.Protocol {
 			case "git":
-				gitRevision, err := ctx.Git().LatestCommitID()
+				gitRevision, err := ctx.Git().CurrentRevision()
 				if err != nil {
 					return err
 				}
@@ -777,8 +818,9 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 		}
 	}
 	failed := false
+	manifest := &Manifest{Label: ctx.Manifest()}
 	for _, op := range ops {
-		updateFn := func() error { return op.Run(ctx) }
+		updateFn := func() error { return op.Run(ctx, manifest) }
 		// Always log the output of updateFn, irrespective of
 		// the value of the verbose flag.
 		opts := runutil.Opts{Verbose: true}
@@ -789,6 +831,9 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	}
 	if failed {
 		return cmdline.ErrExitCode(2)
+	}
+	if err := writeCurrentManifest(ctx, manifest); err != nil {
+		return err
 	}
 	return nil
 }
@@ -833,11 +878,48 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 	return nil
 }
 
+// addProjectToManifest records the information about the given
+// project in the given manifest. The function is used to create a
+// manifest that records the current state of Vanadium projects, which
+// can be used to restore this state at some later point.
+//
+// NOTE: The function assumes that the the given project is on a
+// master branch.
+func addProjectToManifest(ctx *tool.Context, manifest *Manifest, project Project) error {
+	// If the project uses relative revision, replace it with an absolute one.
+	switch project.Protocol {
+	case "git":
+		if project.Revision == "HEAD" {
+			revision, err := ctx.Git(tool.RootDirOpt(project.Path)).CurrentRevision()
+			if err != nil {
+				return err
+			}
+			project.Revision = revision
+		}
+	case "hg":
+		if project.Revision == "tip" {
+			revision, err := ctx.Hg(tool.RootDirOpt(project.Path)).CurrentRevision()
+			if err != nil {
+				return err
+			}
+			project.Revision = revision
+		}
+	}
+	// Replace absolute path with a relative one.
+	root, err := V23Root()
+	if err != nil {
+		return err
+	}
+	project.Path = strings.TrimPrefix(project.Path, root+string(filepath.Separator))
+	manifest.Projects = append(manifest.Projects, project)
+	return nil
+}
+
 type operation interface {
 	// Project identifies the project this operation pertains to.
 	Project() Project
 	// Run executes the operation.
-	Run(ctx *tool.Context) error
+	Run(ctx *tool.Context, manifest *Manifest) error
 	// String returns a string representation of the operation.
 	String() string
 	// Test checks whether the operation would fail.
@@ -856,7 +938,7 @@ type commonOperation struct {
 	source string
 }
 
-func (commonOperation) Run(*tool.Context) error {
+func (commonOperation) Run(*tool.Context, *Manifest) error {
 	return nil
 }
 
@@ -877,7 +959,7 @@ type createOperation struct {
 	commonOperation
 }
 
-func (op createOperation) Run(ctx *tool.Context) (e error) {
+func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(path, perm); err != nil {
 		return err
@@ -904,15 +986,15 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 			// hooks.
 			file := filepath.Join(tmpDir, ".git", "hooks", "commit-msg")
 			if err := ctx.Run().WriteFile(file, []byte(commitMsgHook), perm); err != nil {
-				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
+				return err
 			}
 			file = filepath.Join(tmpDir, ".git", "hooks", "pre-commit")
 			if err := ctx.Run().WriteFile(file, []byte(preCommitHook), perm); err != nil {
-				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
+				return err
 			}
 			file = filepath.Join(tmpDir, ".git", "hooks", "pre-push")
 			if err := ctx.Run().WriteFile(file, []byte(prePushHook), perm); err != nil {
-				return fmt.Errorf("WriteFile(%v, %v) failed: %v", file, perm, err)
+				return err
 			}
 		}
 		cwd, err := os.Getwd()
@@ -953,6 +1035,9 @@ func (op createOperation) Run(ctx *tool.Context) (e error) {
 	if err := ctx.Run().Rename(tmpDir, op.destination); err != nil {
 		return err
 	}
+	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -980,7 +1065,7 @@ type deleteOperation struct {
 	gc bool
 }
 
-func (op deleteOperation) Run(ctx *tool.Context) error {
+func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 	if op.gc {
 		return ctx.Run().RemoveAll(op.source)
 	}
@@ -1014,7 +1099,7 @@ type moveOperation struct {
 	commonOperation
 }
 
-func (op moveOperation) Run(ctx *tool.Context) error {
+func (op moveOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(path, perm); err != nil {
 		return err
@@ -1029,6 +1114,9 @@ func (op moveOperation) Run(ctx *tool.Context) error {
 		return err
 	}
 	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
+		return err
+	}
+	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
 		return err
 	}
 	return nil
@@ -1060,7 +1148,7 @@ type updateOperation struct {
 	commonOperation
 }
 
-func (op updateOperation) Run(ctx *tool.Context) error {
+func (op updateOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 	if err := reportNonMaster(ctx, op.project); err != nil {
 		return err
 	}
@@ -1068,6 +1156,9 @@ func (op updateOperation) Run(ctx *tool.Context) error {
 		return err
 	}
 	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
+		return err
+	}
+	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
 		return err
 	}
 	return nil

@@ -118,7 +118,7 @@ func runSnapshotCreate(command *cmdline.Command, args []string) error {
 	// state of the vanadium project and push the changes to the
 	// remote repository (if applicable), or fail with no effect.
 	createFn := func() error {
-		revision, err := ctx.Git().LatestCommitID()
+		revision, err := ctx.Git().CurrentRevision()
 		if err != nil {
 			return err
 		}
