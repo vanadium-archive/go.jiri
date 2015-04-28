@@ -1507,6 +1507,7 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 	outBinDir := filepath.Join(regTestBinDirPath(), "bin")
 	env := ctx.Env()
 	env["V23_BIN_DIR"] = outBinDir
+	env["V23_REGTEST_DATE"] = againstDate.Format("2006-01-02")
 	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
 	// Now we run tests with various sets of new/old binaries.
 	for _, dir := range directions {
