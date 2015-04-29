@@ -298,6 +298,10 @@ func waitForMounttable(ctx *tool.Context, root, credentialsArg, mounttableRoot s
 // checkServices runs "v23 test run vanadium-prod-services-test" against
 // staging.
 func checkServices(ctx *tool.Context) error {
+	// Wait 5 minutes.
+	fmt.Fprintf(ctx.Stdout(), "Wait for 5 minutes before checking")
+	time.Sleep(time.Minute * 5)
+
 	args := []string{
 		"test",
 		"run",
