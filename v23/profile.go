@@ -648,64 +648,20 @@ func setupWebCommon(ctx *tool.Context) error {
 		return err
 	}
 
-	missingHgrcMessage := `No .hgrc file found in $HOME. Please visit
-https://code.google.com/a/google.com/hosting/settings to get a googlecode.com password.
-Then add the following to your $HOME/.hgrc, and run "v23 profile setup web" again.
-[auth]
-codegoogle.prefix=code.google.com
-codegoogle.username=YOUR_EMAIL
-codegoogle.password=YOUR_GOOGLECODE_PASSWORD
-`
-
-	// Ensure $HOME/.hgrc exists.
-	ensureHgrcExists := func() error {
-		homeDir := os.Getenv("HOME")
-		hgrc := filepath.Join(homeDir, ".hgrc")
-		if _, err := os.Stat(hgrc); err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			} else {
-				return fmt.Errorf(missingHgrcMessage)
-			}
-		}
-		return nil
-	}
-
 	// Clone the Go Ppapi compiler.
 	repoDir := filepath.Join(root, "third_party", "repos")
 	goPpapiRepoDir := filepath.Join(repoDir, "go_ppapi")
-	revision := "d6a826a31648"
+	remote, revision := "https://vanadium.googlesource.com/release.go.ppapi", "5e967194049bd1a6f097854f09fcbbbaa21afc05"
 	cloneGoPpapiFn := func() error {
 		if err := ctx.Run().MkdirAll(repoDir, defaultDirPerm); err != nil {
 			return err
 		}
-		if err := ensureHgrcExists(); err != nil {
-			return err
-		}
-		remote := "https://code.google.com/a/google.com/p/go-ppapi-veyron"
-		if err := run(ctx, "hg", []string{"clone", "--noninteractive", remote, "-r", revision, goPpapiRepoDir}, nil); err != nil {
+		if err := gitCloneRepo(ctx, remote, revision, goPpapiRepoDir); err != nil {
 			return err
 		}
 		return nil
 	}
 	if err := atomicAction(ctx, cloneGoPpapiFn, goPpapiRepoDir, "Clone Go Ppapi repository"); err != nil {
-		return err
-	}
-
-	// Make sure we are on the right revision. If the goDir already
-	// exists, but is on an older revision, the above atomicAction will
-	// have no effect. Thus, we must manually pull the desired revison
-	// and update the repo.
-	//
-	// TODO(nlacasse): Figure out how to ensure we get a specific
-	// revision as part of the above atomicAction.
-	if err := ctx.Run().Chdir(goPpapiRepoDir); err != nil {
-		return err
-	}
-	if err := run(ctx, "hg", []string{"pull", "-r", revision}, nil); err != nil {
-		return err
-	}
-	if err := run(ctx, "hg", []string{"update"}, nil); err != nil {
 		return err
 	}
 
@@ -825,21 +781,15 @@ func installGo15(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
 	if tmpDir, err = ctx.Run().TempDir("", ""); err != nil {
 		return err
 	}
-	if err := ctx.Run().Chdir(tmpDir); err != nil {
-		return err
-	}
 	remote, revision := "https://github.com/golang/go.git", "6ad33be2d9d6b24aa741b3007a4bcd52db222c41"
-	if err := run(ctx, "git", []string{"clone", remote}, nil); err != nil {
+	if err := gitCloneRepo(ctx, remote, revision, tmpDir); err != nil {
 		return err
 	}
-	if err := ctx.Run().Rename(filepath.Join(tmpDir, "go"), goDir); err != nil {
+	if err := ctx.Run().Rename(tmpDir, goDir); err != nil {
 		return err
 	}
 	goSrcDir := filepath.Join(goDir, "src")
 	if err := ctx.Run().Chdir(goSrcDir); err != nil {
-		return err
-	}
-	if err := run(ctx, "git", []string{"reset", "--hard", revision}, nil); err != nil {
 		return err
 	}
 	makeBin := filepath.Join(goSrcDir, "make.bash")
@@ -859,4 +809,27 @@ func unsetGoEnv(env *envutil.Snapshot) {
 	env.Set("GOOS", "")
 	env.Set("GOPATH", "")
 	env.Set("GOROOT", "")
+}
+
+// gitCloneRepo clones a repo at a specific revision in outDir.
+func gitCloneRepo(ctx *tool.Context, remote, revision, outDir string) (e error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+
+	if err := ctx.Run().MkdirAll(outDir, defaultDirPerm); err != nil {
+		return err
+	}
+	if err := run(ctx, "git", []string{"clone", remote, outDir}, nil); err != nil {
+		return err
+	}
+	if err := ctx.Run().Chdir(outDir); err != nil {
+		return err
+	}
+	if err := run(ctx, "git", []string{"reset", "--hard", revision}, nil); err != nil {
+		return err
+	}
+	return nil
 }
