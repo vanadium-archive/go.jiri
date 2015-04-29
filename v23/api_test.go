@@ -252,10 +252,10 @@ func TestPublicApiUpdate(t *testing.T) {
 pkg main, func TestFunction()
 `)
 
-	// Write a change that un-exports TestFunction.
+	// Write a change that changes TestFunction to TestFunction1.
 	writeFileOrDie(t, ctx, filepath.Join(projectPath, "file.go"), `package main
 
-func testFunction() {
+func TestFunction1() {
 }`)
 
 	commitMessage := "Commit file.go"
@@ -275,7 +275,7 @@ func testFunction() {
 		t.Fatalf("%v", err)
 	}
 
-	if got, want := contents.String(), ""; got != want {
-		t.Fatalf("expected empty string, got %s", got)
+	if got, want := contents.String(), "pkg main, func TestFunction1()\n"; got != want {
+		t.Fatalf("expected %s, got %s", want, got)
 	}
 }

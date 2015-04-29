@@ -171,9 +171,9 @@ func parseProjectNames(args []string, projects map[string]util.Project, apiCheck
 	return names, nil
 }
 
-func splitLinesToSet(in io.Reader) map[string]bool {
+func splitLinesToSet(in []byte) map[string]bool {
 	result := make(map[string]bool)
-	scanner := bufio.NewScanner(in)
+	scanner := bufio.NewScanner(bytes.NewReader(in))
 	for scanner.Scan() {
 		result[scanner.Text()] = true
 	}
@@ -252,6 +252,7 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 				pkgName = dir
 			}
 			if apiFileError != nil || out.String() != apiFileContents.String() {
+				apiBytes := out.Bytes()
 				// The user has changed the public API or we
 				// couldn't read the public API in the first
 				// place.
@@ -259,9 +260,9 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 					name:          pkgName,
 					projectName:   projectName,
 					apiFilePath:   apiFilePath,
-					oldApi:        splitLinesToSet(&apiFileContents),
-					newApi:        splitLinesToSet(&out),
-					newApiContent: out.Bytes(),
+					oldApi:        splitLinesToSet(apiFileContents.Bytes()),
+					newApi:        splitLinesToSet(apiBytes),
+					newApiContent: apiBytes,
 					apiFileError:  apiFileError,
 				})
 			}
