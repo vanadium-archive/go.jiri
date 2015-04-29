@@ -924,6 +924,8 @@ func init() {
 		//
 		// TODO(spetrovic): Put these back in once the owners fixes them.
 		newExclusion("golang.org/x/mobile", ".*", true),
+		// This test relies on timing, which results in flakiness on GCE.
+		newExclusion("google.golang.org/appengine/internal", "TestDelayedLogFlushing", isCI()),
 		// The following test requires IPv6, which is not available on
 		// some of our continuous integration instances.
 		newExclusion("golang.org/x/net/icmp", "TestPingGoogle", isCI()),
