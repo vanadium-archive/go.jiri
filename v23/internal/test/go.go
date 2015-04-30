@@ -1649,7 +1649,7 @@ func prepareRegressionBinaries(ctx *tool.Context, in1, in2, out string, targetBi
 	}
 	sort.Strings(sortedBinaries)
 
-	fmt.Fprintf(ctx.Stdout(), "Using binaries from %s and %s out of %s", in1, in2, out)
+	fmt.Fprintf(ctx.Stdout(), "Using binaries from %s and %s out of %s\n", in1, in2, out)
 	for _, name := range sortedBinaries {
 		src := binaries[name]
 		dst := filepath.Join(out, name)
