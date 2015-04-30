@@ -803,7 +803,8 @@ func installGo15(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
 func unsetGoEnv(env *envutil.Snapshot) {
 	env.Set("CGO_ENABLED", "")
 	env.Set("CGO_CFLAGS", "")
-	env.Set("CGO_CGO_LDFLAGS", "")
+	env.Set("CGO_CXXFLAGS", "")
+	env.Set("CGO_LDFLAGS", "")
 	env.Set("GOARCH", "")
 	env.Set("GOBIN", "")
 	env.Set("GOOS", "")

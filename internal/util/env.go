@@ -326,6 +326,7 @@ func setSyncbaseCgoEnv(env *envutil.Snapshot, root, arch string) error {
 	// Set the CGO_* variables for the vanadium syncbase component.
 	env.Set("CGO_ENABLED", "1")
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
+	cxxflags := env.GetTokens("CGO_CXXFLAGS", " ")
 	ldflags := env.GetTokens("CGO_LDFLAGS", " ")
 	dir := filepath.Join(root, "third_party", "cout", "leveldb")
 	if _, err := os.Stat(dir); err != nil {
@@ -334,12 +335,14 @@ func setSyncbaseCgoEnv(env *envutil.Snapshot, root, arch string) error {
 		}
 	} else {
 		cflags = append(cflags, filepath.Join("-I"+dir, "include"))
+		cxxflags = append(cxxflags, filepath.Join("-I"+dir, "include"))
 		ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"))
 		if arch == "linux" {
 			ldflags = append(ldflags, "-Wl,-rpath", filepath.Join(dir, "lib"))
 		}
 	}
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
+	env.SetTokens("CGO_CXXFLAGS", cxxflags, " ")
 	env.SetTokens("CGO_LDFLAGS", ldflags, " ")
 	return nil
 }
