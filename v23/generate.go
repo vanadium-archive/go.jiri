@@ -109,7 +109,7 @@ func runTestGenerate(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	packages, err := goutil.List(ctx, args)
+	packages, err := goutil.List(ctx, args...)
 	if err != nil {
 		return command.UsageErrorf("failed to list %s: %s", args, err)
 	}

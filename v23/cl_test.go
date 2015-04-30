@@ -186,13 +186,11 @@ func Bar() string {
 // createTestGoDependencyConstraint creates a test Go dependency
 // constraint.
 func createTestGoDependencyConstraint(t *testing.T, ctx *tool.Context, rootDir, command string) {
-	depFile := filepath.Join(rootDir, "src", "v.io", "foo", "GO.PACKAGE")
+	depFile := filepath.Join(rootDir, "src", "v.io", "bar", "GO.PACKAGE")
 	depData := `{
-  "dependencies": {
-    "incoming": [
-      {"` + command + `": "..."}
-    ]
-  }
+  "imports": [
+    {"` + command + `": "..."}
+  ]
 }
 `
 	if err := ctx.Run().WriteFile(depFile, []byte(depData), os.FileMode(0644)); err != nil {
@@ -624,7 +622,7 @@ func testGoDependencyHelper(t *testing.T, ok bool) error {
 // a CL that introduces a dependency violation.
 func TestGoDependencyError(t *testing.T) {
 	if err := testGoDependencyHelper(t, false); err == nil {
-		t.Fatalf("go format check did not fail when it should")
+		t.Fatalf("go dependency check did not fail when it should")
 	} else if _, ok := err.(goDependencyError); !ok {
 		t.Fatalf("unexpected error: %v", err)
 	}

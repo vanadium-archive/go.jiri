@@ -109,7 +109,7 @@ func goBuild(ctx *tool.Context, testName string, opts ...goBuildOpt) (_ *test.Re
 	}
 
 	// Enumerate the packages to be built.
-	pkgList, err := goutil.List(ctx, pkgs)
+	pkgList, err := goutil.List(ctx, pkgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *t
 	}
 
 	// Enumerate the packages for which coverage is to be computed.
-	pkgList, err := goutil.List(ctx, pkgs)
+	pkgList, err := goutil.List(ctx, pkgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatche
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to obtain the Vanadium environment: %v", err)
 	}
-	pkgList, err := goutil.List(ctx, pkgs)
+	pkgList, err := goutil.List(ctx, pkgs...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list packages: %v", err)
 	}
@@ -1010,12 +1010,12 @@ func validateAgainstDefaultPackages(ctx *tool.Context, opts []Opt, defaults []st
 		return defsOpt, nil
 	}
 
-	defPkgs, err := goutil.List(ctx, defaults)
+	defPkgs, err := goutil.List(ctx, defaults...)
 	if err != nil {
 		return nil, err
 	}
 
-	pkgs, err := goutil.List(ctx, optPkgs)
+	pkgs, err := goutil.List(ctx, optPkgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -1327,7 +1327,7 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 		// Get packages specified in test-parts.
 		existingPartsPkgs := map[string]struct{}{}
 		for _, pkg := range parts {
-			curPkgs, err := goutil.List(ctx, []string{pkg})
+			curPkgs, err := goutil.List(ctx, pkg)
 			if err != nil {
 				return nil, err
 			}
@@ -1338,7 +1338,7 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 
 		// Get the rest.
 		rest := []string{}
-		allPkgs, err := goutil.List(ctx, allPkgs)
+		allPkgs, err := goutil.List(ctx, allPkgs...)
 		if err != nil {
 			return nil, err
 		}
@@ -1349,7 +1349,7 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 		}
 		return pkgsOpt(rest), nil
 	} else if index < len(parts) {
-		pkgs, err := goutil.List(ctx, []string{parts[index]})
+		pkgs, err := goutil.List(ctx, parts[index])
 		if err != nil {
 			return nil, err
 		}
