@@ -163,14 +163,18 @@ The v23 cl mail flags are:
 
 V23 contributors
 
-Lists vanadium project contributors and the number of their commits. Vanadium
-projects to consider can be specified as an argument. If no projects are
-specified, all vanadium projects are considered by default.
+Lists vanadium project contributors. Vanadium projects to consider can be
+specified as an argument. If no projects are specified, all vanadium projects
+are considered by default.
 
 Usage:
-   v23 contributors <projects>
+   v23 contributors [flags] <projects>
 
 <projects> is a list of projects to consider.
+
+The v23 contributors flags are:
+ -n=false
+   Show number of contributions.
 
 V23 copyright
 

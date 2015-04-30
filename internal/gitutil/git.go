@@ -168,7 +168,7 @@ func (g *Git) CommitWithMessageAndEdit(message string) error {
 // Committers returns a list of committers for the current repository
 // along with the number of their commits.
 func (g *Git) Committers() ([]string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "shortlog", "-s", "-n")
+	out, err := g.runOutputWithOpts(g.disableDryRun(), "shortlog", "-s", "-n", "-e")
 	if err != nil {
 		return nil, err
 	}

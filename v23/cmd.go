@@ -7,14 +7,8 @@ package main
 import (
 	"fmt"
 	"runtime"
-	"sort"
-	"strconv"
-	"strings"
 
-	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -63,97 +57,6 @@ Command v23 is a multi-purpose tool for Vanadium development.
 		cmdVersion,
 		cmdXGo,
 	},
-}
-
-// cmdContributors represents the "v23 contributors" command.
-var cmdContributors = &cmdline.Command{
-	Run:   runContributors,
-	Name:  "contributors",
-	Short: "List vanadium project contributors",
-	Long: `
-Lists vanadium project contributors and the number of their
-commits. Vanadium projects to consider can be specified as an
-argument. If no projects are specified, all vanadium projects are
-considered by default.
-`,
-	ArgsName: "<projects>",
-	ArgsLong: "<projects> is a list of projects to consider.",
-}
-
-func runContributors(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
-	projects, err := util.LocalProjects(ctx)
-	if err != nil {
-		return err
-	}
-	repos := map[string]struct{}{}
-	if len(args) != 0 {
-		for _, arg := range args {
-			repos[arg] = struct{}{}
-		}
-	} else {
-		for name, _ := range projects {
-			repos[name] = struct{}{}
-		}
-	}
-	contributors := map[string]int{}
-	for repo, _ := range repos {
-		project, ok := projects[repo]
-		if !ok {
-			continue
-		}
-		if err := ctx.Run().Chdir(project.Path); err != nil {
-			return err
-		}
-		switch project.Protocol {
-		case "git":
-			lines, err := listCommitters(ctx)
-			if err != nil {
-				return err
-			}
-			for _, line := range lines {
-				tokens := strings.SplitN(line, "\t", 2)
-				n, err := strconv.Atoi(strings.TrimSpace(tokens[0]))
-				if err != nil {
-					return fmt.Errorf("Atoi(%v) failed: %v", tokens[0], err)
-				}
-				contributors[strings.TrimSpace(tokens[1])] += n
-			}
-		default:
-		}
-	}
-	names := []string{}
-	for name, _ := range contributors {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		fmt.Fprintf(command.Stdout(), "%4d %v\n", contributors[name], name)
-	}
-	return nil
-}
-
-func listCommitters(ctx *tool.Context) (_ []string, e error) {
-	branch, err := ctx.Git().CurrentBranchName()
-	if err != nil {
-		return nil, err
-	}
-	stashed, err := ctx.Git().Stash()
-	if err != nil {
-		return nil, err
-	}
-	if stashed {
-		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
-	}
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
-		return nil, err
-	}
-	defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch, !gitutil.Force) }, &e)
-	return ctx.Git().Committers()
 }
 
 // cmdVersion represents the "v23 version" command.
