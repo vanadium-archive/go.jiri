@@ -1402,7 +1402,7 @@ type regressionDate time.Time
 
 func (d *regressionDate) UnmarshalJSON(in []byte) error {
 	str := string(in)
-	if t, err := time.Parse("2006-01-02", str); err == nil {
+	if t, err := time.Parse("\"2006-01-02\"", str); err == nil {
 		*d = regressionDate(t)
 		return nil
 	}
