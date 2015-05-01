@@ -352,7 +352,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 	// Build and install crosstool-ng.
 	xgccOutDir := filepath.Join(root, "third_party", "cout", "xgcc")
 	installNgFn := func() error {
-		xgccSrcDir := filepath.Join(root, "third_party", "csrc", "crosstool-ng-1.19.0")
+		xgccSrcDir := filepath.Join(root, "third_party", "csrc", "crosstool-ng-1.20.0")
 		if err := ctx.Run().Chdir(xgccSrcDir); err != nil {
 			return err
 		}
@@ -396,7 +396,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err != nil {
 			return err
 		}
-		configFile := filepath.Join(dataPath, "crosstool-ng-1.19.0.config")
+		configFile := filepath.Join(dataPath, "crosstool-ng-1.20.0.config")
 		config, err := ioutil.ReadFile(configFile)
 		if err != nil {
 			return fmt.Errorf("ReadFile(%v) failed: %v", configFile, err)
