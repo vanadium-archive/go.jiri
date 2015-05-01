@@ -1455,7 +1455,7 @@ func defaultRegressionConfig() *regressionTestConfig {
 		Tests: "^TestV23Hello.*",
 	}
 	now := time.Now()
-	for _, days := range []int{1, 3, 5} {
+	for _, days := range []int{1} {
 		config.AgainstDates = append(config.AgainstDates,
 			regressionDate(now.AddDate(0, 0, -days)))
 	}
