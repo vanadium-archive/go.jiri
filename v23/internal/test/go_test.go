@@ -407,7 +407,7 @@ func runGoTest(t *testing.T, suffix string, exclusions []exclusion, expectedTest
 		exclusionsOpt(exclusions)}
 	opts = append(opts, testOpts...)
 
-	result, err := goTest(ctx, testName, opts...)
+	result, err := goTestAndReport(ctx, testName, opts...)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

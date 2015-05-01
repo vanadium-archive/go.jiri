@@ -516,8 +516,18 @@ type goTestTask struct {
 	excludedTests []string
 }
 
+// goTestAndReport runs goTest and writes an xml report.
+func goTestAndReport(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Result, e error) {
+	res, suites, err := goTest(ctx, testName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	// Create the xUnit report.
+	return res, xunit.CreateReport(ctx, testName, suites)
+}
+
 // goTest is a helper function for running Go tests.
-func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Result, e error) {
+func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Result, _ []xunit.TestSuite, e error) {
 	timeout := defaultTestTimeout
 	args, suffix, exclusions, pkgs := []string{}, "", []exclusion{}, []string{}
 	var matcher funcMatcher
@@ -551,7 +561,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 
 	// Install dependencies.
 	if err := installGo2XUnit(ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Pre-build non-test packages.
@@ -561,15 +571,15 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 			testName += " " + suffix
 		}
 		if err := xunit.CreateFailureReport(ctx, originalTestName, "BuildTestDependencies", testName, "dependencies build failure", err.Error()); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return &test.Result{Status: test.Failed}, nil
+		return &test.Result{Status: test.Failed}, nil, nil
 	}
 
 	// Enumerate the packages and tests to be built.
 	pkgList, pkgAndFuncList, err := goListPackagesAndFuncs(ctx, pkgs, matcher)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Create a pool of workers.
@@ -632,7 +642,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 				if err != nil {
 					// Token too long error.
 					if !strings.HasSuffix(err.Error(), "token too long") {
-						return nil, err
+						return nil, suites, err
 					}
 					ss = xunit.CreateTestSuiteWithFailure(result.pkg, "Test", "test output contains lines that are too long to parse", "", result.time)
 				}
@@ -676,10 +686,6 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 	}
 	close(taskResults)
 
-	// Create the xUnit report.
-	if err := xunit.CreateReport(ctx, testName, suites); err != nil {
-		return nil, err
-	}
 	testResult := &test.Result{
 		Status:        test.Passed,
 		ExcludedTests: excludedTests,
@@ -688,7 +694,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 	if !allPassed {
 		testResult.Status = test.Failed
 	}
-	return testResult, nil
+	return testResult, suites, nil
 }
 
 // testWorker tests packages.
@@ -1087,7 +1093,7 @@ func thirdPartyGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 		return nil, err
 	}
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, exclusionsOpt(goExclusions), validatedPkgs)
+	return goTestAndReport(ctx, testName, suffix, exclusionsOpt(goExclusions), validatedPkgs)
 }
 
 // thirdPartyGoRace runs Go data-race tests for third-party projects.
@@ -1111,7 +1117,7 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 	args := argsOpt([]string{"-race"})
 	exclusions := append(goExclusions, goRaceExclusions...)
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
-	return goTest(ctx, testName, suffix, args, exclusionsOpt(exclusions), validatedPkgs)
+	return goTestAndReport(ctx, testName, suffix, args, exclusionsOpt(exclusions), validatedPkgs)
 }
 
 // thirdPartyPkgs returns a list of Go expressions that describe all
@@ -1152,7 +1158,7 @@ func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (_ *test.R
 		return nil, err
 	}
 	args := argsOpt([]string{"-bench", ".", "-run", "XXX"})
-	return goTest(ctx, testName, args, pkgs)
+	return goTestAndReport(ctx, testName, args, pkgs)
 }
 
 // vanadiumGoBuild runs Go build for the vanadium projects.
@@ -1286,7 +1292,7 @@ func vanadiumGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Re
 	args := argsOpt([]string{"-race"})
 	timeout := timeoutOpt("15m")
 	suffix := suffixOpt(genTestNameSuffix("GoRace"))
-	return goTest(ctx, testName, args, timeout, suffix, exclusionsOpt(exclusions), partPkgs)
+	return goTestAndReport(ctx, testName, args, timeout, suffix, exclusionsOpt(exclusions), partPkgs)
 }
 
 // identifyPackagesToTest returns a slice of packages to test using the
@@ -1380,7 +1386,7 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_
 	env := ctx.Env()
 	env["V23_BIN_DIR"] = binDirPath()
 	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
-	return goTest(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+	return goTestAndReport(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
 }
 
 // binOrder determines if the regression tests use
@@ -1493,7 +1499,6 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 		return nil, err
 	}
 	globalOpts := []goTestOpt{
-		suffixOpt(genTestNameSuffix("V23Test")),
 		argsOpt([]string{"-run", config.Tests}),
 		getNumWorkersOpt(opts),
 		nonTestArgsOpt([]string{"-v23.tests"}),
@@ -1524,6 +1529,7 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 	}
 
 	out := &test.Result{Status: test.Passed}
+	suites := []xunit.TestSuite{}
 	for _, againstDate := range config.AgainstDates {
 		againstTime := time.Time(againstDate)
 		againstDateStr := againstTime.Format("2006-01-02")
@@ -1549,20 +1555,29 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 					return nil, err
 				}
 				suffix := fmt.Sprintf("Regression(%s, %s, %s)", againstDateStr, set.Name, order)
-				localOpts := append([]goTestOpt{suffixOpt(genTestNameSuffix(suffix))}, globalOpts...)
+				suffixOpt := suffixOpt(genTestNameSuffix(suffix))
+				localOpts := append([]goTestOpt{suffixOpt}, globalOpts...)
 				fmt.Fprintf(ctx.Stdout(), "#### Running %s ####\n", suffix)
-				result, err := goTest(newCtx, testName, localOpts...)
+				result, cursuites, err := goTest(newCtx, testName, localOpts...)
 				if err != nil {
 					return nil, err
 				}
+				suites = append(suites, cursuites...)
 				if result.Status != test.Passed {
 					out.Status = test.Failed
 				}
+				mergeTestSet(out.ExcludedTests, result.ExcludedTests)
+				mergeTestSet(out.SkippedTests, result.SkippedTests)
 			}
 		}
 	}
+	return out, xunit.CreateReport(ctx, testName, suites)
+}
 
-	return out, nil
+func mergeTestSet(into map[string][]string, from map[string][]string) {
+	for k, v := range from {
+		into[k] = append(into[k], v...)
+	}
 }
 
 // noSnapshotErr is returned from downloadVanadiumBinaries when there were no
@@ -1697,5 +1712,5 @@ func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Re
 	}
 	args := argsOpt([]string{})
 	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTest(ctx, testName, suffix, exclusionsOpt(goExclusions), getNumWorkersOpt(opts), pkgs, args)
+	return goTestAndReport(ctx, testName, suffix, exclusionsOpt(goExclusions), getNumWorkersOpt(opts), pkgs, args)
 }
