@@ -143,10 +143,15 @@ func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	bytes, err := ctx.Run().ReadFile(filepath.Join(root, currentManifestFileName))
+	currentManifestFile := filepath.Join(root, currentManifestFileName)
+	bytes, err := ctx.Run().ReadFile(currentManifestFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			fmt.Fprintf(ctx.Stderr(), `WARNING: Could not find %s.
+The contents of this file are stored as metadata in binaries the v23
+tool builds. To fix this problem, please run "v23 update".
+`, currentManifestFile)
+			return &Manifest{}, nil
 		}
 		return nil, err
 	}
