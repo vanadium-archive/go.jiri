@@ -39,6 +39,10 @@ The v23 flags are:
  -v=false
    Print verbose output.
 
+The global flags are:
+ -v23.metadata=<just specify -v23.metadata to activate>
+   Displays metadata for the program and exits.
+
 V23 api
 
 Use this command to ensure that no unintended changes are made to Vanadium's

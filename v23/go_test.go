@@ -11,9 +11,13 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"v.io/x/devtools/internal/buildinfo"
+	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
+	"v.io/x/lib/metadata"
 )
 
 // TestGoVanadiumEnvironment checks that the implementation of the
@@ -324,4 +328,41 @@ func containsStrings(super, sub []string) bool {
 		}
 	}
 	return true
+}
+
+func TestGoBuildWithMetaData(t *testing.T) {
+	ctx, start := tool.NewDefaultContext(), time.Now().UTC()
+	// Set up a temp directory.
+	dir, err := ctx.Run().TempDir("", "v23_metadata_test")
+	if err != nil {
+		t.Fatalf("TempDir failed: %v", err)
+	}
+	defer ctx.Run().RemoveAll(dir)
+	// Build the v23 binary itself.
+	var buf bytes.Buffer
+	opts := runutil.Opts{Stdout: &buf, Stderr: &buf, Verbose: true}
+	testbin := filepath.Join(dir, "testbin")
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "build", "-o", testbin); err != nil {
+		t.Fatalf("build of v23 failed: %v\n%s", err, buf.String())
+	}
+	// Run the v23 binary.
+	buf.Reset()
+	if err := ctx.Run().CommandWithOpts(opts, testbin, "-v23.metadata"); err != nil {
+		t.Errorf("run of v23 -v23.metadata failed: %v\n%s", err, buf.String())
+	}
+	// Decode the output metadata and spot-check some values.
+	outData := buf.Bytes()
+	t.Log(string(outData))
+	md, err := metadata.FromXML(outData)
+	if err != nil {
+		t.Errorf("FromXML failed: %v\n%s", err, outData)
+	}
+	bi, err := buildinfo.FromMetaData(md)
+	if err != nil {
+		t.Errorf("DecodeMetaData(%#v) failed: %v", md, err)
+	}
+	const fudge = -5 * time.Second
+	if bi.Time.Before(start.Add(fudge)) {
+		t.Errorf("build time %v < start %v", bi.Time, start)
+	}
 }

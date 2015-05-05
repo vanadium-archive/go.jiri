@@ -7,8 +7,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
-	"encoding/xml"
 	"fmt"
 	"os"
 	"os/user"
@@ -17,11 +15,13 @@ import (
 	"strings"
 	"time"
 
+	"v.io/x/devtools/internal/buildinfo"
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/metadata"
 )
 
 var (
@@ -115,51 +115,38 @@ func runXGo(command *cmdline.Command, args []string) error {
 }
 
 func setBuildInfoFlags(ctx *tool.Context, args []string, platform util.Platform) ([]string, error) {
-	const buildInfoPackage = "v.io/x/lib/buildinfo"
-
+	info := buildinfo.T{
+		Platform: platform.String(),
+		Time:     time.Now(),
+	}
 	// Compute the "manifest" value.
 	manifest, err := util.CurrentManifest(ctx)
 	if err != nil {
 		return nil, err
 	}
-	manifestBytes, err := xml.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
-	}
-
+	info.Manifest = *manifest
 	// Compute the "pristine" value.
 	states, err := getProjectStates(ctx, true)
 	if err != nil {
 		return nil, err
 	}
-	pristine := true
+	info.Pristine = true
 	for _, state := range states {
 		if state.currentBranch != "master" || state.hasUncommitted || state.hasUntracked {
-			pristine = false
+			info.Pristine = false
 			break
 		}
 	}
-
 	// Compute the "user" value.
-	userName := ""
 	if currUser, err := user.Current(); err == nil {
-		userName = currUser.Name
+		info.User = currUser.Name
 	}
-
-	settings := []struct {
-		variable, value string
-	}{
-		{"manifest", base64.StdEncoding.EncodeToString(manifestBytes)},
-		{"platform", platform.String()},
-		{"pristine", fmt.Sprintf("%v", pristine)},
-		{"timestamp", time.Now().UTC().Format(time.RFC3339)},
-		{"username", userName},
+	// Encode metadata and extract the appropriate ldflags.
+	md, err := info.ToMetaData()
+	if err != nil {
+		return nil, err
 	}
-	flags := []string{}
-	for _, s := range settings {
-		flags = append(flags, "-X", buildInfoPackage+"."+s.variable, fmt.Sprintf("%q", s.value))
-	}
-	ldflags := "-ldflags=" + strings.Join(flags, " ")
+	ldflags := "-ldflags=" + metadata.LDFlag(md)
 	return append([]string{args[0], ldflags}, args[1:]...), nil
 }
 
