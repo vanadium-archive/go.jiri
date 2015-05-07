@@ -15,14 +15,6 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-var (
-	platformFlag string
-)
-
-func init() {
-	cmdEnv.Flags.StringVar(&platformFlag, "platform", "", "Target platform.")
-}
-
 // translateExitCode translates errors from the "os/exec" package that contain
 // exit codes into cmdline.ErrExitCode errors.
 func translateExitCode(err error) error {
@@ -62,11 +54,7 @@ func runEnv(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	platform, err := util.ParsePlatform(platformFlag)
-	if err != nil {
-		return err
-	}
-	env, err := util.VanadiumEnvironment(ctx, platform)
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return err
 	}
@@ -104,7 +92,7 @@ func runRun(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return err
 	}

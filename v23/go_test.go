@@ -35,7 +35,7 @@ func TestGoVanadiumEnvironment(t *testing.T) {
 	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -290,7 +290,7 @@ func TestProcessGoCmdAndArgs(t *testing.T) {
 // transitive dependencies.
 func TestComputeGoDeps(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	hostEnv, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -307,7 +307,7 @@ func TestComputeGoDeps(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Logf("%v\n", test.Pkgs)
-		got, err := computeGoDeps(ctx, hostEnv, test.Pkgs, "")
+		got, err := computeGoDeps(ctx, env, test.Pkgs, "")
 		if err != nil {
 			t.Errorf("%v failed: %v", test.Pkgs, err)
 		}

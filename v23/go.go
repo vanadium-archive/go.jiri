@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -23,18 +24,6 @@ import (
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/metadata"
 )
-
-var (
-	hostGoFlag   string
-	targetGoFlag string
-)
-
-func init() {
-	cmdGo.Flags.StringVar(&hostGoFlag, "host-go", "go", "Go command for the host platform.")
-	cmdGo.Flags.StringVar(&targetGoFlag, "target-go", "go", "Go command for the target platform.")
-	// The "v23 xgo" commands has the same flags as "v23 go".
-	cmdXGo.Flags = cmdGo.Flags
-}
 
 // cmdGo represents the "v23 go" command.
 var cmdGo = &cmdline.Command{
@@ -65,60 +54,81 @@ func runGo(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	return runGoForPlatform(ctx, util.HostPlatform(), command, args)
-}
 
-// cmdXGo represents the "v23 xgo" command.
-var cmdXGo = &cmdline.Command{
-	Run:   runXGo,
-	Name:  "xgo",
-	Short: "Execute the go tool using the vanadium environment and cross-compilation",
-	Long: `
-Wrapper around the 'go' tool that can be used for cross-compilation of
-vanadium Go sources. It takes care of vanadium-specific setup, such as
-setting up the Go specific environment variables or making sure that
-VDL generated files are regenerated before compilation.
-
-In particular, the tool invokes the following command before invoking
-any go tool commands that compile vanadium Go code:
-
-vdl generate -lang=go all
-
-`,
-	ArgsName: "<platform> <arg ...>",
-	ArgsLong: `
-<platform> is the cross-compilation target and has the general format
-<arch><sub>-<os> or <arch><sub>-<os>-<env> where:
-- <arch> is the platform architecture (e.g. 386, amd64 or arm)
-- <sub> is the platform sub-architecture (e.g. v6 or v7 for arm)
-- <os> is the platform operating system (e.g. linux or darwin)
-- <env> is the platform environment (e.g. gnu or android)
-
-<arg ...> is a list of arguments for the go tool."
-`,
-}
-
-func runXGo(command *cmdline.Command, args []string) error {
-	if len(args) < 2 {
-		return command.UsageErrorf("not enough arguments")
-	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
-	platform, err := util.ParsePlatform(args[0])
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return err
 	}
-	return runGoForPlatform(ctx, platform, command, args[1:])
+
+	switch args[0] {
+	case "build", "install":
+		// Provide default ldflags to populate build info metadata in the
+		// binary. Any manual specification of ldflags already in the args
+		// will override this.
+		var err error
+		args, err = setBuildInfoFlags(ctx, args, env)
+		if err != nil {
+			return err
+		}
+		fallthrough
+	case "generate", "run", "test":
+		// Check that all non-master branches have been merged with the
+		// master branch to make sure the vdl tool is not run against
+		// out-of-date code base.
+		if err := reportOutdatedBranches(ctx); err != nil {
+			return err
+		}
+
+		// Generate vdl files, if necessary.
+		if err := generateVDL(ctx, env, args); err != nil {
+			return err
+		}
+	}
+
+	// Run the go tool.
+	goBin, err := env.LookPath("go")
+	if err != nil {
+		return err
+	}
+	opts := ctx.Run().Opts()
+	opts.Env = env.Map()
+	return translateExitCode(ctx.Run().CommandWithOpts(opts, goBin, args...))
 }
 
-func setBuildInfoFlags(ctx *tool.Context, args []string, platform util.Platform) ([]string, error) {
-	info := buildinfo.T{
-		Platform: platform.String(),
-		Time:     time.Now(),
+// getPlatform identifies the target platform by querying the go tool
+// for the values of the GOARCH and GOOS environment variables.
+func getPlatform(ctx *tool.Context, env *envutil.Snapshot) (string, error) {
+	goBin, err := env.LookPath("go")
+	if err != nil {
+		return "", err
 	}
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Env = env.Map()
+	if err = ctx.Run().CommandWithOpts(opts, goBin, "env", "GOARCH"); err != nil {
+		return "", err
+	}
+	arch := strings.TrimSpace(out.String())
+	out.Reset()
+	if err = ctx.Run().CommandWithOpts(opts, goBin, "env", "GOOS"); err != nil {
+		return "", err
+	}
+	os := strings.TrimSpace(out.String())
+	return fmt.Sprintf("%s-%s", arch, os), nil
+}
+
+// setBuildInfoFlags augments the list of arguments with flags for the
+// go compiler that encoded the build information expected by the
+// v.io/x/lib/metadata package.
+func setBuildInfoFlags(ctx *tool.Context, args []string, env *envutil.Snapshot) ([]string, error) {
+	info := buildinfo.T{Time: time.Now()}
+	// Compute the "platform" value.
+	platform, err := getPlatform(ctx, env)
+	if err != nil {
+		return nil, err
+	}
+	info.Platform = platform
 	// Compute the "manifest" value.
 	manifest, err := util.CurrentManifest(ctx)
 	if err != nil {
@@ -141,53 +151,13 @@ func setBuildInfoFlags(ctx *tool.Context, args []string, platform util.Platform)
 	if currUser, err := user.Current(); err == nil {
 		info.User = currUser.Name
 	}
-	// Encode metadata and extract the appropriate ldflags.
+	// Encode buildinfo as metadata and extract the appropriate ldflags.
 	md, err := info.ToMetaData()
 	if err != nil {
 		return nil, err
 	}
 	ldflags := "-ldflags=" + metadata.LDFlag(md)
 	return append([]string{args[0], ldflags}, args[1:]...), nil
-}
-
-func runGoForPlatform(ctx *tool.Context, platform util.Platform, command *cmdline.Command, args []string) error {
-	// Generate vdl files, if necessary.
-	switch args[0] {
-	case "build", "install":
-		// Provide default ldflags to populate build info metadata in
-		// the binary.  Any manual specification of ldflags already in
-		// the args will override this.
-		var err error
-		args, err = setBuildInfoFlags(ctx, args, platform)
-		if err != nil {
-			return err
-		}
-		fallthrough
-	case "generate", "run", "test":
-		// Check that all non-master branches have merged the
-		// master branch to make sure the vdl tool is not run
-		// against out-of-date code base.
-		if err := reportOutdatedBranches(ctx); err != nil {
-			return err
-		}
-
-		if err := generateVDL(ctx, args); err != nil {
-			return err
-		}
-	}
-
-	// Run the go tool for the given platform.
-	targetEnv, err := util.VanadiumEnvironment(ctx, platform)
-	if err != nil {
-		return err
-	}
-	bin, err := targetEnv.LookPath(targetGoFlag)
-	if err != nil {
-		return err
-	}
-	opts := ctx.Run().Opts()
-	opts.Env = targetEnv.Map()
-	return translateExitCode(ctx.Run().CommandWithOpts(opts, bin, args...))
 }
 
 // generateVDL generates VDL for the transitive Go package
@@ -206,15 +176,10 @@ func runGoForPlatform(ctx *tool.Context, platform util.Platform, command *cmdlin
 //
 // TODO(toddw): Change the vdl tool to return vdl packages given the
 // full Go dependencies, after vdl config files are implemented.
-func generateVDL(ctx *tool.Context, cmdArgs []string) error {
-	hostEnv, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
-	if err != nil {
-		return err
-	}
-
+func generateVDL(ctx *tool.Context, env *envutil.Snapshot, cmdArgs []string) error {
 	// Compute which VDL-based Go packages might need to be regenerated.
 	goPkgs, goFiles, goTags := processGoCmdAndArgs(cmdArgs[0], cmdArgs[1:])
-	goDeps, err := computeGoDeps(ctx, hostEnv, append(goPkgs, goFiles...), goTags)
+	goDeps, err := computeGoDeps(ctx, env, append(goPkgs, goFiles...), goTags)
 	if err != nil {
 		return err
 	}
@@ -222,7 +187,7 @@ func generateVDL(ctx *tool.Context, cmdArgs []string) error {
 	// Regenerate the VDL-based Go packages.
 	vdlArgs := []string{"-ignore_unknown", "generate", "-lang=go"}
 	vdlArgs = append(vdlArgs, goDeps...)
-	vdlBin, err := hostEnv.LookPath("vdl")
+	vdlBin, err := exec.LookPath("vdl")
 	if err != nil {
 		return err
 	}
@@ -230,7 +195,7 @@ func generateVDL(ctx *tool.Context, cmdArgs []string) error {
 	opts := ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
-	opts.Env = hostEnv.Map()
+	opts.Env = env.Map()
 	if err := ctx.Run().CommandWithOpts(opts, vdlBin, vdlArgs...); err != nil {
 		return fmt.Errorf("failed to generate vdl: %v\n%s", err, out.String())
 	}
@@ -408,6 +373,10 @@ func makeStringSet(values []string) map[string]bool {
 // separated tokens.  The pkgs may be in any format recognized by "go list"; dir
 // paths, import paths, or go files.
 func computeGoDeps(ctx *tool.Context, env *envutil.Snapshot, pkgs []string, goTags string) ([]string, error) {
+	goBin, err := env.LookPath("go")
+	if err != nil {
+		return nil, err
+	}
 	goListArgs := []string{`list`, `-f`, `{{.ImportPath}} {{join .Deps " "}}`}
 	if goTags != "" {
 		goListArgs = append(goListArgs, "-tags="+goTags)
@@ -422,7 +391,7 @@ func computeGoDeps(ctx *tool.Context, env *envutil.Snapshot, pkgs []string, goTa
 	opts.Stdout = &stdout
 	opts.Stderr = &stderr
 	opts.Env = env.Map()
-	if err := ctx.Run().CommandWithOpts(opts, hostGoFlag, goListArgs...); err != nil {
+	if err := ctx.Run().CommandWithOpts(opts, goBin, goListArgs...); err != nil {
 		return nil, fmt.Errorf("failed to compute go deps: %v\n%s\n%v", err, stderr.String(), pkgs)
 	}
 	scanner := bufio.NewScanner(&stdout)
@@ -479,7 +448,7 @@ func runGoExtDistClean(command *cmdline.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return err
 	}

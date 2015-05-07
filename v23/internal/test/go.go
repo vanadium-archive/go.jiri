@@ -416,7 +416,7 @@ func (t *matchV23TestFunc) goTestOpt() {}
 // by the matcher interface.
 func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatcher) ([]string, map[string][]string, error) {
 
-	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to obtain the Vanadium environment: %v", err)
 	}

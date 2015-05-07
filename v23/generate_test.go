@@ -45,7 +45,7 @@ func parseFile(t *testing.T, file string) []string {
 
 func TestMain(m *testing.M) {
 	ctx := tool.NewDefaultContext()
-	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		panic(err)
 	}

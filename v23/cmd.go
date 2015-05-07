@@ -55,7 +55,6 @@ Command v23 is a multi-purpose tool for Vanadium development.
 		cmdTest,
 		cmdUpdate,
 		cmdVersion,
-		cmdXGo,
 	},
 }
 

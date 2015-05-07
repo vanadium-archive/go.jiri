@@ -5,9 +5,7 @@
 package util
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,127 +16,24 @@ import (
 )
 
 const (
-	rootEnv          = "V23_ROOT"
-	javaEnv          = "JDK_HOME"
-	metadataDirName  = ".v23"
-	metadataFileName = "metadata.v2"
+	v23ProfileEnv = "V23_PROFILE"
+	javaEnv       = "JDK_HOME"
 )
 
-// LocalManifestFile returns the path to the local manifest.
-func LocalManifestFile() (string, error) {
-	root, err := V23Root()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, ".local_manifest"), nil
-}
-
-// LocalSnapshotDir returns the path to the local snapshot directory.
-func LocalSnapshotDir() (string, error) {
-	root, err := V23Root()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, ".snapshot"), nil
-}
-
-// ManifestDir returns the path to the manifest directory.
-func ManifestDir() (string, error) {
-	root, err := V23Root()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, ".manifest", "v2"), nil
-}
-
-// ManifestFile returns the path to the manifest file with the given
-// relative path.
-func ManifestFile(name string) (string, error) {
-	dir, err := ManifestDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, name), nil
-}
-
-// RemoteSnapshotDir returns the path to the remote snapshot directory.
-func RemoteSnapshotDir() (string, error) {
-	manifestDir, err := ManifestDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(manifestDir, "snapshot"), nil
-}
-
-// ResolveManifestPath resolves the given manifest name to an absolute
-// path in the local filesystem.
-func ResolveManifestPath(name string) (string, error) {
-	if name != "" {
-		if filepath.IsAbs(name) {
-			return name, nil
-		}
-		return ManifestFile(name)
-	}
-	path, err := LocalManifestFile()
-	if err != nil {
-		return "", err
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return ResolveManifestPath("default")
-		}
-		return "", fmt.Errorf("Stat(%v) failed: %v", err)
-	}
-	return path, nil
-}
-
-// DataDirPath returns the path to the data directory of the given tool.
-func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
-	projects, tools, err := readManifest(ctx, false)
-	if err != nil {
-		return "", err
-	}
-	if toolName == "" {
-		// If the tool name is not set, use "v23" as the default. As a
-		// consequence, any manifest is assumed to specify a "v23" tool.
-		toolName = "v23"
-	}
-	tool, ok := tools[toolName]
-	if !ok {
-		return "", fmt.Errorf("tool %q not found in the manifest", tool.Name)
-	}
-	projectName := tool.Project
-	project, ok := projects[projectName]
-	if !ok {
-		return "", fmt.Errorf("project %q not found in the manifest", projectName)
-	}
-	return filepath.Join(project.Path, tool.Data), nil
-}
-
-// LoadConfig loads the tools configuration file into memory.
-func LoadConfig(ctx *tool.Context) (*Config, error) {
-	dataDir, err := DataDirPath(ctx, tool.Name)
-	if err != nil {
-		return nil, err
-	}
-	configPath := filepath.Join(dataDir, "conf.json")
-	configBytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("ReadFile(%v) failed: %v", configPath, err)
-	}
-	var config Config
-	if err := json.Unmarshal(configBytes, &config); err != nil {
-		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(configBytes), err)
-	}
-	return &config, nil
-}
-
 // VanadiumEnvironment returns the environment variables setting for
-// vanadium. The util package captures the original state of the
-// relevant environment variables when the tool is initialized, and
-// every invocation of this function updates this original state
-// according to the current config of the v23 tool.
-func VanadiumEnvironment(ctx *tool.Context, platform Platform) (*envutil.Snapshot, error) {
+// the Vanadium project. The util package captures the original state
+// of the relevant environment variables when the tool is initialized
+// and every invocation of this function updates this original state
+// according to the v23 tool configuration.
+//
+// By default, the Vanadium Go and VDL workspaces are added to the
+// GOPATH and VDLPATH environment variables respectively. In addition,
+// the V23_PROFILE environment variable can be used to activate an
+// environment variable setting for various development profiles of
+// the Vanadium project (e.g. arm, android, java, or nacl). Unlike the
+// default setting, the setting enabled by the V23_PROFILE environment
+// variable can override existing environment.
+func VanadiumEnvironment(ctx *tool.Context) (*envutil.Snapshot, error) {
 	env := envutil.NewSnapshotFromOS()
 	root, err := V23Root()
 	if err != nil {
@@ -148,132 +43,112 @@ func VanadiumEnvironment(ctx *tool.Context, platform Platform) (*envutil.Snapsho
 	if err != nil {
 		return nil, err
 	}
+	env.Set("CGO_ENABLED", "1")
 	if err := setGoPath(ctx, env, root, config); err != nil {
 		return nil, err
 	}
 	if err := setVdlPath(ctx, env, root, config); err != nil {
 		return nil, err
 	}
-	if platform.OS == "darwin" || platform.OS == "linux" {
-		if err := setSyncbaseCgoEnv(env, root, platform.OS); err != nil {
-			return nil, err
-		}
+	if err := setSyncbaseEnv(env, root); err != nil {
+		return nil, err
 	}
-	switch {
-	case platform.Arch == runtime.GOARCH && platform.OS == runtime.GOOS:
-		// Set environment variables needed to build a Go shared library used
-		// by Java.
-		setJavaEnv(env, platform)
-	case platform.Arch == "arm" && platform.OS == "linux":
-		// Set up cross-compilation for arm / linux.
-		if err := setArmEnv(env, platform); err != nil {
-			return nil, err
+	if profile := os.Getenv(v23ProfileEnv); profile != "" {
+		fmt.Fprintf(ctx.Stdout(), `NOTE: Enabling environment variable setting for %q.
+This can override values of existing environment variables.
+`, profile)
+		switch profile {
+		case "android":
+			// Cross-compilation for android on linux.
+			if err := setAndroidEnv(env, root); err != nil {
+				return nil, err
+			}
+		case "arm":
+			// Cross-compilation for arm on linux.
+			if err := setArmEnv(env, root); err != nil {
+				return nil, err
+			}
+		case "java":
+			// Building of a Go shared library for Java.
+			if err := setJavaEnv(env); err != nil {
+				return nil, err
+			}
+		case "nacl":
+			// Cross-compilation for nacl.
+			if err := setNaclEnv(env, root); err != nil {
+				return nil, err
+			}
+		default:
+			fmt.Fprintf(ctx.Stderr(), "Unknown environment profile %q", profile)
 		}
-	case platform.Arch == "arm" && platform.OS == "android":
-		// Set up cross-compilation for arm / android.
-		if err := setAndroidEnv(env, platform); err != nil {
-			return nil, err
-		}
-	case (platform.Arch == "386" || platform.Arch == "amd64p32") && platform.OS == "nacl":
-		// Set up cross-compilation nacl.
-		if err := setNaclEnv(env, platform); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, UnsupportedPlatformErr{platform}
 	}
 	return env, nil
 }
 
-// VanadiumGitRepoHost returns the URL that hosts vanadium git
-// repositories.
-func VanadiumGitRepoHost() string {
-	return "https://vanadium.googlesource.com/"
-}
-
-// V23Root returns the root of the vanadium universe.
-func V23Root() (string, error) {
-	root := os.Getenv(rootEnv)
-	if root == "" {
-		return "", fmt.Errorf("%v is not set", rootEnv)
-	}
-	result, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root)
-	}
-	return result, nil
-}
-
-// setJavaEnv sets the environment variables used for building a Go shared
-// library that is invoked from Java code.
-// Note that we set these variables for all builds, Java-related or not, but
-// for non-Java cases they will be a noop.
-func setJavaEnv(env *envutil.Snapshot, platform Platform) {
-	if platform.OS != "linux" { // Java-related builds only supported on Linux
-		return
-	}
+// setJavaEnv sets the environment variables used for building a Go
+// shared library that is invoked from Java code. If Java is not
+// installed on the host, this function is a no-op.
+func setJavaEnv(env *envutil.Snapshot) error {
 	jdkHome := os.Getenv(javaEnv)
 	if jdkHome == "" {
-		return
+		return nil
 	}
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
 	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", "linux"))
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
+	return nil
 }
 
 // setAndroidEnv sets the environment variables used for android
 // cross-compilation.
-func setAndroidEnv(env *envutil.Snapshot, platform Platform) error {
-	setJavaEnv(env, platform)
-
-	root, err := V23Root()
-	if err != nil {
+func setAndroidEnv(env *envutil.Snapshot, root string) error {
+	// Set the environment variables needed for building Go shared
+	// libraries for Java.
+	if err := setJavaEnv(env); err != nil {
 		return err
 	}
-	// Set Go specific environment variables.
-	env.Set("CGO_ENABLED", "1")
-	env.Set("GOOS", platform.OS)
-	env.Set("GOARCH", platform.Arch)
-	env.Set("GOARM", strings.TrimPrefix(platform.SubArch, "v"))
 
-	// Add the paths to vanadium cross-compilation tools to the PATH.
+	// Set Go specific environment variables.
+	env.Set("GOARCH", "arm")
+	env.Set("GOARM", "7")
+	env.Set("GOOS", "android")
+
+	// Add the path to android cross-compiler to the PATH.
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{
 		filepath.Join(root, "third_party", "android", "go", "bin"),
 	}, path...)
 	env.SetTokens("PATH", path, ":")
+
 	return nil
 }
 
 // setArmEnv sets the environment variables used for android
 // cross-compilation.
-func setArmEnv(env *envutil.Snapshot, platform Platform) error {
-	root, err := V23Root()
-	if err != nil {
-		return err
-	}
+func setArmEnv(env *envutil.Snapshot, root string) error {
 	// Set Go specific environment variables.
-	env.Set("GOARCH", platform.Arch)
-	env.Set("GOARM", strings.TrimPrefix(platform.SubArch, "v"))
-	env.Set("GOOS", platform.OS)
+	env.Set("GOARCH", "arm")
+	env.Set("GOARM", "6")
+	env.Set("GOOS", "linux")
 
-	// Add the paths to vanadium cross-compilation tools to the PATH.
+	// Add the paths to arm cross-compilation tools to the PATH.
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{
 		filepath.Join(root, "third_party", "cout", "xgcc", "cross_arm"),
 		filepath.Join(root, "third_party", "repos", "go_arm", "bin"),
 	}, path...)
 	env.SetTokens("PATH", path, ":")
+
 	return nil
 }
 
-// setGoPath adds the paths to vanadium Go workspaces to the GOPATH
+// setGoPath adds the paths to Vanadium Go workspaces to the GOPATH
 // variable.
 func setGoPath(ctx *tool.Context, env *envutil.Snapshot, root string, config *Config) error {
 	return setPathHelper(ctx, env, "GOPATH", root, config.GoWorkspaces())
 }
 
-// setVdlPath adds the paths to vanadium VDL workspaces to the VDLPATH
+// setVdlPath adds the paths to Vanadium VDL workspaces to the VDLPATH
 // variable.
 func setVdlPath(ctx *tool.Context, env *envutil.Snapshot, root string, config *Config) error {
 	return setPathHelper(ctx, env, "VDLPATH", root, config.VDLWorkspaces())
@@ -313,18 +188,23 @@ func setPathHelper(ctx *tool.Context, env *envutil.Snapshot, name, root string, 
 
 // setNaclEnv sets the environment variables used for nacl
 // cross-compilation.
-func setNaclEnv(env *envutil.Snapshot, platform Platform) error {
-	env.Set("GOARCH", platform.Arch)
-	env.Set("GOOS", platform.OS)
+func setNaclEnv(env *envutil.Snapshot, root string) error {
+	env.Set("GOARCH", "amd64p32")
+	env.Set("GOOS", "nacl")
+
+	// Add the path to nacl cross-compiler to the PATH.
+	path := env.GetTokens("PATH", ":")
+	path = append([]string{
+		filepath.Join(root, "third_party", "repos", "go_ppapi", "bin"),
+	}, path...)
+	env.SetTokens("PATH", path, ":")
+
 	return nil
 }
 
-// setSyncbaseCgoEnv sets the CGO_ENABLED variable and adds the LevelDB
-// third-party C++ libraries vanadium Go code depends on to the CGO_CFLAGS and
-// CGO_LDFLAGS variables.
-func setSyncbaseCgoEnv(env *envutil.Snapshot, root, arch string) error {
-	// Set the CGO_* variables for the vanadium syncbase component.
-	env.Set("CGO_ENABLED", "1")
+// setSyncbaseEnv adds the LevelDB third-party C++ libraries Vanadium
+// Go code depends on to the CGO_CFLAGS and CGO_LDFLAGS variables.
+func setSyncbaseEnv(env *envutil.Snapshot, root string) error {
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
 	cxxflags := env.GetTokens("CGO_CXXFLAGS", " ")
 	ldflags := env.GetTokens("CGO_LDFLAGS", " ")
@@ -333,25 +213,20 @@ func setSyncbaseCgoEnv(env *envutil.Snapshot, root, arch string) error {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("Stat(%v) failed: %v", dir, err)
 		}
-	} else {
-		cflags = append(cflags, filepath.Join("-I"+dir, "include"))
-		cxxflags = append(cxxflags, filepath.Join("-I"+dir, "include"))
-		ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"))
-		if arch == "linux" {
-			ldflags = append(ldflags, "-Wl,-rpath", filepath.Join(dir, "lib"))
-		}
+		return nil
+	}
+	cflags = append(cflags, filepath.Join("-I"+dir, "include"))
+	cxxflags = append(cxxflags, filepath.Join("-I"+dir, "include"))
+	ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"))
+	// TODO(jsimsa): Currently, the "v23 profile setup syncbase" command
+	// only compiles LevelDB C++ libraries for the host architecture. As
+	// a consequence, the syncbase component can only be compiled if the
+	// target platform matches the host platform.
+	if runtime.GOARCH == "linux" {
+		ldflags = append(ldflags, "-Wl,-rpath", filepath.Join(dir, "lib"))
 	}
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
 	env.SetTokens("CGO_CXXFLAGS", cxxflags, " ")
 	env.SetTokens("CGO_LDFLAGS", ldflags, " ")
 	return nil
-}
-
-// BuildCopRotationPath returns the path to the build cop rotation file.
-func BuildCopRotationPath(ctx *tool.Context) (string, error) {
-	dataDir, err := DataDirPath(ctx, tool.Name)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dataDir, "buildcop.xml"), nil
 }

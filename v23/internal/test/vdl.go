@@ -43,7 +43,7 @@ func vanadiumGoVDL(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result
 	opts := ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
-	venv, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	venv, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,12 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"sort"
+
+	"v.io/x/devtools/internal/tool"
 )
 
 // Config holds configuration common to vanadium tools.
@@ -130,6 +135,24 @@ func NewConfig(opts ...ConfigOpt) *Config {
 		}
 	}
 	return &c
+}
+
+// LoadConfig returns the developer tools configuration.
+func LoadConfig(ctx *tool.Context) (*Config, error) {
+	dataDir, err := DataDirPath(ctx, tool.Name)
+	if err != nil {
+		return nil, err
+	}
+	configPath := filepath.Join(dataDir, "conf.json")
+	configBytes, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("ReadFile(%v) failed: %v", configPath, err)
+	}
+	var config Config
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(configBytes), err)
+	}
+	return &config, nil
 }
 
 // GoWorkspaces returns the Go workspaces included in the config.

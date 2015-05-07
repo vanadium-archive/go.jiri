@@ -27,8 +27,6 @@ The v23 commands are:
    test         Manage vanadium tests
    update       Update all vanadium tools and projects
    version      Print version
-   xgo          Execute the go tool using the vanadium environment and
-                cross-compilation
    help         Display help for commands or topics
 
 The v23 flags are:
@@ -229,13 +227,9 @@ If arguments are given, prints only the value of each named variable, each on a
 separate line in the same order as the arguments.
 
 Usage:
-   v23 env [flags] [name ...]
+   v23 env [name ...]
 
 [name ...] is an optional list of variable names.
-
-The v23 env flags are:
- -platform=
-   Target platform.
 
 V23 go
 
@@ -250,15 +244,9 @@ tool commands that compile vanadium Go code:
 vdl generate -lang=go all
 
 Usage:
-   v23 go [flags] <arg ...>
+   v23 go <arg ...>
 
 <arg ...> is a list of arguments for the go tool.
-
-The v23 go flags are:
- -host-go=go
-   Go command for the host platform.
- -target-go=go
-   Go command for the target platform.
 
 V23 goext
 
@@ -644,35 +632,6 @@ Print version of the v23 tool.
 
 Usage:
    v23 version
-
-V23 xgo
-
-Wrapper around the 'go' tool that can be used for cross-compilation of vanadium
-Go sources. It takes care of vanadium-specific setup, such as setting up the Go
-specific environment variables or making sure that VDL generated files are
-regenerated before compilation.
-
-In particular, the tool invokes the following command before invoking any go
-tool commands that compile vanadium Go code:
-
-vdl generate -lang=go all
-
-Usage:
-   v23 xgo [flags] <platform> <arg ...>
-
-<platform> is the cross-compilation target and has the general format
-<arch><sub>-<os> or <arch><sub>-<os>-<env> where: - <arch> is the platform
-architecture (e.g. 386, amd64 or arm) - <sub> is the platform sub-architecture
-(e.g. v6 or v7 for arm) - <os> is the platform operating system (e.g. linux or
-darwin) - <env> is the platform environment (e.g. gnu or android)
-
-<arg ...> is a list of arguments for the go tool."
-
-The v23 xgo flags are:
- -host-go=go
-   Go command for the host platform.
- -target-go=go
-   Go command for the target platform.
 
 V23 help
 

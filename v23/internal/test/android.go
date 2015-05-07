@@ -180,8 +180,10 @@ func buildAndroidLibs(ctx *tool.Context, appDir string) error {
 	// Build the vanadium android library.
 	jniLibName := "libveyronjni.so"
 	jniLibPath := filepath.Join(tmpDir, jniLibName)
-	buildArgs := []string{"xgo", "armv7-android", "build", "-o", jniLibPath, "-ldflags=\"-shared\"", "-tags", "android", "v.io/jni"}
-	if err := ctx.Run().Command("v23", buildArgs...); err != nil {
+	buildArgs := []string{"go", "build", "-o", jniLibPath, "-ldflags=\"-shared\"", "-tags", "android", "v.io/jni"}
+	opts := ctx.Run().Opts()
+	opts.Env["V23_ENV"] = "android"
+	if err := ctx.Run().CommandWithOpts(opts, "v23", buildArgs...); err != nil {
 		return err
 	}
 	// Link vanadium android library into the app native lib dir.

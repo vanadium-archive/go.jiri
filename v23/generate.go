@@ -91,7 +91,7 @@ const (
 )
 
 func configureBuilder(ctx *tool.Context) (cleanup func(), err error) {
-	env, err := util.VanadiumEnvironment(ctx, util.HostPlatform())
+	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to obtain the Vanadium environment: %v", err)
 	}

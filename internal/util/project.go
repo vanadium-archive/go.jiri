@@ -397,7 +397,7 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 		return err
 	}
 
-	env, err := VanadiumEnvironment(ctx, HostPlatform())
+	env, err := VanadiumEnvironment(ctx)
 	if err != nil {
 		return err
 	}
