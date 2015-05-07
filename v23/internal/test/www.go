@@ -64,3 +64,7 @@ func vanadiumWWWSite(ctx *tool.Context, testName string, _ ...Opt) (*test.Result
 func vanadiumWWWTutorials(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return commonVanadiumWWW(ctx, testName, "test-tutorials", defaultWWWTestTimeout)
 }
+
+func vanadiumWWWTutorialsUI(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-ui", defaultWWWTestTimeout)
+}

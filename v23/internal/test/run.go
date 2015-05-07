@@ -109,6 +109,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-release-test":           vanadiumReleaseTest,
 	"vanadium-www-site":               vanadiumWWWSite,
 	"vanadium-www-tutorials":          vanadiumWWWTutorials,
+	"vanadium-www-tutorials-ui":       vanadiumWWWTutorialsUI,
 }
 
 func newTestContext(ctx *tool.Context, env map[string]string) *tool.Context {
