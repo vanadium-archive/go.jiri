@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/gerrit"
@@ -32,6 +34,8 @@ var (
 	editFlag        bool
 	forceFlag       bool
 	gofmtFlag       bool
+	govetFlag       bool
+	govetBinaryFlag string
 	presubmitFlag   string
 	reviewersFlag   string
 	uncommittedFlag bool
@@ -47,6 +51,8 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
+	cmdCLMail.Flags.BoolVar(&govetFlag, "check-govet", true, "Check that no go vet violations exist.")
+	cmdCLMail.Flags.StringVar(&govetBinaryFlag, "go-vet-binary", "", "Specify the path to the go vet binary to use.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
@@ -243,6 +249,15 @@ func (s goFormatError) Error() string {
 	return result
 }
 
+type goVetError []string
+
+func (s goVetError) Error() string {
+	result := "changelist contains 'go vet' violation(s)\n\n"
+	result += "To resolve this problem, fix the following violations:\n"
+	result += "  " + strings.Join(s, "\n  ")
+	return result
+}
+
 type noChangeIDError struct{}
 
 func (_ noChangeIDError) Error() string {
@@ -399,18 +414,104 @@ var presubmitTestLabelRE *regexp.Regexp = regexp.MustCompile(`PresubmitTest:\s*(
 
 // checkGoFormat checks if the code to be submitted needs to be
 // formatted with "go fmt".
-func (r *review) checkGoFormat() (e error) {
-	files, err := r.ctx.Git().ModifiedFiles("master", r.branch)
+func (r *review) checkGoFormat() error {
+	goFiles, err := r.modifiedGoFiles()
+	if err != nil || len(goFiles) == 0 {
+		return err
+	}
+	// Check if the formatting differs from gofmt.
+	var out bytes.Buffer
+	opts := r.ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Stderr = &out
+	args := []string{"run", "gofmt", "-l"}
+	args = append(args, goFiles...)
+	if err := r.ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
+		return err
+	}
+	if out.Len() != 0 {
+		return goFormatError(out.String())
+	}
+	return nil
+}
+
+// checkGoVet checks if the code to submitted has any "go vet" violations.
+func (r *review) checkGoVet() (e error) {
+	vetBin, cleanup, err := buildGoVetBinary(r.ctx)
 	if err != nil {
 		return err
+	}
+	defer collect.Error(cleanup, &e)
+
+	goFiles, err := r.modifiedGoFiles()
+	if err != nil || len(goFiles) == 0 {
+		return err
+	}
+	// Check if the files generate any "go vet" errors.
+	var out bytes.Buffer
+	opts := r.ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Stderr = &out
+	args := []string{"run", vetBin}
+	// We vet one file at a time, because go vet only allows vetting of files of
+	// the same package per invocation.
+	var vetErrors []string
+	for _, file := range goFiles {
+		err := r.ctx.Run().CommandWithOpts(opts, "v23", append(args, file)...)
+		if err == nil {
+			continue
+		}
+		// A non-zero exit status means we should have a go vet violation.
+		exiterr, ok := err.(*exec.ExitError)
+		if !ok {
+			return err
+		}
+		status, ok := exiterr.Sys().(syscall.WaitStatus)
+		if !ok {
+			return err
+		}
+		if status.ExitStatus() != 0 {
+			vetErrors = append(vetErrors, out.String())
+		}
+	}
+	if len(vetErrors) > 0 {
+		return goVetError(vetErrors)
+	}
+	return nil
+}
+
+func buildGoVetBinary(ctx *tool.Context) (vetBin string, cleanup func() error, e error) {
+	vetBin = govetBinaryFlag
+	cleanup = func() error { return nil }
+	if len(vetBin) == 0 {
+		// build the go vet binary.
+		tmpDir, err := ctx.Run().TempDir("", "")
+		if err != nil {
+			return "", cleanup, err
+		}
+		cleanup = func() error { return ctx.Run().RemoveAll(tmpDir) }
+		vetBin = filepath.Join(tmpDir, "vet")
+		if err := ctx.Run().Command("v23", "go", "build", "-o", vetBin, "golang.org/x/tools/cmd/vet"); err != nil {
+			cleanup()
+			return "", cleanup, err
+		}
+	}
+	return vetBin, cleanup, nil
+}
+
+// modifiedGoFiles returns the modified go files in the change to be submitted.
+func (r *review) modifiedGoFiles() ([]string, error) {
+	files, err := r.ctx.Git().ModifiedFiles("master", r.branch)
+	if err != nil {
+		return nil, err
 	}
 	wd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("Getwd() failed: %v", err)
+		return nil, fmt.Errorf("Getwd() failed: %v", err)
 	}
 	topLevel, err := r.ctx.Git().TopLevel()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	goFiles := []string{}
 	for _, file := range files {
@@ -435,22 +536,7 @@ func (r *review) checkGoFormat() (e error) {
 		}
 		goFiles = append(goFiles, file)
 	}
-	// Check if the formatting differs from gofmt.
-	if len(goFiles) != 0 {
-		var out bytes.Buffer
-		opts := r.ctx.Run().Opts()
-		opts.Stdout = &out
-		opts.Stderr = &out
-		args := []string{"run", "gofmt", "-l"}
-		args = append(args, goFiles...)
-		if err := r.ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
-			return err
-		}
-		if out.Len() != 0 {
-			return goFormatError(out.String())
-		}
-	}
-	return nil
+	return goFiles, nil
 }
 
 // checkCopyright checks if the submitted code introduces source code
@@ -645,6 +731,11 @@ func (r *review) run() (e error) {
 	}
 	if gofmtFlag {
 		if err := r.checkGoFormat(); err != nil {
+			return err
+		}
+	}
+	if govetFlag {
+		if err := r.checkGoVet(); err != nil {
 			return err
 		}
 	}

@@ -152,12 +152,16 @@ The v23 cl mail flags are:
    Check that no go-depcop violations exist.
  -check-gofmt=true
    Check that no go fmt violations exist.
+ -check-govet=true
+   Check that no go vet violations exist.
  -check-uncommitted=true
    Check that no uncommitted changes exist.
  -d=false
    Send a draft changelist.
  -edit=true
    Open an editor to edit the commit message.
+ -go-vet-binary=
+   Specify the path to the go vet binary to use.
  -presubmit=all
    The type of presubmit tests to run. Valid values: none,all.
  -r=

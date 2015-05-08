@@ -698,6 +698,94 @@ func TestGoFormatOK(t *testing.T) {
 	}
 }
 
+// testGoVetHelper is a function that contains the logic shared
+// by TestGoVetError and TestGoVetOK.
+func testGoVetHelper(t *testing.T, ok bool) error {
+	ctx := tool.NewDefaultContext()
+
+	// build the go vet binary and set the flag.
+	vetBin, cleanup, err := buildGoVetBinary(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	govetBinaryFlag = vetBin
+	defer func() { govetBinaryFlag = "" }()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	root, _, _, gerritPath := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
+	branch := "my-branch"
+	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	file := "file.go"
+	validFileContent := `package main
+
+import "fmt"
+
+func main() {}
+`
+	invalidFileContent := `package main
+
+import "fmt"
+
+func main() {
+	fmt.Printf("%v")
+}
+`
+
+	fileContent := validFileContent
+	if !ok {
+		fileContent = invalidFileContent
+	}
+
+	fmt.Println(fileContent)
+	if err := ctx.Run().WriteFile(file, []byte(fileContent), 0644); err != nil {
+		t.Fatalf("WriteFile(%v, %v) failed: %v", file, fileContent, err)
+	}
+	// Make an invalid Go file in a testdata/ directory.
+	const testdata = "testdata"
+	ignoredFile, ignoredContent := filepath.Join(testdata, "ignored.go"), invalidFileContent
+	if err := ctx.Run().MkdirAll(testdata, 0744); err != nil {
+		t.Fatalf("MkdirAll(%v) failed: %v", testdata, err)
+	}
+	if err := ctx.Run().WriteFile(ignoredFile, []byte(ignoredContent), 0644); err != nil {
+		t.Fatalf("WriteFile(%v, %v) failed: %v", ignoredFile, ignoredContent, err)
+	}
+	commitMessage := "Commit " + file
+	if err := ctx.Git().CommitFile(file, commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	return review.checkGoVet()
+}
+
+// TestGoVetError checks that the Go vet check fails for a CL
+// contains go vet violations.
+func TestGoVetError(t *testing.T) {
+	if err := testGoVetHelper(t, false); err == nil {
+		t.Fatalf("go vet check did not fail when it should")
+	} else if _, ok := err.(goVetError); !ok {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestGoVetOK checks that the Go vet check succeeds for a CL
+// that does not contain go vet violations.
+func TestGoVetOK(t *testing.T) {
+	if err := testGoVetHelper(t, true); err != nil {
+		t.Fatalf("go vet check failed: %v", err)
+	}
+}
+
 // TestSendReview checks the various options for sending a review.
 func TestSendReview(t *testing.T) {
 	ctx := tool.NewDefaultContext()
@@ -937,7 +1025,7 @@ func TestDirtyBranch(t *testing.T) {
 	}
 	untrackedFile, untrackedFileContent := "untracked-file", "untracked-file content"
 	if err := ctx.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %t) failed: %v", untrackedFile, untrackedFileContent, err)
+		t.Fatalf("WriteFile(%v, %v) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
 	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
