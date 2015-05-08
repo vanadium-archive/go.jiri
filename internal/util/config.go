@@ -5,10 +5,9 @@
 package util
 
 import (
-	"encoding/json"
+	"encoding/xml"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
+	"os"
 	"sort"
 
 	"v.io/x/devtools/internal/tool"
@@ -16,6 +15,9 @@ import (
 
 // Config holds configuration common to vanadium tools.
 type Config struct {
+	// apiCheckProjects identifies the set of project names for which an
+	// API check is required.
+	apiCheckProjects map[string]struct{}
 	// goWorkspaces identifies V23_ROOT subdirectories that contain a
 	// Go workspace.
 	goWorkspaces []string
@@ -39,9 +41,6 @@ type Config struct {
 	// vdlWorkspaces identifies V23_ROOT subdirectories that contain
 	// a VDL workspace.
 	vdlWorkspaces []string
-	// apiCheckRequiredProjects identifies the set of project names for
-	// which an API check is required.
-	apiCheckRequiredProjects map[string]bool
 }
 
 // ConfigOpt is an interface for Config factory options.
@@ -91,31 +90,17 @@ type VDLWorkspacesOpt []string
 
 func (VDLWorkspacesOpt) configOpt() {}
 
-type ApiCheckRequiredProjectsOpt []string
+type APICheckProjectsOpt map[string]struct{}
 
-func (ApiCheckRequiredProjectsOpt) configOpt() {}
-
-func listToSet(keys []string) map[string]bool {
-	result := make(map[string]bool)
-	for _, key := range keys {
-		result[key] = true
-	}
-	return result
-}
-
-func keys(set map[string]bool) []string {
-	var result []string
-	for key, _ := range set {
-		result = append(result, key)
-	}
-	return result
-}
+func (APICheckProjectsOpt) configOpt() {}
 
 // NewConfig is the Config factory.
 func NewConfig(opts ...ConfigOpt) *Config {
 	var c Config
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
+		case APICheckProjectsOpt:
+			c.apiCheckProjects = map[string]struct{}(typedOpt)
 		case GoWorkspacesOpt:
 			c.goWorkspaces = []string(typedOpt)
 		case ProjectTestsOpt:
@@ -130,29 +115,15 @@ func NewConfig(opts ...ConfigOpt) *Config {
 			c.testParts = map[string][]string(typedOpt)
 		case VDLWorkspacesOpt:
 			c.vdlWorkspaces = []string(typedOpt)
-		case ApiCheckRequiredProjectsOpt:
-			c.apiCheckRequiredProjects = listToSet([]string(typedOpt))
 		}
 	}
 	return &c
 }
 
-// LoadConfig returns the developer tools configuration.
-func LoadConfig(ctx *tool.Context) (*Config, error) {
-	dataDir, err := DataDirPath(ctx, tool.Name)
-	if err != nil {
-		return nil, err
-	}
-	configPath := filepath.Join(dataDir, "conf.json")
-	configBytes, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("ReadFile(%v) failed: %v", configPath, err)
-	}
-	var config Config
-	if err := json.Unmarshal(configBytes, &config); err != nil {
-		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(configBytes), err)
-	}
-	return &config, nil
+// APICheckProjects returns the set of project names for which an API
+// check is required.
+func (c Config) APICheckProjects() map[string]struct{} {
+	return c.apiCheckProjects
 }
 
 // GoWorkspaces returns the Go workspaces included in the config.
@@ -233,52 +204,174 @@ func (c Config) VDLWorkspaces() []string {
 	return c.vdlWorkspaces
 }
 
-// ApiCheckRequiredProjects returns the set of project names for which an API
-// check is required.
-func (c Config) ApiCheckRequiredProjects() map[string]bool {
-	return c.apiCheckRequiredProjects
+type configSchema struct {
+	XMLName            xml.Name               `xml:"config"`
+	APICheckProjects   []string               `xml:"apiCheckProjects>project"`
+	GoWorkspaces       []string               `xml:"goWorkspaces>workspace"`
+	ProjectTests       testGroupSchemas       `xml:"projectTests>project"`
+	SnapshotLabelTests testGroupSchemas       `xml:"snapshotLabelTests>snapshot"`
+	TestDependencies   dependencyGroupSchemas `xml:"testDependencies>test"`
+	TestGroups         testGroupSchemas       `xml:"testGroups>group"`
+	TestParts          partGroupSchemas       `xml:"testParts>test"`
+	VDLWorkspaces      []string               `xml:"vdlWorkspaces>workspace"`
 }
 
-type config struct {
-	GoWorkspaces             []string            `json:"go-workspaces-new"`
-	ProjectTests             map[string][]string `json:"project-tests"`
-	SnapshotLabelTests       map[string][]string `json:"snapshot-label-tests"`
-	TestDependencies         map[string][]string `json:"test-dependencies"`
-	TestGroups               map[string][]string `json:"test-groups"`
-	TestParts                map[string][]string `json:"test-parts"`
-	VDLWorkspaces            []string            `json:"vdl-workspaces-new"`
-	ApiCheckRequiredProjects []string            `json:"api-check-required-projects"`
+type dependencyGroupSchema struct {
+	Name         string   `xml:"name,attr"`
+	Dependencies []string `xml:"dependency"`
 }
 
-var _ json.Marshaler = (*Config)(nil)
+type dependencyGroupSchemas []dependencyGroupSchema
 
-func (c Config) MarshalJSON() ([]byte, error) {
-	return json.Marshal(config{
-		GoWorkspaces:             c.goWorkspaces,
-		ProjectTests:             c.projectTests,
-		SnapshotLabelTests:       c.snapshotLabelTests,
-		TestDependencies:         c.testDependencies,
-		TestGroups:               c.testGroups,
-		TestParts:                c.testParts,
-		VDLWorkspaces:            c.vdlWorkspaces,
-		ApiCheckRequiredProjects: keys(c.apiCheckRequiredProjects),
-	})
+func (d dependencyGroupSchemas) Len() int           { return len(d) }
+func (d dependencyGroupSchemas) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
+func (d dependencyGroupSchemas) Less(i, j int) bool { return d[i].Name < d[j].Name }
+
+type partGroupSchema struct {
+	Name  string   `xml:"name,atrr"`
+	Parts []string `xml:"part"`
 }
 
-var _ json.Unmarshaler = (*Config)(nil)
+type partGroupSchemas []partGroupSchema
 
-func (c *Config) UnmarshalJSON(data []byte) error {
-	var conf config
-	if err := json.Unmarshal(data, &conf); err != nil {
+func (p partGroupSchemas) Len() int           { return len(p) }
+func (p partGroupSchemas) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p partGroupSchemas) Less(i, j int) bool { return p[i].Name < p[j].Name }
+
+type testGroupSchema struct {
+	Name  string   `xml:"name,attr"`
+	Tests []string `xml:"test"`
+}
+
+type testGroupSchemas []testGroupSchema
+
+func (p testGroupSchemas) Len() int           { return len(p) }
+func (p testGroupSchemas) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p testGroupSchemas) Less(i, j int) bool { return p[i].Name < p[j].Name }
+
+// LoadConfig returns the configuration stored in the tools
+// configuration file.
+func LoadConfig(ctx *tool.Context) (*Config, error) {
+	configPath, err := ConfigFilePath(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return loadConfig(ctx, configPath)
+}
+
+func loadConfig(ctx *tool.Context, path string) (*Config, error) {
+	configBytes, err := ctx.Run().ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var data configSchema
+	if err := xml.Unmarshal(configBytes, &data); err != nil {
+		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(configBytes), err)
+	}
+	config := &Config{
+		apiCheckProjects:   map[string]struct{}{},
+		goWorkspaces:       []string{},
+		projectTests:       map[string][]string{},
+		snapshotLabelTests: map[string][]string{},
+		testDependencies:   map[string][]string{},
+		testGroups:         map[string][]string{},
+		testParts:          map[string][]string{},
+		vdlWorkspaces:      []string{},
+	}
+	for _, project := range data.APICheckProjects {
+		config.apiCheckProjects[project] = struct{}{}
+	}
+	for _, workspace := range data.GoWorkspaces {
+		config.goWorkspaces = append(config.goWorkspaces, workspace)
+	}
+	sort.Strings(config.goWorkspaces)
+	for _, project := range data.ProjectTests {
+		config.projectTests[project.Name] = project.Tests
+	}
+	for _, snapshot := range data.SnapshotLabelTests {
+		config.snapshotLabelTests[snapshot.Name] = snapshot.Tests
+	}
+	for _, test := range data.TestDependencies {
+		config.testDependencies[test.Name] = test.Dependencies
+	}
+	for _, group := range data.TestGroups {
+		config.testGroups[group.Name] = group.Tests
+	}
+	for _, test := range data.TestParts {
+		config.testParts[test.Name] = test.Parts
+	}
+	for _, workspace := range data.VDLWorkspaces {
+		config.vdlWorkspaces = append(config.vdlWorkspaces, workspace)
+	}
+	sort.Strings(config.vdlWorkspaces)
+	return config, nil
+}
+
+// SaveConfig writes the given configuration to the tools
+// configuration file.
+func SaveConfig(ctx *tool.Context, config *Config) error {
+	configPath, err := ConfigFilePath(ctx)
+	if err != nil {
 		return err
 	}
-	c.goWorkspaces = conf.GoWorkspaces
-	c.projectTests = conf.ProjectTests
-	c.snapshotLabelTests = conf.SnapshotLabelTests
-	c.testDependencies = conf.TestDependencies
-	c.testGroups = conf.TestGroups
-	c.testParts = conf.TestParts
-	c.vdlWorkspaces = conf.VDLWorkspaces
-	c.apiCheckRequiredProjects = listToSet(conf.ApiCheckRequiredProjects)
+	return saveConfig(ctx, config, configPath)
+}
+
+func saveConfig(ctx *tool.Context, config *Config, path string) error {
+	var data configSchema
+	for project, _ := range config.apiCheckProjects {
+		data.APICheckProjects = append(data.APICheckProjects, project)
+	}
+	sort.Strings(data.APICheckProjects)
+	for _, workspace := range config.goWorkspaces {
+		data.GoWorkspaces = append(data.GoWorkspaces, workspace)
+	}
+	sort.Strings(data.GoWorkspaces)
+	for name, tests := range config.projectTests {
+		data.ProjectTests = append(data.ProjectTests, testGroupSchema{
+			Name:  name,
+			Tests: tests,
+		})
+	}
+	sort.Sort(data.ProjectTests)
+	for name, tests := range config.snapshotLabelTests {
+		data.SnapshotLabelTests = append(data.SnapshotLabelTests, testGroupSchema{
+			Name:  name,
+			Tests: tests,
+		})
+	}
+	sort.Sort(data.SnapshotLabelTests)
+	for name, dependencies := range config.testDependencies {
+		data.TestDependencies = append(data.TestDependencies, dependencyGroupSchema{
+			Name:         name,
+			Dependencies: dependencies,
+		})
+	}
+	sort.Sort(data.TestDependencies)
+	for name, tests := range config.testGroups {
+		data.TestGroups = append(data.TestGroups, testGroupSchema{
+			Name:  name,
+			Tests: tests,
+		})
+	}
+	sort.Sort(data.TestGroups)
+	for name, parts := range config.testParts {
+		data.TestParts = append(data.TestParts, partGroupSchema{
+			Name:  name,
+			Parts: parts,
+		})
+	}
+	sort.Sort(data.TestParts)
+	for _, workspace := range config.vdlWorkspaces {
+		data.VDLWorkspaces = append(data.VDLWorkspaces, workspace)
+	}
+	sort.Strings(data.VDLWorkspaces)
+	bytes, err := xml.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("MarshalIndent(%v) failed: %v", data, err)
+	}
+	if err := ctx.Run().WriteFile(path, bytes, os.FileMode(0644)); err != nil {
+		return err
+	}
 	return nil
 }

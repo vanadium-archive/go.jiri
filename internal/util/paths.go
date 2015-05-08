@@ -18,13 +18,31 @@ const (
 	metadataFileName = "metadata.v2"
 )
 
+// AliasesFilePath returns the path to the aliases file.
+func AliasesFilePath(ctx *tool.Context) (string, error) {
+	dataDir, err := DataDirPath(ctx, tool.Name)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dataDir, "aliases.v1.xml"), nil
+}
+
 // BuildCopRotationPath returns the path to the build cop rotation file.
 func BuildCopRotationPath(ctx *tool.Context) (string, error) {
 	dataDir, err := DataDirPath(ctx, tool.Name)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dataDir, "buildcop.xml"), nil
+	return filepath.Join(dataDir, "buildcop.v1.xml"), nil
+}
+
+// ConfigFilePath returns the path to the tools configuration file.
+func ConfigFilePath(ctx *tool.Context) (string, error) {
+	dataDir, err := DataDirPath(ctx, tool.Name)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dataDir, "config.v1.xml"), nil
 }
 
 // DataDirPath returns the path to the data directory of the given tool.

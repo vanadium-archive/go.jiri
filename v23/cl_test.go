@@ -300,15 +300,15 @@ func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util
 	}
 }
 
-// testApiHelper is a function that contains the logic shared
-// by TestApiError and TestApiOK.
-func testGoApiHelper(t *testing.T, ok bool, check bool) error {
+// testAPIHelper is a function that contains the logic shared
+// by TestAPIError and TestAPIOK.
+func testGoAPIHelper(t *testing.T, ok bool, check bool) error {
 	ctx := tool.NewDefaultContext()
-	env := setupApiTest(t, ctx)
-	defer teardownApiTest(t, env)
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
 
 	if check {
-		config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+		config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
 		env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	}
 
@@ -355,27 +355,27 @@ func PublicFunction() {}`
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	return review.checkGoApi()
+	return review.checkGoAPI()
 }
 
-func TestApiError(t *testing.T) {
-	if err := testGoApiHelper(t, false, true); err == nil {
+func TestAPIError(t *testing.T) {
+	if err := testGoAPIHelper(t, false, true); err == nil {
 		t.Fatalf("go api check did not fail when it should")
 	} else if _, ok := err.(apiError); !ok {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestApiOK(t *testing.T) {
-	if err := testGoApiHelper(t, true, true); err != nil {
+func TestAPIOK(t *testing.T) {
+	if err := testGoAPIHelper(t, true, true); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestApiSkip(t *testing.T) {
+func TestAPISkip(t *testing.T) {
 	// Run the API helper in a failure mode. However, no failure should be
 	// reported because this check is skipped.
-	if err := testGoApiHelper(t, false, false); err != nil {
+	if err := testGoAPIHelper(t, false, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

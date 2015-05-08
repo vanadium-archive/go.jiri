@@ -5,7 +5,6 @@
 package util
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -23,7 +22,7 @@ type FakeV23Root struct {
 
 const (
 	defaultDataDir    = "data"
-	defaultConfigFile = "conf.json"
+	defaultConfigFile = "config.v1.xml"
 	defaultManifest   = "default"
 	manifestProject   = ".manifest"
 	manifestVersion   = "v2"
@@ -207,15 +206,7 @@ func (root FakeV23Root) ReadRemoteToolsConfig(ctx *tool.Context) (*Config, error
 }
 
 func (root FakeV23Root) readToolsConfig(ctx *tool.Context, path string) (*Config, error) {
-	bytes, err := ctx.Run().ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var config Config
-	if err := xml.Unmarshal(bytes, &config); err != nil {
-		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(bytes), err)
-	}
-	return &config, nil
+	return loadConfig(ctx, path)
 }
 
 // ReadLocalManifest read a manifest from the local manifest project.
@@ -273,11 +264,7 @@ func (root FakeV23Root) WriteRemoteToolsConfig(ctx *tool.Context, config *Config
 }
 
 func (root FakeV23Root) writeToolsConfig(ctx *tool.Context, config *Config, dir, path string) error {
-	bytes, err := json.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("Marshal(%v) failed: %v", config, err)
-	}
-	if err := ctx.Run().WriteFile(path, bytes, os.FileMode(0600)); err != nil {
+	if err := saveConfig(ctx, config, path); err != nil {
 		return err
 	}
 	if err := ctx.Git(tool.RootDirOpt(dir)).Add(path); err != nil {

@@ -487,8 +487,8 @@ func (r *review) checkGoDependencies() error {
 	return nil
 }
 
-// checkGoApi checks if the public Go API has changed.
-func (r *review) checkGoApi() error {
+// checkGoAPI checks if the public Go API has changed.
+func (r *review) checkGoAPI() error {
 	name, err := util.CurrentProjectName(r.ctx)
 	if err != nil {
 		return err
@@ -500,12 +500,12 @@ func (r *review) checkGoApi() error {
 	if err != nil {
 		return err
 	}
-	if _, ok := config.ApiCheckRequiredProjects()[name]; !ok {
+	if _, ok := config.APICheckProjects()[name]; !ok {
 		// Skip the check for this project, it's not required.
 		return nil
 	}
 	var out bytes.Buffer
-	if err := doApiCheck(&out, r.ctx.Stderr(), []string{name}, false); err != nil {
+	if err := doAPICheck(&out, r.ctx.Stderr(), []string{name}, false); err != nil {
 		return err
 	}
 	if out.Len() != 0 {
@@ -649,7 +649,7 @@ func (r *review) run() (e error) {
 		}
 	}
 	if apiFlag {
-		if err := r.checkGoApi(); err != nil {
+		if err := r.checkGoAPI(); err != nil {
 			return err
 		}
 	}

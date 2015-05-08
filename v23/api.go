@@ -27,24 +27,24 @@ var (
 )
 
 func init() {
-	cmdApiCheck.Flags.BoolVar(&detailedOutputFlag, "detailed", true, "If true, shows each API change in an expanded form. Otherwise, only a summary is shown.")
-	cmdApi.Flags.StringVar(&gotoolsBinPathFlag, "gotools-bin", "", "The path to the gotools binary to use. If empty, gotools will be built if necessary.")
+	cmdAPICheck.Flags.BoolVar(&detailedOutputFlag, "detailed", true, "If true, shows each API change in an expanded form. Otherwise, only a summary is shown.")
+	cmdAPI.Flags.StringVar(&gotoolsBinPathFlag, "gotools-bin", "", "The path to the gotools binary to use. If empty, gotools will be built if necessary.")
 }
 
-// cmdApi represents the "v23 api" command.
-var cmdApi = &cmdline.Command{
+// cmdAPI represents the "v23 api" command.
+var cmdAPI = &cmdline.Command{
 	Name:  "api",
 	Short: "Work with Vanadium's public API",
 	Long: `
 Use this command to ensure that no unintended changes are made to Vanadium's
 public API.
 `,
-	Children: []*cmdline.Command{cmdApiCheck, cmdApiUpdate},
+	Children: []*cmdline.Command{cmdAPICheck, cmdAPIUpdate},
 }
 
-// cmdApiCheck represents the "v23 api check" command.
-var cmdApiCheck = &cmdline.Command{
-	Run:      runApiCheck,
+// cmdAPICheck represents the "v23 api check" command.
+var cmdAPICheck = &cmdline.Command{
+	Run:      runAPICheck,
 	Name:     "check",
 	Short:    "Check to see if any changes have been made to the public API.",
 	Long:     "Check to see if any changes have been made to the public API.",
@@ -52,7 +52,7 @@ var cmdApiCheck = &cmdline.Command{
 	ArgsLong: "<projects> is a list of Vanadium projects to check. If none are specified, all projects that require a public API check upon presubmit are checked.",
 }
 
-func readApiFileContents(path string, buf *bytes.Buffer) (e error) {
+func readAPIFileContents(path string, buf *bytes.Buffer) (e error) {
 	file, err := os.Open(path)
 	defer collect.Error(file.Close, &e)
 	if err != nil {
@@ -77,9 +77,9 @@ type packageChange struct {
 	name          string
 	projectName   string
 	apiFilePath   string
-	oldApi        map[string]bool // set
-	newApi        map[string]bool // set
-	newApiContent []byte
+	oldAPI        map[string]bool // set
+	newAPI        map[string]bool // set
+	newAPIContent []byte
 
 	// If true, indicates that there was a problem reading the old API file.
 	apiFileError error
@@ -127,10 +127,10 @@ func buildGotools(ctx *tool.Context) (string, func() error, error) {
 	return gotoolsBin, cleanup, nil
 }
 
-func isFailedApiCheckFatal(projectName string, apiCheckRequiredProjects map[string]bool, apiFileError error) bool {
+func isFailedAPICheckFatal(projectName string, apiCheckProjects map[string]struct{}, apiFileError error) bool {
 	if pathError, ok := apiFileError.(*os.PathError); ok {
 		if pathError.Err == os.ErrNotExist {
-			if _, ok := apiCheckRequiredProjects[projectName]; !ok {
+			if _, ok := apiCheckProjects[projectName]; !ok {
 				return false
 			}
 		}
@@ -154,11 +154,11 @@ func shouldIgnoreFile(file string) bool {
 
 // parseProjectNames identifies the set of projects that the "v23 api
 // ..." command should be applied to.
-func parseProjectNames(args []string, projects map[string]util.Project, apiCheckRequiredProjects map[string]bool) ([]string, error) {
+func parseProjectNames(args []string, projects map[string]util.Project, apiCheckProjects map[string]struct{}) ([]string, error) {
 	names := args
 	if len(names) == 0 {
 		// Use all projects for which an API check is required.
-		for name, _ := range apiCheckRequiredProjects {
+		for name, _ := range apiCheckProjects {
 			names = append(names, name)
 		}
 	} else {
@@ -190,12 +190,12 @@ func packageName(path string) string {
 	return ""
 }
 
-func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bool, args []string) (changes []packageChange, e error) {
+func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, args []string) (changes []packageChange, e error) {
 	projects, _, err := util.ReadManifest(ctx)
 	if err != nil {
 		return nil, err
 	}
-	projectNames, err := parseProjectNames(args, projects, apiCheckRequiredProjects)
+	projectNames, err := parseProjectNames(args, projects, apiCheckProjects)
 	if err != nil {
 		return nil, err
 	}
@@ -230,12 +230,11 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 			// Read the existing public API file.
 			apiFilePath := filepath.Join(dir, ".api")
 			var apiFileContents bytes.Buffer
-			apiFileError := readApiFileContents(apiFilePath, &apiFileContents)
+			apiFileError := readAPIFileContents(apiFilePath, &apiFileContents)
 			if apiFileError != nil {
-				if !isFailedApiCheckFatal(projectName, apiCheckRequiredProjects, apiFileError) {
-					// We couldn't read the API file, but
-					// this project doesn't require one.
-					// Just warn the user.
+				if !isFailedAPICheckFatal(projectName, apiCheckProjects, apiFileError) {
+					// We couldn't read the API file, but this project doesn't
+					// require one.  Just warn the user.
 					fmt.Fprintf(ctx.Stderr(), "WARNING: could not read public API from %s: %v\n", apiFilePath, err)
 					fmt.Fprintf(ctx.Stderr(), "WARNING: skipping public API check for %s\n", dir)
 					continue
@@ -260,9 +259,9 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 					name:          pkgName,
 					projectName:   projectName,
 					apiFilePath:   apiFilePath,
-					oldApi:        splitLinesToSet(apiFileContents.Bytes()),
-					newApi:        splitLinesToSet(apiBytes),
-					newApiContent: apiBytes,
+					oldAPI:        splitLinesToSet(apiFileContents.Bytes()),
+					newAPI:        splitLinesToSet(apiBytes),
+					newAPIContent: apiBytes,
 					apiFileError:  apiFileError,
 				})
 			}
@@ -271,20 +270,20 @@ func getPackageChanges(ctx *tool.Context, apiCheckRequiredProjects map[string]bo
 	return
 }
 
-func runApiCheck(command *cmdline.Command, args []string) error {
-	return doApiCheck(command.Stdout(), command.Stderr(), args, detailedOutputFlag)
+func runAPICheck(command *cmdline.Command, args []string) error {
+	return doAPICheck(command.Stdout(), command.Stderr(), args, detailedOutputFlag)
 }
 
 func printChangeSummary(out io.Writer, change packageChange, detailedOutput bool) {
 	var removedEntries []string
 	var addedEntries []string
-	for entry, _ := range change.oldApi {
-		if !change.newApi[entry] {
+	for entry, _ := range change.oldAPI {
+		if !change.newAPI[entry] {
 			removedEntries = append(removedEntries, entry)
 		}
 	}
-	for entry, _ := range change.newApi {
-		if !change.oldApi[entry] {
+	for entry, _ := range change.newAPI {
+		if !change.oldAPI[entry] {
 			addedEntries = append(addedEntries, entry)
 		}
 	}
@@ -307,7 +306,7 @@ func printChangeSummary(out io.Writer, change packageChange, detailedOutput bool
 	}
 }
 
-func doApiCheck(stdout, stderr io.Writer, args []string, detailedOutput bool) error {
+func doAPICheck(stdout, stderr io.Writer, args []string, detailedOutput bool) error {
 	ctx := tool.NewContext(tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
@@ -320,7 +319,7 @@ func doApiCheck(stdout, stderr io.Writer, args []string, detailedOutput bool) er
 	if err != nil {
 		return err
 	}
-	changes, err := getPackageChanges(ctx, config.ApiCheckRequiredProjects(), args)
+	changes, err := getPackageChanges(ctx, config.APICheckProjects(), args)
 	if err != nil {
 		return err
 	} else if len(changes) > 0 {
@@ -336,9 +335,9 @@ func doApiCheck(stdout, stderr io.Writer, args []string, detailedOutput bool) er
 	return nil
 }
 
-// cmdApiUpdate represents the "v23 api fix" command.
-var cmdApiUpdate = &cmdline.Command{
-	Run:      runApiFix,
+// cmdAPIUpdate represents the "v23 api fix" command.
+var cmdAPIUpdate = &cmdline.Command{
+	Run:      runAPIFix,
 	Name:     "fix",
 	Short:    "Updates the .api files to reflect your changes to the public API.",
 	Long:     "Updates the .api files to reflect your changes to the public API.",
@@ -346,7 +345,7 @@ var cmdApiUpdate = &cmdline.Command{
 	ArgsLong: "<projects> is a list of Vanadium projects to update. If none are specified, all project APIs are updated.",
 }
 
-func runApiFix(command *cmdline.Command, args []string) error {
+func runAPIFix(command *cmdline.Command, args []string) error {
 	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
@@ -356,12 +355,12 @@ func runApiFix(command *cmdline.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	changes, err := getPackageChanges(ctx, config.ApiCheckRequiredProjects(), args)
+	changes, err := getPackageChanges(ctx, config.APICheckProjects(), args)
 	if err != nil {
 		return err
 	}
 	for _, change := range changes {
-		if err := ctx.Run().WriteFile(change.apiFilePath, []byte(change.newApiContent), 0644); err != nil {
+		if err := ctx.Run().WriteFile(change.apiFilePath, []byte(change.newAPIContent), 0644); err != nil {
 			return fmt.Errorf("WriteFile(%s) failed: %v", change.apiFilePath, err)
 		}
 		fmt.Fprintf(ctx.Stdout(), "Updated %s.\n", change.apiFilePath)

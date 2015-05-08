@@ -5,13 +5,18 @@
 package util
 
 import (
-	"encoding/json"
+	"os"
 	"reflect"
-	"sort"
 	"testing"
+
+	"v.io/x/devtools/internal/tool"
 )
 
 var (
+	apiCheckProjects = map[string]struct{}{
+		"projectA": struct{}{},
+		"projectB": struct{}{},
+	}
 	goWorkspaces = []string{"test-go-workspace"}
 	projectTests = map[string][]string{
 		"test-project":  []string{"test-test-A", "test-test-group"},
@@ -30,14 +35,13 @@ var (
 	testParts = map[string][]string{
 		"test-test-A": []string{"p1", "p2"},
 	}
-	vdlWorkspaces            = []string{"test-vdl-workspace"}
-	apiCheckRequiredProjects = []string{
-		"projectA",
-		"projectB",
-	}
+	vdlWorkspaces = []string{"test-vdl-workspace"}
 )
 
 func testConfigAPI(t *testing.T, c *Config) {
+	if got, want := c.APICheckProjects(), apiCheckProjects; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected results: got %v, want %v", got, want)
+	}
 	if got, want := c.GoWorkspaces(), goWorkspaces; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
@@ -68,15 +72,11 @@ func testConfigAPI(t *testing.T, c *Config) {
 	if got, want := c.VDLWorkspaces(), vdlWorkspaces; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
-	got, want := keys(c.ApiCheckRequiredProjects()), apiCheckRequiredProjects
-	sort.Strings(got)
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("unexpected results: got %v, want %v", got, want)
-	}
 }
 
-func TestConfig(t *testing.T) {
+func TestConfigAPI(t *testing.T) {
 	config := NewConfig(
+		APICheckProjectsOpt(apiCheckProjects),
 		GoWorkspacesOpt(goWorkspaces),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
@@ -84,14 +84,31 @@ func TestConfig(t *testing.T) {
 		TestGroupsOpt(testGroups),
 		TestPartsOpt(testParts),
 		VDLWorkspacesOpt(vdlWorkspaces),
-		ApiCheckRequiredProjectsOpt(apiCheckRequiredProjects),
 	)
 
 	testConfigAPI(t, config)
 }
 
-func TestConfigMarshal(t *testing.T) {
+func TestConfigSerialization(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+
+	root, err := NewFakeV23Root(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer func() {
+		if err := root.Cleanup(ctx); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+	oldRoot, err := V23Root()
+	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("V23_ROOT", oldRoot)
+
 	config := NewConfig(
+		APICheckProjectsOpt(apiCheckProjects),
 		GoWorkspacesOpt(goWorkspaces),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
@@ -99,17 +116,13 @@ func TestConfigMarshal(t *testing.T) {
 		TestGroupsOpt(testGroups),
 		TestPartsOpt(testParts),
 		VDLWorkspacesOpt(vdlWorkspaces),
-		ApiCheckRequiredProjectsOpt(apiCheckRequiredProjects),
 	)
 
-	data, err := json.Marshal(config)
+	root.WriteLocalToolsConfig(ctx, config)
+	config2, err := root.ReadLocalToolsConfig(ctx)
 	if err != nil {
-		t.Fatalf("Marhsall(%v) failed: %v", config, err)
-	}
-	var config2 Config
-	if err := json.Unmarshal(data, &config2); err != nil {
-		t.Fatalf("Unmarshall(%v) failed: %v", string(data), err)
+		t.Fatalf("%v", err)
 	}
 
-	testConfigAPI(t, &config2)
+	testConfigAPI(t, config2)
 }

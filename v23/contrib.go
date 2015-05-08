@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/xml"
 	"fmt"
 	"regexp"
 	"sort"
@@ -47,30 +48,70 @@ type contributor struct {
 }
 
 var (
-	contributorRE = regexp.MustCompile("^(.*)\t(.*) (<.*>)$")
+	contributorRE = regexp.MustCompile("^(.*)\t(.*) <(.*)>$")
 )
 
-var (
-	dedupEmail = map[string]string{
-		"<aghassemi@aghassemi-macbookpro.roam.corp.google.com>": "<aghassemi@google.com>",
-		"<asadovsky@gmail.com>":                                 "<sadovsky@google.com>",
-		"<git-jregan.google.com>":                               "<jregan@google.com>",
-		"<rjkroege@chromium.org>":                               "<rjkroege@google.com>",
-		"<sjr@jdns.org>":                                        "<sjr@google.com>",
+type aliasesSchema struct {
+	XMLName xml.Name      `xml:"aliases"`
+	Names   []nameSchema  `xml:"name"`
+	Emails  []emailSchema `xml:"email"`
+}
+
+type nameSchema struct {
+	Canonical string   `xml:"canonical"`
+	Aliases   []string `xml:"alias"`
+}
+
+type emailSchema struct {
+	Canonical string   `xml:"canonical"`
+	Aliases   []string `xml:"alias"`
+}
+
+type aliasMaps struct {
+	emails map[string]string
+	names  map[string]string
+}
+
+func canonicalize(aliases *aliasMaps, email, name string) (string, string) {
+	canonicalEmail, canonicalName := email, name
+	if email, ok := aliases.emails[email]; ok {
+		canonicalEmail = email
 	}
-	dedupName = map[string]string{
-		"aghassemi":                                   "Ali Ghassemi",
-		"Ankur":                                       "Ankur Taly",
-		"Benj Prosnitz":                               "Benjamin Prosnitz",
-		"David Why Use Two When One Will Do Presotto": "David Presotto",
-		"Gautham":         "Gautham Thambidorai",
-		"gauthamt":        "Gautham Thambidorai",
-		"lnizix":          "Ellen Isaacs",
-		"Nicolas Lacasse": "Nicolas LaCasse",
-		"Wm Leler":        "William Leler",
-		"wmleler":         "William Leler",
+	if name, ok := aliases.names[name]; ok {
+		canonicalName = name
 	}
-)
+	return canonicalEmail, canonicalName
+}
+
+func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
+	aliasesFile, err := util.AliasesFilePath(ctx)
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := ctx.Run().ReadFile(aliasesFile)
+	if err != nil {
+		return nil, err
+	}
+	var data aliasesSchema
+	if err := xml.Unmarshal(bytes, &data); err != nil {
+		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(bytes), err)
+	}
+	aliases := &aliasMaps{
+		emails: map[string]string{},
+		names:  map[string]string{},
+	}
+	for _, email := range data.Emails {
+		for _, alias := range email.Aliases {
+			aliases.emails[alias] = email.Canonical
+		}
+	}
+	for _, name := range data.Names {
+		for _, alias := range name.Aliases {
+			aliases.names[alias] = name.Canonical
+		}
+	}
+	return aliases, nil
+}
 
 func runContributors(command *cmdline.Command, args []string) error {
 	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
@@ -78,6 +119,7 @@ func runContributors(command *cmdline.Command, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
+
 	projects, err := util.LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -91,6 +133,11 @@ func runContributors(command *cmdline.Command, args []string) error {
 		for name, _ := range projects {
 			projectNames[name] = struct{}{}
 		}
+	}
+
+	aliases, err := loadAliases(ctx)
+	if err != nil {
+		return err
 	}
 	contributors := map[string]*contributor{}
 	for name, _ := range projectNames {
@@ -121,15 +168,10 @@ func runContributors(command *cmdline.Command, args []string) error {
 					email: strings.TrimSpace(matches[3]),
 					name:  strings.TrimSpace(matches[2]),
 				}
-				if c.email == "<jenkins.veyron@gmail.com>" {
+				if c.email == "jenkins.veyron@gmail.com" {
 					continue
 				}
-				if email, ok := dedupEmail[c.email]; ok {
-					c.email = email
-				}
-				if name, ok := dedupName[c.name]; ok {
-					c.name = name
-				}
+				c.email, c.name = canonicalize(aliases, c.email, c.name)
 				if existing, ok := contributors[c.name]; ok {
 					existing.count += c.count
 				} else {
@@ -148,7 +190,7 @@ func runContributors(command *cmdline.Command, args []string) error {
 		if countFlag {
 			fmt.Fprintf(command.Stdout(), "%4d ", c.count)
 		}
-		fmt.Fprintf(command.Stdout(), "%v %v\n", c.name, c.email)
+		fmt.Fprintf(command.Stdout(), "%v <%v>\n", c.name, c.email)
 	}
 	return nil
 }

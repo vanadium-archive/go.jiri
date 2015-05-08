@@ -40,7 +40,7 @@ var cmdRoot = &cmdline.Command{
 Command v23 is a multi-purpose tool for Vanadium development.
 `,
 	Children: []*cmdline.Command{
-		cmdApi,
+		cmdAPI,
 		cmdBuildCop,
 		cmdCL,
 		cmdContributors,

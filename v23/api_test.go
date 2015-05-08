@@ -29,9 +29,9 @@ type testEnv struct {
 	gotoolsCleanup func() error
 }
 
-// setupApiTest sets up the test environment and returns a testEnv representing
-// the environment that was created.
-func setupApiTest(t *testing.T, ctx *tool.Context) testEnv {
+// setupAPITest sets up the test environment and returns a testEnv
+// representing the environment that was created.
+func setupAPITest(t *testing.T, ctx *tool.Context) testEnv {
 	root, err := util.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -70,7 +70,7 @@ func setupApiTest(t *testing.T, ctx *tool.Context) testEnv {
 	return testEnv{oldRoot, root, ctx, gotoolsPath, cleanup}
 }
 
-func teardownApiTest(t *testing.T, env testEnv) {
+func teardownAPITest(t *testing.T, env testEnv) {
 	os.Setenv("V23_ROOT", env.oldRoot)
 	if err := env.fakeRoot.Cleanup(env.ctx); err != nil {
 		t.Fatalf("%v")
@@ -81,14 +81,14 @@ func teardownApiTest(t *testing.T, env testEnv) {
 	gotoolsBinPathFlag = ""
 }
 
-// TestPublicApiCheckError checks that the public API check fails for a CL that
-// introduces changes to the public API.
-func TestPublicApiCheckError(t *testing.T) {
+// TestPublicAPICheckError checks that the public API check fails for
+// a CL that introduces changes to the public API.
+func TestPublicAPICheckError(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	env := setupApiTest(t, ctx)
-	defer teardownApiTest(t, env)
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
 
-	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
 	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
@@ -113,21 +113,21 @@ func testFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
-		t.Fatalf("doApiCheck failed: %v", err)
+	if err := doAPICheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
+		t.Fatalf("doAPICheck failed: %v", err)
 	} else if buf.String() == "" {
-		t.Fatalf("doApiCheck detected no changes, but some were expected")
+		t.Fatalf("doAPICheck detected no changes, but some were expected")
 	}
 }
 
-// TestPublicApiCheckOk checks that the public API check succeeds for a CL that
-// introduces no changes to the public API.
-func TestPublicApiCheckOk(t *testing.T) {
+// TestPublicAPICheckOk checks that the public API check succeeds for
+// a CL that introduces no changes to the public API.
+func TestPublicAPICheckOk(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	env := setupApiTest(t, ctx)
-	defer teardownApiTest(t, env)
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
 
-	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
 	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
@@ -152,21 +152,21 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
-		t.Fatalf("doApiCheck failed: %v", err)
+	if err := doAPICheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
+		t.Fatalf("doAPICheck failed: %v", err)
 	} else if buf.String() != "" {
-		t.Fatalf("doApiCheck detected changes, but none were expected: %s", buf.String())
+		t.Fatalf("doAPICheck detected changes, but none were expected: %s", buf.String())
 	}
 }
 
-// TestPublicApiMissingApiFile ensures that the check will fail if a 'required
-// check' project has a missing .api file.
-func TestPublicApiMissingApiFile(t *testing.T) {
+// TestPublicAPIMissingAPIFile ensures that the check will fail if a
+// 'required check' project has a missing .api file.
+func TestPublicAPIMissingAPIFile(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	env := setupApiTest(t, ctx)
-	defer teardownApiTest(t, env)
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
 
-	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
 	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
@@ -186,24 +186,24 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
-		t.Fatalf("doApiCheck failed: %v", err)
+	if err := doAPICheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
+		t.Fatalf("doAPICheck failed: %v", err)
 	} else if buf.String() == "" {
-		t.Fatalf("doApiCheck should have failed, but did not")
+		t.Fatalf("doAPICheck should have failed, but did not")
 	} else if !strings.Contains(buf.String(), "could not read the package's .api file") {
-		t.Fatalf("doApiCheck failed, but not for the expected reason: %s", buf.String())
+		t.Fatalf("doAPICheck failed, but not for the expected reason: %s", buf.String())
 	}
 }
 
-// TestPublicApiMissingApiFileNotRequired ensures that the check will not fail
-// if a 'required check' project has a missing .api file but that API file is
-// in an 'internal' package.
-func TestPublicApiMissingApiFileNotRequired(t *testing.T) {
+// TestPublicAPIMissingAPIFileNotRequired ensures that the check will
+// not fail if a 'required check' project has a missing .api file but
+// that API file is in an 'internal' package.
+func TestPublicAPIMissingAPIFileNotRequired(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	env := setupApiTest(t, ctx)
-	defer teardownApiTest(t, env)
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
 
-	config := util.NewConfig(util.ApiCheckRequiredProjectsOpt([]string{"test"}))
+	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
 	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
@@ -227,19 +227,19 @@ func TestFunction() {
 	}
 
 	var buf bytes.Buffer
-	if err := doApiCheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
-		t.Fatalf("doApiCheck failed: %v", err)
+	if err := doAPICheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
+		t.Fatalf("doAPICheck failed: %v", err)
 	} else if buf.String() != "" {
-		t.Fatalf("doApiCheck should have passed, but did not: %s", buf.String())
+		t.Fatalf("doAPICheck should have passed, but did not: %s", buf.String())
 	}
 }
 
-// TestPublicApiUpdate checks that the api update command correctly updates the
-// API definition.
-func TestPublicApiUpdate(t *testing.T) {
+// TestPublicAPIUpdate checks that the api update command correctly
+// updates the API definition.
+func TestPublicAPIUpdate(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	env := setupApiTest(t, ctx)
-	defer teardownApiTest(t, env)
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
 
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
@@ -264,13 +264,13 @@ func TestFunction1() {
 	}
 
 	command := cmdline.Command{}
-	if err := runApiFix(&command, []string{"test"}); err != nil {
+	if err := runAPIFix(&command, []string{"test"}); err != nil {
 		t.Fatalf("should have succeeded but did not: %v", err)
 	}
 
 	// The new public API is empty, so there should be nothing in the .api file.
 	var contents bytes.Buffer
-	err := readApiFileContents(filepath.Join(projectPath, ".api"), &contents)
+	err := readAPIFileContents(filepath.Join(projectPath, ".api"), &contents)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
