@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	_ "v.io/x/ref/profiles"
+	_ "v.io/x/ref/runtime/factories/generic"
 	xm "v.io/x/ref/test/modules"
 )
 
