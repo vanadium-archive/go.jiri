@@ -228,7 +228,7 @@ func (d dependencyGroupSchemas) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 func (d dependencyGroupSchemas) Less(i, j int) bool { return d[i].Name < d[j].Name }
 
 type partGroupSchema struct {
-	Name  string   `xml:"name,atrr"`
+	Name  string   `xml:"name,attr"`
 	Parts []string `xml:"part"`
 }
 
