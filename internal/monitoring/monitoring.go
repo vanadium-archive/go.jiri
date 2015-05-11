@@ -16,6 +16,26 @@ const (
 	customMetricPrefix = "custom.cloudmonitoring.googleapis.com"
 )
 
+type ServiceLocation struct {
+	Instance string
+	Zone     string
+}
+
+var ServiceLocationMap = map[string]*ServiceLocation{
+	"/ns.dev.v.io:8101": &ServiceLocation{
+		Instance: "vanadium-cell-master",
+		Zone:     "us-central1-c",
+	},
+	"/ns.dev.v.io:8151": &ServiceLocation{
+		Instance: "vanadium-cell-master",
+		Zone:     "us-central1-c",
+	},
+	"/ns.dev.staging.v.io:8101": &ServiceLocation{
+		Instance: "vanadium-cell-master",
+		Zone:     "us-central1-c",
+	},
+}
+
 type labelData struct {
 	key         string
 	description string
