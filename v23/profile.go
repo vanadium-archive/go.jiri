@@ -21,7 +21,7 @@ import (
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -44,7 +44,7 @@ const (
 )
 
 // cmdProfile represents the "v23 profile" command.
-var cmdProfile = &cmdline2.Command{
+var cmdProfile = &cmdline.Command{
 	Name:  "profile",
 	Short: "Manage vanadium profiles",
 	Long: `
@@ -53,18 +53,18 @@ platform-independent profiles that map different platforms to a set
 of libraries and tools that can be used for a factor of vanadium
 development.
 `,
-	Children: []*cmdline2.Command{cmdProfileList, cmdProfileSetup},
+	Children: []*cmdline.Command{cmdProfileList, cmdProfileSetup},
 }
 
 // cmdProfileList represents the "v23 profile list" command.
-var cmdProfileList = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runProfileList),
+var cmdProfileList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runProfileList),
 	Name:   "list",
 	Short:  "List known vanadium profiles",
 	Long:   "List known vanadium profiles.",
 }
 
-func runProfileList(env *cmdline2.Env, _ []string) error {
+func runProfileList(env *cmdline.Env, _ []string) error {
 	profiles := []string{}
 	for p := range knownProfiles {
 		profiles = append(profiles, p)
@@ -77,8 +77,8 @@ func runProfileList(env *cmdline2.Env, _ []string) error {
 }
 
 // cmdProfileSetup represents the "v23 profile setup" command.
-var cmdProfileSetup = &cmdline2.Command{
-	Runner:   cmdline2.RunnerFunc(runProfileSetup),
+var cmdProfileSetup = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runProfileSetup),
 	Name:     "setup",
 	Short:    "Set up the given vanadium profiles",
 	Long:     "Set up the given vanadium profiles.",
@@ -86,7 +86,7 @@ var cmdProfileSetup = &cmdline2.Command{
 	ArgsLong: "<profiles> is a list of profiles to set up.",
 }
 
-func runProfileSetup(env *cmdline2.Env, args []string) error {
+func runProfileSetup(env *cmdline.Env, args []string) error {
 	// Check that the profiles to be set up exist.
 	for _, arg := range args {
 		if _, ok := knownProfiles[arg]; !ok {

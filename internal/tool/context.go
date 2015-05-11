@@ -13,7 +13,7 @@ import (
 	"v.io/x/devtools/internal/hgutil"
 	"v.io/x/devtools/internal/jenkins"
 	"v.io/x/devtools/internal/runutil"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 // Context represents an execution context of a tool command
@@ -96,7 +96,7 @@ func NewContext(opts ContextOpts) *Context {
 
 // NewContextFromEnv returns a new context instance based on the given cmdline
 // environment.
-func NewContextFromEnv(env *cmdline2.Env, opts ContextOpts) *Context {
+func NewContextFromEnv(env *cmdline.Env, opts ContextOpts) *Context {
 	initOpts(newContextOpts(), &opts)
 	opts.Stdout = env.Stdout
 	opts.Stderr = env.Stderr

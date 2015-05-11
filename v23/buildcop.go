@@ -10,30 +10,30 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 // cmdBuildCop represents the "v23 buildcop" command.
-var cmdBuildCop = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runBuildCop),
+var cmdBuildCop = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runBuildCop),
 	Name:   "buildcop",
 	Short:  "Manage vanadium build cop schedule",
 	Long: `
 Manage vanadium build cop schedule. If no subcommand is given, it shows the LDAP
 of the current build cop.
 `,
-	Children: []*cmdline2.Command{cmdBuildCopList},
+	Children: []*cmdline.Command{cmdBuildCopList},
 }
 
 // cmdBuildCopList represents the "v23 buildcop list" command.
-var cmdBuildCopList = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runBuildCopList),
+var cmdBuildCopList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runBuildCopList),
 	Name:   "list",
 	Short:  "List available build cop schedule",
 	Long:   "List available build cop schedule.",
 }
 
-func runBuildCop(env *cmdline2.Env, _ []string) error {
+func runBuildCop(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
@@ -47,7 +47,7 @@ func runBuildCop(env *cmdline2.Env, _ []string) error {
 	return nil
 }
 
-func runBuildCopList(env *cmdline2.Env, _ []string) error {
+func runBuildCopList(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,

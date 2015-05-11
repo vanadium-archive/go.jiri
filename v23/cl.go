@@ -18,7 +18,7 @@ import (
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 const commitMessageFile = ".gerrit_commit_message"
@@ -54,18 +54,18 @@ func init() {
 }
 
 // cmdCL represents the "v23 cl" command.
-var cmdCL = &cmdline2.Command{
+var cmdCL = &cmdline.Command{
 	Name:     "cl",
 	Short:    "Manage vanadium changelists",
 	Long:     "Manage vanadium changelists.",
-	Children: []*cmdline2.Command{cmdCLCleanup, cmdCLMail},
+	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail},
 }
 
 // cmdCLCleanup represents the "v23 cl cleanup" command.
 //
 // TODO(jsimsa): Make this part of the "submit" command".
-var cmdCLCleanup = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runCLCleanup),
+var cmdCLCleanup = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runCLCleanup),
 	Name:   "cleanup",
 	Short:  "Clean up branches that have been merged",
 	Long: `
@@ -149,7 +149,7 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 	return nil
 }
 
-func runCLCleanup(env *cmdline2.Env, args []string) error {
+func runCLCleanup(env *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		return env.UsageErrorf("cleanup requires at least one argument")
 	}
@@ -162,8 +162,8 @@ func runCLCleanup(env *cmdline2.Env, args []string) error {
 }
 
 // cmdCLMail represents the "v23 cl mail" command.
-var cmdCLMail = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runCLMail),
+var cmdCLMail = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runCLMail),
 	Name:   "mail",
 	Short:  "Mail a changelist based on the current branch to Gerrit for review",
 	Long: `
@@ -276,7 +276,7 @@ var defaultMessageHeader = `
 `
 
 // runCLMail is a wrapper that sets up and runs a review instance.
-func runCLMail(env *cmdline2.Env, _ []string) error {
+func runCLMail(env *cmdline.Env, _ []string) error {
 	// Sanity checks for the presubmitFlag.
 	if !checkPresubmitFlag() {
 		return env.UsageErrorf("Invalid value for -presubmit flag. Valid values: %s.",

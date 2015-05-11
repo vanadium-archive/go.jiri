@@ -12,7 +12,7 @@ import (
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	v23test "v.io/x/devtools/v23/internal/test"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -37,16 +37,16 @@ func init() {
 }
 
 // cmdTest represents the "v23 test" command.
-var cmdTest = &cmdline2.Command{
+var cmdTest = &cmdline.Command{
 	Name:     "test",
 	Short:    "Manage vanadium tests",
 	Long:     "Manage vanadium tests.",
-	Children: []*cmdline2.Command{cmdTestGenerate, cmdTestProject, cmdTestRun, cmdTestList},
+	Children: []*cmdline.Command{cmdTestGenerate, cmdTestProject, cmdTestRun, cmdTestList},
 }
 
 // cmdTestProject represents the "v23 test project" command.
-var cmdTestProject = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runTestProject),
+var cmdTestProject = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runTestProject),
 	Name:   "project",
 	Short:  "Run tests for a vanadium project",
 	Long: `
@@ -59,7 +59,7 @@ specified using the basename of the URL (e.g. "vanadium.go.core" implies
 	ArgsLong: "<project> identifies the project for which to run tests.",
 }
 
-func runTestProject(env *cmdline2.Env, args []string) error {
+func runTestProject(env *cmdline.Env, args []string) error {
 	if len(args) != 1 {
 		return env.UsageErrorf("unexpected number of arguments")
 	}
@@ -76,15 +76,15 @@ func runTestProject(env *cmdline2.Env, args []string) error {
 	printSummary(ctx, results)
 	for _, result := range results {
 		if result.Status != test.Passed {
-			return cmdline2.ErrExitCode(test.FailedExitCode)
+			return cmdline.ErrExitCode(test.FailedExitCode)
 		}
 	}
 	return nil
 }
 
 // cmdTestRun represents the "v23 test run" command.
-var cmdTestRun = &cmdline2.Command{
-	Runner:   cmdline2.RunnerFunc(runTestRun),
+var cmdTestRun = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runTestRun),
 	Name:     "run",
 	Short:    "Run vanadium tests",
 	Long:     "Run vanadium tests.",
@@ -92,7 +92,7 @@ var cmdTestRun = &cmdline2.Command{
 	ArgsLong: "<name...> is a list names identifying the tests to run.",
 }
 
-func runTestRun(env *cmdline2.Env, args []string) error {
+func runTestRun(env *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		return env.UsageErrorf("unexpected number of arguments")
 	}
@@ -108,7 +108,7 @@ func runTestRun(env *cmdline2.Env, args []string) error {
 	printSummary(ctx, results)
 	for _, result := range results {
 		if result.Status != test.Passed {
-			return cmdline2.ErrExitCode(test.FailedExitCode)
+			return cmdline.ErrExitCode(test.FailedExitCode)
 		}
 	}
 	return nil
@@ -154,14 +154,14 @@ func printSummary(ctx *tool.Context, results map[string]*test.Result) {
 }
 
 // cmdTestList represents the "v23 test list" command.
-var cmdTestList = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runTestList),
+var cmdTestList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runTestList),
 	Name:   "list",
 	Short:  "List vanadium tests",
 	Long:   "List vanadium tests.",
 }
 
-func runTestList(env *cmdline2.Env, _ []string) error {
+func runTestList(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
