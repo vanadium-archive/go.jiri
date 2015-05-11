@@ -12,16 +12,16 @@ import (
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 // translateExitCode translates errors from the "os/exec" package that contain
-// exit codes into cmdline2.ErrExitCode errors.
+// exit codes into cmdline.ErrExitCode errors.
 func translateExitCode(err error) error {
 	if exit, ok := err.(*exec.ExitError); ok {
 		if wait, ok := exit.Sys().(syscall.WaitStatus); ok {
 			if status := wait.ExitStatus(); wait.Exited() && status != 0 {
-				return cmdline2.ErrExitCode(status)
+				return cmdline.ErrExitCode(status)
 			}
 		}
 	}
@@ -29,8 +29,8 @@ func translateExitCode(err error) error {
 }
 
 // cmdEnv represents the "v23 env" command.
-var cmdEnv = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runEnv),
+var cmdEnv = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runEnv),
 	Name:   "env",
 	Short:  "Print vanadium environment variables",
 	Long: `
@@ -48,7 +48,7 @@ each on a separate line in the same order as the arguments.
 	ArgsLong: "[name ...] is an optional list of variable names.",
 }
 
-func runEnv(cmdlineEnv *cmdline2.Env, args []string) error {
+func runEnv(cmdlineEnv *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
@@ -71,8 +71,8 @@ func runEnv(cmdlineEnv *cmdline2.Env, args []string) error {
 }
 
 // cmdRun represents the "v23 run" command.
-var cmdRun = &cmdline2.Command{
-	Runner:   cmdline2.RunnerFunc(runRun),
+var cmdRun = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runRun),
 	Name:     "run",
 	Short:    "Run an executable using the vanadium environment",
 	Long:     "Run an executable using the vanadium environment.",
@@ -83,7 +83,7 @@ verbatim to the executable.
 `,
 }
 
-func runRun(cmdlineEnv *cmdline2.Env, args []string) error {
+func runRun(cmdlineEnv *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		return cmdlineEnv.UsageErrorf("no command to run")
 	}

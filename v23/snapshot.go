@@ -18,7 +18,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	v23test "v.io/x/devtools/v23/internal/test"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -31,7 +31,7 @@ func init() {
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
 }
 
-var cmdSnapshot = &cmdline2.Command{
+var cmdSnapshot = &cmdline.Command{
 	Name:  "snapshot",
 	Short: "Manage snapshots of the vanadium project",
 	Long: `
@@ -43,12 +43,12 @@ The command-line flag "-remote" determines whether the command
 pertains to "local" snapshots that are only stored locally or "remote"
 snapshots the are revisioned in the manifest repository.
 `,
-	Children: []*cmdline2.Command{cmdSnapshotCreate, cmdSnapshotList},
+	Children: []*cmdline.Command{cmdSnapshotCreate, cmdSnapshotList},
 }
 
 // cmdSnapshotCreate represents the "v23 snapshot create" command.
-var cmdSnapshotCreate = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runSnapshotCreate),
+var cmdSnapshotCreate = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runSnapshotCreate),
 	Name:   "create",
 	Short:  "Create a new snapshot of the vanadium project",
 	Long: `
@@ -87,7 +87,7 @@ is not an API. It is an implementation and can change without notice.
 	ArgsLong: "<label> is the snapshot label.",
 }
 
-func runSnapshotCreate(env *cmdline2.Env, args []string) error {
+func runSnapshotCreate(env *cmdline.Env, args []string) error {
 	if len(args) != 1 {
 		return env.UsageErrorf("unexpected number of arguments")
 	}
@@ -297,8 +297,8 @@ func runTests(ctx *tool.Context, label string) error {
 }
 
 // cmdSnapshotList represents the "v23 snapshot list" command.
-var cmdSnapshotList = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runSnapshotList),
+var cmdSnapshotList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runSnapshotList),
 	Name:   "list",
 	Short:  "List existing snapshots of vanadium projects",
 	Long: `
@@ -310,7 +310,7 @@ command lists snapshots for all known labels.
 	ArgsLong: "<label ...> is a list of snapshot labels.",
 }
 
-func runSnapshotList(env *cmdline2.Env, args []string) error {
+func runSnapshotList(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
@@ -361,7 +361,7 @@ func runSnapshotList(env *cmdline2.Env, args []string) error {
 		}
 	}
 	if failed {
-		return cmdline2.ErrExitCode(2)
+		return cmdline.ErrExitCode(2)
 	}
 
 	// Print snapshots for all labels.

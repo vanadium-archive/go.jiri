@@ -16,7 +16,7 @@ import (
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -28,8 +28,8 @@ func init() {
 }
 
 // cmdContributors represents the "v23 contributors" command.
-var cmdContributors = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runContributors),
+var cmdContributors = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runContributors),
 	Name:   "contributors",
 	Short:  "List vanadium project contributors",
 	Long: `
@@ -113,7 +113,7 @@ func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
 	return aliases, nil
 }
 
-func runContributors(env *cmdline2.Env, args []string) error {
+func runContributors(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,

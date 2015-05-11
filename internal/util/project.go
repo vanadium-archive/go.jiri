@@ -18,7 +18,7 @@ import (
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 // CL represents a changelist.
@@ -468,7 +468,7 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 		}
 	}
 	if failed {
-		return cmdline2.ErrExitCode(2)
+		return cmdline.ErrExitCode(2)
 	}
 	return nil
 }
@@ -625,7 +625,7 @@ func installTools(ctx *tool.Context, dir string) error {
 		}
 	}
 	if failed {
-		return cmdline2.ErrExitCode(2)
+		return cmdline.ErrExitCode(2)
 	}
 	// TODO(jsimsa): Make sure the "$V23_ROOT/bin" directory is removed,
 	// forcing people to update their PATH. Remove this once all
@@ -835,7 +835,7 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 		}
 	}
 	if failed {
-		return cmdline2.ErrExitCode(2)
+		return cmdline.ErrExitCode(2)
 	}
 	if err := writeCurrentManifest(ctx, manifest); err != nil {
 		return err

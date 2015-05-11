@@ -14,7 +14,7 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 func createLabelDir(t *testing.T, ctx *tool.Context, snapshotDir, name string, snapshots []string) {
@@ -119,7 +119,7 @@ func TestList(t *testing.T) {
 		// Check that running "v23 snapshot list" with no arguments
 		// returns the expected output.
 		var stdout bytes.Buffer
-		env := &cmdline2.Env{Stdout: &stdout}
+		env := &cmdline.Env{Stdout: &stdout}
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -245,7 +245,7 @@ func TestCreate(t *testing.T) {
 
 	// Create a local snapshot.
 	var stdout bytes.Buffer
-	env := &cmdline2.Env{Stdout: &stdout}
+	env := &cmdline.Env{Stdout: &stdout}
 	remoteFlag = false
 	if err := runSnapshotCreate(env, []string{"test-local"}); err != nil {
 		t.Fatalf("%v", err)

@@ -17,7 +17,7 @@ import (
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 	"v.io/x/lib/metadata"
 )
 
@@ -27,7 +27,7 @@ import (
 func TestGoVanadiumEnvironment(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 	var stdout, stderr bytes.Buffer
-	cmdlineEnv := &cmdline2.Env{Stdout: &stdout, Stderr: &stderr}
+	cmdlineEnv := &cmdline.Env{Stdout: &stdout, Stderr: &stderr}
 	oldGoPath := os.Getenv("GOPATH")
 	if err := os.Setenv("GOPATH", ""); err != nil {
 		t.Fatalf("%v", err)
@@ -51,7 +51,7 @@ func TestGoVanadiumEnvironment(t *testing.T) {
 func TestGoVDLGeneration(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 	var stdout, stderr bytes.Buffer
-	cmdlineEnv := &cmdline2.Env{Stdout: &stdout, Stderr: &stderr}
+	cmdlineEnv := &cmdline.Env{Stdout: &stdout, Stderr: &stderr}
 	// Create a temporary directory for all our work.
 	const tmpDirPrefix = "test_vgo"
 	tmpDir, err := ctx.Run().TempDir("", tmpDirPrefix)

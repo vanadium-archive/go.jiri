@@ -20,7 +20,7 @@ import (
 	"v.io/x/devtools/internal/goutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -33,8 +33,8 @@ func init() {
 	cmdTestGenerate.Flags.BoolVar(&progressFlag, "progress", false, "Print verbose progress information.")
 }
 
-var cmdTestGenerate = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runTestGenerate),
+var cmdTestGenerate = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runTestGenerate),
 	Name:   "generate",
 	Short:  "Generates supporting code for v23 integration tests.",
 	Long: `
@@ -103,7 +103,7 @@ func configureBuilder(ctx *tool.Context) (cleanup func(), err error) {
 	return cleanup, nil
 }
 
-func runTestGenerate(env *cmdline2.Env, args []string) error {
+func runTestGenerate(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,

@@ -12,7 +12,7 @@ import (
 	"runtime"
 
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -31,17 +31,17 @@ func init() {
 }
 
 func main() {
-	cmdline2.Main(cmdRoot)
+	cmdline.Main(cmdRoot)
 }
 
 // cmdRoot represents the root of the v23 tool.
-var cmdRoot = &cmdline2.Command{
+var cmdRoot = &cmdline.Command{
 	Name:  "v23",
 	Short: "multi-purpose tool for Vanadium development",
 	Long: `
 Command v23 is a multi-purpose tool for Vanadium development.
 `,
-	Children: []*cmdline2.Command{
+	Children: []*cmdline.Command{
 		cmdAPI,
 		cmdBuildCop,
 		cmdCL,
@@ -61,14 +61,14 @@ Command v23 is a multi-purpose tool for Vanadium development.
 }
 
 // cmdVersion represents the "v23 version" command.
-var cmdVersion = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runVersion),
+var cmdVersion = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runVersion),
 	Name:   "version",
 	Short:  "Print version",
 	Long:   "Print version of the v23 tool.",
 }
 
-func runVersion(env *cmdline2.Env, _ []string) error {
+func runVersion(env *cmdline.Env, _ []string) error {
 	fmt.Fprintf(env.Stdout, "v23 tool version %v\n", tool.Version)
 	return nil
 }

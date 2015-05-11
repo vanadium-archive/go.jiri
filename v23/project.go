@@ -14,7 +14,7 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 var (
@@ -35,16 +35,16 @@ func init() {
 }
 
 // cmdProject represents the "v23 project" command.
-var cmdProject = &cmdline2.Command{
+var cmdProject = &cmdline.Command{
 	Name:     "project",
 	Short:    "Manage the vanadium projects",
 	Long:     "Manage the vanadium projects.",
-	Children: []*cmdline2.Command{cmdProjectClean, cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
+	Children: []*cmdline.Command{cmdProjectClean, cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
 }
 
 // cmdProjectClean represents the "v23 project clean" command.
-var cmdProjectClean = &cmdline2.Command{
-	Runner:   cmdline2.RunnerFunc(runProjectClean),
+var cmdProjectClean = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runProjectClean),
 	Name:     "clean",
 	Short:    "Restore vanadium projects to their pristine state",
 	Long:     "Restore vanadium projects back to their master branches and get rid of all the local branches and changes.",
@@ -52,7 +52,7 @@ var cmdProjectClean = &cmdline2.Command{
 	ArgsLong: "<project ...> is a list of projects to clean up.",
 }
 
-func runProjectClean(env *cmdline2.Env, args []string) (e error) {
+func runProjectClean(env *cmdline.Env, args []string) (e error) {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
@@ -82,8 +82,8 @@ func runProjectClean(env *cmdline2.Env, args []string) (e error) {
 }
 
 // cmdProjectList represents the "v23 project list" command.
-var cmdProjectList = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runProjectList),
+var cmdProjectList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runProjectList),
 	Name:   "list",
 	Short:  "List existing vanadium projects and branches",
 	Long:   "Inspect the local filesystem and list the existing projects and branches.",
@@ -164,7 +164,7 @@ func getProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*projectSt
 }
 
 // runProjectList generates a listing of local projects.
-func runProjectList(env *cmdline2.Env, _ []string) error {
+func runProjectList(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
@@ -205,8 +205,8 @@ func runProjectList(env *cmdline2.Env, _ []string) error {
 }
 
 // cmdProjectShellPrompt represents the "v23 project shell-prompt" command.
-var cmdProjectShellPrompt = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runProjectShellPrompt),
+var cmdProjectShellPrompt = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runProjectShellPrompt),
 	Name:   "shell-prompt",
 	Short:  "Print a succinct status of projects, suitable for shell prompts",
 	Long: `
@@ -217,7 +217,7 @@ indication of each project's status:
 `,
 }
 
-func runProjectShellPrompt(env *cmdline2.Env, args []string) error {
+func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
@@ -275,8 +275,8 @@ func runProjectShellPrompt(env *cmdline2.Env, args []string) error {
 }
 
 // cmdProjectPoll represents the "v23 project poll" command.
-var cmdProjectPoll = &cmdline2.Command{
-	Runner: cmdline2.RunnerFunc(runProjectPoll),
+var cmdProjectPoll = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runProjectPoll),
 	Name:   "poll",
 	Short:  "Poll existing vanadium projects",
 	Long: `
@@ -290,7 +290,7 @@ tests are specified, all projects are polled by default.
 
 // runProjectPoll generates a description of changes that exist
 // remotely but do not exist locally.
-func runProjectPoll(env *cmdline2.Env, args []string) error {
+func runProjectPoll(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,

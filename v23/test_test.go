@@ -13,7 +13,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/v23/internal/test"
-	"v.io/x/lib/cmdline2"
+	"v.io/x/lib/cmdline"
 )
 
 func TestTestProject(t *testing.T) {
@@ -51,7 +51,7 @@ func TestTestProject(t *testing.T) {
 	// Check that running the tests for the test project generates
 	// the expected output.
 	var out bytes.Buffer
-	env := &cmdline2.Env{Stdout: &out, Stderr: &out}
+	env := &cmdline.Env{Stdout: &out, Stderr: &out}
 	if err := runTestProject(env, []string{"https://test-project"}); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -93,7 +93,7 @@ func TestTestRun(t *testing.T) {
 
 	// Check that running the test generates the expected output.
 	var out bytes.Buffer
-	env := &cmdline2.Env{Stdout: &out, Stderr: &out}
+	env := &cmdline.Env{Stdout: &out, Stderr: &out}
 	if err := runTestRun(env, []string{"ignore-this"}); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -135,7 +135,7 @@ func TestTestList(t *testing.T) {
 
 	// Check that listing existing tests generates the expected output.
 	var out bytes.Buffer
-	env := &cmdline2.Env{Stdout: &out, Stderr: &out}
+	env := &cmdline.Env{Stdout: &out, Stderr: &out}
 	if err := runTestList(env, []string{}); err != nil {
 		t.Fatalf("%v", err)
 	}
