@@ -10,9 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 func writeFileOrDie(t *testing.T, ctx *tool.Context, path, contents string) {
@@ -263,8 +264,9 @@ func TestFunction1() {
 		t.Fatalf("%v", err)
 	}
 
-	command := cmdline.Command{}
-	if err := runAPIFix(&command, []string{"test"}); err != nil {
+	var out bytes.Buffer
+	cmdlineEnv := &cmdline2.Env{Stdout: &out, Stderr: &out}
+	if err := runAPIFix(cmdlineEnv, []string{"test"}); err != nil {
 		t.Fatalf("should have succeeded but did not: %v", err)
 	}
 

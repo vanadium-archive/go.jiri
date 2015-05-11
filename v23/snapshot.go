@@ -18,7 +18,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	v23test "v.io/x/devtools/v23/internal/test"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -31,7 +31,7 @@ func init() {
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
 }
 
-var cmdSnapshot = &cmdline.Command{
+var cmdSnapshot = &cmdline2.Command{
 	Name:  "snapshot",
 	Short: "Manage snapshots of the vanadium project",
 	Long: `
@@ -43,14 +43,14 @@ The command-line flag "-remote" determines whether the command
 pertains to "local" snapshots that are only stored locally or "remote"
 snapshots the are revisioned in the manifest repository.
 `,
-	Children: []*cmdline.Command{cmdSnapshotCreate, cmdSnapshotList},
+	Children: []*cmdline2.Command{cmdSnapshotCreate, cmdSnapshotList},
 }
 
 // cmdSnapshotCreate represents the "v23 snapshot create" command.
-var cmdSnapshotCreate = &cmdline.Command{
-	Run:   runSnapshotCreate,
-	Name:  "create",
-	Short: "Create a new snapshot of the vanadium project",
+var cmdSnapshotCreate = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runSnapshotCreate),
+	Name:   "create",
+	Short:  "Create a new snapshot of the vanadium project",
 	Long: `
 The "v23 snapshot create <label>" command first checks whether the
 vanadium project configuration associates the given label with any
@@ -87,12 +87,12 @@ is not an API. It is an implementation and can change without notice.
 	ArgsLong: "<label> is the snapshot label.",
 }
 
-func runSnapshotCreate(command *cmdline.Command, args []string) error {
+func runSnapshotCreate(env *cmdline2.Env, args []string) error {
 	if len(args) != 1 {
-		return command.UsageErrorf("unexpected number of arguments")
+		return env.UsageErrorf("unexpected number of arguments")
 	}
 	label := args[0]
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -297,10 +297,10 @@ func runTests(ctx *tool.Context, label string) error {
 }
 
 // cmdSnapshotList represents the "v23 snapshot list" command.
-var cmdSnapshotList = &cmdline.Command{
-	Run:   runSnapshotList,
-	Name:  "list",
-	Short: "List existing snapshots of vanadium projects",
+var cmdSnapshotList = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runSnapshotList),
+	Name:   "list",
+	Short:  "List existing snapshots of vanadium projects",
 	Long: `
 The "snapshot list" command lists existing snapshots of the labels
 specified as command-line arguments. If no arguments are provided, the
@@ -310,8 +310,8 @@ command lists snapshots for all known labels.
 	ArgsLong: "<label ...> is a list of snapshot labels.",
 }
 
-func runSnapshotList(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runSnapshotList(env *cmdline2.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -357,11 +357,11 @@ func runSnapshotList(command *cmdline.Command, args []string) error {
 				return err
 			}
 			failed = true
-			fmt.Fprintf(command.Stderr(), "snapshot label %q not found", label)
+			fmt.Fprintf(env.Stderr, "snapshot label %q not found", label)
 		}
 	}
 	if failed {
-		return cmdline.ErrExitCode(2)
+		return cmdline2.ErrExitCode(2)
 	}
 
 	// Print snapshots for all labels.
@@ -374,9 +374,9 @@ func runSnapshotList(command *cmdline.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("ReadDir(%v) failed: %v", labelDir, err)
 		}
-		fmt.Fprintf(command.Stdout(), "snapshots of label %q:\n", label)
+		fmt.Fprintf(env.Stdout, "snapshots of label %q:\n", label)
 		for _, fileInfo := range fileInfoList {
-			fmt.Fprintf(command.Stdout(), "  %v\n", fileInfo.Name())
+			fmt.Fprintf(env.Stdout, "  %v\n", fileInfo.Name())
 		}
 	}
 	return nil

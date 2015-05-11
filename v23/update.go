@@ -11,7 +11,7 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -26,10 +26,10 @@ func init() {
 }
 
 // cmdUpdate represents the "v23 update" command.
-var cmdUpdate = &cmdline.Command{
-	Run:   runUpdate,
-	Name:  "update",
-	Short: "Update all vanadium tools and projects",
+var cmdUpdate = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runUpdate),
+	Name:   "update",
+	Short:  "Update all vanadium tools and projects",
 	Long: `
 Updates all vanadium projects, builds the latest version of vanadium
 tools, and installs the resulting binaries into
@@ -80,8 +80,8 @@ is not an API. It is an implementation and can change without notice.
 `,
 }
 
-func runUpdate(command *cmdline.Command, _ []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runUpdate(env *cmdline2.Env, _ []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,

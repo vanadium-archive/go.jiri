@@ -12,7 +12,7 @@ import (
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	v23test "v.io/x/devtools/v23/internal/test"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -37,18 +37,18 @@ func init() {
 }
 
 // cmdTest represents the "v23 test" command.
-var cmdTest = &cmdline.Command{
+var cmdTest = &cmdline2.Command{
 	Name:     "test",
 	Short:    "Manage vanadium tests",
 	Long:     "Manage vanadium tests.",
-	Children: []*cmdline.Command{cmdTestGenerate, cmdTestProject, cmdTestRun, cmdTestList},
+	Children: []*cmdline2.Command{cmdTestGenerate, cmdTestProject, cmdTestRun, cmdTestList},
 }
 
 // cmdTestProject represents the "v23 test project" command.
-var cmdTestProject = &cmdline.Command{
-	Run:   runTestProject,
-	Name:  "project",
-	Short: "Run tests for a vanadium project",
+var cmdTestProject = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runTestProject),
+	Name:   "project",
+	Short:  "Run tests for a vanadium project",
 	Long: `
 Runs tests for a vanadium project that is by the remote URL specified as
 the command-line argument. Projects hosted on googlesource.com, can be
@@ -59,11 +59,11 @@ specified using the basename of the URL (e.g. "vanadium.go.core" implies
 	ArgsLong: "<project> identifies the project for which to run tests.",
 }
 
-func runTestProject(command *cmdline.Command, args []string) error {
+func runTestProject(env *cmdline2.Env, args []string) error {
 	if len(args) != 1 {
-		return command.UsageErrorf("unexpected number of arguments")
+		return env.UsageErrorf("unexpected number of arguments")
 	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -76,15 +76,15 @@ func runTestProject(command *cmdline.Command, args []string) error {
 	printSummary(ctx, results)
 	for _, result := range results {
 		if result.Status != test.Passed {
-			return cmdline.ErrExitCode(test.FailedExitCode)
+			return cmdline2.ErrExitCode(test.FailedExitCode)
 		}
 	}
 	return nil
 }
 
 // cmdTestRun represents the "v23 test run" command.
-var cmdTestRun = &cmdline.Command{
-	Run:      runTestRun,
+var cmdTestRun = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runTestRun),
 	Name:     "run",
 	Short:    "Run vanadium tests",
 	Long:     "Run vanadium tests.",
@@ -92,11 +92,11 @@ var cmdTestRun = &cmdline.Command{
 	ArgsLong: "<name...> is a list names identifying the tests to run.",
 }
 
-func runTestRun(command *cmdline.Command, args []string) error {
+func runTestRun(env *cmdline2.Env, args []string) error {
 	if len(args) == 0 {
-		return command.UsageErrorf("unexpected number of arguments")
+		return env.UsageErrorf("unexpected number of arguments")
 	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -108,7 +108,7 @@ func runTestRun(command *cmdline.Command, args []string) error {
 	printSummary(ctx, results)
 	for _, result := range results {
 		if result.Status != test.Passed {
-			return cmdline.ErrExitCode(test.FailedExitCode)
+			return cmdline2.ErrExitCode(test.FailedExitCode)
 		}
 	}
 	return nil
@@ -154,15 +154,15 @@ func printSummary(ctx *tool.Context, results map[string]*test.Result) {
 }
 
 // cmdTestList represents the "v23 test list" command.
-var cmdTestList = &cmdline.Command{
-	Run:   runTestList,
-	Name:  "list",
-	Short: "List vanadium tests",
-	Long:  "List vanadium tests.",
+var cmdTestList = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runTestList),
+	Name:   "list",
+	Short:  "List vanadium tests",
+	Long:   "List vanadium tests.",
 }
 
-func runTestList(command *cmdline.Command, _ []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runTestList(env *cmdline2.Env, _ []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,

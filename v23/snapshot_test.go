@@ -14,7 +14,7 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 func createLabelDir(t *testing.T, ctx *tool.Context, snapshotDir, name string, snapshots []string) {
@@ -119,12 +119,11 @@ func TestList(t *testing.T) {
 		// Check that running "v23 snapshot list" with no arguments
 		// returns the expected output.
 		var stdout bytes.Buffer
-		command := cmdline.Command{}
-		command.Init(nil, &stdout, nil)
+		env := &cmdline2.Env{Stdout: &stdout}
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if err := runSnapshotList(&command, nil); err != nil {
+		if err := runSnapshotList(env, nil); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want := stdout.String(), generateOutput(labels)
@@ -135,7 +134,7 @@ func TestList(t *testing.T) {
 		// Check that running "v23 snapshot list" with one argument
 		// returns the expected output.
 		stdout.Reset()
-		if err := runSnapshotList(&command, []string{"stable"}); err != nil {
+		if err := runSnapshotList(env, []string{"stable"}); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want = stdout.String(), generateOutput(labels[1:])
@@ -146,7 +145,7 @@ func TestList(t *testing.T) {
 		// Check that running "v23 snapshot list" with
 		// multiple arguments returns the expected output.
 		stdout.Reset()
-		if err := runSnapshotList(&command, []string{"beta", "stable"}); err != nil {
+		if err := runSnapshotList(env, []string{"beta", "stable"}); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want = stdout.String(), generateOutput(labels)
@@ -245,10 +244,10 @@ func TestCreate(t *testing.T) {
 	}
 
 	// Create a local snapshot.
-	command := cmdline.Command{}
-	command.Init(nil, nil, nil)
+	var stdout bytes.Buffer
+	env := &cmdline2.Env{Stdout: &stdout}
 	remoteFlag = false
-	if err := runSnapshotCreate(&command, []string{"test-local"}); err != nil {
+	if err := runSnapshotCreate(env, []string{"test-local"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -281,7 +280,7 @@ func TestCreate(t *testing.T) {
 	// Create a remote snapshot.
 	remoteFlag = true
 	root.EnableRemoteManifestPush(ctx)
-	if err := runSnapshotCreate(&command, []string{"test-remote"}); err != nil {
+	if err := runSnapshotCreate(env, []string{"test-remote"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 

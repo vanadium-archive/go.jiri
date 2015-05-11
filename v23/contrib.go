@@ -16,7 +16,7 @@ import (
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -28,10 +28,10 @@ func init() {
 }
 
 // cmdContributors represents the "v23 contributors" command.
-var cmdContributors = &cmdline.Command{
-	Run:   runContributors,
-	Name:  "contributors",
-	Short: "List vanadium project contributors",
+var cmdContributors = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runContributors),
+	Name:   "contributors",
+	Short:  "List vanadium project contributors",
 	Long: `
 Lists vanadium project contributors. Vanadium projects to consider can
 be specified as an argument. If no projects are specified, all
@@ -113,8 +113,8 @@ func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
 	return aliases, nil
 }
 
-func runContributors(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runContributors(env *cmdline2.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -188,9 +188,9 @@ func runContributors(command *cmdline.Command, args []string) error {
 	for _, name := range names {
 		c := contributors[name]
 		if countFlag {
-			fmt.Fprintf(command.Stdout(), "%4d ", c.count)
+			fmt.Fprintf(env.Stdout, "%4d ", c.count)
 		}
-		fmt.Fprintf(command.Stdout(), "%v <%v>\n", c.name, c.email)
+		fmt.Fprintf(env.Stdout, "%v <%v>\n", c.name, c.email)
 	}
 	return nil
 }

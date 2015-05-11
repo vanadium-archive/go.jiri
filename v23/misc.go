@@ -12,16 +12,16 @@ import (
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 // translateExitCode translates errors from the "os/exec" package that contain
-// exit codes into cmdline.ErrExitCode errors.
+// exit codes into cmdline2.ErrExitCode errors.
 func translateExitCode(err error) error {
 	if exit, ok := err.(*exec.ExitError); ok {
 		if wait, ok := exit.Sys().(syscall.WaitStatus); ok {
 			if status := wait.ExitStatus(); wait.Exited() && status != 0 {
-				return cmdline.ErrExitCode(status)
+				return cmdline2.ErrExitCode(status)
 			}
 		}
 	}
@@ -29,10 +29,10 @@ func translateExitCode(err error) error {
 }
 
 // cmdEnv represents the "v23 env" command.
-var cmdEnv = &cmdline.Command{
-	Run:   runEnv,
-	Name:  "env",
-	Short: "Print vanadium environment variables",
+var cmdEnv = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runEnv),
+	Name:   "env",
+	Short:  "Print vanadium environment variables",
 	Long: `
 Print vanadium environment variables.
 
@@ -48,8 +48,8 @@ each on a separate line in the same order as the arguments.
 	ArgsLong: "[name ...] is an optional list of variable names.",
 }
 
-func runEnv(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runEnv(cmdlineEnv *cmdline2.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -60,19 +60,19 @@ func runEnv(command *cmdline.Command, args []string) error {
 	}
 	if len(args) > 0 {
 		for _, name := range args {
-			fmt.Fprintln(command.Stdout(), env.Get(name))
+			fmt.Fprintln(cmdlineEnv.Stdout, env.Get(name))
 		}
 		return nil
 	}
 	for _, entry := range envutil.ToQuotedSlice(env.DeltaMap()) {
-		fmt.Fprintln(command.Stdout(), entry)
+		fmt.Fprintln(cmdlineEnv.Stdout, entry)
 	}
 	return nil
 }
 
 // cmdRun represents the "v23 run" command.
-var cmdRun = &cmdline.Command{
-	Run:      runRun,
+var cmdRun = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runRun),
 	Name:     "run",
 	Short:    "Run an executable using the vanadium environment",
 	Long:     "Run an executable using the vanadium environment.",
@@ -83,11 +83,11 @@ verbatim to the executable.
 `,
 }
 
-func runRun(command *cmdline.Command, args []string) error {
+func runRun(cmdlineEnv *cmdline2.Env, args []string) error {
 	if len(args) == 0 {
-		return command.UsageErrorf("no command to run")
+		return cmdlineEnv.UsageErrorf("no command to run")
 	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -102,11 +102,11 @@ func runRun(command *cmdline.Command, args []string) error {
 	// warn the user that they might want to use the specialized wrapper.
 	switch args[0] {
 	case "go":
-		fmt.Fprintln(command.Stderr(), `WARNING: using "v23 run go" instead of "v23 go" skips vdl generation`)
+		fmt.Fprintln(cmdlineEnv.Stderr, `WARNING: using "v23 run go" instead of "v23 go" skips vdl generation`)
 	}
 	execCmd := exec.Command(args[0], args[1:]...)
-	execCmd.Stdout = command.Stdout()
-	execCmd.Stderr = command.Stderr()
+	execCmd.Stdout = cmdlineEnv.Stdout
+	execCmd.Stderr = cmdlineEnv.Stderr
 	execCmd.Env = env.Slice()
 	return translateExitCode(execCmd.Run())
 }

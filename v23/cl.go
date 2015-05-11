@@ -18,7 +18,7 @@ import (
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 const commitMessageFile = ".gerrit_commit_message"
@@ -54,20 +54,20 @@ func init() {
 }
 
 // cmdCL represents the "v23 cl" command.
-var cmdCL = &cmdline.Command{
+var cmdCL = &cmdline2.Command{
 	Name:     "cl",
 	Short:    "Manage vanadium changelists",
 	Long:     "Manage vanadium changelists.",
-	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail},
+	Children: []*cmdline2.Command{cmdCLCleanup, cmdCLMail},
 }
 
 // cmdCLCleanup represents the "v23 cl cleanup" command.
 //
 // TODO(jsimsa): Make this part of the "submit" command".
-var cmdCLCleanup = &cmdline.Command{
-	Run:   runCLCleanup,
-	Name:  "cleanup",
-	Short: "Clean up branches that have been merged",
+var cmdCLCleanup = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runCLCleanup),
+	Name:   "cleanup",
+	Short:  "Clean up branches that have been merged",
 	Long: `
 The cleanup command checks that the given branches have been merged
 into the master branch. If a branch differs from the master, it
@@ -149,11 +149,11 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 	return nil
 }
 
-func runCLCleanup(command *cmdline.Command, args []string) error {
+func runCLCleanup(env *cmdline2.Env, args []string) error {
 	if len(args) == 0 {
-		return command.UsageErrorf("cleanup requires at least one argument")
+		return env.UsageErrorf("cleanup requires at least one argument")
 	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -162,10 +162,10 @@ func runCLCleanup(command *cmdline.Command, args []string) error {
 }
 
 // cmdCLMail represents the "v23 cl mail" command.
-var cmdCLMail = &cmdline.Command{
-	Run:   runCLMail,
-	Name:  "mail",
-	Short: "Mail a changelist based on the current branch to Gerrit for review",
+var cmdCLMail = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runCLMail),
+	Name:   "mail",
+	Short:  "Mail a changelist based on the current branch to Gerrit for review",
 	Long: `
 Squashes all commits of a local branch into a single "changelist" and
 mails this changelist to Gerrit as a single commit. First time the
@@ -276,13 +276,13 @@ var defaultMessageHeader = `
 `
 
 // runCLMail is a wrapper that sets up and runs a review instance.
-func runCLMail(command *cmdline.Command, _ []string) error {
+func runCLMail(env *cmdline2.Env, _ []string) error {
 	// Sanity checks for the presubmitFlag.
 	if !checkPresubmitFlag() {
-		return command.UsageErrorf("Invalid value for -presubmit flag. Valid values: %s.",
+		return env.UsageErrorf("Invalid value for -presubmit flag. Valid values: %s.",
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,

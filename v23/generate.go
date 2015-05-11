@@ -20,7 +20,7 @@ import (
 	"v.io/x/devtools/internal/goutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -33,10 +33,10 @@ func init() {
 	cmdTestGenerate.Flags.BoolVar(&progressFlag, "progress", false, "Print verbose progress information.")
 }
 
-var cmdTestGenerate = &cmdline.Command{
-	Run:   runTestGenerate,
-	Name:  "generate",
-	Short: "Generates supporting code for v23 integration tests.",
+var cmdTestGenerate = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runTestGenerate),
+	Name:   "generate",
+	Short:  "Generates supporting code for v23 integration tests.",
 	Long: `
 The generate subcommand supports the vanadium integration test
 framework and unit tests by generating go files that contain supporting
@@ -103,15 +103,15 @@ func configureBuilder(ctx *tool.Context) (cleanup func(), err error) {
 	return cleanup, nil
 }
 
-func runTestGenerate(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runTestGenerate(env *cmdline2.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
 	packages, err := goutil.List(ctx, args...)
 	if err != nil {
-		return command.UsageErrorf("failed to list %s: %s", args, err)
+		return env.UsageErrorf("failed to list %s: %s", args, err)
 	}
 
 	cleanup, err := configureBuilder(ctx)
@@ -127,7 +127,7 @@ func runTestGenerate(command *cmdline.Command, args []string) error {
 	for _, pkg := range packages {
 		bpkg, err := build.Import(pkg, ".", build.ImportMode(build.ImportComment))
 		if err != nil {
-			return command.UsageErrorf("failed to import %q: err: %s", pkg, err)
+			return env.UsageErrorf("failed to import %q: err: %s", pkg, err)
 		}
 		if err := generatePackage(ctx, bpkg); err != nil {
 			return err

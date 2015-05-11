@@ -21,7 +21,7 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 func init() {
@@ -86,7 +86,7 @@ var languages map[string]languageSpec = map[string]languageSpec{
 }
 
 // cmdCopyright represents the "v23 copyright" command.
-var cmdCopyright = &cmdline.Command{
+var cmdCopyright = &cmdline2.Command{
 	Name:  "copyright",
 	Short: "Manage vanadium copyright",
 	Long: `
@@ -96,12 +96,12 @@ projects contains the appropriate licensing files. Optionally, the
 command can be used to fix the appropriate copyright headers and
 licensing files.
 `,
-	Children: []*cmdline.Command{cmdCopyrightCheck, cmdCopyrightFix},
+	Children: []*cmdline2.Command{cmdCopyrightCheck, cmdCopyrightFix},
 }
 
 // cmdCopyrightCheck represents the "v23 copyright check" command.
-var cmdCopyrightCheck = &cmdline.Command{
-	Run:      runCopyrightCheck,
+var cmdCopyrightCheck = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runCopyrightCheck),
 	Name:     "check",
 	Short:    "Check copyright headers and licensing files",
 	Long:     "Check copyright headers and licensing files.",
@@ -109,13 +109,13 @@ var cmdCopyrightCheck = &cmdline.Command{
 	ArgsLong: "<projects> is a list of projects to check.",
 }
 
-func runCopyrightCheck(command *cmdline.Command, args []string) error {
-	return copyrightHelper(command.Stdout(), command.Stderr(), args, false)
+func runCopyrightCheck(env *cmdline2.Env, args []string) error {
+	return copyrightHelper(env.Stdout, env.Stderr, args, false)
 }
 
 // cmdCopyrightFix represents the "v23 copyright fix" command.
-var cmdCopyrightFix = &cmdline.Command{
-	Run:      runCopyrightFix,
+var cmdCopyrightFix = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runCopyrightFix),
 	Name:     "fix",
 	Short:    "Fix copyright headers and licensing files",
 	Long:     "Fix copyright headers and licensing files.",
@@ -123,8 +123,8 @@ var cmdCopyrightFix = &cmdline.Command{
 	ArgsLong: "<projects> is a list of projects to fix.",
 }
 
-func runCopyrightFix(command *cmdline.Command, args []string) error {
-	return copyrightHelper(command.Stdout(), command.Stderr(), args, true)
+func runCopyrightFix(env *cmdline2.Env, args []string) error {
+	return copyrightHelper(env.Stdout, env.Stderr, args, true)
 }
 
 // copyrightHelper implements the logic of "v23 copyright {check,fix}".

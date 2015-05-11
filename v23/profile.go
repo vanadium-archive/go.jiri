@@ -21,7 +21,7 @@ import (
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -44,7 +44,7 @@ const (
 )
 
 // cmdProfile represents the "v23 profile" command.
-var cmdProfile = &cmdline.Command{
+var cmdProfile = &cmdline2.Command{
 	Name:  "profile",
 	Short: "Manage vanadium profiles",
 	Long: `
@@ -53,32 +53,32 @@ platform-independent profiles that map different platforms to a set
 of libraries and tools that can be used for a factor of vanadium
 development.
 `,
-	Children: []*cmdline.Command{cmdProfileList, cmdProfileSetup},
+	Children: []*cmdline2.Command{cmdProfileList, cmdProfileSetup},
 }
 
 // cmdProfileList represents the "v23 profile list" command.
-var cmdProfileList = &cmdline.Command{
-	Run:   runProfileList,
-	Name:  "list",
-	Short: "List known vanadium profiles",
-	Long:  "List known vanadium profiles.",
+var cmdProfileList = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runProfileList),
+	Name:   "list",
+	Short:  "List known vanadium profiles",
+	Long:   "List known vanadium profiles.",
 }
 
-func runProfileList(command *cmdline.Command, _ []string) error {
+func runProfileList(env *cmdline2.Env, _ []string) error {
 	profiles := []string{}
 	for p := range knownProfiles {
 		profiles = append(profiles, p)
 	}
 	sort.Strings(profiles)
 	for _, p := range profiles {
-		fmt.Fprintf(command.Stdout(), "%s\n", p)
+		fmt.Fprintf(env.Stdout, "%s\n", p)
 	}
 	return nil
 }
 
 // cmdProfileSetup represents the "v23 profile setup" command.
-var cmdProfileSetup = &cmdline.Command{
-	Run:      runProfileSetup,
+var cmdProfileSetup = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runProfileSetup),
 	Name:     "setup",
 	Short:    "Set up the given vanadium profiles",
 	Long:     "Set up the given vanadium profiles.",
@@ -86,17 +86,17 @@ var cmdProfileSetup = &cmdline.Command{
 	ArgsLong: "<profiles> is a list of profiles to set up.",
 }
 
-func runProfileSetup(command *cmdline.Command, args []string) error {
+func runProfileSetup(env *cmdline2.Env, args []string) error {
 	// Check that the profiles to be set up exist.
 	for _, arg := range args {
 		if _, ok := knownProfiles[arg]; !ok {
-			return command.UsageErrorf("profile %v does not exist", arg)
+			return env.UsageErrorf("profile %v does not exist", arg)
 		}
 	}
 
 	// Setup the profiles.
 	t := true
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &t,

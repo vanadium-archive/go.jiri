@@ -17,6 +17,7 @@ import (
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
+	"v.io/x/lib/cmdline2"
 	"v.io/x/lib/metadata"
 )
 
@@ -24,15 +25,15 @@ import (
 // "v23 go" command sets up the vanadium environment and then
 // dispatches calls to the go tool.
 func TestGoVanadiumEnvironment(t *testing.T) {
-	ctx, testCmd := tool.NewDefaultContext(), *cmdGo
+	ctx := tool.NewDefaultContext()
 	var stdout, stderr bytes.Buffer
-	testCmd.Init(nil, &stdout, &stderr)
+	cmdlineEnv := &cmdline2.Env{Stdout: &stdout, Stderr: &stderr}
 	oldGoPath := os.Getenv("GOPATH")
 	if err := os.Setenv("GOPATH", ""); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("GOPATH", oldGoPath)
-	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
+	if err := runGo(cmdlineEnv, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 	env, err := util.VanadiumEnvironment(ctx)
@@ -48,9 +49,9 @@ func TestGoVanadiumEnvironment(t *testing.T) {
 // go" command generates up-to-date VDL files for select go tool
 // commands before dispatching these commands to the go tool.
 func TestGoVDLGeneration(t *testing.T) {
-	ctx, testCmd := tool.NewDefaultContext(), *cmdGo
+	ctx := tool.NewDefaultContext()
 	var stdout, stderr bytes.Buffer
-	testCmd.Init(nil, &stdout, &stderr)
+	cmdlineEnv := &cmdline2.Env{Stdout: &stdout, Stderr: &stderr}
 	// Create a temporary directory for all our work.
 	const tmpDirPrefix = "test_vgo"
 	tmpDir, err := ctx.Run().TempDir("", tmpDirPrefix)
@@ -90,7 +91,7 @@ func TestGoVDLGeneration(t *testing.T) {
 	}
 	defer os.Setenv("VDLPATH", oldVdlPath)
 	// Check that the 'env' go command does not generate the test VDL file.
-	if err := runGo(&testCmd, []string{"env", "GOPATH"}); err != nil {
+	if err := runGo(cmdlineEnv, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())
 	}
 	if _, err := os.Stat(outFile); err != nil {
@@ -101,7 +102,7 @@ func TestGoVDLGeneration(t *testing.T) {
 		t.Fatalf("file %v exists and it should not.", outFile)
 	}
 	// Check that the 'build' go command generates the test VDL file.
-	if err := runGo(&testCmd, []string{"build", "testpkg"}); err != nil {
+	if err := runGo(cmdlineEnv, []string{"build", "testpkg"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())
 	}
 	if _, err := os.Stat(outFile); err != nil {

@@ -21,15 +21,15 @@ import (
 	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 	"v.io/x/lib/metadata"
 )
 
 // cmdGo represents the "v23 go" command.
-var cmdGo = &cmdline.Command{
-	Run:   runGo,
-	Name:  "go",
-	Short: "Execute the go tool using the vanadium environment",
+var cmdGo = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runGo),
+	Name:   "go",
+	Short:  "Execute the go tool using the vanadium environment",
 	Long: `
 Wrapper around the 'go' tool that can be used for compilation of
 vanadium Go sources. It takes care of vanadium-specific setup, such as
@@ -45,11 +45,11 @@ vdl generate -lang=go all
 	ArgsLong: "<arg ...> is a list of arguments for the go tool.",
 }
 
-func runGo(command *cmdline.Command, args []string) error {
+func runGo(cmdlineEnv *cmdline2.Env, args []string) error {
 	if len(args) == 0 {
-		return command.UsageErrorf("not enough arguments")
+		return cmdlineEnv.UsageErrorf("not enough arguments")
 	}
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -417,18 +417,18 @@ func computeGoDeps(ctx *tool.Context, env *envutil.Snapshot, pkgs []string, goTa
 }
 
 // cmdGoExt represents the "v23 goext" command.
-var cmdGoExt = &cmdline.Command{
+var cmdGoExt = &cmdline2.Command{
 	Name:     "goext",
 	Short:    "Vanadium extensions of the go tool",
 	Long:     "Vanadium extension of the go tool.",
-	Children: []*cmdline.Command{cmdGoExtDistClean},
+	Children: []*cmdline2.Command{cmdGoExtDistClean},
 }
 
 // cmdGoExtDistClean represents the "v23 goext distclean" command.
-var cmdGoExtDistClean = &cmdline.Command{
-	Run:   runGoExtDistClean,
-	Name:  "distclean",
-	Short: "Restore the vanadium Go workspaces to their pristine state",
+var cmdGoExtDistClean = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runGoExtDistClean),
+	Name:   "distclean",
+	Short:  "Restore the vanadium Go workspaces to their pristine state",
 	Long: `
 Unlike the 'go clean' command, which only removes object files for
 packages in the source tree, the 'goext disclean' command removes all
@@ -438,8 +438,8 @@ packages that no longer exist in the source tree.
 `,
 }
 
-func runGoExtDistClean(command *cmdline.Command, _ []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runGoExtDistClean(cmdlineEnv *cmdline2.Env, _ []string) error {
+	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
@@ -466,7 +466,7 @@ func runGoExtDistClean(command *cmdline.Command, _ []string) error {
 		}
 	}
 	if failed {
-		return cmdline.ErrExitCode(2)
+		return cmdline2.ErrExitCode(2)
 	}
 	return nil
 }

@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// The following enables go generate to generate the doc.go file.
+//go:generate go run $V23_ROOT/release/go/src/v.io/x/lib/cmdline/testdata/gendoc.go .
+
 package main
 
 import (
@@ -9,7 +12,7 @@ import (
 	"runtime"
 
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -27,19 +30,18 @@ func init() {
 	cmdRoot.Flags.BoolVar(&colorFlag, "color", true, "Use color to format output.")
 }
 
-// root returns a command that represents the root of the v23 tool.
-func root() *cmdline.Command {
-	return cmdRoot
+func main() {
+	cmdline2.Main(cmdRoot)
 }
 
 // cmdRoot represents the root of the v23 tool.
-var cmdRoot = &cmdline.Command{
+var cmdRoot = &cmdline2.Command{
 	Name:  "v23",
 	Short: "multi-purpose tool for Vanadium development",
 	Long: `
 Command v23 is a multi-purpose tool for Vanadium development.
 `,
-	Children: []*cmdline.Command{
+	Children: []*cmdline2.Command{
 		cmdAPI,
 		cmdBuildCop,
 		cmdCL,
@@ -59,14 +61,14 @@ Command v23 is a multi-purpose tool for Vanadium development.
 }
 
 // cmdVersion represents the "v23 version" command.
-var cmdVersion = &cmdline.Command{
-	Run:   runVersion,
-	Name:  "version",
-	Short: "Print version",
-	Long:  "Print version of the v23 tool.",
+var cmdVersion = &cmdline2.Command{
+	Runner: cmdline2.RunnerFunc(runVersion),
+	Name:   "version",
+	Short:  "Print version",
+	Long:   "Print version of the v23 tool.",
 }
 
-func runVersion(command *cmdline.Command, _ []string) error {
-	fmt.Fprintf(command.Stdout(), "v23 tool version %v\n", tool.Version)
+func runVersion(env *cmdline2.Env, _ []string) error {
+	fmt.Fprintf(env.Stdout, "v23 tool version %v\n", tool.Version)
 	return nil
 }

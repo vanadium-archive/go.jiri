@@ -21,6 +21,7 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
+	"v.io/x/lib/cmdline2"
 )
 
 func fnNames(decls []ast.Decl) []string {
@@ -210,7 +211,7 @@ func TestV23Generate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmdTestGenerate.Init(nil, os.Stdout, os.Stderr)
+	env := cmdline2.NewEnv()
 	for _, c := range cases {
 		dir := filepath.Join("testdata", c.dir)
 		if err := os.Chdir(dir); err != nil {
@@ -221,7 +222,7 @@ func TestV23Generate(t *testing.T) {
 		if len(output) == 0 {
 			output = "v23"
 		}
-		if err := cmdTestGenerate.Execute([]string{"--prefix=" + output}); err != nil {
+		if err := cmdline2.ParseAndRun(cmdTestGenerate, env, []string{"--prefix=" + output}); err != nil {
 			t.Fatal(err)
 		}
 		// parseFile returns nil if the file doesn't exist, which must
@@ -233,10 +234,9 @@ func TestV23Generate(t *testing.T) {
 			t.Fatalf("%s: got: %v, want: %#v", dir, got, want)
 		}
 
-		testCmd := *cmdGo
 		var stdout, stderr bytes.Buffer
-		testCmd.Init(nil, &stdout, &stderr)
-		if err := runGo(&testCmd, []string{"test", "-v", "--v23.tests"}); err != nil {
+		env := &cmdline2.Env{Stdout: &stdout, Stderr: &stderr}
+		if err := runGo(env, []string{"test", "-v", "--v23.tests"}); err != nil {
 			t.Log(stderr.String())
 			t.Fatalf("%s: %v", dir, err)
 		}

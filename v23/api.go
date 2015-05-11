@@ -17,7 +17,7 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
-	"v.io/x/lib/cmdline"
+	"v.io/x/lib/cmdline2"
 )
 
 var (
@@ -32,19 +32,19 @@ func init() {
 }
 
 // cmdAPI represents the "v23 api" command.
-var cmdAPI = &cmdline.Command{
+var cmdAPI = &cmdline2.Command{
 	Name:  "api",
 	Short: "Work with Vanadium's public API",
 	Long: `
 Use this command to ensure that no unintended changes are made to Vanadium's
 public API.
 `,
-	Children: []*cmdline.Command{cmdAPICheck, cmdAPIUpdate},
+	Children: []*cmdline2.Command{cmdAPICheck, cmdAPIUpdate},
 }
 
 // cmdAPICheck represents the "v23 api check" command.
-var cmdAPICheck = &cmdline.Command{
-	Run:      runAPICheck,
+var cmdAPICheck = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runAPICheck),
 	Name:     "check",
 	Short:    "Check to see if any changes have been made to the public API.",
 	Long:     "Check to see if any changes have been made to the public API.",
@@ -270,8 +270,8 @@ func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, 
 	return
 }
 
-func runAPICheck(command *cmdline.Command, args []string) error {
-	return doAPICheck(command.Stdout(), command.Stderr(), args, detailedOutputFlag)
+func runAPICheck(env *cmdline2.Env, args []string) error {
+	return doAPICheck(env.Stdout, env.Stderr, args, detailedOutputFlag)
 }
 
 func printChangeSummary(out io.Writer, change packageChange, detailedOutput bool) {
@@ -336,8 +336,8 @@ func doAPICheck(stdout, stderr io.Writer, args []string, detailedOutput bool) er
 }
 
 // cmdAPIUpdate represents the "v23 api fix" command.
-var cmdAPIUpdate = &cmdline.Command{
-	Run:      runAPIFix,
+var cmdAPIUpdate = &cmdline2.Command{
+	Runner:   cmdline2.RunnerFunc(runAPIFix),
 	Name:     "fix",
 	Short:    "Updates the .api files to reflect your changes to the public API.",
 	Long:     "Updates the .api files to reflect your changes to the public API.",
@@ -345,8 +345,8 @@ var cmdAPIUpdate = &cmdline.Command{
 	ArgsLong: "<projects> is a list of Vanadium projects to update. If none are specified, all project APIs are updated.",
 }
 
-func runAPIFix(command *cmdline.Command, args []string) error {
-	ctx := tool.NewContextFromCommand(command, tool.ContextOpts{
+func runAPIFix(env *cmdline2.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:    &colorFlag,
 		DryRun:   &dryRunFlag,
 		Manifest: &manifestFlag,

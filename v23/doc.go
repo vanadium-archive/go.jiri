@@ -89,8 +89,8 @@ Manage vanadium build cop schedule. If no subcommand is given, it shows the LDAP
 of the current build cop.
 
 Usage:
-   v23 buildcop <command>
    v23 buildcop
+   v23 buildcop <command>
 
 The v23 buildcop commands are:
    list        List available build cop schedule
@@ -641,11 +641,6 @@ Help with args displays the usage of the specified sub-command or help topic.
 
 "help ..." recursively displays help for all commands and topics.
 
-Output is formatted to a target width in runes, determined by checking the
-CMDLINE_WIDTH environment variable, falling back on the terminal width, falling
-back on 80 chars.  By setting CMDLINE_WIDTH=x, if x > 0 the width is x, if x < 0
-the width is unlimited, and if x == 0 or is unset one of the fallbacks is used.
-
 Usage:
    v23 help [flags] [command/topic ...]
 
@@ -658,5 +653,9 @@ The v23 help flags are:
       full    - Good for cmdline output, shows all global flags.
       godoc   - Good for godoc processing.
    Override the default by setting the CMDLINE_STYLE environment variable.
+ -width=<terminal width>
+   Format output to this target width in runes, or unlimited if width < 0.
+   Defaults to the terminal width if available.  Override the default by setting
+   the CMDLINE_WIDTH environment variable.
 */
 package main
