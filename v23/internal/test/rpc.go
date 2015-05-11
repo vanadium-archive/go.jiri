@@ -54,8 +54,8 @@ const (
 	gceNodePrefix        = "tmpnode-rpc"
 
 	vcloudPkg = "v.io/x/devtools/vcloud"
-	serverPkg = "v.io/x/ref/profiles/internal/rpc/stress/stressd"
-	clientPkg = "v.io/x/ref/profiles/internal/rpc/stress/stress"
+	serverPkg = "v.io/x/ref/runtime/internal/rpc/stress/stressd"
+	clientPkg = "v.io/x/ref/runtime/internal/rpc/stress/stress"
 )
 
 var (

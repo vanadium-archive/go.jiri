@@ -7,7 +7,7 @@ package transitive_nouse
 import (
 	"testing"
 
-	_ "v.io/x/ref/profiles"
+	_ "v.io/x/ref/runtime/factories/generic"
 
 	"v.io/x/devtools/v23/testdata/transitive/middle"
 )

@@ -921,7 +921,7 @@ func init() {
 		// This test triggers a bug in go 1.4.1 garbage collector.
 		//
 		// https://github.com/veyron/release-issues/issues/1494
-		newExclusion("v.io/x/ref/profiles/internal/rpc/stream/vc", "TestConcurrentFlows", isDarwin() && is386()),
+		newExclusion("v.io/x/ref/runtime/internal/rpc/stream/vc", "TestConcurrentFlows", isDarwin() && is386()),
 		// The fsnotify package tests are flaky on darwin. This begs the
 		// question of whether we should be relying on this library at
 		// all.

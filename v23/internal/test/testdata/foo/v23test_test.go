@@ -5,7 +5,7 @@
 package foo_test
 
 import (
-	_ "v.io/x/ref/profiles"
+	_ "v.io/x/ref/runtime/factories/generic"
 	"v.io/x/ref/test/v23tests"
 )
 

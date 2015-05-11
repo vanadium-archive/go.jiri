@@ -79,8 +79,8 @@ func cmpImports(got, want []string) bool {
 func TestV23Generate(t *testing.T) {
 	sysImports := []string{"fmt", "io", "os", "testing"}
 	modulesImports := []string{"v.io/x/ref/test/modules"}
-	vioImports := []string{"v.io/x/ref/profiles", "v.io/x/ref/test"}
-	v23Imports := []string{"v.io/x/ref/test", "v.io/x/ref/test/v23tests", "v.io/x/ref/profiles"}
+	vioImports := []string{"v.io/x/ref/runtime/factories/generic", "v.io/x/ref/test"}
+	v23Imports := []string{"v.io/x/ref/test", "v.io/x/ref/test/v23tests", "v.io/x/ref/runtime/factories/generic"}
 
 	common := append(sysImports, modulesImports...)
 	usesModules := append([]string{}, common...)
@@ -149,7 +149,7 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestV23Filename"},
 			[]string{"TestInternalFilename", "TestV23Filename"},
 			append(append([]string{}, common...), "v.io/x/ref/test", "v.io/x/ref/test/v23tests"),
-			[]string{"testing", "v.io/x/ref/test/v23tests", "v.io/x/ref/profiles"},
+			[]string{"testing", "v.io/x/ref/test/v23tests", "v.io/x/ref/runtime/factories/generic"},
 		},
 		{"modules_and_v23", "",
 			[]string{"TestMain", "init"},
@@ -166,7 +166,7 @@ func TestV23Generate(t *testing.T) {
 			[]string{"init"},
 			[]string{"TestModulesOnlyExt", "TestModulesOnlyInt"},
 			usesModules,
-			append(append([]string{}, common...), "v.io/x/ref/profiles"),
+			append(append([]string{}, common...), "v.io/x/ref/runtime/factories/generic"),
 		},
 		{"v23_only", "",
 			nil,
@@ -194,7 +194,7 @@ func TestV23Generate(t *testing.T) {
 			[]string{"TestMain", "TestV23OneA"},
 			[]string{"TestModulesExternal", "TestV23OneA"},
 			[]string{
-				"os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/profiles"},
+				"os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/runtime/factories/generic"},
 			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/test/modules"}, v23Imports...),
 		},
 		{"internal_transitive_external", "",
@@ -202,8 +202,8 @@ func TestV23Generate(t *testing.T) {
 			nil,
 			[]string{"TestInternal", "TestModulesExternal"},
 			[]string{
-				"fmt", "os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/test", "v.io/x/ref/profiles"},
-			[]string{"testing", testdata + "internal_transitive_external", "v.io/x/ref/profiles"},
+				"fmt", "os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/test", "v.io/x/ref/runtime/factories/generic"},
+			[]string{"testing", testdata + "internal_transitive_external", "v.io/x/ref/runtime/factories/generic"},
 		},
 	}
 
