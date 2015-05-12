@@ -37,7 +37,7 @@ func main() {
 // cmdRoot represents the root of the v23 tool.
 var cmdRoot = &cmdline.Command{
 	Name:  "v23",
-	Short: "multi-purpose tool for Vanadium development",
+	Short: "Multi-purpose tool for Vanadium development",
 	Long: `
 Command v23 is a multi-purpose tool for Vanadium development.
 `,

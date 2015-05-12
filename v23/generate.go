@@ -36,7 +36,7 @@ func init() {
 var cmdTestGenerate = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runTestGenerate),
 	Name:   "generate",
-	Short:  "Generates supporting code for v23 integration tests.",
+	Short:  "Generate supporting code for v23 integration tests",
 	Long: `
 The generate subcommand supports the vanadium integration test
 framework and unit tests by generating go files that contain supporting

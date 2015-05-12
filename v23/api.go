@@ -46,8 +46,8 @@ public API.
 var cmdAPICheck = &cmdline.Command{
 	Runner:   cmdline.RunnerFunc(runAPICheck),
 	Name:     "check",
-	Short:    "Check to see if any changes have been made to the public API.",
-	Long:     "Check to see if any changes have been made to the public API.",
+	Short:    "Check if any changes have been made to the public API",
+	Long:     "Check if any changes have been made to the public API.",
 	ArgsName: "<projects>",
 	ArgsLong: "<projects> is a list of Vanadium projects to check. If none are specified, all projects that require a public API check upon presubmit are checked.",
 }
@@ -339,8 +339,8 @@ func doAPICheck(stdout, stderr io.Writer, args []string, detailedOutput bool) er
 var cmdAPIUpdate = &cmdline.Command{
 	Runner:   cmdline.RunnerFunc(runAPIFix),
 	Name:     "fix",
-	Short:    "Updates the .api files to reflect your changes to the public API.",
-	Long:     "Updates the .api files to reflect your changes to the public API.",
+	Short:    "Update .api files to reflect changes to the public API",
+	Long:     "Update .api files to reflect changes to the public API.",
 	ArgsName: "<projects>",
 	ArgsLong: "<projects> is a list of Vanadium projects to update. If none are specified, all project APIs are updated.",
 }

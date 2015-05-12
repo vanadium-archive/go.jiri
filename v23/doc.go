@@ -50,8 +50,8 @@ Usage:
    v23 api [flags] <command>
 
 The v23 api commands are:
-   check       Check to see if any changes have been made to the public API.
-   fix         Updates the .api files to reflect your changes to the public API.
+   check       Check if any changes have been made to the public API
+   fix         Update .api files to reflect changes to the public API
 
 The v23 api flags are:
  -gotools-bin=
@@ -60,7 +60,7 @@ The v23 api flags are:
 
 V23 api check
 
-Check to see if any changes have been made to the public API.
+Check if any changes have been made to the public API.
 
 Usage:
    v23 api check [flags] <projects>
@@ -75,7 +75,7 @@ The v23 api check flags are:
 
 V23 api fix
 
-Updates the .api files to reflect your changes to the public API.
+Update .api files to reflect changes to the public API.
 
 Usage:
    v23 api fix <projects>
@@ -468,7 +468,7 @@ Usage:
    v23 test <command>
 
 The v23 test commands are:
-   generate    Generates supporting code for v23 integration tests.
+   generate    Generate supporting code for v23 integration tests
    project     Run tests for a vanadium project
    run         Run vanadium tests
    list        List vanadium tests
