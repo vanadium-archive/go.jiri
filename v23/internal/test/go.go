@@ -782,7 +782,7 @@ func installGoCover(ctx *tool.Context) error {
 		}
 	}
 	if scanner.Err() != nil {
-		return fmt.Errorf("Scan() failed: %v")
+		return fmt.Errorf("Scan() failed: %v", scanner.Err())
 	}
 	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/cover"); err != nil {
 		return err
@@ -1327,13 +1327,12 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 		return pkgsOpt(allPkgs), nil
 	}
 
-	if index == len(parts) {
-		// Special handling for getting the packages other than the packages
-		// specified in "test-parts".
-
-		// Get packages specified in test-parts.
-		existingPartsPkgs := map[string]struct{}{}
-		for _, pkg := range parts {
+	// Get packages specified in test-parts before the current index.
+	existingPartsPkgs := map[string]struct{}{}
+	for i := 0; i < index; i++ {
+		pkgSpec := parts[i]
+		pkgs := strings.Split(pkgSpec, ",")
+		for _, pkg := range pkgs {
 			curPkgs, err := goutil.List(ctx, pkg)
 			if err != nil {
 				return nil, err
@@ -1342,27 +1341,28 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 				existingPartsPkgs[curPkg] = struct{}{}
 			}
 		}
-
-		// Get the rest.
-		rest := []string{}
-		allPkgs, err := goutil.List(ctx, allPkgs...)
-		if err != nil {
-			return nil, err
-		}
-		for _, pkg := range allPkgs {
-			if _, ok := existingPartsPkgs[pkg]; !ok {
-				rest = append(rest, pkg)
-			}
-		}
-		return pkgsOpt(rest), nil
-	} else if index < len(parts) {
-		pkgs, err := goutil.List(ctx, parts[index])
-		if err != nil {
-			return nil, err
-		}
-		return pkgsOpt(pkgs), nil
 	}
-	return nil, fmt.Errorf("invalid part index: %d/%d", index, len(parts)-1)
+
+	// Get packages for the current index.
+	pkgs, err := goutil.List(ctx, allPkgs...)
+	if err != nil {
+		return nil, err
+	}
+	if index < len(parts) {
+		pkgs, err = goutil.List(ctx, parts[index])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Exclude "existingPartsPkgs" from "pkgs".
+	rest := []string{}
+	for _, pkg := range pkgs {
+		if _, ok := existingPartsPkgs[pkg]; !ok {
+			rest = append(rest, pkg)
+		}
+	}
+	return pkgsOpt(rest), nil
 }
 
 // vanadiumIntegrationTest runs integration tests for Vanadium
