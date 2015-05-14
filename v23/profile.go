@@ -31,6 +31,7 @@ var (
 		"arm":         struct{}{},
 		"android":     struct{}{},
 		"java":        struct{}{},
+		"nodejs":      struct{}{},
 		"syncbase":    struct{}{},
 		"third-party": struct{}{},
 		"web":         struct{}{},
@@ -138,6 +139,8 @@ func setup(ctx *tool.Context, os, profile string) error {
 			return setupSyncbaseDarwin(ctx)
 		case "third-party":
 			return setupThirdPartyDarwin(ctx)
+		case "nodejs":
+			return setupNodejsDarwin(ctx)
 		case "web":
 			return setupWebDarwin(ctx)
 		default:
@@ -153,6 +156,8 @@ func setup(ctx *tool.Context, os, profile string) error {
 			return setupJavaLinux(ctx)
 		case "syncbase":
 			return setupSyncbaseLinux(ctx)
+		case "nodejs":
+			return setupNodejsLinux(ctx)
 		case "web":
 			return setupWebLinux(ctx)
 		default:
@@ -603,24 +608,24 @@ func setupThirdPartyDarwin(ctx *tool.Context) error {
 	return nil
 }
 
-// setupWebDarwin sets up the web profile for darwin.
-func setupWebDarwin(ctx *tool.Context) error {
-	return setupWebCommon(ctx)
+// setupNodejsDarwin sets up the nodejs profile for darwin.
+func setupNodejsDarwin(ctx *tool.Context) error {
+	return setupNodejsCommon(ctx)
 }
 
-// setupWebLinux sets up the web profile for linux
-func setupWebLinux(ctx *tool.Context) error {
+// setupNodejsLinux sets up the nodejs profile for linux.
+func setupNodejsLinux(ctx *tool.Context) error {
 	// Install dependencies.
-	pkgs := []string{"g++", "libc6-i386", "zip"}
+	pkgs := []string{"g++"}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
 
-	return setupWebCommon(ctx)
+	return setupNodejsCommon(ctx)
 }
 
-// setupWebHelper sets up the web profile.
-func setupWebCommon(ctx *tool.Context) error {
+// setupNodejsCommon sets up the nodejs profile.
+func setupNodejsCommon(ctx *tool.Context) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -645,6 +650,37 @@ func setupWebCommon(ctx *tool.Context) error {
 		return nil
 	}
 	if err := atomicAction(ctx, installNodeFn, nodeOutDir, "Build and install NodeJS"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// setupWebDarwin sets up the web profile for darwin.
+func setupWebDarwin(ctx *tool.Context) error {
+	return setupWebCommon(ctx)
+}
+
+// setupWebLinux sets up the web profile for linux.
+func setupWebLinux(ctx *tool.Context) error {
+	// Install dependencies.
+	pkgs := []string{"g++", "libc6-i386", "zip"}
+	if err := installDeps(ctx, pkgs); err != nil {
+		return err
+	}
+
+	return setupWebCommon(ctx)
+}
+
+// setupWebCommon sets up the web profile.
+func setupWebCommon(ctx *tool.Context) error {
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+
+	// Build and install NodeJS.
+	if err := setupNodejsCommon(ctx); err != nil {
 		return err
 	}
 
