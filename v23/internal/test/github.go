@@ -54,6 +54,11 @@ var (
 			github:       "git@github.com:vanadium/chat.git",
 		},
 		Mirror{
+			name:         "media-sharing",
+			googlesource: "https://vanadium.googlesource.com/release.projects.media-sharing",
+			github:       "git@github.com:vanadium/media-sharing.git",
+		},
+		Mirror{
 			name:         "pipe2browser",
 			googlesource: "https://vanadium.googlesource.com/release.projects.pipe2browser",
 			github:       "git@github.com:vanadium/pipe2browser.git",
@@ -62,6 +67,11 @@ var (
 			name:         "playground",
 			googlesource: "https://vanadium.googlesource.com/release.projects.playground",
 			github:       "git@github.com:vanadium/playground.git",
+		},
+		Mirror{
+			name:         "physical-lock",
+			googlesource: "https://vanadium.googlesource.com/release.projects.physical-lock",
+			github:       "git@github.com:vanadium/physical-lock.git",
 		},
 		Mirror{
 			name:         "third_party",
