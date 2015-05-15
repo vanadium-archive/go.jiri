@@ -417,7 +417,7 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 	args := []string{"build", "-ldflags", ldflags, "-o", output, pkg}
 	var stderr bytes.Buffer
 	opts := ctx.Run().Opts()
-	opts.Env = env.Map()
+	opts.Env = env.ToMap()
 	opts.Stdout = ioutil.Discard
 	opts.Stderr = &stderr
 	if err := ctx.Run().CommandWithOpts(opts, "go", args...); err != nil {

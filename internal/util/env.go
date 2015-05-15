@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
+	"v.io/x/lib/envvar"
 )
 
 const (
@@ -33,8 +33,8 @@ const (
 // the Vanadium project (e.g. arm, android, java, or nacl). Unlike the
 // default setting, the setting enabled by the V23_PROFILE environment
 // variable can override existing environment.
-func VanadiumEnvironment(ctx *tool.Context) (*envutil.Snapshot, error) {
-	env := envutil.NewSnapshotFromOS()
+func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
+	env := envvar.VarsFromOS()
 	root, err := V23Root()
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ This can override values of existing environment variables.
 // setJavaEnv sets the environment variables used for building a Go
 // shared library that is invoked from Java code. If Java is not
 // installed on the host, this function is a no-op.
-func setJavaEnv(env *envutil.Snapshot) error {
+func setJavaEnv(env *envvar.Vars) error {
 	jdkHome := os.Getenv(javaEnv)
 	if jdkHome == "" {
 		return nil
@@ -101,7 +101,7 @@ func setJavaEnv(env *envutil.Snapshot) error {
 
 // setAndroidEnv sets the environment variables used for android
 // cross-compilation.
-func setAndroidEnv(env *envutil.Snapshot, root string) error {
+func setAndroidEnv(env *envvar.Vars, root string) error {
 	// Set the environment variables needed for building Go shared
 	// libraries for Java.
 	if err := setJavaEnv(env); err != nil {
@@ -125,7 +125,7 @@ func setAndroidEnv(env *envutil.Snapshot, root string) error {
 
 // setArmEnv sets the environment variables used for android
 // cross-compilation.
-func setArmEnv(env *envutil.Snapshot, root string) error {
+func setArmEnv(env *envvar.Vars, root string) error {
 	// Set Go specific environment variables.
 	env.Set("GOARCH", "arm")
 	env.Set("GOARM", "6")
@@ -144,19 +144,19 @@ func setArmEnv(env *envutil.Snapshot, root string) error {
 
 // setGoPath adds the paths to Vanadium Go workspaces to the GOPATH
 // variable.
-func setGoPath(ctx *tool.Context, env *envutil.Snapshot, root string, config *Config) error {
+func setGoPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config) error {
 	return setPathHelper(ctx, env, "GOPATH", root, config.GoWorkspaces())
 }
 
 // setVdlPath adds the paths to Vanadium VDL workspaces to the VDLPATH
 // variable.
-func setVdlPath(ctx *tool.Context, env *envutil.Snapshot, root string, config *Config) error {
+func setVdlPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config) error {
 	return setPathHelper(ctx, env, "VDLPATH", root, config.VDLWorkspaces())
 }
 
 // setPathHelper is a utility function for setting path environment
 // variables for different types of workspaces.
-func setPathHelper(ctx *tool.Context, env *envutil.Snapshot, name, root string, workspaces []string) error {
+func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, workspaces []string) error {
 	path := env.GetTokens(name, ":")
 	projects, _, err := readManifest(ctx, false)
 	if err != nil {
@@ -188,7 +188,7 @@ func setPathHelper(ctx *tool.Context, env *envutil.Snapshot, name, root string, 
 
 // setNaclEnv sets the environment variables used for nacl
 // cross-compilation.
-func setNaclEnv(env *envutil.Snapshot, root string) error {
+func setNaclEnv(env *envvar.Vars, root string) error {
 	env.Set("GOARCH", "amd64p32")
 	env.Set("GOOS", "nacl")
 
@@ -204,7 +204,7 @@ func setNaclEnv(env *envutil.Snapshot, root string) error {
 
 // setSyncbaseEnv adds the LevelDB third-party C++ libraries Vanadium
 // Go code depends on to the CGO_CFLAGS and CGO_LDFLAGS variables.
-func setSyncbaseEnv(env *envutil.Snapshot, root string) error {
+func setSyncbaseEnv(env *envvar.Vars, root string) error {
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
 	cxxflags := env.GetTokens("CGO_CXXFLAGS", " ")
 	ldflags := env.GetTokens("CGO_LDFLAGS", " ")

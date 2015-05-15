@@ -7,12 +7,13 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 	"syscall"
 
-	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/envvar"
 )
 
 // translateExitCode translates errors from the "os/exec" package that contain
@@ -64,8 +65,12 @@ func runEnv(cmdlineEnv *cmdline.Env, args []string) error {
 		}
 		return nil
 	}
-	for _, entry := range envutil.ToQuotedSlice(env.DeltaMap()) {
-		fmt.Fprintln(cmdlineEnv.Stdout, entry)
+	for key, delta := range env.Deltas() {
+		var value string
+		if delta != nil {
+			value = `"` + strings.Replace(*delta, `"`, `\"`, -1) + `"`
+		}
+		fmt.Fprintln(cmdlineEnv.Stdout, envvar.JoinKeyValue(key, value))
 	}
 	return nil
 }
@@ -107,6 +112,6 @@ func runRun(cmdlineEnv *cmdline.Env, args []string) error {
 	execCmd := exec.Command(args[0], args[1:]...)
 	execCmd.Stdout = cmdlineEnv.Stdout
 	execCmd.Stderr = cmdlineEnv.Stderr
-	execCmd.Env = env.Slice()
+	execCmd.Env = env.ToSlice()
 	return translateExitCode(execCmd.Run())
 }

@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
+	"v.io/x/lib/envvar"
 )
 
 // TestV23RootSymlink checks that V23Root interprets the value
@@ -103,7 +103,7 @@ func testSetPathHelper(t *testing.T, name string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	env := envutil.NewSnapshot(nil)
+	env := new(envvar.Vars)
 	switch name {
 	case "GOPATH":
 		if err := setGoPath(ctx, env, v23Root, config); err != nil {

@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"v.io/x/devtools/internal/envutil"
+	"v.io/x/lib/envvar"
 )
 
 const (
@@ -96,7 +96,7 @@ func (r *Run) command(timeout time.Duration, opts Opts, path string, args ...str
 	defer r.decreaseIndent()
 	// Check if <path> identifies a binary in the PATH environment
 	// variable of the opts.Env.
-	binary, err := envutil.NewSnapshot(opts.Env).LookPath(path)
+	binary, err := LookPath(path, opts.Env)
 	if err == nil {
 		// If so, make sure to execute this binary. This step
 		// enables us to "shadow" binaries included in the
@@ -114,11 +114,11 @@ func (r *Run) command(timeout time.Duration, opts Opts, path string, args ...str
 	command.Stdout = opts.Stdout
 	command.Stderr = opts.Stderr
 	if len(opts.Env) != 0 {
-		snapshot := envutil.NewSnapshotFromOS()
+		vars := envvar.VarsFromOS()
 		for key, value := range opts.Env {
-			snapshot.Set(key, value)
+			vars.Set(key, value)
 		}
-		command.Env = snapshot.Slice()
+		command.Env = vars.ToSlice()
 	}
 	if opts.Verbose || opts.DryRun {
 		args := []string{}

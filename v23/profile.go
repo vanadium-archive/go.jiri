@@ -18,10 +18,10 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/envutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/envvar"
 )
 
 var (
@@ -344,7 +344,7 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 		if err := ctx.Run().MkdirAll(repoDir, defaultDirPerm); err != nil {
 			return err
 		}
-		makeEnv := envutil.NewSnapshotFromOS()
+		makeEnv := envvar.VarsFromOS()
 		unsetGoEnv(makeEnv)
 		makeEnv.Set("GOARCH", "arm")
 		makeEnv.Set("GOOS", "linux")
@@ -557,7 +557,7 @@ func setupAndroidLinux(ctx *tool.Context) (e error) {
 	// Install Android Go.
 	androidGo := filepath.Join(androidRoot, "go")
 	installGoFn := func() error {
-		makeEnv := envutil.NewSnapshotFromOS()
+		makeEnv := envvar.VarsFromOS()
 		unsetGoEnv(makeEnv)
 		makeEnv.Set("CC_FOR_TARGET", filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-gcc"))
 		makeEnv.Set("GOOS", "android")
@@ -577,7 +577,7 @@ func setupJavaLinux(ctx *tool.Context) error {
 	javaRoot := filepath.Join(root, "third_party", "java")
 	javaGo := filepath.Join(javaRoot, "go")
 	installGoFn := func() error {
-		return installGo15(ctx, javaGo, envutil.NewSnapshotFromOS())
+		return installGo15(ctx, javaGo, envvar.VarsFromOS())
 	}
 	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
 }
@@ -769,7 +769,7 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 
 // installGo14 installs Go 1.4 at a given location, using the provided
 // environment during compilation.
-func installGo14(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
+func installGo14(ctx *tool.Context, goDir string, env *envvar.Vars) error {
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
 		return err
@@ -794,7 +794,7 @@ func installGo14(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
 	}
 	makeBin := filepath.Join(goSrcDir, "make.bash")
 	makeArgs := []string{"--no-clean"}
-	if err := run(ctx, makeBin, makeArgs, env.Map()); err != nil {
+	if err := run(ctx, makeBin, makeArgs, env.ToMap()); err != nil {
 		return err
 	}
 	return nil
@@ -802,14 +802,14 @@ func installGo14(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
 
 // installGo15 installs Go 1.5 at a given location, using the provided
 // environment during compilation.
-func installGo15(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
+func installGo15(ctx *tool.Context, goDir string, env *envvar.Vars) error {
 	// First install bootstrap Go 1.4 for the host.
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
 		return err
 	}
 	goBootstrapDir := filepath.Join(tmpDir, "go")
-	if err := installGo14(ctx, goBootstrapDir, envutil.NewSnapshotFromOS()); err != nil {
+	if err := installGo14(ctx, goBootstrapDir, envvar.VarsFromOS()); err != nil {
 		return err
 	}
 
@@ -830,13 +830,13 @@ func installGo15(ctx *tool.Context, goDir string, env *envutil.Snapshot) error {
 	}
 	makeBin := filepath.Join(goSrcDir, "make.bash")
 	env.Set("GOROOT_BOOTSTRAP", goBootstrapDir)
-	if err := run(ctx, makeBin, nil, env.Map()); err != nil {
+	if err := run(ctx, makeBin, nil, env.ToMap()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func unsetGoEnv(env *envutil.Snapshot) {
+func unsetGoEnv(env *envvar.Vars) {
 	env.Set("CGO_ENABLED", "")
 	env.Set("CGO_CFLAGS", "")
 	env.Set("CGO_CXXFLAGS", "")

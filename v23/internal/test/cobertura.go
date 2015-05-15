@@ -86,7 +86,7 @@ func coverageFromGoTestOutput(ctx *tool.Context, testOutput io.Reader) (*testCov
 	opts := ctx.Run().Opts()
 	opts.Stdin = testOutput
 	opts.Stdout = &out
-	opts.Env = env.Map()
+	opts.Env = env.ToMap()
 	if err := ctx.Run().CommandWithOpts(opts, bin); err != nil {
 		return nil, err
 	}
