@@ -452,7 +452,7 @@ func (r *review) checkGoVet() (e error) {
 	opts := r.ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
-	args := []string{"run", vetBin}
+	args := []string{"run", vetBin, "--composites=false"}
 	// We vet one file at a time, because go vet only allows vetting of files of
 	// the same package per invocation.
 	var vetErrors []string
