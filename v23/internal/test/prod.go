@@ -50,12 +50,21 @@ func testSingleProdService(ctx *tool.Context, vroot, principalDir string, servic
 	opts.Stdout = &out
 	opts.Stderr = &out
 	start := time.Now()
-	if err := ctx.Run().TimedCommandWithOpts(test.DefaultTimeout, opts, bin, "--v23.credentials", principalDir, "signature", "--show-reserved", service.objectName); err != nil {
-		return generateXUnitTestSuite(ctx, &xunit.Failure{"vrpc", out.String()}, service.name, time.Now().Sub(start))
+	args := []string{}
+	if principalDir != "" {
+		args = append(args, "--v23.credentials", principalDir)
+	}
+	args = append(args, "signature", "--show-reserved")
+	if principalDir == "" {
+		args = append(args, "--insecure")
+	}
+	args = append(args, service.objectName)
+	if err := ctx.Run().TimedCommandWithOpts(test.DefaultTimeout, opts, bin, args...); err != nil {
+		return generateXUnitTestSuite(ctx, &xunit.Failure{Message: "vrpc", Data: out.String()}, service.name, time.Now().Sub(start))
 	}
 	if !service.regexp.Match(out.Bytes()) {
 		fmt.Fprintf(ctx.Stderr(), "couldn't match regexp %q in output:\n%v\n", service.regexp, out.String())
-		return generateXUnitTestSuite(ctx, &xunit.Failure{"vrpc", "mismatching signature"}, service.name, time.Now().Sub(start))
+		return generateXUnitTestSuite(ctx, &xunit.Failure{Message: "vrpc", Data: "mismatching signature"}, service.name, time.Now().Sub(start))
 	}
 	return generateXUnitTestSuite(ctx, nil, service.name, time.Now().Sub(start))
 }
@@ -204,7 +213,7 @@ func testIdentityProviderHTTP(ctx *tool.Context, blessingRoot string) (suite *xu
 	}
 	var failure *xunit.Failure
 	if err != nil {
-		failure = &xunit.Failure{"identityd HTTP", err.Error()}
+		failure = &xunit.Failure{Message: "identityd HTTP", Data: err.Error()}
 	}
 	return generateXUnitTestSuite(ctx, failure, url, time.Now().Sub(start)), response.PublicKey, response.Names
 }
