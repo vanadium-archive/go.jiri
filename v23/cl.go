@@ -47,7 +47,7 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", true, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
-	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-depcop", true, "Check that no go-depcop violations exist.")
+	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
@@ -567,7 +567,7 @@ func (r *review) checkGoDependencies() error {
 	opts := r.ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
-	if err := r.ctx.Run().CommandWithOpts(opts, "v23", "run", "go-depcop", "check", "v.io/..."); err != nil {
+	if err := r.ctx.Run().CommandWithOpts(opts, "v23", "run", "godepcop", "check", "v.io/..."); err != nil {
 		return goDependencyError(out.String())
 	}
 	return nil
