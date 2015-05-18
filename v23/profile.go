@@ -733,6 +733,34 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 		return err
 	}
 
+	// Build and install Snappy.
+	snappyOutDir := filepath.Join(root, "third_party", "cout", "snappy")
+	installSnappyFn := func() error {
+		snappySrcDir := filepath.Join(root, "third_party", "csrc", "snappy-1.1.2")
+		if err := ctx.Run().Chdir(snappySrcDir); err != nil {
+			return err
+		}
+		if err := run(ctx, "autoreconf", []string{"--install", "--force", "--verbose"}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "./configure", []string{fmt.Sprintf("--prefix=%v", snappyOutDir), "--enable-shared=false"}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "make", []string{fmt.Sprintf("-j%d", runtime.NumCPU())}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "make", []string{"install"}, nil); err != nil {
+			return err
+		}
+		if err := run(ctx, "make", []string{"distclean"}, nil); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := atomicAction(ctx, installSnappyFn, snappyOutDir, "Build and install Snappy"); err != nil {
+		return err
+	}
+
 	// Build and install LevelDB.
 	leveldbOutDir := filepath.Join(root, "third_party", "cout", "leveldb")
 	installLeveldbFn := func() error {
@@ -751,7 +779,11 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 		if err := run(ctx, "mkdir", []string{leveldbLibDir}, nil); err != nil {
 			return err
 		}
-		env := map[string]string{"PREFIX": leveldbLibDir}
+		env := map[string]string{
+			"PREFIX":   leveldbLibDir,
+			"CXXFLAGS": "-I" + filepath.Join(snappyOutDir, "include"),
+			"LDFLAGS":  "-L" + filepath.Join(snappyOutDir, "lib"),
+		}
 		if err := run(ctx, "make", []string{"clean"}, env); err != nil {
 			return err
 		}
