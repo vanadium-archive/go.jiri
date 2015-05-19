@@ -230,7 +230,7 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *t
 		return nil, err
 	}
 
-	// Pre-build non-test packages.
+	// Build dependencies of test packages.
 	if err := buildTestDeps(ctx, pkgs); err != nil {
 		if err := xunit.CreateFailureReport(ctx, testName, "BuildTestDependencies", "TestCoverage", "dependencies build failure", err.Error()); err != nil {
 			return nil, err
@@ -239,10 +239,16 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *t
 	}
 
 	// Enumerate the packages for which coverage is to be computed.
+	fmt.Fprintf(ctx.Stdout(), "listing test packages and functions ... ")
 	pkgList, err := goutil.List(ctx, pkgs...)
 	if err != nil {
-		return nil, err
+		fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", err.Error())
+		if err := xunit.CreateFailureReport(ctx, testName, "ListPackages", "TestCoverage", "listing package failure", err.Error()); err != nil {
+			return nil, err
+		}
+		return &test.Result{Status: test.Failed}, nil
 	}
+	fmt.Fprintf(ctx.Stdout(), "ok\n")
 
 	// Create a pool of workers.
 	numPkgs := len(pkgList)
@@ -415,14 +421,17 @@ func (t *matchV23TestFunc) goTestOpt() {}
 // packages and obtaining lists of function names that are matched
 // by the matcher interface.
 func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatcher) ([]string, map[string][]string, error) {
+	fmt.Fprintf(ctx.Stdout(), "listing test packages and functions ... ")
 
 	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to obtain the Vanadium environment: %v", err)
+		fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", err.Error())
+		return nil, nil, err
 	}
 	pkgList, err := goutil.List(ctx, pkgs...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list packages: %v", err)
+		fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", err.Error())
+		return nil, nil, err
 	}
 
 	matched := map[string][]string{}
@@ -433,6 +442,7 @@ func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatche
 	for _, pkg := range pkgList {
 		pi, err := buildContext.Import(pkg, ".", build.ImportMode(0))
 		if err != nil {
+			fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", err.Error())
 			return nil, nil, err
 		}
 		testFiles := append(pi.TestGoFiles, pi.XTestGoFiles...)
@@ -441,7 +451,8 @@ func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatche
 			file := filepath.Join(pi.Dir, testFile)
 			testAST, err := parser.ParseFile(fset, file, nil, parser.Mode(0))
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed parsing: %v: %v", file, err)
+				fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", err.Error())
+				return nil, nil, err
 			}
 			for _, decl := range testAST.Decls {
 				fn, ok := decl.(*ast.FuncDecl)
@@ -457,6 +468,8 @@ func goListPackagesAndFuncs(ctx *tool.Context, pkgs []string, matcher funcMatche
 			pkgsWithTests = append(pkgsWithTests, pkg)
 		}
 	}
+
+	fmt.Fprintf(ctx.Stdout(), "ok\n")
 	return pkgsWithTests, matched, nil
 }
 
@@ -564,7 +577,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 		return nil, nil, err
 	}
 
-	// Pre-build non-test packages.
+	// Build dependencies of test packages.
 	if err := buildTestDeps(ctx, pkgs); err != nil {
 		originalTestName := testName
 		if len(suffix) != 0 {
@@ -576,10 +589,17 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 		return &test.Result{Status: test.Failed}, nil, nil
 	}
 
-	// Enumerate the packages and tests to be built.
+	// Enumerate the packages to be built and tests to be executed.
 	pkgList, pkgAndFuncList, err := goListPackagesAndFuncs(ctx, pkgs, matcher)
 	if err != nil {
-		return nil, nil, err
+		originalTestName := testName
+		if len(suffix) != 0 {
+			testName += " " + suffix
+		}
+		if err := xunit.CreateFailureReport(ctx, originalTestName, "ListPackagesAndFuncs", testName, "package parsing failure", err.Error()); err != nil {
+			return nil, nil, err
+		}
+		return &test.Result{Status: test.Failed}, nil, nil
 	}
 
 	// Create a pool of workers.
@@ -587,12 +607,12 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 	tasks := make(chan goTestTask, numPkgs)
 	taskResults := make(chan testResult, numPkgs)
 
-	fmt.Fprintf(ctx.Stdout(), "Running tests using %d workers...\n", numWorkers)
-	fmt.Fprintf(ctx.Stdout(), "Running tests concurrently...\n")
+	fmt.Fprintf(ctx.Stdout(), "running tests using %d workers...\n", numWorkers)
+	fmt.Fprintf(ctx.Stdout(), "running tests concurrently...\n")
 	staggeredWorker := func() {
 		delay := time.Duration(rand.Int63n(30*1000)) * time.Millisecond
 		if ctx.Verbose() {
-			fmt.Fprintf(ctx.Stdout(), "Staggering start of test worker by %s\n", delay)
+			fmt.Fprintf(ctx.Stdout(), "staggering start of test worker by %s\n", delay)
 		}
 		time.Sleep(delay)
 		testWorker(ctx, timeout, args, nonTestArgs, tasks, taskResults)
@@ -752,13 +772,12 @@ func buildTestDeps(ctx *tool.Context, pkgs []string) error {
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stderr = &out
-	err := ctx.Run().CommandWithOpts(opts, "v23", args...)
-	if err == nil {
-		fmt.Fprintf(ctx.Stdout(), "ok\n")
-		return nil
+	if err := ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
+		fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", out.String())
+		return fmt.Errorf("%v\n%s", err, out.String())
 	}
-	fmt.Fprintf(ctx.Stdout(), "failed\n%s\n", out.String())
-	return fmt.Errorf("%v\n%s", err, out.String())
+	fmt.Fprintf(ctx.Stdout(), "ok\n")
+	return nil
 }
 
 // installGoCover makes sure the "go cover" tool is installed.
