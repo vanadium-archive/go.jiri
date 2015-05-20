@@ -205,28 +205,34 @@ func setNaclEnv(env *envvar.Vars, root string) error {
 // setSyncbaseEnv adds the LevelDB third-party C++ libraries Vanadium
 // Go code depends on to the CGO_CFLAGS and CGO_LDFLAGS variables.
 func setSyncbaseEnv(env *envvar.Vars, root string) error {
-	cflags := env.GetTokens("CGO_CFLAGS", " ")
-	cxxflags := env.GetTokens("CGO_CXXFLAGS", " ")
-	ldflags := env.GetTokens("CGO_LDFLAGS", " ")
-	dir := filepath.Join(root, "third_party", "cout", "leveldb")
-	if _, err := os.Stat(dir); err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("Stat(%v) failed: %v", dir, err)
+	libs := []string{
+		"leveldb",
+		"snappy",
+	}
+	for _, lib := range libs {
+		cflags := env.GetTokens("CGO_CFLAGS", " ")
+		cxxflags := env.GetTokens("CGO_CXXFLAGS", " ")
+		ldflags := env.GetTokens("CGO_LDFLAGS", " ")
+		dir := filepath.Join(root, "third_party", "cout", lib)
+		if _, err := os.Stat(dir); err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("Stat(%v) failed: %v", dir, err)
+			}
+			continue
 		}
-		return nil
+		cflags = append(cflags, filepath.Join("-I"+dir, "include"))
+		cxxflags = append(cxxflags, filepath.Join("-I"+dir, "include"))
+		ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"))
+		// TODO(jsimsa): Currently, the "v23 profile setup syncbase" command
+		// only compiles LevelDB C++ libraries for the host architecture. As
+		// a consequence, the syncbase component can only be compiled if the
+		// target platform matches the host platform.
+		if runtime.GOARCH == "linux" {
+			ldflags = append(ldflags, "-Wl,-rpath", filepath.Join(dir, "lib"))
+		}
+		env.SetTokens("CGO_CFLAGS", cflags, " ")
+		env.SetTokens("CGO_CXXFLAGS", cxxflags, " ")
+		env.SetTokens("CGO_LDFLAGS", ldflags, " ")
 	}
-	cflags = append(cflags, filepath.Join("-I"+dir, "include"))
-	cxxflags = append(cxxflags, filepath.Join("-I"+dir, "include"))
-	ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"))
-	// TODO(jsimsa): Currently, the "v23 profile setup syncbase" command
-	// only compiles LevelDB C++ libraries for the host architecture. As
-	// a consequence, the syncbase component can only be compiled if the
-	// target platform matches the host platform.
-	if runtime.GOARCH == "linux" {
-		ldflags = append(ldflags, "-Wl,-rpath", filepath.Join(dir, "lib"))
-	}
-	env.SetTokens("CGO_CFLAGS", cflags, " ")
-	env.SetTokens("CGO_CXXFLAGS", cxxflags, " ")
-	env.SetTokens("CGO_LDFLAGS", ldflags, " ")
 	return nil
 }
