@@ -89,9 +89,14 @@ var cmdProjectList = &cmdline.Command{
 	Long:   "Inspect the local filesystem and list the existing projects and branches.",
 }
 
+type branchState struct {
+	name             string
+	hasGerritMessage bool
+}
+
 type projectState struct {
 	project        util.Project
-	branches       []string
+	branches       []branchState
 	currentBranch  string
 	hasUncommitted bool
 	hasUntracked   bool
@@ -103,10 +108,17 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 	switch state.project.Protocol {
 	case "git":
 		scm := ctx.Git(tool.RootDirOpt(state.project.Path))
-		state.branches, state.currentBranch, err = scm.GetBranches()
+		var branches []string
+		branches, state.currentBranch, err = scm.GetBranches()
 		if err != nil {
 			ch <- err
 			return
+		}
+		for _, branch := range branches {
+			state.branches = append(state.branches, branchState{
+				name:             branch,
+				hasGerritMessage: scm.HasFile(branch, commitMessageFile),
+			})
 		}
 		if checkDirty {
 			state.hasUncommitted, err = scm.HasUncommittedChanges()
@@ -122,14 +134,21 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 		}
 	case "hg":
 		scm := ctx.Hg(tool.RootDirOpt(state.project.Path))
-		state.branches, state.currentBranch, err = scm.GetBranches()
+		var branches []string
+		branches, state.currentBranch, err = scm.GetBranches()
 		if err != nil {
 			ch <- err
 			return
 		}
+		for _, branch := range branches {
+			state.branches = append(state.branches, branchState{
+				name:             branch,
+				hasGerritMessage: false,
+			})
+		}
 		if checkDirty {
-			// TODO(sadovsky): Extend hgutil so that we can populate these fields
-			// correctly.
+			// TODO(sadovsky): Extend hgutil so that we can populate these
+			// fields correctly.
 			state.hasUncommitted = false
 			state.hasUntracked = false
 		}
@@ -193,11 +212,15 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 		fmt.Fprintf(ctx.Stdout(), "project=%q path=%q\n", path.Base(name), state.project.Path)
 		if branchesFlag {
 			for _, branch := range state.branches {
-				if branch == state.currentBranch {
-					fmt.Fprintf(ctx.Stdout(), "  * %v\n", branch)
-				} else {
-					fmt.Fprintf(ctx.Stdout(), "  %v\n", branch)
+				s := "  "
+				if branch.name == state.currentBranch {
+					s += "* "
 				}
+				s += branch.name
+				if branch.hasGerritMessage {
+					s += " (exported to gerrit)"
+				}
+				fmt.Fprintf(ctx.Stdout(), "%v\n", s)
 			}
 		}
 	}

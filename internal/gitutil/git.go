@@ -71,10 +71,7 @@ func (g *Git) AddRemote(name, path string) error {
 // BranchExists tests whether a branch with the given name exists in the local
 // repository.
 func (g *Git) BranchExists(branchName string) bool {
-	if err := g.run("show-branch", branchName); err != nil {
-		return false
-	}
-	return true
+	return g.run("show-branch", branchName) == nil
 }
 
 // BranchesDiffer tests whether two branches have any changes between them.
@@ -281,6 +278,11 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	return branches, current, nil
 }
 
+// HasFile checks whether the given branch contains the given file.
+func (g *Git) HasFile(branch, file string) bool {
+	return g.run("cat-file", "-e", branch+":"+file) == nil
+}
+
 // HasUncommittedChanges checks whether the current branch contains
 // any uncommitted changes.
 func (g *Git) HasUncommittedChanges() (bool, error) {
@@ -314,10 +316,7 @@ func (g *Git) IsFileCommitted(file string) bool {
 		return false
 	}
 	// Check if file is unknown to git.
-	if err := g.run("ls-files", file, "--error-unmatch"); err != nil {
-		return false
-	}
-	return true
+	return g.run("ls-files", file, "--error-unmatch") == nil
 }
 
 // LatestCommitMessage returns the latest commit message on the current branch.
