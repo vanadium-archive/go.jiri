@@ -787,7 +787,7 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 		if err := run(ctx, "make", []string{"clean"}, env); err != nil {
 			return err
 		}
-		if err := run(ctx, "make", []string{"all"}, env); err != nil {
+		if err := run(ctx, "make", []string{"static"}, env); err != nil {
 			return err
 		}
 		return nil
