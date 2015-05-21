@@ -368,15 +368,6 @@ func ApplyToLocalMaster(ctx *tool.Context, project Project, fn func() error) (e 
 			return err
 		}
 		defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch, !gitutil.Force) }, &e)
-	case "hg":
-		branch, err := ctx.Hg().CurrentBranchName()
-		if err != nil {
-			return err
-		}
-		if err := ctx.Hg().CheckoutBranch("default"); err != nil {
-			return err
-		}
-		defer collect.Error(func() error { return ctx.Hg().CheckoutBranch(branch) }, &e)
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
@@ -647,11 +638,6 @@ func pullProject(ctx *tool.Context, project Project) error {
 				return err
 			}
 			return ctx.Git().Reset(project.Revision)
-		case "hg":
-			if err := ctx.Hg().Pull(); err != nil {
-				return err
-			}
-			return ctx.Hg().CheckoutRevision(project.Revision)
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
@@ -709,9 +695,8 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 			switch project.Protocol {
 			case "git":
 				project.Revision = "HEAD"
-			case "hg":
-				project.Revision = "tip"
 			default:
+				return UnsupportedProtocolErr(project.Protocol)
 			}
 		}
 		projects[project.Name] = project
@@ -761,8 +746,6 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 			ctx.Run().OutputWithOpts(opts, []string{line1, line2})
 		}
 		return nil
-	case "hg":
-		return nil
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
@@ -790,8 +773,6 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 					return err
 				}
 				revision = gitRevision
-				return nil
-			case "hg":
 				return nil
 			default:
 				return UnsupportedProtocolErr(project.Protocol)
@@ -901,14 +882,8 @@ func addProjectToManifest(ctx *tool.Context, manifest *Manifest, project Project
 			}
 			project.Revision = revision
 		}
-	case "hg":
-		if project.Revision == "tip" {
-			revision, err := ctx.Hg(tool.RootDirOpt(project.Path)).CurrentRevision()
-			if err != nil {
-				return err
-			}
-			project.Revision = revision
-		}
+	default:
+		return UnsupportedProtocolErr(project.Protocol)
 	}
 	// Replace absolute path with a relative one.
 	root, err := V23Root()
@@ -1011,21 +986,6 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 			return err
 		}
 		if err := ctx.Git().Reset(op.project.Revision); err != nil {
-			return err
-		}
-	case "hg":
-		if err := ctx.Hg().Clone(op.project.Remote, tmpDir); err != nil {
-			return err
-		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-		if err := ctx.Run().Chdir(tmpDir); err != nil {
-			return err
-		}
-		if err := ctx.Hg().CheckoutRevision(op.project.Revision); err != nil {
 			return err
 		}
 	default:

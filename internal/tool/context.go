@@ -10,7 +10,6 @@ import (
 
 	"v.io/x/devtools/internal/gerrit"
 	"v.io/x/devtools/internal/gitutil"
-	"v.io/x/devtools/internal/hgutil"
 	"v.io/x/devtools/internal/jenkins"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/lib/cmdline"
@@ -138,13 +137,9 @@ func (ctx Context) Gerrit(host, username, password string) *gerrit.Gerrit {
 type gitOpt interface {
 	gitOpt()
 }
-type hgOpt interface {
-	hgOpt()
-}
 type RootDirOpt string
 
 func (RootDirOpt) gitOpt() {}
-func (RootDirOpt) hgOpt()  {}
 
 // Git returns a new git instance.
 //
@@ -160,26 +155,6 @@ func (ctx Context) Git(opts ...gitOpt) *gitutil.Git {
 		}
 	}
 	return gitutil.New(ctx.run, rootDir)
-}
-
-type HgOpts struct {
-	Root string
-}
-
-// Hg returns a new hg instance.
-//
-// This method accepts one optional argument: the repository root to
-// use for commands issued by the returned instance. If not specified,
-// commands will use the current directory as the repository root.
-func (ctx Context) Hg(opts ...hgOpt) *hgutil.Hg {
-	rootDir := ""
-	for _, opt := range opts {
-		switch typedOpt := opt.(type) {
-		case RootDirOpt:
-			rootDir = string(typedOpt)
-		}
-	}
-	return hgutil.New(ctx.run, rootDir)
 }
 
 // Jenkins returns a new Jenkins instance that can be used to

@@ -103,7 +103,6 @@ type projectState struct {
 }
 
 func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch chan<- error) {
-	// TODO(sadovsky): Create a common interface for Git and Hg.
 	var err error
 	switch state.project.Protocol {
 	case "git":
@@ -131,26 +130,6 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 				ch <- err
 				return
 			}
-		}
-	case "hg":
-		scm := ctx.Hg(tool.RootDirOpt(state.project.Path))
-		var branches []string
-		branches, state.currentBranch, err = scm.GetBranches()
-		if err != nil {
-			ch <- err
-			return
-		}
-		for _, branch := range branches {
-			state.branches = append(state.branches, branchState{
-				name:             branch,
-				hasGerritMessage: false,
-			})
-		}
-		if checkDirty {
-			// TODO(sadovsky): Extend hgutil so that we can populate these
-			// fields correctly.
-			state.hasUncommitted = false
-			state.hasUntracked = false
 		}
 	default:
 		ch <- util.UnsupportedProtocolErr(state.project.Protocol)
