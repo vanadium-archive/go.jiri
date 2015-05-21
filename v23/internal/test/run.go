@@ -109,8 +109,9 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-regression-test":        vanadiumRegressionTest,
 	"vanadium-release-test":           vanadiumReleaseTest,
 	"vanadium-www-site":               vanadiumWWWSite,
-	"vanadium-www-tutorials":          vanadiumWWWTutorials,
-	"vanadium-www-tutorials-ui":       vanadiumWWWTutorialsUI,
+	"vanadium-www-tutorials-core":     vanadiumWWWTutorialsCore,
+	"vanadium-www-tutorials-js-node":  vanadiumWWWTutorialsJSNode,
+	"vanadium-www-tutorials-js-web":   vanadiumWWWTutorialsJSWeb,
 	"vanadium-www-deploy-staging":     vanadiumWWWDeployStaging,
 	"vanadium-www-deploy-production":  vanadiumWWWDeployProduction,
 }

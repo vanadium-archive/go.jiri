@@ -61,12 +61,16 @@ func vanadiumWWWSite(ctx *tool.Context, testName string, _ ...Opt) (*test.Result
 	return commonVanadiumWWW(ctx, testName, "test-site", defaultWWWTestTimeout)
 }
 
-func vanadiumWWWTutorials(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-tutorials", defaultWWWTestTimeout)
+func vanadiumWWWTutorialsCore(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-core", defaultWWWTestTimeout)
 }
 
-func vanadiumWWWTutorialsUI(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-tutorials-ui", defaultWWWTestTimeout)
+func vanadiumWWWTutorialsJSNode(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-node", defaultWWWTestTimeout)
+}
+
+func vanadiumWWWTutorialsJSWeb(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-web", defaultWWWTestTimeout)
 }
 
 func vanadiumWWWDeployStaging(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
