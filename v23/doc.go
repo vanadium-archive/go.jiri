@@ -475,45 +475,29 @@ The v23 test commands are:
 
 V23 test generate
 
-The generate subcommand supports the vanadium integration test framework and
-unit tests by generating go files that contain supporting code. v23 test
-generate is intended to be invoked via the 'go generate' mechanism and the
-resulting files are to be checked in.
+The generate command supports the vanadium integration test framework and unit
+tests by generating go files that contain supporting code.  v23 test generate is
+intended to be invoked via the 'go generate' mechanism and the resulting files
+are to be checked in.
 
-Integration tests are functions of the form shown below that are defined in
-'external' tests (i.e. those occurring in _test packages, rather than being part
-of the package being tested). This ensures that integration tests are isolated
-from the packages being tested and can be moved to their own package if need be.
-Integration tests have the following form:
+Integration tests are functions of the following form:
 
-    func V23Test<x> (i *v23tests.T)
+    func V23Test<x>(i *v23tests.T)
 
-    'v23 test generate' operates as follows:
+These functions are typically defined in 'external' *_test packages, to ensure
+better isolation.  But they may also be defined directly in the 'internal' *
+package.  The following helper functions will be generated:
 
-In addition, some commonly used functionality in vanadium unit tests is
-streamlined. Arguably this should be in a separate command/file but for now they
-are lumped together. The additional functionality is as follows:
+    func TestV23<x>(t *testing.T) {
+      v23tests.RunTest(t, V23Test<x>)
+    }
 
-1. v.io/veyron/test/modules requires the use of an explicit
-   registration mechanism. 'v23 test generate' automatically
-   generates these registration functions for any test function matches
-   the modules.Main signature.
+In addition a TestMain function is generated, if it doesn't already exist.  Note
+that Go requires that at most one TestMain function is defined across both the
+internal and external test packages.
 
-   For:
-   // SubProc does the following...
-   // Usage: <a> <b>...
-   func SubProc(stdin io.Reader, stdout, stderr io.Writer, env map[string]string, args ...string) error
-
-   It will generate:
-
-   modules.RegisterChild("SubProc",`SubProc does the following...
-Usage: <a> <b>...`, SubProc)
-
-2. 'TestMain' is used as the entry point for all vanadium tests, integration
-   and otherwise. v23 will generate an appropriate version of this if one is
-   not already defined. TestMain is 'special' in that only one definiton can
-   occur across both the internal and external test packages. This is a
-   consequence of how the go testing system is implemented.
+The generated TestMain performs common initialization, and also performs child
+process dispatching for tests that use "v.io/veyron/test/modules".
 
 Usage:
    v23 test generate [flags] [packages]

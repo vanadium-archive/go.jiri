@@ -5,292 +5,143 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"testing"
 
-	"go/ast"
-	"go/build"
-	"go/parser"
-	"go/token"
-
-	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
-func fnNames(decls []ast.Decl) []string {
-	names := []string{}
-	for _, d := range decls {
-		if fn, ok := d.(*ast.FuncDecl); ok {
-			names = append(names, fn.Name.Name)
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-func parseFile(t *testing.T, file string) []string {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, file, nil, parser.ParseComments)
+// TestV23TestGenerate tests that "v23 test generate" works as expected.  For
+// each "golden" source directory under ./testdata/generate/* we copy the
+// contents into a tmpdir, then run "v23 test generate" against that tmpdir, and
+// finally compare the generated files against the golden source directory.
+func TestV23TestGenerate(t *testing.T) {
+	// Create a tmpdir where all generated files will go.
+	tmpdir, err := ioutil.TempDir("", "v23_test_gen_")
 	if err != nil {
-		return nil
+		t.Fatalf("TempDir failed: %v", err)
 	}
-	return fnNames(f.Decls)
-}
-
-func TestMain(m *testing.M) {
-	ctx := tool.NewDefaultContext()
-	env, err := util.VanadiumEnvironment(ctx)
-	if err != nil {
-		panic(err)
+	defer os.RemoveAll(tmpdir)
+	// Set GOPATH so that the tmpdir appears first.
+	oldGoPath := os.Getenv("GOPATH")
+	newGoPath := strings.Join([]string{tmpdir, oldGoPath}, ":")
+	if err := os.Setenv("GOPATH", newGoPath); err != nil {
+		t.Fatalf(`Setenv("GOPATH", %q) failed: %v`, newGoPath, err)
 	}
-	build.Default.GOPATH = env.Get("GOPATH")
-	os.Exit(m.Run())
-}
-
-func importPackage(t *testing.T, path string) *build.Package {
-	bpkg, err := build.Import(path, ".", build.ImportMode(build.ImportComment))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return bpkg
-}
-
-func cmpImports(got, want []string) bool {
-	if len(got) != len(want) {
-		return false
-	}
-	sort.Strings(got)
-	sort.Strings(want)
-	for i, g := range got {
-		if g != want[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func TestV23Generate(t *testing.T) {
-	sysImports := []string{"fmt", "io", "os", "testing"}
-	modulesImports := []string{"v.io/x/ref/test/modules"}
-	vioImports := []string{"v.io/x/ref/runtime/factories/generic", "v.io/x/ref/test"}
-	v23Imports := []string{"v.io/x/ref/test", "v.io/x/ref/test/v23tests", "v.io/x/ref/runtime/factories/generic"}
-
-	common := append(sysImports, modulesImports...)
-	usesModules := append([]string{}, common...)
-	usesModules = append(usesModules, vioImports...)
-	usesModulesAndV23Tests := append([]string{}, common...)
-	usesModulesAndV23Tests = append(usesModulesAndV23Tests, v23Imports...)
-	usesModulesAndV23TestsNoProfile := append([]string{}, common...)
-	usesModulesAndV23TestsNoProfile = append(usesModulesAndV23TestsNoProfile, "v.io/x/ref/test/v23tests")
-	testdata := "v.io/x/devtools/v23/testdata/"
-	middle := testdata + "transitive/middle"
-
-	cases := []struct {
-		dir, output                      string
-		internal, external               []string
-		testOutput                       []string
-		internalImports, externalImports []string
-	}{
-		// an empty package.
-		{"empty", "",
-			[]string{"TestMain"},
-			nil,
-			nil,
-			[]string{"os", "testing", "v.io/x/ref/test"},
-			nil,
-		},
-		// has a TestMain and a single module, hence the init function.
-		{"has_main", "",
-			nil,
-			[]string{"init"},
-			[]string{"TestHasMain"},
-			nil,
-			usesModules,
-		},
-		// has internal tests only
-		{"internal_only", "",
-			[]string{"TestMain", "init"},
-			nil,
-			[]string{"TestModulesInternalOnly"},
-			usesModules,
-			nil,
-		},
-		// has external modules only
-		{"external_only", "",
-			nil,
-			[]string{"TestMain", "init"},
-			[]string{"TestExternalOnly"},
-			nil,
-			usesModules,
-		},
-		// has V23 tests and internal+external modules
-		{"one", "",
-			[]string{"TestMain", "init"},
-			[]string{"TestV23OneA", "TestV23OneB", "init"},
-			[]string{
-				"TestModulesOneAndTwo",
-				"TestModulesOneExt",
-				"TestV23OneA",
-				"TestV23OneB",
-				"TestV23TestMain"},
-			usesModulesAndV23Tests,
-			usesModulesAndV23TestsNoProfile,
-		},
-		// test the -output flag.
-		{"filename", "other",
-			[]string{"TestMain", "init"},
-			[]string{"TestV23Filename"},
-			[]string{"TestInternalFilename", "TestV23Filename"},
-			append(append([]string{}, common...), "v.io/x/ref/test", "v.io/x/ref/test/v23tests"),
-			[]string{"testing", "v.io/x/ref/test/v23tests", "v.io/x/ref/runtime/factories/generic"},
-		},
-		{"modules_and_v23", "",
-			[]string{"TestMain", "init"},
-			[]string{"TestV23ModulesAndV23A", "TestV23ModulesAndV23B", "init"},
-			[]string{"TestModulesAndV23Ext",
-				"TestModulesAndV23Int",
-				"TestV23ModulesAndV23A",
-				"TestV23ModulesAndV23B"},
-			usesModulesAndV23Tests,
-			usesModulesAndV23TestsNoProfile,
-		},
-		{"modules_only", "",
-			[]string{"TestMain", "init"},
-			[]string{"init"},
-			[]string{"TestModulesOnlyExt", "TestModulesOnlyInt"},
-			usesModules,
-			append(append([]string{}, common...), "v.io/x/ref/runtime/factories/generic"),
-		},
-		{"v23_only", "",
-			nil,
-			[]string{"TestMain", "TestV23V23OnlyA", "TestV23V23OnlyB"},
-			[]string{"TestV23V23OnlyA", "TestV23V23OnlyB"},
-			nil,
-			append(append([]string{}, "os", "testing"), v23Imports...),
-		},
-		{"transitive", "",
-			[]string{"TestMain"},
-			nil,
-			[]string{"TestModulesInternalOnly"},
-			append(append(append([]string{}, "fmt", "os", "testing", middle), modulesImports...), vioImports...),
-			nil,
-		},
-		{"transitive_no_use", "",
-			[]string{"TestMain"},
-			nil,
-			[]string{"TestWithoutModules"},
-			append(append([]string{}, "os", "testing", middle), vioImports...),
-			nil,
-		},
-		{"transitive_external", "",
-			nil,
-			[]string{"TestMain", "TestV23OneA"},
-			[]string{"TestModulesExternal", "TestV23OneA"},
-			[]string{
-				"os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/runtime/factories/generic"},
-			append([]string{"fmt", "os", "testing", testdata + "transitive_external", "v.io/x/ref/test/modules"}, v23Imports...),
-		},
-		{"internal_transitive_external", "",
-			[]string{"TestMain"},
-			nil,
-			[]string{"TestInternal", "TestModulesExternal"},
-			[]string{
-				"fmt", "os", "testing", middle, "v.io/x/ref/test/modules", "v.io/x/ref/test", "v.io/x/ref/runtime/factories/generic"},
-			[]string{"testing", testdata + "internal_transitive_external", "v.io/x/ref/runtime/factories/generic"},
-		},
-	}
-
+	defer os.Setenv("GOPATH", oldGoPath)
+	// Read each test directory under ./testdata/generate.
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
+	gendir := filepath.Join(tmpdir, "src", "v.io", "x", "devtools", "v23", "testdata", "generate")
+	srcdir := filepath.Join(cwd, "testdata", "generate")
+	infos, err := ioutil.ReadDir(srcdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Test generation of each test directory.
+	var testDirs []string
+	for _, info := range infos {
+		if !info.IsDir() {
+			continue
+		}
+		testGenerate(t, gendir, srcdir, info.Name())
+		testDirs = append(testDirs, info.Name())
+	}
+	// Make sure that we really ran the tests against all our test directories.
+	if got, want := testDirs, []string{"empty", "external_only", "has_main", "internal_only", "internal_transitive_external", "modules_and_v23", "modules_only", "one", "prefix_other", "transitive", "v23_only"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Ran tests against %v, want %v", got, want)
+	}
+}
+
+func testGenerate(t *testing.T, gendir, srcdir, name string) {
+	// Copy source files for "name" from srcdir to gendir.
+	const pre = "prefix_"
+	prefix := "v23"
+	if strings.HasPrefix(name, pre) {
+		prefix = name[len(pre):]
+	}
+	if err := copyAll(filepath.Join(gendir, name), filepath.Join(srcdir, name), prefix); err != nil {
+		t.Fatal(err)
+	}
+	// Generate test files into gendir.
 	env := cmdline.NewEnv()
-	for _, c := range cases {
-		dir := filepath.Join("testdata", c.dir)
-		if err := os.Chdir(dir); err != nil {
-			t.Fatal(err)
+	if err := cmdline.ParseAndRun(cmdTestGenerate, env, []string{"-prefix=" + prefix, "v.io/x/devtools/v23/testdata/generate/" + name}); err != nil {
+		t.Fatal(err)
+	}
+	// Validate generated files.
+	extFile := filepath.Join(name, prefix+externalSuffix)
+	intFile := filepath.Join(name, prefix+internalSuffix)
+	for _, f := range []string{extFile, intFile} {
+		srcData, srcErr := ioutil.ReadFile(filepath.Join(srcdir, f))
+		if srcErr != nil && !os.IsNotExist(srcErr) {
+			t.Errorf("%s: Read src file failed: %v", f, srcErr)
 		}
-		t.Logf("test: %v", dir)
-		output := c.output
-		if len(output) == 0 {
-			output = "v23"
+		genData, genErr := ioutil.ReadFile(filepath.Join(gendir, f))
+		if genErr != nil && !os.IsNotExist(genErr) {
+			t.Errorf("%s: Read gen file failed: %v", f, genErr)
 		}
-		if err := cmdline.ParseAndRun(cmdTestGenerate, env, []string{"--prefix=" + output}); err != nil {
-			t.Fatal(err)
+		if got, want := srcErr == nil, genErr == nil; got != want {
+			t.Errorf("%s: Got src exist %v, want %v", f, got, want)
 		}
-		// parseFile returns nil if the file doesn't exist, which must
-		// be matched by nil in the internal/external fields in the cases.
-		if got, want := parseFile(t, output+"_internal_test.go"), c.internal; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%s: got: %v, want: %#v", dir, got, want)
+		if got, want := srcData, genData; !bytes.Equal(got, want) {
+			t.Errorf("%s: Got data %s, want %s", f, got, want)
 		}
-		if got, want := parseFile(t, output+"_test.go"), c.external; !reflect.DeepEqual(got, want) {
-			t.Fatalf("%s: got: %v, want: %#v", dir, got, want)
-		}
+	}
+}
 
-		var stdout, stderr bytes.Buffer
-		env := &cmdline.Env{Stdout: &stdout, Stderr: &stderr}
-		if err := runGo(env, []string{"test", "-v", "--v23.tests"}); err != nil {
-			t.Log(stderr.String())
-			t.Fatalf("%s: %v", dir, err)
+// copyAll copies all files and directories from srcdir into dstdir, skipping
+// generated files with the given prefix.
+func copyAll(dstdir, srcdir, prefix string) error {
+	if err := os.MkdirAll(dstdir, os.ModePerm); err != nil {
+		return err
+	}
+	infos, err := ioutil.ReadDir(srcdir)
+	if err != nil {
+		return err
+	}
+	for _, info := range infos {
+		name := info.Name()
+		if name == prefix+externalSuffix || name == prefix+internalSuffix {
+			// Skip generated files, based on the prefix.
+			continue
 		}
+		dst, src := filepath.Join(dstdir, name), filepath.Join(srcdir, name)
+		if info.IsDir() {
+			// Copy directories recursively.
+			return copyAll(dst, src, prefix)
+		}
+		// Copy files from src to dst.
+		srcFile, err := os.Open(src)
+		if err != nil {
+			return err
+		}
+		dstFile, err := os.Create(dst)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		scanner := bufio.NewScanner(&stdout)
-		lines := []string{}
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
-		}
-		sort.Strings(lines)
-		// Lines looks like:
-		// --- PASS: Test1
-		// --- PASS: Test2
-		// === RUN Test1
-		// === RUN Test2
-		// PASS
-		// ok v.io.... <time>
-
-		if got, want := len(lines), (len(c.testOutput)*2)+2; got != want {
-			t.Fatalf("%s: got %v, want %v", dir, got, want)
-		}
-
-		l := 0
-		for _, prefix := range []string{"--- PASS: ", "=== RUN "} {
-			for _, fn := range c.testOutput {
-				got, want := lines[l], prefix+fn
-				if !strings.HasPrefix(got, want) {
-					t.Fatalf("%s: expected %q to start with %q", dir, got, want)
-				}
-				l++
-			}
-		}
-		if got, want := lines[l], "PASS"; got != want {
-			t.Fatalf("%s: got %v, want %v", dir, got, want)
-		}
-		l++
-		got := lines[l]
-		if !strings.HasPrefix(got, "ok") {
-			t.Fatalf("%s: line %q doesn't start with \"ok\"", dir, got)
-		}
-
-		if !strings.Contains(got, dir) {
-			t.Fatalf("%s: line %q doesn't contain %q", dir, dir)
-		}
-
-		bpkg := importPackage(t, "v.io/x/devtools/v23/testdata/"+c.dir)
-		if got, want := bpkg.TestImports, c.internalImports; !cmpImports(got, want) {
-			t.Fatalf("got %v, want %v,", got, want)
-		}
-		if got, want := bpkg.XTestImports, c.externalImports; !cmpImports(got, want) {
-			t.Fatalf("got %v, want %v,", got, want)
-		}
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatal(err)
-		}
+// TestV23TestGenerateTestdata runs "go test" against all packages under
+// testdata/generate.  These are normally skipped since they're under a testdata
+// directory.
+func TestV23TestGenerateTestdata(t *testing.T) {
+	var out bytes.Buffer
+	env := &cmdline.Env{Stdout: &out, Stderr: &out}
+	if err := runGo(env, []string{"test", "./testdata/generate/...", "-v", "-v23.tests"}); err != nil {
+		t.Log(out.String())
+		t.Errorf("tests under testdata/generate failed: %v", err)
 	}
 }
