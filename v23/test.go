@@ -16,19 +16,21 @@ import (
 )
 
 var (
-	blessingsRootFlag string
-	credDirFlag       string
-	namespaceRootFlag string
-	numWorkersFlag    int
-	outputDirFlag     string
-	partFlag          int
-	pkgsFlag          string
+	adminCredDirFlag     string
+	blessingsRootFlag    string
+	namespaceRootFlag    string
+	numWorkersFlag       int
+	outputDirFlag        string
+	partFlag             int
+	pkgsFlag             string
+	publisherCredDirFlag string
 )
 
 func init() {
 	cmdTestRun.Flags.StringVar(&blessingsRootFlag, "blessings-root", "dev.v.io", "The blessings root.")
-	cmdTestRun.Flags.StringVar(&credDirFlag, "v23.credentials", "", "Directory for vanadium credentials.")
+	cmdTestRun.Flags.StringVar(&adminCredDirFlag, "v23.credentials.admin", "", "Directory for vanadium credentials.")
 	cmdTestRun.Flags.StringVar(&namespaceRootFlag, "v23.namespace.root", "/ns.dev.v.io:8101", "The namespace root.")
+	cmdTestRun.Flags.StringVar(&publisherCredDirFlag, "v23.credentials.publisher", "", "Directory for vanadium credentials for publishing new binaries.")
 	cmdTestRun.Flags.IntVar(&numWorkersFlag, "num-test-workers", runtime.NumCPU(), "Set the number of test workers to use; use 1 to serialize all tests.")
 	cmdTestRun.Flags.Lookup("num-test-workers").DefValue = "<runtime.NumCPU()>"
 	cmdTestRun.Flags.StringVar(&outputDirFlag, "output-dir", "", "Directory to output test results into.")
@@ -128,10 +130,11 @@ func optsFromFlags() (opts []v23test.Opt) {
 	opts = append(opts, v23test.PkgsOpt(pkgs))
 	opts = append(opts,
 		v23test.BlessingsRootOpt(blessingsRootFlag),
-		v23test.CredDirOpt(credDirFlag),
+		v23test.AdminCredDirOpt(adminCredDirFlag),
 		v23test.NamespaceRootOpt(namespaceRootFlag),
 		v23test.NumWorkersOpt(numWorkersFlag),
 		v23test.OutputDirOpt(outputDirFlag),
+		v23test.PublisherCredDirOpt(publisherCredDirFlag),
 	)
 	return
 }

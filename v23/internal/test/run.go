@@ -140,11 +140,11 @@ type BlessingsRootOpt string
 
 func (BlessingsRootOpt) Opt() {}
 
-// CredDirOpt is an option that specifies the security credentials directory
-// used in VanadiumReleaseTest.
-type CredDirOpt string
+// AdminCredDirOpt is an option that specifies the security credentials
+// directory for admin tasks used in VanadiumReleaseTest.
+type AdminCredDirOpt string
 
-func (CredDirOpt) Opt() {}
+func (AdminCredDirOpt) Opt() {}
 
 // NamespaceRootOpt is an option that specifies the namespace root of the
 // services to check in VanadiumProdServicesTest.
@@ -173,6 +173,12 @@ func (PartOpt) Opt() {}
 type PkgsOpt []string
 
 func (PkgsOpt) Opt() {}
+
+// PublisherCredDirOpt is an option that specifies the security credentials
+// directory for publishing binaries used in VanadiumReleaseTest.
+type PublisherCredDirOpt string
+
+func (PublisherCredDirOpt) Opt() {}
 
 // ListTests returns a list of all tests known by the test package.
 func ListTests() ([]string, error) {

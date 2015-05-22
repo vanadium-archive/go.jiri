@@ -60,13 +60,18 @@ func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...Opt) (_ *te
 		msg string
 		fn  func() error
 	}
-	credDir := getCredDirOptValue(opts)
+	adminCredDir, publisherCredDir := getCredDirOptValues(opts)
 	steps := []step{
 		step{
-			msg: fmt.Sprintf("Fetching credentials from %v\n", credDir),
+			msg: fmt.Sprintf("Fetching credentials from %v (admin) and %v (publisher)\n", adminCredDir, publisherCredDir),
 			fn: func() error {
-				_, err := os.Stat(credDir)
-				return err
+				if _, err := os.Stat(adminCredDir); err != nil {
+					return err
+				}
+				if _, err := os.Stat(publisherCredDir); err != nil {
+					return err
+				}
+				return nil
 			},
 		},
 		step{
@@ -75,7 +80,7 @@ func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...Opt) (_ *te
 		},
 		step{
 			msg: "Update services\n",
-			fn:  func() error { return updateServices(ctx, root, credDir) },
+			fn:  func() error { return updateServices(ctx, root, adminCredDir, publisherCredDir) },
 		},
 		step{
 			msg: "Check services\n",
@@ -112,17 +117,19 @@ func invoker(ctx *tool.Context, msg string, fn func() error) (*test.Result, erro
 	return nil, nil
 }
 
-// getCredDirOptValue returns the value of credentials dir from the
-// given Opt slice.
-func getCredDirOptValue(opts []Opt) string {
-	credDir := ""
+// getCredDirOptValues returns the values of credentials dirs (admin, publisher)
+// from the given Opt slice.
+func getCredDirOptValues(opts []Opt) (string, string) {
+	adminCredDir, publisherCredDir := "", ""
 	for _, opt := range opts {
 		switch v := opt.(type) {
-		case CredDirOpt:
-			credDir = string(v)
+		case AdminCredDirOpt:
+			adminCredDir = string(v)
+		case PublisherCredDirOpt:
+			publisherCredDir = string(v)
 		}
 	}
-	return credDir
+	return adminCredDir, publisherCredDir
 }
 
 // buildBinaries builds all vanadium binaries.
@@ -136,16 +143,17 @@ func buildBinaries(ctx *tool.Context, root string) error {
 
 // updateServices pushes services' binaries to the applications and binaries
 // services and tells the device manager to update all its app.
-func updateServices(ctx *tool.Context, root, credDir string) (e error) {
+func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir string) (e error) {
 	deviceBin := filepath.Join(root, "release", "go", "bin", "device")
-	credentialsArg := fmt.Sprintf("--v23.credentials=%s", credDir)
+	adminCredentialsArg := fmt.Sprintf("--v23.credentials=%s", adminCredDir)
+	publisherCredentialsArg := fmt.Sprintf("--v23.credentials=%s", publisherCredDir)
 	nsArg := fmt.Sprintf("--v23.namespace.root=%s", globalMountTable)
 
 	// Push all binaries.
 	{
 		fmt.Fprintln(ctx.Stdout(), "Pushing binaries...")
 		args := []string{
-			credentialsArg,
+			publisherCredentialsArg,
 			nsArg,
 			"publish",
 			"--goos=linux",
@@ -160,7 +168,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 	// A helper function to update a single app.
 	updateAppFn := func(appName string) error {
 		args := []string{
-			credentialsArg,
+			publisherCredentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", localMountTable),
 			"updateall",
 			appName,
@@ -191,11 +199,11 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 	// Update Device Manager.
 	{
 		fmt.Fprintln(ctx.Stdout(), "Updating device manager...")
-		if err := updateDeviceManagerEnvelope(ctx, root, credentialsArg, nsArg); err != nil {
+		if err := updateDeviceManagerEnvelope(ctx, root, publisherCredentialsArg, nsArg); err != nil {
 			return err
 		}
 		args := []string{
-			credentialsArg,
+			publisherCredentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", globalMountTable),
 			"update",
 			objNameForDeviceManager,
@@ -203,7 +211,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
 			return err
 		}
-		if err := waitForMounttable(ctx, root, credentialsArg, localMountTable); err != nil {
+		if err := waitForMounttable(ctx, root, adminCredentialsArg, localMountTable); err != nil {
 			return err
 		}
 	}
@@ -214,7 +222,7 @@ func updateServices(ctx *tool.Context, root, credDir string) (e error) {
 		if err := updateAppFn("devmgr/apps/mounttabled"); err != nil {
 			return err
 		}
-		if err := waitForMounttable(ctx, root, credentialsArg, globalMountTable); err != nil {
+		if err := waitForMounttable(ctx, root, adminCredentialsArg, globalMountTable); err != nil {
 			return err
 		}
 	}

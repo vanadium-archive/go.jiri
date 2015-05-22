@@ -545,8 +545,10 @@ The v23 test run flags are:
  -pkgs=
    Comma-separated list of Go package expressions that identify a subset of
    tests to run; only relevant for Go-based tests
- -v23.credentials=
+ -v23.credentials.admin=
    Directory for vanadium credentials.
+ -v23.credentials.publisher=
+   Directory for vanadium credentials for publishing new binaries.
  -v23.namespace.root=/ns.dev.v.io:8101
    The namespace root.
 
