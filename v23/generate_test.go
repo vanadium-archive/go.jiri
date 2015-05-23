@@ -72,7 +72,7 @@ func testGenerate(t *testing.T, gendir, srcdir, name string) {
 		t.Fatal(err)
 	}
 	// Generate test files into gendir.
-	env := cmdline.NewEnv()
+	env := cmdline.EnvFromOS()
 	if err := cmdline.ParseAndRun(cmdTestGenerate, env, []string{"-prefix=" + prefix, "v.io/x/devtools/v23/testdata/generate/" + name}); err != nil {
 		t.Fatal(err)
 	}
