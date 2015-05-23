@@ -170,8 +170,8 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		args := []string{
 			publisherCredentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", localMountTable),
-			"updateall",
-			appName,
+			"update",
+			appName + "/...",
 		}
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
 			return err
