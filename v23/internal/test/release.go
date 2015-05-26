@@ -168,9 +168,10 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 	// A helper function to update a single app.
 	updateAppFn := func(appName string) error {
 		args := []string{
-			publisherCredentialsArg,
+			adminCredentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", localMountTable),
 			"update",
+			"-parallelism=BYKIND",
 			appName + "/...",
 		}
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
@@ -203,7 +204,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			return err
 		}
 		args := []string{
-			publisherCredentialsArg,
+			adminCredentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", globalMountTable),
 			"update",
 			objNameForDeviceManager,
