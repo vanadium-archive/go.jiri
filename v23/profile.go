@@ -559,6 +559,7 @@ func setupAndroidLinux(ctx *tool.Context) (e error) {
 	installGoFn := func() error {
 		makeEnv := envvar.VarsFromOS()
 		unsetGoEnv(makeEnv)
+		makeEnv.Set("CGO_ENABLED", "1")
 		makeEnv.Set("CC_FOR_TARGET", filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-gcc"))
 		makeEnv.Set("GOOS", "android")
 		makeEnv.Set("GOARCH", "arm")
@@ -849,7 +850,7 @@ func installGo15(ctx *tool.Context, goDir string, env *envvar.Vars) error {
 	if tmpDir, err = ctx.Run().TempDir("", ""); err != nil {
 		return err
 	}
-	remote, revision := "https://github.com/golang/go.git", "6ad33be2d9d6b24aa741b3007a4bcd52db222c41"
+	remote, revision := "https://github.com/golang/go.git", "22e4b8167f14bdd33738cfdc21c3396b2341f8fd"
 	if err := gitCloneRepo(ctx, remote, revision, tmpDir); err != nil {
 		return err
 	}
