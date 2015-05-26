@@ -135,6 +135,10 @@ func setup(ctx *tool.Context, os, profile string) error {
 	switch os {
 	case "darwin":
 		switch profile {
+		case "android":
+			return setupAndroidDarwin(ctx)
+		case "java":
+			return setupJavaDarwin(ctx)
 		case "syncbase":
 			return setupSyncbaseDarwin(ctx)
 		case "third-party":
@@ -468,8 +472,9 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 	return nil
 }
 
-// setupAndroidLinux sets up the android profile for linux.
-func setupAndroidLinux(ctx *tool.Context) (e error) {
+// setupAndroidCommon prepares the shared cross-platform parts of the android
+// setup.
+func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -535,8 +540,9 @@ func setupAndroidLinux(ctx *tool.Context) (e error) {
 			fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		remote := "http://dl.google.com/android/ndk/android-ndk-r9d-linux-x86_64.tar.bz2"
-		local := filepath.Join(tmpDir, "android-ndk-r9d-linux-x86_64.tar.bz2")
+		filename := "android-ndk-r9d-" + os + "-x86_64.tar.bz2"
+		remote := "http://dl.google.com/android/ndk/" + filename
+		local := filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
 		}
@@ -569,8 +575,18 @@ func setupAndroidLinux(ctx *tool.Context) (e error) {
 	return atomicAction(ctx, installGoFn, androidGo, "Download and build Android Go")
 }
 
-// setupJavaLinux sets up the java profile for linux.
-func setupJavaLinux(ctx *tool.Context) error {
+// setupAndroidDarwin sets up the android profile for darwin.
+func setupAndroidDarwin(ctx *tool.Context) error {
+	return setupAndroidCommon(ctx, "darwin")
+}
+
+// setupAndroidLinux sets up the android profile for linux.
+func setupAndroidLinux(ctx *tool.Context) error {
+	return setupAndroidCommon(ctx, "linux")
+}
+
+// setupJavaCommon contains cross-platform actions to setup the java profile.
+func setupJavaCommon(ctx *tool.Context) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -581,6 +597,16 @@ func setupJavaLinux(ctx *tool.Context) error {
 		return installGo15(ctx, javaGo, envvar.VarsFromOS())
 	}
 	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
+}
+
+// setupJavaDarwin sets up the java profile for mac.
+func setupJavaDarwin(ctx *tool.Context) error {
+	return setupJavaCommon(ctx)
+}
+
+// setupJavaLinux sets up the java profile for linux.
+func setupJavaLinux(ctx *tool.Context) error {
+	return setupJavaCommon(ctx)
 }
 
 // setupThirdPartyDarwin sets up the third-party profile for darwin.
