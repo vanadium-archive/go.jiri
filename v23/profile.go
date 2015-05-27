@@ -499,7 +499,7 @@ func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 			fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		remote := "http://dl.google.com/android/android-sdk_r23-linux.tgz"
+		remote := "https://dl.google.com/android/android-sdk_r23-linux.tgz"
 		local := filepath.Join(tmpDir, "android-sdk.tgz")
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
@@ -541,7 +541,7 @@ func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 		filename := "android-ndk-r9d-" + os + "-x86_64.tar.bz2"
-		remote := "http://dl.google.com/android/ndk/" + filename
+		remote := "https://dl.google.com/android/ndk/" + filename
 		local := filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
