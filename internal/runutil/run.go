@@ -9,19 +9,8 @@ package runutil
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"os/signal"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
-
-	"v.io/x/lib/envvar"
-)
-
-const (
-	prefix = ">>"
 )
 
 var (
@@ -29,41 +18,13 @@ var (
 )
 
 type Run struct {
-	indent int
-	opts   Opts
+	*executor
 }
 
-type Opts struct {
-	Color   bool
-	Dir     string
-	DryRun  bool
-	Env     map[string]string
-	Stdin   io.Reader
-	Stdout  io.Writer
-	Stderr  io.Writer
-	Verbose bool
-}
-
-// New is the Run factory.
-func New(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) *Run {
-	if color {
-		term := os.Getenv("TERM")
-		switch term {
-		case "dumb", "":
-			color = false
-		}
-	}
+// NewRun is the Run factory.
+func NewRun(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) *Run {
 	return &Run{
-		indent: 0,
-		opts: Opts{
-			Color:   color,
-			DryRun:  dryRun,
-			Env:     env,
-			Stdin:   stdin,
-			Stdout:  stdout,
-			Stderr:  stderr,
-			Verbose: verbose,
-		},
+		newExecutor(env, stdin, stdout, stderr, color, dryRun, verbose),
 	}
 }
 
@@ -92,138 +53,8 @@ func (r *Run) TimedCommandWithOpts(timeout time.Duration, opts Opts, path string
 }
 
 func (r *Run) command(timeout time.Duration, opts Opts, path string, args ...string) error {
-	r.increaseIndent()
-	defer r.decreaseIndent()
-	// Check if <path> identifies a binary in the PATH environment
-	// variable of the opts.Env.
-	binary, err := LookPath(path, opts.Env)
-	if err == nil {
-		// If so, make sure to execute this binary. This step
-		// enables us to "shadow" binaries included in the
-		// PATH environment variable of the host OS (which
-		// would be otherwise used to lookup <path>).
-		//
-		// This mechanism is used instead of modifying the
-		// PATH environment variable of the host OS as the
-		// latter is not thread-safe.
-		path = binary
-	}
-	command := exec.Command(path, args...)
-	command.Dir = opts.Dir
-	command.Stdin = opts.Stdin
-	command.Stdout = opts.Stdout
-	command.Stderr = opts.Stderr
-	if len(opts.Env) != 0 {
-		vars := envvar.VarsFromOS()
-		for key, value := range opts.Env {
-			vars.Set(key, value)
-		}
-		command.Env = vars.ToSlice()
-	}
-	if opts.Verbose || opts.DryRun {
-		args := []string{}
-		for _, arg := range command.Args {
-			// Quote any arguments that contain '"', ''', '|', or ' '.
-			if strings.IndexAny(arg, "\"' |") != -1 {
-				args = append(args, strconv.Quote(arg))
-			} else {
-				args = append(args, arg)
-			}
-		}
-		r.printf(r.opts.Stdout, strings.Join(args, " "))
-	}
-	if opts.DryRun {
-		r.printf(r.opts.Stdout, "OK")
-		return nil
-	}
-	if timeout == 0 {
-		// No timeout.
-		var err error
-		if err = command.Run(); err != nil {
-			if opts.Verbose {
-				r.printf(r.opts.Stdout, "FAILED")
-			}
-		} else {
-			if opts.Verbose {
-				r.printf(r.opts.Stdout, "OK")
-			}
-		}
-		return err
-	}
-	return r.timedCommand(timeout, opts, command)
-}
-
-// timedCommand executes the given command, terminating it forcefully
-// if it is still running after the given timeout elapses.
-func (r *Run) timedCommand(timeout time.Duration, opts Opts, command *exec.Cmd) error {
-	// Make the process of this command a new process group leader
-	// to facilitate clean up of processes that time out.
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// Kill this process group explicitly when receiving SIGTERM
-	// or SIGINT signals.
-	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		<-sigchan
-		r.terminateProcessGroup(command)
-	}()
-	if err := command.Start(); err != nil {
-		if opts.Verbose {
-			r.printf(r.opts.Stdout, "FAILED")
-		}
-		return err
-	}
-	done := make(chan error, 1)
-	go func() {
-		done <- command.Wait()
-	}()
-	select {
-	case <-time.After(timeout):
-		// The command has timed out.
-		r.terminateProcessGroup(command)
-		// Allow goroutine to exit.
-		<-done
-		if opts.Verbose {
-			r.printf(r.opts.Stdout, "TIMED OUT")
-		}
-		return CommandTimedOutErr
-	case err := <-done:
-		if err != nil {
-			if opts.Verbose {
-				r.printf(r.opts.Stdout, "FAILED")
-			}
-		} else {
-			if opts.Verbose {
-				r.printf(r.opts.Stdout, "OK")
-			}
-		}
-		return err
-	}
-}
-
-// terminateProcessGroup sends SIGTERM followed by SIGKILL to the
-// process group (the negative value of the process's pid).
-func (r *Run) terminateProcessGroup(command *exec.Cmd) {
-	pid := -command.Process.Pid
-	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-		fmt.Fprintf(r.opts.Stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGTERM, err)
-	}
-	fmt.Fprintf(r.opts.Stderr, "Waiting for command to exit: %q\n", command.Path)
-	// Give the process some time to shut down cleanly.
-	for i := 0; i < 10; i++ {
-		select {
-		case <-time.After(time.Second):
-			if err := syscall.Kill(pid, 0); err != nil {
-				return
-			}
-		}
-	}
-	// If it still exists, send SIGKILL to it.
-	if err := syscall.Kill(pid, 0); err == nil {
-		if err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL); err != nil {
-			fmt.Fprintf(r.opts.Stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGKILL, err)
-		}
-	}
+	_, err := r.execute(true, timeout, opts, path, args...)
+	return err
 }
 
 // Function runs the given function and logs its outcome using the
@@ -268,29 +99,10 @@ func (r *Run) OutputWithOpts(opts Opts, output []string) {
 	}
 }
 
-// Opts returns the options of the run instance.
-func (r *Run) Opts() Opts {
-	return r.opts
-}
-
-func (r *Run) decreaseIndent() {
-	r.indent--
-}
-
-func (r *Run) increaseIndent() {
-	r.indent++
-}
-
 func (r *Run) logLine(line string) {
 	if !strings.HasPrefix(line, prefix) {
 		r.increaseIndent()
 		defer r.decreaseIndent()
 	}
 	r.printf(r.opts.Stdout, "%v", line)
-}
-
-func (r *Run) printf(stdout io.Writer, format string, args ...interface{}) {
-	timestamp := time.Now().Format("15:04:05.00")
-	args = append([]interface{}{timestamp, strings.Repeat(prefix, r.indent)}, args...)
-	fmt.Fprintf(stdout, "[%s] %v "+format+"\n", args...)
 }

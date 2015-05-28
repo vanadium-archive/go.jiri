@@ -19,8 +19,9 @@ import (
 // invocation. Its purpose is to enable sharing of state throughout
 // the lifetime of a command invocation.
 type Context struct {
-	opts ContextOpts
-	run  *runutil.Run
+	opts  ContextOpts
+	run   *runutil.Run
+	start *runutil.Start
 }
 
 // ContextOpts records the context options.
@@ -86,10 +87,12 @@ func initOpts(defaultOpts, opts *ContextOpts) {
 // NewContext is the Context factory.
 func NewContext(opts ContextOpts) *Context {
 	initOpts(newContextOpts(), &opts)
-	run := runutil.New(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
+	run := runutil.NewRun(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
+	start := runutil.NewStart(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
 	return &Context{
-		opts: opts,
-		run:  run,
+		opts:  opts,
+		run:   run,
+		start: start,
 	}
 }
 
@@ -116,17 +119,17 @@ func (ctx Context) Clone(opts ContextOpts) *Context {
 
 // Color returns the color setting of the context.
 func (ctx Context) Color() bool {
-	return ctx.run.Opts().Color
+	return *ctx.opts.Color
 }
 
 // DryRun returns the dry run setting of the context.
 func (ctx Context) DryRun() bool {
-	return ctx.run.Opts().DryRun
+	return *ctx.opts.DryRun
 }
 
 // Env returns the environment of the context.
 func (ctx Context) Env() map[string]string {
-	return ctx.run.Opts().Env
+	return ctx.opts.Env
 }
 
 // Gerrit returns the Gerrit instance of the context.
@@ -173,22 +176,27 @@ func (ctx Context) Run() *runutil.Run {
 	return ctx.run
 }
 
+// Start returns the start instance of the context.
+func (ctx Context) Start() *runutil.Start {
+	return ctx.start
+}
+
 // Stdin returns the standard input of the context.
 func (ctx Context) Stdin() io.Reader {
-	return ctx.run.Opts().Stdin
+	return ctx.opts.Stdin
 }
 
 // Stdout returns the standard output of the context.
 func (ctx Context) Stdout() io.Writer {
-	return ctx.run.Opts().Stdout
+	return ctx.opts.Stdout
 }
 
 // Stderr returns the standard error output of the context.
 func (ctx Context) Stderr() io.Writer {
-	return ctx.run.Opts().Stderr
+	return ctx.opts.Stderr
 }
 
 // Verbose returns the verbosity setting of the context.
 func (ctx Context) Verbose() bool {
-	return ctx.run.Opts().Verbose
+	return *ctx.opts.Verbose
 }
