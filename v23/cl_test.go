@@ -186,17 +186,12 @@ func Bar() string {
 // createTestGoDependencyConstraint creates a test Go dependency
 // constraint.
 func createTestGoDependencyConstraint(t *testing.T, ctx *tool.Context, rootDir, command string) {
-	depFile := filepath.Join(rootDir, "src", "v.io", "bar", "GO.PACKAGE")
-	depData := `{
-  "imports": [
-    {"` + command + `": "..."}
-  ]
-}
-`
+	depFile := filepath.Join(rootDir, "src", "v.io", "bar", ".godepcop")
+	depData := `<godepcop><import ` + command + `="..."/></godepcop>`
 	if err := ctx.Run().WriteFile(depFile, []byte(depData), os.FileMode(0644)); err != nil {
 		t.Fatalf("WriteFile(%v) failed: %v", depFile, err)
 	}
-	if err := ctx.Git().CommitFile(depFile, "commit GO.PACKAGE"); err != nil {
+	if err := ctx.Git().CommitFile(depFile, "commit .godepcop"); err != nil {
 		t.Fatalf("%v", err)
 	}
 }

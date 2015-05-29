@@ -1,0 +1,5 @@
+<godepcop>
+  <import allow="code.google.com/p/goauth2/..."/>
+  <import allow="golang.org/x/net/..."/>
+  <import allow="google.golang.org/api/..."/>
+</godepcop>

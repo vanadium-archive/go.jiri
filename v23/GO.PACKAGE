@@ -1,8 +1,0 @@
-{
-	"imports": [
-		{"allow": "v.io/x/lib/..."},
-		{"allow": "v.io/x/devtools/internal/..."},
-		{"allow": "v.io/x/devtools/v23/internal/..."},
-		{"deny": "..."}
-	]
-}

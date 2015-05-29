@@ -5,10 +5,6 @@
 // Package gitutil provides Go wrappers for various Git commands.
 package gitutil
 
-// TODO(sadovsky): This package should only be accessed via
-// Context. We should make it internal somehow (e.g. via GO.PACKAGE,
-// or Go 1.4's "internal").
-
 import (
 	"bytes"
 	"fmt"
