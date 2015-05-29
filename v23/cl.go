@@ -207,13 +207,16 @@ func (s changeConflictError) Error() string {
 	return result
 }
 
-type copyrightError string
+type copyrightError struct {
+	message string
+	project string
+}
 
 func (s copyrightError) Error() string {
 	result := "changelist does not adhere to the copyright conventions\n\n"
-	result += "To resolve this problem, run 'v23 copyright fix <project>' to\n"
+	result += "To resolve this problem, run 'v23 copyright fix " + s.project + "' to\n"
 	result += "fix the following violations:\n"
-	result += string(s)
+	result += s.message
 	return result
 }
 
@@ -555,7 +558,10 @@ func (r *review) checkCopyright() error {
 		return err
 	}
 	if out.Len() != 0 {
-		return copyrightError(out.String())
+		return copyrightError{
+			message: out.String(),
+			project: name,
+		}
 	}
 	return nil
 }
