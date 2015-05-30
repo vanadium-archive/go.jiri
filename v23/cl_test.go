@@ -187,7 +187,7 @@ func Bar() string {
 // constraint.
 func createTestGoDependencyConstraint(t *testing.T, ctx *tool.Context, rootDir, command string) {
 	depFile := filepath.Join(rootDir, "src", "v.io", "bar", ".godepcop")
-	depData := `<godepcop><import ` + command + `="..."/></godepcop>`
+	depData := `<godepcop><pkg ` + command + `="..."/></godepcop>`
 	if err := ctx.Run().WriteFile(depFile, []byte(depData), os.FileMode(0644)); err != nil {
 		t.Fatalf("WriteFile(%v) failed: %v", depFile, err)
 	}

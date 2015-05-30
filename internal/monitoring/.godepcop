@@ -1,5 +1,5 @@
 <godepcop>
-  <import allow="code.google.com/p/goauth2/..."/>
-  <import allow="golang.org/x/net/..."/>
-  <import allow="google.golang.org/api/..."/>
+  <pkg allow="code.google.com/p/goauth2/..."/>
+  <pkg allow="golang.org/x/net/..."/>
+  <pkg allow="google.golang.org/api/..."/>
 </godepcop>
