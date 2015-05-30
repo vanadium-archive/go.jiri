@@ -41,7 +41,7 @@ The global flags are:
  -v23.metadata=<just specify -v23.metadata to activate>
    Displays metadata for the program and exits.
 
-V23 api
+V23 api - Work with Vanadium's public API
 
 Use this command to ensure that no unintended changes are made to Vanadium's
 public API.
@@ -58,7 +58,7 @@ The v23 api flags are:
    The path to the gotools binary to use. If empty, gotools will be built if
    necessary.
 
-V23 api check
+V23 api check - Check if any changes have been made to the public API
 
 Check if any changes have been made to the public API.
 
@@ -83,7 +83,7 @@ Usage:
 <projects> is a list of Vanadium projects to update. If none are specified, all
 project APIs are updated.
 
-V23 buildcop
+V23 buildcop - Manage vanadium build cop schedule
 
 Manage vanadium build cop schedule. If no subcommand is given, it shows the LDAP
 of the current build cop.
@@ -95,14 +95,14 @@ Usage:
 The v23 buildcop commands are:
    list        List available build cop schedule
 
-V23 buildcop list
+V23 buildcop list - List available build cop schedule
 
 List available build cop schedule.
 
 Usage:
    v23 buildcop list
 
-V23 cl
+V23 cl - Manage vanadium changelists
 
 Manage vanadium changelists.
 
@@ -114,7 +114,7 @@ The v23 cl commands are:
    mail        Mail a changelist based on the current branch to Gerrit for
                review
 
-V23 cl cleanup
+V23 cl cleanup - Clean up branches that have been merged
 
 The cleanup command checks that the given branches have been merged into the
 master branch. If a branch differs from the master, it reports the difference
@@ -129,7 +129,7 @@ The v23 cl cleanup flags are:
  -f=false
    Ignore unmerged changes.
 
-V23 cl mail
+V23 cl mail - Mail a changelist based on the current branch to Gerrit for review
 
 Squashes all commits of a local branch into a single "changelist" and mails this
 changelist to Gerrit as a single commit. First time the command is invoked, it
@@ -167,7 +167,7 @@ The v23 cl mail flags are:
  -r=
    Comma-seperated list of emails or LDAPs to request review.
 
-V23 contributors
+V23 contributors - List vanadium project contributors
 
 Lists vanadium project contributors. Vanadium projects to consider can be
 specified as an argument. If no projects are specified, all vanadium projects
@@ -182,7 +182,7 @@ The v23 contributors flags are:
  -n=false
    Show number of contributions.
 
-V23 copyright
+V23 copyright - Manage vanadium copyright
 
 This command can be used to check if all source code files of Vanadium projects
 contain the appropriate copyright header and also if all projects contains the
@@ -200,7 +200,7 @@ The v23 copyright flags are:
  -manifest=
    Name of the project manifest.
 
-V23 copyright check
+V23 copyright check - Check copyright headers and licensing files
 
 Check copyright headers and licensing files.
 
@@ -209,7 +209,7 @@ Usage:
 
 <projects> is a list of projects to check.
 
-V23 copyright fix
+V23 copyright fix - Fix copyright headers and licensing files
 
 Fix copyright headers and licensing files.
 
@@ -218,7 +218,7 @@ Usage:
 
 <projects> is a list of projects to fix.
 
-V23 env
+V23 env - Print vanadium environment variables
 
 Print vanadium environment variables.
 
@@ -235,7 +235,7 @@ Usage:
 
 [name ...] is an optional list of variable names.
 
-V23 go
+V23 go - Execute the go tool using the vanadium environment
 
 Wrapper around the 'go' tool that can be used for compilation of vanadium Go
 sources. It takes care of vanadium-specific setup, such as setting up the Go
@@ -252,7 +252,7 @@ Usage:
 
 <arg ...> is a list of arguments for the go tool.
 
-V23 goext
+V23 goext - Vanadium extensions of the go tool
 
 Vanadium extension of the go tool.
 
@@ -262,7 +262,7 @@ Usage:
 The v23 goext commands are:
    distclean   Restore the vanadium Go workspaces to their pristine state
 
-V23 goext distclean
+V23 goext distclean - Restore the vanadium Go workspaces to their pristine state
 
 Unlike the 'go clean' command, which only removes object files for packages in
 the source tree, the 'goext disclean' command removes all object files from
@@ -273,7 +273,7 @@ source tree.
 Usage:
    v23 goext distclean
 
-V23 profile
+V23 profile - Manage vanadium profiles
 
 To facilitate development across different platforms, vanadium defines
 platform-independent profiles that map different platforms to a set of libraries
@@ -286,14 +286,14 @@ The v23 profile commands are:
    list        List known vanadium profiles
    setup       Set up the given vanadium profiles
 
-V23 profile list
+V23 profile list - List known vanadium profiles
 
 List known vanadium profiles.
 
 Usage:
    v23 profile list
 
-V23 profile setup
+V23 profile setup - Set up the given vanadium profiles
 
 Set up the given vanadium profiles.
 
@@ -302,7 +302,7 @@ Usage:
 
 <profiles> is a list of profiles to set up.
 
-V23 project
+V23 project - Manage the vanadium projects
 
 Manage the vanadium projects.
 
@@ -315,7 +315,7 @@ The v23 project commands are:
    shell-prompt Print a succinct status of projects, suitable for shell prompts
    poll         Poll existing vanadium projects
 
-V23 project clean
+V23 project clean - Restore vanadium projects to their pristine state
 
 Restore vanadium projects back to their master branches and get rid of all the
 local branches and changes.
@@ -329,7 +329,7 @@ The v23 project clean flags are:
  -branches=false
    Delete all non-master branches.
 
-V23 project list
+V23 project list - List existing vanadium projects and branches
 
 Inspect the local filesystem and list the existing projects and branches.
 
@@ -361,7 +361,7 @@ The v23 project shell-prompt flags are:
  -show-name=false
    Show the name of the current repo.
 
-V23 project poll
+V23 project poll - Poll existing vanadium projects
 
 Poll vanadium projects that can affect the outcome of the given tests and report
 whether any new changes in these projects exist. If no tests are specified, all
@@ -376,7 +376,7 @@ The v23 project poll flags are:
  -manifest=
    Name of the project manifest.
 
-V23 run
+V23 run - Run an executable using the vanadium environment
 
 Run an executable using the vanadium environment.
 
@@ -386,7 +386,7 @@ Usage:
 <executable> [arg ...] is the executable to run and any arguments to pass
 verbatim to the executable.
 
-V23 snapshot
+V23 snapshot - Manage snapshots of the vanadium project
 
 The "v23 snapshot" command can be used to manage snapshots of the vanadium
 project. In particular, it can be used to create new snapshots and to list
@@ -407,7 +407,7 @@ The v23 snapshot flags are:
  -remote=false
    Manage remote snapshots.
 
-V23 snapshot create
+V23 snapshot create - Create a new snapshot of the vanadium project
 
 The "v23 snapshot create <label>" command first checks whether the vanadium
 project configuration associates the given label with any tests. If so, the
@@ -449,7 +449,7 @@ The v23 snapshot create flags are:
  -time-format=2006-01-02T15:04:05Z07:00
    Time format for snapshot file name.
 
-V23 snapshot list
+V23 snapshot list - List existing snapshots of vanadium projects
 
 The "snapshot list" command lists existing snapshots of the labels specified as
 command-line arguments. If no arguments are provided, the command lists
@@ -460,7 +460,7 @@ Usage:
 
 <label ...> is a list of snapshot labels.
 
-V23 test
+V23 test - Manage vanadium tests
 
 Manage vanadium tests.
 
@@ -473,7 +473,7 @@ The v23 test commands are:
    run         Run vanadium tests
    list        List vanadium tests
 
-V23 test generate
+V23 test generate - Generate supporting code for v23 integration tests
 
 The generate command supports the vanadium integration test framework and unit
 tests by generating go files that contain supporting code.  v23 test generate is
@@ -512,7 +512,7 @@ The v23 test generate flags are:
  -progress=false
    Print verbose progress information.
 
-V23 test project
+V23 test project - Run tests for a vanadium project
 
 Runs tests for a vanadium project that is by the remote URL specified as the
 command-line argument. Projects hosted on googlesource.com, can be specified
@@ -524,7 +524,7 @@ Usage:
 
 <project> identifies the project for which to run tests.
 
-V23 test run
+V23 test run - Run vanadium tests
 
 Run vanadium tests.
 
@@ -552,14 +552,14 @@ The v23 test run flags are:
  -v23.namespace.root=/ns.dev.v.io:8101
    The namespace root.
 
-V23 test list
+V23 test list - List vanadium tests
 
 List vanadium tests.
 
 Usage:
    v23 test list
 
-V23 update
+V23 update - Update all vanadium tools and projects
 
 Updates all vanadium projects, builds the latest version of vanadium tools, and
 installs the resulting binaries into $V23_ROOT/devtools/bin. The sequence in
@@ -616,14 +616,14 @@ The v23 update flags are:
  -manifest=
    Name of the project manifest.
 
-V23 version
+V23 version - Print version
 
 Print version of the v23 tool.
 
 Usage:
    v23 version
 
-V23 help
+V23 help - Display help for commands or topics
 
 Help with no args displays the usage of the parent command.
 
