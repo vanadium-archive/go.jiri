@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -144,6 +145,7 @@ func buildBinaries(ctx *tool.Context, root string) error {
 // updateServices pushes services' binaries to the applications and binaries
 // services and tells the device manager to update all its app.
 func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir string) (e error) {
+	debugBin := filepath.Join(root, "release", "go", "bin", "debug")
 	deviceBin := filepath.Join(root, "release", "go", "bin", "device")
 	adminCredentialsArg := fmt.Sprintf("--v23.credentials=%s", adminCredDir)
 	publisherCredentialsArg := fmt.Sprintf("--v23.credentials=%s", publisherCredDir)
@@ -180,6 +182,35 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		return nil
 	}
 
+	// A helper function to check a single app's build time.
+	checkBuildTimeFn := func(appName string) error {
+		now := time.Now()
+		adminCredentialsArg := fmt.Sprintf("--v23.credentials=%s", adminCredDir)
+		args := []string{
+			adminCredentialsArg,
+			fmt.Sprintf("--v23.namespace.root=%s", localMountTable),
+			"stats",
+			"read",
+			fmt.Sprintf("%s/*/*/stats/system/metadata/build.Time", appName),
+		}
+		var out bytes.Buffer
+		opts := ctx.Run().Opts()
+		opts.Stdout = io.MultiWriter(opts.Stdout, &out)
+		if err := ctx.Run().TimedCommandWithOpts(defaultReleaseTestTimeout, opts, debugBin, args...); err != nil {
+			return err
+		}
+		// TODO(jingjin): check the build manifest label after changing the
+		// pre-release process to first cut the snapshot and then get the binaries
+		// for staging from the snapshot where we should be able to exactly match
+		// the build label.
+		buildTimeRE := regexp.MustCompile(fmt.Sprintf(`.*build\.Time:\s%sT.*`, now.Format("2006-01-02")))
+		statsOutput := out.String()
+		if !buildTimeRE.MatchString(statsOutput) {
+			return fmt.Errorf("Update failed.\nBuild time: %s", statsOutput)
+		}
+		return nil
+	}
+
 	// Update services except for device manager and mounttable.
 	{
 		fmt.Fprintln(ctx.Stdout(), "Updating services other than device manager and mounttable...")
@@ -192,6 +223,9 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		}
 		for _, app := range apps {
 			if err := updateAppFn(app); err != nil {
+				return err
+			}
+			if err := checkBuildTimeFn(app); err != nil {
 				return err
 			}
 		}
@@ -215,15 +249,20 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		if err := waitForMounttable(ctx, root, adminCredentialsArg, localMountTable); err != nil {
 			return err
 		}
+		// TODO(jingjin): check build time for device manager.
 	}
 
 	// Update mounttable last.
 	{
 		fmt.Fprintln(ctx.Stdout(), "Updating mounttable...")
-		if err := updateAppFn("devmgr/apps/mounttabled"); err != nil {
+		mounttableName := "devmgr/apps/mounttabled"
+		if err := updateAppFn(mounttableName); err != nil {
 			return err
 		}
 		if err := waitForMounttable(ctx, root, adminCredentialsArg, globalMountTable); err != nil {
+			return err
+		}
+		if err := checkBuildTimeFn(mounttableName); err != nil {
 			return err
 		}
 	}
