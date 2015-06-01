@@ -39,11 +39,11 @@ func runOncall(env *cmdline.Env, _ []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	oncall, err := util.Oncall(ctx, time.Now())
+	shift, err := util.Oncall(ctx, time.Now())
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(ctx.Stdout(), "%s\n", oncall)
+	fmt.Fprintf(ctx.Stdout(), "%s,%s\n", shift.Primary, shift.Secondary)
 	return nil
 }
 

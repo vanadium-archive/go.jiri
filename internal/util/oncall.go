@@ -14,10 +14,14 @@ import (
 )
 
 type OncallRotation struct {
-	Shifts []struct {
-		Primary string `xml:"primary"`
-		Date    string `xml:"startDate"`
-	} `xml:"shift"`
+	Shifts  []OncallShift `xml:"shift"`
+	XMLName xml.Name      `xml:"rotation"`
+}
+
+type OncallShift struct {
+	Primary   string `xml:"primary"`
+	Secondary string `xml:"secondary"`
+	Date      string `xml:"startDate"`
 }
 
 // LoadOncallRotation parses the default oncall schedule file.
@@ -37,13 +41,13 @@ func LoadOncallRotation(ctx *tool.Context) (*OncallRotation, error) {
 	return &rotation, nil
 }
 
-// Oncall finds the oncall at the given time from the oncall
-// configuration file by comparing timestamps.
-func Oncall(ctx *tool.Context, targetTime time.Time) (string, error) {
+// Oncall finds the oncall shift at the given time from the
+// oncall configuration file by comparing timestamps.
+func Oncall(ctx *tool.Context, targetTime time.Time) (*OncallShift, error) {
 	// Parse oncall configuration file.
 	rotation, err := LoadOncallRotation(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Find the oncall at targetTime.
@@ -52,11 +56,11 @@ func Oncall(ctx *tool.Context, targetTime time.Time) (string, error) {
 		shift := rotation.Shifts[i]
 		t, err := time.Parse(layout, shift.Date)
 		if err != nil {
-			return "", fmt.Errorf("Parse(%q, %v) failed: %v", layout, shift.Date, err)
+			return nil, fmt.Errorf("Parse(%q, %v) failed: %v", layout, shift.Date, err)
 		}
 		if targetTime.Unix() >= t.Unix() {
-			return shift.Primary, nil
+			return &shift, nil
 		}
 	}
-	return "", nil
+	return nil, nil
 }

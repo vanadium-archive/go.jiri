@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func createOncallFile(t *testing.T, ctx *tool.Context) {
   </shift>
   <shift>
     <primary>suharshs</primary>
-    <secondary>tilaks</secondary>
+    <secondary>jingjin</secondary>
     <startDate>Nov 12, 2014 12:00:00 PM</startDate>
   </shift>
   <shift>
@@ -71,25 +72,37 @@ func TestOncall(t *testing.T) {
 	// Create a oncall.v1.xml file.
 	createOncallFile(t, ctx)
 	type testCase struct {
-		targetTime     time.Time
-		expectedOncall string
+		targetTime    time.Time
+		expectedShift *OncallShift
 	}
 	testCases := []testCase{
 		testCase{
-			targetTime:     time.Date(2013, time.November, 5, 12, 0, 0, 0, time.Local),
-			expectedOncall: "",
+			targetTime:    time.Date(2013, time.November, 5, 12, 0, 0, 0, time.Local),
+			expectedShift: nil,
 		},
 		testCase{
-			targetTime:     time.Date(2014, time.November, 5, 12, 0, 0, 0, time.Local),
-			expectedOncall: "spetrovic",
+			targetTime: time.Date(2014, time.November, 5, 12, 0, 0, 0, time.Local),
+			expectedShift: &OncallShift{
+				Primary:   "spetrovic",
+				Secondary: "suharshs",
+				Date:      "Nov 5, 2014 12:00:00 PM",
+			},
 		},
 		testCase{
-			targetTime:     time.Date(2014, time.November, 5, 14, 0, 0, 0, time.Local),
-			expectedOncall: "spetrovic",
+			targetTime: time.Date(2014, time.November, 5, 14, 0, 0, 0, time.Local),
+			expectedShift: &OncallShift{
+				Primary:   "spetrovic",
+				Secondary: "suharshs",
+				Date:      "Nov 5, 2014 12:00:00 PM",
+			},
 		},
 		testCase{
-			targetTime:     time.Date(2014, time.November, 20, 14, 0, 0, 0, time.Local),
-			expectedOncall: "jsimsa",
+			targetTime: time.Date(2014, time.November, 20, 14, 0, 0, 0, time.Local),
+			expectedShift: &OncallShift{
+				Primary:   "jsimsa",
+				Secondary: "toddw",
+				Date:      "Nov 19, 2014 12:00:00 PM",
+			},
 		},
 	}
 	for _, test := range testCases {
@@ -97,8 +110,8 @@ func TestOncall(t *testing.T) {
 		if err != nil {
 			t.Fatalf("want no errors, got: %v", err)
 		}
-		if test.expectedOncall != got {
-			t.Fatalf("want %v, got %v", test.expectedOncall, got)
+		if !reflect.DeepEqual(test.expectedShift, got) {
+			t.Fatalf("want %#v, got %#v", test.expectedShift, got)
 		}
 	}
 }
