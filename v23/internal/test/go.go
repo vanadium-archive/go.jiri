@@ -658,6 +658,16 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 		case testFailed, testPassed:
 			if strings.Index(result.output, "no test files") == -1 &&
 				strings.Index(result.output, "package excluded") == -1 {
+				if testName == "vanadium-go-bench" {
+					// TODO(jsimsa): The go2xunit tool used for parsing output
+					// of Go tests ignores output of Go benchmarks. We dump
+					// output of benchmarks to stdout to persist this
+					// information in the console logs of our CI. This is a
+					// temporary solution until someone finds the enthusiasm to
+					// implement benchmark output parsing, tracking and
+					// graphing.
+					fmt.Fprintf(ctx.Stdout(), result.output)
+				}
 				ss, err := xunit.TestSuiteFromGoTestOutput(ctx, bytes.NewBufferString(result.output))
 				if err != nil {
 					// Token too long error.
