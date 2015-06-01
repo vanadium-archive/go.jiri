@@ -13,13 +13,13 @@ Usage:
 
 The v23 commands are:
    api          Work with Vanadium's public API
-   buildcop     Manage vanadium build cop schedule
    cl           Manage vanadium changelists
    contributors List vanadium project contributors
    copyright    Manage vanadium copyright
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
+   oncall       Manage vanadium oncall schedule
    profile      Manage vanadium profiles
    project      Manage the vanadium projects
    run          Run an executable using the vanadium environment
@@ -82,25 +82,6 @@ Usage:
 
 <projects> is a list of Vanadium projects to update. If none are specified, all
 project APIs are updated.
-
-V23 buildcop - Manage vanadium build cop schedule
-
-Manage vanadium build cop schedule. If no subcommand is given, it shows the LDAP
-of the current build cop.
-
-Usage:
-   v23 buildcop
-   v23 buildcop <command>
-
-The v23 buildcop commands are:
-   list        List available build cop schedule
-
-V23 buildcop list - List available build cop schedule
-
-List available build cop schedule.
-
-Usage:
-   v23 buildcop list
 
 V23 cl - Manage vanadium changelists
 
@@ -272,6 +253,25 @@ source tree.
 
 Usage:
    v23 goext distclean
+
+V23 oncall - Manage vanadium oncall schedule
+
+Manage vanadium oncall schedule. If no subcommand is given, it shows the LDAP of
+the current oncall.
+
+Usage:
+   v23 oncall
+   v23 oncall <command>
+
+The v23 oncall commands are:
+   list        List available oncall schedule
+
+V23 oncall list - List available oncall schedule
+
+List available oncall schedule.
+
+Usage:
+   v23 oncall list
 
 V23 profile - Manage vanadium profiles
 

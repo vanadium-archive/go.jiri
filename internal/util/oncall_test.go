@@ -14,7 +14,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 )
 
-func createBuildCopFile(t *testing.T, ctx *tool.Context) {
+func createOncallFile(t *testing.T, ctx *tool.Context) {
 	content := `<?xml version="1.0" ?>
 <rotation>
   <shift>
@@ -33,22 +33,22 @@ func createBuildCopFile(t *testing.T, ctx *tool.Context) {
     <startDate>Nov 19, 2014 12:00:00 PM</startDate>
   </shift>
 </rotation>`
-	buildCopRotationsFile, err := BuildCopRotationPath(ctx)
+	oncallRotationsFile, err := OncallRotationPath(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	dir := filepath.Dir(buildCopRotationsFile)
+	dir := filepath.Dir(oncallRotationsFile)
 	dirMode := os.FileMode(0700)
 	if err := ctx.Run().MkdirAll(dir, dirMode); err != nil {
 		t.Fatalf("MkdirAll(%q, %v) failed: %v", dir, dirMode, err)
 	}
 	fileMode := os.FileMode(0644)
-	if err := ioutil.WriteFile(buildCopRotationsFile, []byte(content), fileMode); err != nil {
-		t.Fatalf("WriteFile(%q, %q, %v) failed: %v", buildCopRotationsFile, content, fileMode, err)
+	if err := ioutil.WriteFile(oncallRotationsFile, []byte(content), fileMode); err != nil {
+		t.Fatalf("WriteFile(%q, %q, %v) failed: %v", oncallRotationsFile, content, fileMode, err)
 	}
 }
 
-func TestBuildCop(t *testing.T) {
+func TestOncall(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 	root, err := NewFakeV23Root(ctx)
 	if err != nil {
@@ -68,37 +68,37 @@ func TestBuildCop(t *testing.T) {
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
 
-	// Create a buildcop.xml file.
-	createBuildCopFile(t, ctx)
+	// Create a oncall.v1.xml file.
+	createOncallFile(t, ctx)
 	type testCase struct {
-		targetTime       time.Time
-		expectedBuildCop string
+		targetTime     time.Time
+		expectedOncall string
 	}
 	testCases := []testCase{
 		testCase{
-			targetTime:       time.Date(2013, time.November, 5, 12, 0, 0, 0, time.Local),
-			expectedBuildCop: "",
+			targetTime:     time.Date(2013, time.November, 5, 12, 0, 0, 0, time.Local),
+			expectedOncall: "",
 		},
 		testCase{
-			targetTime:       time.Date(2014, time.November, 5, 12, 0, 0, 0, time.Local),
-			expectedBuildCop: "spetrovic",
+			targetTime:     time.Date(2014, time.November, 5, 12, 0, 0, 0, time.Local),
+			expectedOncall: "spetrovic",
 		},
 		testCase{
-			targetTime:       time.Date(2014, time.November, 5, 14, 0, 0, 0, time.Local),
-			expectedBuildCop: "spetrovic",
+			targetTime:     time.Date(2014, time.November, 5, 14, 0, 0, 0, time.Local),
+			expectedOncall: "spetrovic",
 		},
 		testCase{
-			targetTime:       time.Date(2014, time.November, 20, 14, 0, 0, 0, time.Local),
-			expectedBuildCop: "jsimsa",
+			targetTime:     time.Date(2014, time.November, 20, 14, 0, 0, 0, time.Local),
+			expectedOncall: "jsimsa",
 		},
 	}
 	for _, test := range testCases {
-		got, err := BuildCop(ctx, test.targetTime)
+		got, err := Oncall(ctx, test.targetTime)
 		if err != nil {
 			t.Fatalf("want no errors, got: %v", err)
 		}
-		if test.expectedBuildCop != got {
-			t.Fatalf("want %v, got %v", test.expectedBuildCop, got)
+		if test.expectedOncall != got {
+			t.Fatalf("want %v, got %v", test.expectedOncall, got)
 		}
 	}
 }

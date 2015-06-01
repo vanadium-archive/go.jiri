@@ -13,57 +13,57 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-// cmdBuildCop represents the "v23 buildcop" command.
-var cmdBuildCop = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runBuildCop),
-	Name:   "buildcop",
-	Short:  "Manage vanadium build cop schedule",
+// cmdOncall represents the "v23 oncall" command.
+var cmdOncall = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runOncall),
+	Name:   "oncall",
+	Short:  "Manage vanadium oncall schedule",
 	Long: `
-Manage vanadium build cop schedule. If no subcommand is given, it shows the LDAP
-of the current build cop.
+Manage vanadium oncall schedule. If no subcommand is given, it shows the LDAP
+of the current oncall.
 `,
-	Children: []*cmdline.Command{cmdBuildCopList},
+	Children: []*cmdline.Command{cmdOncallList},
 }
 
-// cmdBuildCopList represents the "v23 buildcop list" command.
-var cmdBuildCopList = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runBuildCopList),
+// cmdOncallList represents the "v23 oncall list" command.
+var cmdOncallList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runOncallList),
 	Name:   "list",
-	Short:  "List available build cop schedule",
-	Long:   "List available build cop schedule.",
+	Short:  "List available oncall schedule",
+	Long:   "List available oncall schedule.",
 }
 
-func runBuildCop(env *cmdline.Env, _ []string) error {
+func runOncall(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	buildcop, err := util.BuildCop(ctx, time.Now())
+	oncall, err := util.Oncall(ctx, time.Now())
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(ctx.Stdout(), "%s\n", buildcop)
+	fmt.Fprintf(ctx.Stdout(), "%s\n", oncall)
 	return nil
 }
 
-func runBuildCopList(env *cmdline.Env, _ []string) error {
+func runOncallList(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	rotation, err := util.LoadBuildCopRotation(ctx)
+	rotation, err := util.LoadOncallRotation(ctx)
 	if err != nil {
 		return err
 	}
-	// Print the schedule with the current build cop marked.
+	// Print the schedule with the current oncall marked.
 	layout := "Jan 2, 2006 3:04:05 PM"
 	now := time.Now().Unix()
-	foundBuildCop := false
+	foundOncall := false
 	for i, shift := range rotation.Shifts {
 		prefix := "   "
-		if !foundBuildCop && i < len(rotation.Shifts)-1 {
+		if !foundOncall && i < len(rotation.Shifts)-1 {
 			nextDate := rotation.Shifts[i+1].Date
 			nextTimestamp, err := time.Parse(layout, nextDate)
 			if err != nil {
@@ -72,10 +72,10 @@ func runBuildCopList(env *cmdline.Env, _ []string) error {
 			}
 			if now < nextTimestamp.Unix() {
 				prefix = "-> "
-				foundBuildCop = true
+				foundOncall = true
 			}
 		}
-		if i == len(rotation.Shifts)-1 && !foundBuildCop {
+		if i == len(rotation.Shifts)-1 && !foundOncall {
 			prefix = "-> "
 		}
 		fmt.Fprintf(ctx.Stdout(), "%s%25s: %s\n", prefix, shift.Date, shift.Primary)

@@ -27,13 +27,13 @@ func AliasesFilePath(ctx *tool.Context) (string, error) {
 	return filepath.Join(dataDir, "aliases.v1.xml"), nil
 }
 
-// BuildCopRotationPath returns the path to the build cop rotation file.
-func BuildCopRotationPath(ctx *tool.Context) (string, error) {
+// OncallRotationPath returns the path to the oncall rotation file.
+func OncallRotationPath(ctx *tool.Context) (string, error) {
 	dataDir, err := DataDirPath(ctx, tool.Name)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dataDir, "buildcop.v1.xml"), nil
+	return filepath.Join(dataDir, "oncall.v1.xml"), nil
 }
 
 // ConfigFilePath returns the path to the tools configuration file.
@@ -131,7 +131,7 @@ func ResolveManifestPath(name string) (string, error) {
 		if os.IsNotExist(err) {
 			return ResolveManifestPath("default")
 		}
-		return "", fmt.Errorf("Stat(%v) failed: %v", err)
+		return "", fmt.Errorf("Stat(%v) failed: %v", path, err)
 	}
 	return path, nil
 }
@@ -150,7 +150,7 @@ func V23Root() (string, error) {
 	}
 	result, err := filepath.EvalSymlinks(root)
 	if err != nil {
-		return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root)
+		return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root, err)
 	}
 	return result, nil
 }

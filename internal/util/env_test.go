@@ -44,9 +44,11 @@ func TestV23RootSymlink(t *testing.T) {
 
 	// Set the V23_ROOT to the symlink created above and check
 	// that V23Root() evaluates the symlink.
+	oldRoot := os.Getenv("V23_ROOT")
 	if err := os.Setenv("V23_ROOT", symRoot); err != nil {
 		t.Fatalf("%v", err)
 	}
+	defer os.Setenv("V23_ROOT", oldRoot)
 	got, err := V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
