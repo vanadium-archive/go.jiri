@@ -515,7 +515,7 @@ func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 
 	// Install Android SDK packagess.
 	androidPkgs := []androidPkg{
-		androidPkg{"Android SDK Platform-tools", filepath.Join(sdkRoot, "platform-tools")},
+		androidPkg{"Android SDK Platform-tools, revision 22", filepath.Join(sdkRoot, "platform-tools")},
 		androidPkg{"SDK Platform Android 4.4.2, API 19, revision 4", filepath.Join(sdkRoot, "platforms", "android-19")},
 		androidPkg{"Android SDK Build-tools, revision 21.0.2", filepath.Join(sdkRoot, "build-tools")},
 		androidPkg{"ARM EABI v7a System Image, Android API 19, revision 2", filepath.Join(sdkRoot, "system-images", "android-19")},
