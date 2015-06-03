@@ -209,11 +209,23 @@ func setSyncbaseEnv(env *envvar.Vars, root string) error {
 		"leveldb",
 		"snappy",
 	}
+	// TODO(rogulenko): get these vars from a config file.
+	goos, goarch := os.Getenv("GOOS"), os.Getenv("GOARCH")
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	if goarch == "" {
+		goarch = runtime.GOARCH
+	}
 	for _, lib := range libs {
 		cflags := env.GetTokens("CGO_CFLAGS", " ")
 		cxxflags := env.GetTokens("CGO_CXXFLAGS", " ")
 		ldflags := env.GetTokens("CGO_LDFLAGS", " ")
-		dir := filepath.Join(root, "third_party", "cout", lib)
+		dir, err := ThirdPartyCCodePath(goos, goarch)
+		if err != nil {
+			return err
+		}
+		dir = filepath.Join(dir, lib)
 		if _, err := os.Stat(dir); err != nil {
 			if !os.IsNotExist(err) {
 				return fmt.Errorf("Stat(%v) failed: %v", dir, err)
@@ -223,10 +235,6 @@ func setSyncbaseEnv(env *envvar.Vars, root string) error {
 		cflags = append(cflags, filepath.Join("-I"+dir, "include"))
 		cxxflags = append(cxxflags, filepath.Join("-I"+dir, "include"))
 		ldflags = append(ldflags, filepath.Join("-L"+dir, "lib"))
-		// TODO(jsimsa): Currently, the "v23 profile setup syncbase" command
-		// only compiles LevelDB C++ libraries for the host architecture. As
-		// a consequence, the syncbase component can only be compiled if the
-		// target platform matches the host platform.
 		if runtime.GOARCH == "linux" {
 			ldflags = append(ldflags, "-Wl,-rpath", filepath.Join(dir, "lib"))
 		}

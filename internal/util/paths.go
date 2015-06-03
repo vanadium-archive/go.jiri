@@ -136,6 +136,16 @@ func ResolveManifestPath(name string) (string, error) {
 	return path, nil
 }
 
+// ThirdPartyCCodePath returns that path to the directory containing built
+// binaries for the target OS and architecture.
+func ThirdPartyCCodePath(os, arch string) (string, error) {
+	root, err := V23Root()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, "third_party", "cout", fmt.Sprintf("%s_%s", os, arch)), nil
+}
+
 // VanadiumGitRepoHost returns the URL that hosts Vanadium git
 // repositories.
 func VanadiumGitRepoHost() string {
