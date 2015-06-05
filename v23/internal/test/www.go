@@ -6,6 +6,7 @@ package test
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 
 	"v.io/x/devtools/internal/collect"
@@ -79,4 +80,45 @@ func vanadiumWWWDeployStaging(ctx *tool.Context, testName string, _ ...Opt) (*te
 
 func vanadiumWWWDeployProduction(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return commonVanadiumWWW(ctx, testName, "deploy-production", defaultWWWTestTimeout)
+}
+
+// vanadiumWWWConfigDeployHelper updates remote instance configuration and restarts remote nginx, auth, and proxy services.
+func vanadiumWWWConfigDeployHelper(ctx *tool.Context, testName string, env string, _ ...Opt) (_ *test.Result, e error) {
+	cleanup, err := initTest(ctx, testName, nil)
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Change dir to infrastructure/nginx.
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, internalTestError{err, "V23Root"}
+	}
+
+	dir := filepath.Join(root, "infrastructure", "nginx")
+	if err := ctx.Run().Chdir(dir); err != nil {
+		return nil, internalTestError{err, "Chdir"}
+	}
+
+	// Update configuration.
+	target := strings.Join([]string{"deploy", env}, "-")
+	if err := ctx.Run().Command("make", target); err != nil {
+		return &test.Result{Status: test.Failed}, nil
+	}
+
+	// Restart remote services.
+	project := strings.Join([]string{"vanadium", env}, "-")
+	if err := ctx.Run().Command("./restart.sh", project); err != nil {
+		return &test.Result{Status: test.Failed}, nil
+	}
+
+	return &test.Result{Status: test.Passed}, nil
+}
+
+func vanadiumWWWConfigDeployProduction(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumWWWConfigDeployHelper(ctx, testName, "production")
+}
+func vanadiumWWWConfigDeployStaging(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumWWWConfigDeployHelper(ctx, testName, "staging")
 }
