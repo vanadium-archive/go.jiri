@@ -22,12 +22,15 @@ import (
 )
 
 const (
-	stagingBlessingsRoot    = "dev.staging.v.io" // TODO(jingjin): use a better name and update prod.go.
+	bucket                  = "gs://vanadium-release"
 	localMountTable         = "/ns.dev.staging.v.io:8151"
 	globalMountTable        = "/ns.dev.staging.v.io:8101"
+	manifestEnvVar          = "SNAPSHOT_MANIFEST"
 	numRetries              = 30
 	objNameForDeviceManager = "devices/vanadium-cell-master/devmgr/device"
 	retryPeriod             = 10 * time.Second
+	stagingBlessingsRoot    = "dev.staging.v.io" // TODO(jingjin): use a better name and update prod.go.
+	snapshotName            = "rc"
 )
 
 var (
@@ -100,6 +103,71 @@ func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...Opt) (_ *te
 	return &test.Result{Status: test.Passed}, nil
 }
 
+// vanadiumReleaseCandidate updates binaries of staging cloud services and run tests for them.
+func vanadiumReleaseCandidate(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, err
+	}
+
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	type step struct {
+		msg string
+		fn  func() error
+	}
+	rcLabel := ""
+	adminCredDir, publisherCredDir := getCredDirOptValues(opts)
+	steps := []step{
+		step{
+			msg: "Extract release candidate label\n",
+			fn: func() error {
+				var err error
+				rcLabel, err = extractRCLabel()
+				return err
+			},
+		},
+		step{
+			msg: fmt.Sprintf("Checking existence of credentials in %v (admin) and %v (publisher)\n", adminCredDir, publisherCredDir),
+			fn: func() error {
+				if _, err := os.Stat(adminCredDir); err != nil {
+					return err
+				}
+				if _, err := os.Stat(publisherCredDir); err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+		step{
+			msg: "Prepare binaries\n",
+			fn:  func() error { return prepareBinaries(ctx, root, rcLabel) },
+		},
+		step{
+			msg: "Update services\n",
+			fn:  func() error { return updateServices(ctx, root, adminCredDir, publisherCredDir) },
+		},
+		step{
+			msg: "Check services\n",
+			fn:  func() error { return checkServices(ctx) },
+		},
+		step{
+			msg: "Update the 'latest' file\n",
+			fn:  func() error { return updateLatestFile(ctx, rcLabel) },
+		},
+	}
+	for _, step := range steps {
+		if result, err := invoker(ctx, step.msg, step.fn); result != nil || err != nil {
+			return result, err
+		}
+	}
+	return &test.Result{Status: test.Passed}, nil
+}
+
 // invoker invokes the given function and returns test.Result and/or
 // errors based on function's results.
 func invoker(ctx *tool.Context, msg string, fn func() error) (*test.Result, error) {
@@ -116,6 +184,16 @@ func invoker(ctx *tool.Context, msg string, fn func() error) (*test.Result, erro
 	}
 	test.Pass(ctx, msg)
 	return nil, nil
+}
+
+// extractRCLabel extracts release candidate label from the manifest path stored
+// in the <manifestEnvVar> environment variable.
+func extractRCLabel() (string, error) {
+	manifestPath := os.Getenv(manifestEnvVar)
+	if manifestPath == "" {
+		return "", fmt.Errorf("Environment variable %q not set", manifestEnvVar)
+	}
+	return filepath.Base(manifestPath), nil
 }
 
 // getCredDirOptValues returns the values of credentials dirs (admin, publisher)
@@ -137,6 +215,26 @@ func getCredDirOptValues(opts []Opt) (string, string) {
 func buildBinaries(ctx *tool.Context, root string) error {
 	args := []string{"go", "install", "v.io/..."}
 	if err := ctx.Run().Command("v23", args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// prepareBinaries builds all vanadium binaries and uploads them to Google Storage bucket.
+func prepareBinaries(ctx *tool.Context, root, rcLabel string) error {
+	// Build binaries.
+	args := []string{"go", "install", "v.io/..."}
+	if err := ctx.Run().Command("v23", args...); err != nil {
+		return err
+	}
+
+	// Upload binaries.
+	args = []string{
+		"-q", "-m", "cp", "-r",
+		filepath.Join(root, "release", "go", "bin"),
+		fmt.Sprintf("%s/%s", bucket, rcLabel),
+	}
+	if err := ctx.Run().Command("gsutil", args...); err != nil {
 		return err
 	}
 	return nil
@@ -376,4 +474,72 @@ func createSnapshot(ctx *tool.Context) (e error) {
 		return err
 	}
 	return nil
+}
+
+// updateLatestFile updates the "latest" file in Google Storage bucket to the
+// given release candidate label.
+func updateLatestFile(ctx *tool.Context, rcLabel string) error {
+	tmpDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer ctx.Run().RemoveAll(tmpDir)
+	latestFile := filepath.Join(tmpDir, "latest")
+	if err := ctx.Run().WriteFile(latestFile, []byte(rcLabel), os.FileMode(0600)); err != nil {
+		return err
+	}
+	args := []string{"-q", "cp", latestFile, fmt.Sprintf("%s/latest", bucket)}
+	if err := ctx.Run().Command("gsutil", args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// vanadiumReleaseCandidateSnapshot takes a snapshot of the current V23_ROOT and
+// outputs the symlink target (the relative path to V23_ROOT) of that snapshot
+// in the form of "<manifestEnvVar>=<symlinkTarget>" to stdout.
+// The output will be processed by the "Script Content" Jenkins plugin which
+// will make the environment varialbe <manifestEnvVar> available for the rest of
+// the test environment.
+func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, err
+	}
+
+	cleanup, err := initTest(ctx, testName, []string{})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Take snapshot.
+	args := []string{
+		"snapshot",
+		"--remote",
+		"create",
+		// TODO(jingjin): change this to use "date-rc<n>" format when the function is ready.
+		"--time-format=2006-01-02.15:04",
+		snapshotName,
+	}
+	if err := ctx.Run().Command("v23", args...); err != nil {
+		return nil, internalTestError{err, "Snapshot"}
+	}
+
+	// Get the symlink target of the newly created snapshot manifest.
+	snapshotDir, err := util.RemoteSnapshotDir()
+	if err != nil {
+		return nil, err
+	}
+	symlink := filepath.Join(snapshotDir, snapshotName)
+	target, err := filepath.EvalSymlinks(symlink)
+	if err != nil {
+		return nil, internalTestError{fmt.Errorf("EvalSymlinks(%s) failed: %v", symlink, err), "Resolve Snapshot Symlink"}
+	}
+
+	// Output.
+	relativePath := strings.TrimPrefix(target+"/", root)
+	fmt.Fprintf(ctx.Stdout(), "%s=%s\n", manifestEnvVar, relativePath)
+
+	return &test.Result{Status: test.Passed}, nil
 }
