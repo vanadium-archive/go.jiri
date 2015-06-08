@@ -150,7 +150,9 @@ func getProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*projectSt
 			project: project,
 		}
 		states[name] = state
-		go setProjectState(ctx, state, checkDirty, sem)
+		// ctx is not threadsafe, so we make a clone for each
+		// goroutine.
+		go setProjectState(ctx.Clone(tool.ContextOpts{}), state, checkDirty, sem)
 	}
 	for _ = range projects {
 		err := <-sem
