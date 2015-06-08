@@ -140,7 +140,7 @@ func setup(ctx *tool.Context, os, profile string) error {
 		case "java":
 			return setupJavaDarwin(ctx)
 		case "syncbase":
-			return setupSyncbaseDarwin(ctx)
+			return setupSyncbase(ctx)
 		case "third-party":
 			return setupThirdPartyDarwin(ctx)
 		case "nodejs":
@@ -159,7 +159,7 @@ func setup(ctx *tool.Context, os, profile string) error {
 		case "java":
 			return setupJavaLinux(ctx)
 		case "syncbase":
-			return setupSyncbaseLinux(ctx)
+			return setupSyncbase(ctx)
 		case "nodejs":
 			return setupNodejsLinux(ctx)
 		case "web":
@@ -744,24 +744,24 @@ func setupWebCommon(ctx *tool.Context) error {
 	return nil
 }
 
-// setupSyncbaseLinux sets up the syncbase profile for linux.
-func setupSyncbaseLinux(ctx *tool.Context) (e error) {
-	return setupSyncbaseHelper(ctx)
-}
-
-// setupSyncbaseDarwin sets up the syncbase profile for darwin.
-func setupSyncbaseDarwin(ctx *tool.Context) (e error) {
-	return setupSyncbaseHelper(ctx)
-}
-
-func setupSyncbaseHelper(ctx *tool.Context) (e error) {
+// setupSyncbase sets up the syncbase profile.
+func setupSyncbase(ctx *tool.Context) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
 
+	// TODO(rogulenko): get these var from a config file.
+	goos, goarch := runtime.GOOS, os.Getenv("GOARCH")
+	if goarch == "" {
+		goarch = runtime.GOARCH
+	}
+	var outPrefix string
+	if outPrefix, err = util.ThirdPartyCCodePath(goos, goarch); err != nil {
+		return err
+	}
 	// Build and install Snappy.
-	snappyOutDir := filepath.Join(root, "third_party", "cout", "snappy")
+	snappyOutDir := filepath.Join(outPrefix, "snappy")
 	installSnappyFn := func() error {
 		snappySrcDir := filepath.Join(root, "third_party", "csrc", "snappy-1.1.2")
 		if err := ctx.Run().Chdir(snappySrcDir); err != nil {
@@ -770,7 +770,16 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 		if err := run(ctx, "autoreconf", []string{"--install", "--force", "--verbose"}, nil); err != nil {
 			return err
 		}
-		if err := run(ctx, "./configure", []string{fmt.Sprintf("--prefix=%v", snappyOutDir), "--enable-shared=false"}, nil); err != nil {
+		args := []string{
+			fmt.Sprintf("--prefix=%v", snappyOutDir),
+			"--enable-shared=false",
+		}
+		env := map[string]string{}
+		if goarch == "386" {
+			env["CC"] = "gcc -m32"
+			env["CXX"] = "g++ -m32"
+		}
+		if err := run(ctx, "./configure", args, env); err != nil {
 			return err
 		}
 		if err := run(ctx, "make", []string{fmt.Sprintf("-j%d", runtime.NumCPU())}, nil); err != nil {
@@ -789,7 +798,7 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 	}
 
 	// Build and install LevelDB.
-	leveldbOutDir := filepath.Join(root, "third_party", "cout", "leveldb")
+	leveldbOutDir := filepath.Join(outPrefix, "leveldb")
 	installLeveldbFn := func() error {
 		leveldbSrcDir := filepath.Join(root, "third_party", "csrc", "leveldb")
 		if err := ctx.Run().Chdir(leveldbSrcDir); err != nil {
@@ -810,6 +819,10 @@ func setupSyncbaseHelper(ctx *tool.Context) (e error) {
 			"PREFIX":   leveldbLibDir,
 			"CXXFLAGS": "-I" + filepath.Join(snappyOutDir, "include"),
 			"LDFLAGS":  "-L" + filepath.Join(snappyOutDir, "lib"),
+		}
+		if goarch == "386" {
+			env["CC"] = "gcc -m32"
+			env["CXX"] = "g++ -m32"
 		}
 		if err := run(ctx, "make", []string{"clean"}, env); err != nil {
 			return err
