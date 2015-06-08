@@ -140,7 +140,7 @@ func setup(ctx *tool.Context, os, profile string) error {
 		case "java":
 			return setupJavaDarwin(ctx)
 		case "syncbase":
-			return setupSyncbase(ctx)
+			return setupSyncbaseDarwin(ctx)
 		case "third-party":
 			return setupThirdPartyDarwin(ctx)
 		case "nodejs":
@@ -159,7 +159,7 @@ func setup(ctx *tool.Context, os, profile string) error {
 		case "java":
 			return setupJavaLinux(ctx)
 		case "syncbase":
-			return setupSyncbase(ctx)
+			return setupSyncbaseLinux(ctx)
 		case "nodejs":
 			return setupNodejsLinux(ctx)
 		case "web":
@@ -290,7 +290,7 @@ func installDeps(ctx *tool.Context, pkgs []string) error {
 					return err
 				}
 			}
-		case "brew":
+		case "darwin":
 			installPkgs := []string{}
 			for _, pkg := range pkgs {
 				if err := run(ctx, "brew", []string{"ls", "--versions", pkg}, nil); err != nil {
@@ -744,8 +744,32 @@ func setupWebCommon(ctx *tool.Context) error {
 	return nil
 }
 
-// setupSyncbase sets up the syncbase profile.
-func setupSyncbase(ctx *tool.Context) (e error) {
+// setupSyncbaseDarwin sets up the syncbase profile for darwin.
+func setupSyncbaseDarwin(ctx *tool.Context) error {
+	// Install dependencies.
+	pkgs := []string{
+		"autoconf", "automake", "libtool", "pkg-config",
+	}
+	if err := installDeps(ctx, pkgs); err != nil {
+		return err
+	}
+	return setupSyncbaseCommon(ctx)
+}
+
+// setupSyncbaseLinux sets up the syncbase profile for linux.
+func setupSyncbaseLinux(ctx *tool.Context) error {
+	// Install dependencies.
+	pkgs := []string{
+		"autoconf", "automake", "g++", "libtool", "pkg-config",
+	}
+	if err := installDeps(ctx, pkgs); err != nil {
+		return err
+	}
+	return setupSyncbaseCommon(ctx)
+}
+
+// setupSyncbaseCommon sets up the syncbase profile.
+func setupSyncbaseCommon(ctx *tool.Context) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
