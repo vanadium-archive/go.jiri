@@ -106,17 +106,24 @@ func testSetPathHelper(t *testing.T, name string) {
 		t.Fatalf("%v", err)
 	}
 	env := new(envvar.Vars)
+	var want string
 	switch name {
 	case "GOPATH":
+		want = filepath.Join(v23Root, "test")
 		if err := setGoPath(ctx, env, v23Root, config); err != nil {
 			t.Fatalf("%v", err)
 		}
 	case "VDLPATH":
+		// Make a fake src directory.
+		want = filepath.Join(v23Root, "test", "src")
+		if err := ctx.Run().MkdirAll(want, 0755); err != nil {
+			t.Fatalf("%v", err)
+		}
 		if err := setVdlPath(ctx, env, v23Root, config); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
-	if got, want := env.Get(name), filepath.Join(v23Root, "test"); got != want {
+	if got := env.Get(name); got != want {
 		t.Fatalf("unexpected value: got %v, want %v", got, want)
 	}
 }

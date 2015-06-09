@@ -145,25 +145,25 @@ func setArmEnv(env *envvar.Vars, root string) error {
 // setGoPath adds the paths to Vanadium Go workspaces to the GOPATH
 // variable.
 func setGoPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config) error {
-	return setPathHelper(ctx, env, "GOPATH", root, config.GoWorkspaces())
+	return setPathHelper(ctx, env, "GOPATH", root, config.GoWorkspaces(), "")
 }
 
 // setVdlPath adds the paths to Vanadium VDL workspaces to the VDLPATH
 // variable.
 func setVdlPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config) error {
-	return setPathHelper(ctx, env, "VDLPATH", root, config.VDLWorkspaces())
+	return setPathHelper(ctx, env, "VDLPATH", root, config.VDLWorkspaces(), "src")
 }
 
 // setPathHelper is a utility function for setting path environment
 // variables for different types of workspaces.
-func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, workspaces []string) error {
+func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, workspaces []string, suffix string) error {
 	path := env.GetTokens(name, ":")
 	projects, _, err := readManifest(ctx, false)
 	if err != nil {
 		return err
 	}
 	for _, workspace := range workspaces {
-		absWorkspace := filepath.Join(root, workspace)
+		absWorkspace := filepath.Join(root, workspace, suffix)
 		// Only append an entry to the path if the workspace is rooted
 		// under a v23 project that exists locally or vice versa.
 		for _, project := range projects {

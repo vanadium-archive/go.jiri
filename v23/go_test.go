@@ -86,7 +86,7 @@ func TestGoVDLGeneration(t *testing.T) {
 	}
 	defer os.Setenv("GOPATH", oldGoPath)
 	oldVdlPath := os.Getenv("VDLPATH")
-	if err := os.Setenv("VDLPATH", tmpDir+":"+oldVdlPath); err != nil {
+	if err := os.Setenv("VDLPATH", filepath.Join(tmpDir, "src")+":"+oldVdlPath); err != nil {
 		t.Fatalf("Setenv() failed: %v", err)
 	}
 	defer os.Setenv("VDLPATH", oldVdlPath)
