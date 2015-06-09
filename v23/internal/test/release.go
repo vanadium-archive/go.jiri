@@ -538,7 +538,7 @@ func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts .
 	}
 
 	// Output.
-	relativePath := strings.TrimPrefix(target+"/", root)
+	relativePath := strings.TrimPrefix(target, root+"/")
 	fmt.Fprintf(ctx.Stdout(), "%s=%s\n", manifestEnvVar, relativePath)
 
 	return &test.Result{Status: test.Passed}, nil
