@@ -31,6 +31,7 @@ const (
 	retryPeriod             = 10 * time.Second
 	stagingBlessingsRoot    = "dev.staging.v.io" // TODO(jingjin): use a better name and update prod.go.
 	snapshotName            = "rc"
+	snapshotManifestFile    = ".release_candidate_snapshot_manifest"
 )
 
 var (
@@ -496,11 +497,9 @@ func updateLatestFile(ctx *tool.Context, rcLabel string) error {
 }
 
 // vanadiumReleaseCandidateSnapshot takes a snapshot of the current V23_ROOT and
-// outputs the symlink target (the relative path to V23_ROOT) of that snapshot
-// in the form of "<manifestEnvVar>=<symlinkTarget>" to stdout.
-// The output will be processed by the "Script Content" Jenkins plugin which
-// will make the environment varialbe <manifestEnvVar> available for the rest of
-// the test environment.
+// writes the symlink target (the relative path to V23_ROOT) of that snapshot
+// in the form of "<manifestEnvVar>=<symlinkTarget>" to
+// "V23_ROOT/<snapshotManifestFile>".
 func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
@@ -537,9 +536,11 @@ func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts .
 		return nil, internalTestError{fmt.Errorf("EvalSymlinks(%s) failed: %v", symlink, err), "Resolve Snapshot Symlink"}
 	}
 
-	// Output.
+	// Write to a file.
 	relativePath := strings.TrimPrefix(target, root+"/")
-	fmt.Fprintf(ctx.Stdout(), "%s=%s\n", manifestEnvVar, relativePath)
+	if err := ctx.Run().WriteFile(filepath.Join(root, snapshotManifestFile), []byte(relativePath), os.FileMode(0644)); err != nil {
+		return nil, internalTestError{err, "Record Snapshot Manifest Target"}
+	}
 
 	return &test.Result{Status: test.Passed}, nil
 }
