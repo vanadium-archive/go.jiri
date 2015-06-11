@@ -238,6 +238,23 @@ func prepareBinaries(ctx *tool.Context, root, rcLabel string) error {
 	if err := ctx.Run().Command("gsutil", args...); err != nil {
 		return err
 	}
+
+	// Upload the .done file to signal that all binaries have been
+	// successfully uploaded.
+	tmpDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer ctx.Run().RemoveAll(tmpDir)
+	doneFile := filepath.Join(tmpDir, ".done")
+	if err := ctx.Run().WriteFile(doneFile, nil, os.FileMode(0600)); err != nil {
+		return err
+	}
+	args = []string{"-q", "cp", doneFile, fmt.Sprintf("%s/%s", bucket, rcLabel)}
+	if err := ctx.Run().Command("gsutil", args...); err != nil {
+		return err
+	}
+
 	return nil
 }
 
