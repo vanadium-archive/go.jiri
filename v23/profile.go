@@ -760,7 +760,7 @@ func setupSyncbaseDarwin(ctx *tool.Context) error {
 func setupSyncbaseLinux(ctx *tool.Context) error {
 	// Install dependencies.
 	pkgs := []string{
-		"autoconf", "automake", "g++", "libtool", "pkg-config",
+		"autoconf", "automake", "g++", "g++-multilib", "gcc-multilib", "libtool", "pkg-config",
 	}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
