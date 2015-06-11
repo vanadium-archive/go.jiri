@@ -45,6 +45,7 @@ var (
 		"mounttabled",
 		"roled",
 		"deviced",
+		"proxyd:vlab-proxyd",
 	}
 )
 
@@ -336,6 +337,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			"devmgr/apps/identityd",
 			"devmgr/apps/proxyd",
 			"devmgr/apps/roled",
+			"devmgr/apps/VLabProxy",
 		}
 		for _, app := range apps {
 			if err := updateAppFn(app); err != nil {
