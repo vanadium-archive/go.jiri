@@ -293,7 +293,7 @@ func installDeps(ctx *tool.Context, pkgs []string) error {
 		case "darwin":
 			installPkgs := []string{}
 			for _, pkg := range pkgs {
-				if err := run(ctx, "brew", []string{"ls", "--versions", pkg}, nil); err != nil {
+				if err := run(ctx, "brew", []string{"ls", pkg}, nil); err != nil {
 					installPkgs = append(installPkgs, pkg)
 				}
 			}
