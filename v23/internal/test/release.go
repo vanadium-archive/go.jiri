@@ -554,7 +554,11 @@ func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts .
 	}
 
 	// Write to a file.
-	relativePath := strings.TrimPrefix(target, root+"/")
+	manifestDir, err := util.ManifestDir()
+	if err != nil {
+		return nil, err
+	}
+	relativePath := strings.TrimPrefix(target, manifestDir+string(filepath.Separator))
 	content := fmt.Sprintf("%s=%s", manifestEnvVar, relativePath)
 	if err := ctx.Run().WriteFile(filepath.Join(root, snapshotManifestFile), []byte(content), os.FileMode(0644)); err != nil {
 		return nil, internalTestError{err, "Record Snapshot Manifest Target"}
