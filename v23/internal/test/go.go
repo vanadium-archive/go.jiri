@@ -1175,7 +1175,7 @@ func thirdPartyPkgs() ([]string, error) {
 // vanadiumGoBench runs Go benchmarks for vanadium projects.
 func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1193,7 +1193,7 @@ func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (_ *test.R
 // vanadiumGoBuild runs Go build for the vanadium projects.
 func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1210,7 +1210,7 @@ func vanadiumGoBuild(ctx *tool.Context, testName string, opts ...Opt) (_ *test.R
 // vanadiumGoCoverage runs Go coverage tests for vanadium projects.
 func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1303,7 +1303,7 @@ func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...Opt) (_ *tes
 // vanadiumGoRace runs Go data-race tests for vanadium projects.
 func vanadiumGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1398,7 +1398,7 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 // projects.
 func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1517,7 +1517,7 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 	fmt.Fprintf(ctx.Stdout(), "Using config:\n%s\n", string(configBytes))
 
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -1728,7 +1728,7 @@ func genTestNameSuffix(baseSuffix string) string {
 // vanadiumGoTest runs Go tests for vanadium projects.
 func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
