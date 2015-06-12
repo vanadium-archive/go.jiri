@@ -57,7 +57,7 @@ func vanadiumCreateInstanceTest(ctx *tool.Context, testName string, opts ...Opt)
 		return nil, internalTestError{fmt.Errorf("script not defined in %s environment variable", scriptEnvVar), "Env"}
 	}
 
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
