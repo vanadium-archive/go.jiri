@@ -15,9 +15,12 @@ import (
 
 // Config holds configuration common to vanadium tools.
 type Config struct {
-	// apiCheckProjects identifies the set of project names for which an
-	// API check is required.
+	// apiCheckProjects identifies the set of project names for which
+	// the API check is required.
 	apiCheckProjects map[string]struct{}
+	// copyrightCheckProjects identifies the set of project names for
+	// which the copyright check is required.
+	copyrightCheckProjects map[string]struct{}
 	// goWorkspaces identifies V23_ROOT subdirectories that contain a
 	// Go workspace.
 	goWorkspaces []string
@@ -47,6 +50,18 @@ type Config struct {
 type ConfigOpt interface {
 	configOpt()
 }
+
+// APICheckProjectsOpt is the type that can be used to pass the Config
+// factory a API check projects option.
+type APICheckProjectsOpt map[string]struct{}
+
+func (APICheckProjectsOpt) configOpt() {}
+
+// CopyrightCheckProjectsOpt is the type that can be used to pass the
+// Config factory a copyright check projects option.
+type CopyrightCheckProjectsOpt map[string]struct{}
+
+func (CopyrightCheckProjectsOpt) configOpt() {}
 
 // GoWorkspacesOpt is the type that can be used to pass the Config
 // factory a Go workspace option.
@@ -90,10 +105,6 @@ type VDLWorkspacesOpt []string
 
 func (VDLWorkspacesOpt) configOpt() {}
 
-type APICheckProjectsOpt map[string]struct{}
-
-func (APICheckProjectsOpt) configOpt() {}
-
 // NewConfig is the Config factory.
 func NewConfig(opts ...ConfigOpt) *Config {
 	var c Config
@@ -101,6 +112,8 @@ func NewConfig(opts ...ConfigOpt) *Config {
 		switch typedOpt := opt.(type) {
 		case APICheckProjectsOpt:
 			c.apiCheckProjects = map[string]struct{}(typedOpt)
+		case CopyrightCheckProjectsOpt:
+			c.copyrightCheckProjects = map[string]struct{}(typedOpt)
 		case GoWorkspacesOpt:
 			c.goWorkspaces = []string(typedOpt)
 		case ProjectTestsOpt:
@@ -120,10 +133,16 @@ func NewConfig(opts ...ConfigOpt) *Config {
 	return &c
 }
 
-// APICheckProjects returns the set of project names for which an API
+// APICheckProjects returns the set of project names for which the API
 // check is required.
 func (c Config) APICheckProjects() map[string]struct{} {
 	return c.apiCheckProjects
+}
+
+// CopyrightCheckProjects returns the set of project names for which
+// the copyright check is required.
+func (c Config) CopyrightCheckProjects() map[string]struct{} {
+	return c.copyrightCheckProjects
 }
 
 // GoWorkspaces returns the Go workspaces included in the config.
@@ -205,15 +224,16 @@ func (c Config) VDLWorkspaces() []string {
 }
 
 type configSchema struct {
-	XMLName            xml.Name               `xml:"config"`
-	APICheckProjects   []string               `xml:"apiCheckProjects>project"`
-	GoWorkspaces       []string               `xml:"goWorkspaces>workspace"`
-	ProjectTests       testGroupSchemas       `xml:"projectTests>project"`
-	SnapshotLabelTests testGroupSchemas       `xml:"snapshotLabelTests>snapshot"`
-	TestDependencies   dependencyGroupSchemas `xml:"testDependencies>test"`
-	TestGroups         testGroupSchemas       `xml:"testGroups>group"`
-	TestParts          partGroupSchemas       `xml:"testParts>test"`
-	VDLWorkspaces      []string               `xml:"vdlWorkspaces>workspace"`
+	APICheckProjects       []string               `xml:"apiCheckProjects>project"`
+	CopyrightCheckProjects []string               `xml:"copyrightCheckProjects>project"`
+	GoWorkspaces           []string               `xml:"goWorkspaces>workspace"`
+	ProjectTests           testGroupSchemas       `xml:"projectTests>project"`
+	SnapshotLabelTests     testGroupSchemas       `xml:"snapshotLabelTests>snapshot"`
+	TestDependencies       dependencyGroupSchemas `xml:"testDependencies>test"`
+	TestGroups             testGroupSchemas       `xml:"testGroups>group"`
+	TestParts              partGroupSchemas       `xml:"testParts>test"`
+	VDLWorkspaces          []string               `xml:"vdlWorkspaces>workspace"`
+	XMLName                xml.Name               `xml:"config"`
 }
 
 type dependencyGroupSchema struct {
@@ -269,17 +289,21 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(configBytes), err)
 	}
 	config := &Config{
-		apiCheckProjects:   map[string]struct{}{},
-		goWorkspaces:       []string{},
-		projectTests:       map[string][]string{},
-		snapshotLabelTests: map[string][]string{},
-		testDependencies:   map[string][]string{},
-		testGroups:         map[string][]string{},
-		testParts:          map[string][]string{},
-		vdlWorkspaces:      []string{},
+		apiCheckProjects:       map[string]struct{}{},
+		copyrightCheckProjects: map[string]struct{}{},
+		goWorkspaces:           []string{},
+		projectTests:           map[string][]string{},
+		snapshotLabelTests:     map[string][]string{},
+		testDependencies:       map[string][]string{},
+		testGroups:             map[string][]string{},
+		testParts:              map[string][]string{},
+		vdlWorkspaces:          []string{},
 	}
 	for _, project := range data.APICheckProjects {
 		config.apiCheckProjects[project] = struct{}{}
+	}
+	for _, project := range data.CopyrightCheckProjects {
+		config.copyrightCheckProjects[project] = struct{}{}
 	}
 	for _, workspace := range data.GoWorkspaces {
 		config.goWorkspaces = append(config.goWorkspaces, workspace)
@@ -323,6 +347,10 @@ func saveConfig(ctx *tool.Context, config *Config, path string) error {
 		data.APICheckProjects = append(data.APICheckProjects, project)
 	}
 	sort.Strings(data.APICheckProjects)
+	for project, _ := range config.copyrightCheckProjects {
+		data.CopyrightCheckProjects = append(data.CopyrightCheckProjects, project)
+	}
+	sort.Strings(data.CopyrightCheckProjects)
 	for _, workspace := range config.goWorkspaces {
 		data.GoWorkspaces = append(data.GoWorkspaces, workspace)
 	}

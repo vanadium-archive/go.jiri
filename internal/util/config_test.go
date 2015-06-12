@@ -17,6 +17,10 @@ var (
 		"projectA": struct{}{},
 		"projectB": struct{}{},
 	}
+	copyrightCheckProjects = map[string]struct{}{
+		"projectC": struct{}{},
+		"projectD": struct{}{},
+	}
 	goWorkspaces = []string{"test-go-workspace"}
 	projectTests = map[string][]string{
 		"test-project":  []string{"test-test-A", "test-test-group"},
@@ -40,6 +44,9 @@ var (
 
 func testConfigAPI(t *testing.T, c *Config) {
 	if got, want := c.APICheckProjects(), apiCheckProjects; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected results: got %v, want %v", got, want)
+	}
+	if got, want := c.CopyrightCheckProjects(), copyrightCheckProjects; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected results: got %v, want %v", got, want)
 	}
 	if got, want := c.GoWorkspaces(), goWorkspaces; !reflect.DeepEqual(got, want) {
@@ -77,6 +84,7 @@ func testConfigAPI(t *testing.T, c *Config) {
 func TestConfigAPI(t *testing.T) {
 	config := NewConfig(
 		APICheckProjectsOpt(apiCheckProjects),
+		CopyrightCheckProjectsOpt(copyrightCheckProjects),
 		GoWorkspacesOpt(goWorkspaces),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
@@ -109,6 +117,7 @@ func TestConfigSerialization(t *testing.T) {
 
 	config := NewConfig(
 		APICheckProjectsOpt(apiCheckProjects),
+		CopyrightCheckProjectsOpt(copyrightCheckProjects),
 		GoWorkspacesOpt(goWorkspaces),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),

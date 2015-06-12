@@ -152,25 +152,6 @@ func shouldIgnoreFile(file string) bool {
 	return false
 }
 
-// parseProjectNames identifies the set of projects that the "v23 api
-// ..." command should be applied to.
-func parseProjectNames(args []string, projects map[string]util.Project, apiCheckProjects map[string]struct{}) ([]string, error) {
-	names := args
-	if len(names) == 0 {
-		// Use all projects for which an API check is required.
-		for name, _ := range apiCheckProjects {
-			names = append(names, name)
-		}
-	} else {
-		for _, name := range names {
-			if _, ok := projects[name]; !ok {
-				return nil, fmt.Errorf("project %q does not exist in the project manifest", name)
-			}
-		}
-	}
-	return names, nil
-}
-
 func splitLinesToSet(in []byte) map[string]bool {
 	result := make(map[string]bool)
 	scanner := bufio.NewScanner(bytes.NewReader(in))
@@ -195,18 +176,13 @@ func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, 
 	if err != nil {
 		return nil, err
 	}
-	projectNames, err := parseProjectNames(args, projects, apiCheckProjects)
-	if err != nil {
-		return nil, err
-	}
-
 	gotoolsBin, cleanup, err := buildGotools(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer collect.Error(cleanup, &e)
 
-	for _, projectName := range projectNames {
+	for _, projectName := range parseProjectNames(ctx, args, projects, apiCheckProjects) {
 		path := projects[projectName].Path
 		branch, err := ctx.Git(tool.RootDirOpt(path)).CurrentBranchName()
 		if err != nil {

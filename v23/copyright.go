@@ -141,10 +141,6 @@ func copyrightHelper(stdout, stderr io.Writer, args []string, fix bool) error {
 	if err != nil {
 		return err
 	}
-	names, err := parseArgs(args, projects)
-	if err != nil {
-		return err
-	}
 	dataDir, err := util.DataDirPath(ctx, "v23")
 	if err != nil {
 		return err
@@ -153,7 +149,11 @@ func copyrightHelper(stdout, stderr io.Writer, args []string, fix bool) error {
 	if err != nil {
 		return err
 	}
-	for _, name := range names {
+	config, err := util.LoadConfig(ctx)
+	if err != nil {
+		return err
+	}
+	for _, name := range parseProjectNames(ctx, args, projects, config.CopyrightCheckProjects()) {
 		if err := checkProject(ctx, projects[name], assets, fix); err != nil {
 			return err
 		}
@@ -360,26 +360,4 @@ func loadAssets(ctx *tool.Context, dir string) (*copyrightAssets, error) {
 	}
 	result.Copyright = string(bytes)
 	return &result, nil
-}
-
-// parseArgs identifies the set of projects that the "v23 copyright
-// ..." command should be applied to.
-func parseArgs(args []string, projects map[string]util.Project) ([]string, error) {
-	names := args
-	if len(names) == 0 {
-		// Use all projects (except for the third_party project) as the
-		// default.
-		for name, _ := range projects {
-			if name != "third_party" {
-				names = append(names, name)
-			}
-		}
-	} else {
-		for _, name := range names {
-			if _, ok := projects[name]; !ok {
-				return nil, fmt.Errorf("project %q does not exist in the project manifest", name)
-			}
-		}
-	}
-	return names, nil
 }
