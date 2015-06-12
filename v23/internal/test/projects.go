@@ -73,7 +73,7 @@ func vanadiumBrowserTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Re
 	return runProjectTest(ctx, testName, "browser", "test", env, []string{"web"})
 }
 
-// vanadiumBrowserTest runs the ui tests for the Vanadium browser.
+// vanadiumBrowserTestWeb runs the ui tests for the Vanadium browser.
 func vanadiumBrowserTestWeb(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return runProjectTest(ctx, testName, "browser", "test-ui", nil, []string{"web"})
 }
@@ -86,6 +86,11 @@ func vanadiumChatShellTest(ctx *tool.Context, testName string, _ ...Opt) (*test.
 // vanadiumChatWebTest runs the tests for the chat web client.
 func vanadiumChatWebTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return runProjectTest(ctx, testName, "chat", "test-web", nil, []string{"web"})
+}
+
+// vanadiumChatWebUITest runs the ui tests for the chat web client.
+func vanadiumChatWebUITest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return runProjectTest(ctx, testName, "chat", "test-ui", nil, []string{"web"})
 }
 
 // vanadiumPipe2BrowserTest runs the tests for pipe2browser.
