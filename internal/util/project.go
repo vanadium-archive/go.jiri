@@ -60,11 +60,11 @@ type Project struct {
 	// Name is the project name.
 	Name string `xml:"name,attr"`
 	// Path is the path used to store the project locally. Project
-	// manifest uses paths that are relative to the V23_ROOT
+	// manifest uses paths that are relative to the $V23_ROOT
 	// environment variable. When a manifest is parsed (e.g. in
 	// RemoteProjects), the program logic converts the relative
 	// paths to an absolute paths, using the current value of the
-	// V23_ROOT environment variable as a prefix.
+	// $V23_ROOT environment variable as a prefix.
 	Path string `xml:"path,attr"`
 	// Protocol is the version control protocol used by the
 	// project. If not set, "git" is used as the default.
@@ -110,14 +110,34 @@ func (e UnsupportedProtocolErr) Error() string {
 // project names to a collections of commits.
 type Update map[string][]CL
 
+var devtoolsBinDir = filepath.Join("devtools", "bin")
+
 // CreateSnapshot creates a manifest that encodes the current state of
 // master branches of all projects and writes this snapshot out to the
 // given file.
 func CreateSnapshot(ctx *tool.Context, path string) error {
-	// Create an in-memory representation of the build manifest.
+	// Create an in-memory representation of the current projects.
 	manifest, err := snapshotLocalProjects(ctx)
 	if err != nil {
 		return err
+	}
+	// If the $V23_ROOT/devtools/bin/v23 binary exists, add the "v23"
+	// tool to the manifest. The binary might not exist if we are
+	// dealing with a fake Vanadium root used for testing.
+	root, err := V23Root()
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(root, devtoolsBinDir)); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		manifest.Tools = append(manifest.Tools, Tool{
+			Data:    "data",
+			Name:    "v23",
+			Package: "v.io/x/devtools/v23",
+			Project: "release.go.x.devtools",
+		})
 	}
 	perm := os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(filepath.Dir(path), perm); err != nil {
@@ -435,7 +455,7 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 	for _, name := range names {
 		tool := remoteTools[name]
 		// Skip tools with no package specified. Besides increasing
-		// robustness, this step also allow us to create V23_ROOT
+		// robustness, this step also allows us to create Vanadium root
 		// fakes without having to provide an implementation for the "v23"
 		// tool, which every manifest needs to specify.
 		if tool.Package == "" {
@@ -554,7 +574,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		if p, ok := projects[project.Name]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
-		// Root relative paths in the V23_ROOT.
+		// Root relative paths in the $V23_ROOT directory.
 		if !filepath.IsAbs(project.Path) {
 			project.Path = filepath.Join(root, project.Path)
 		}
@@ -595,8 +615,8 @@ func installTools(ctx *tool.Context, dir string) error {
 	failed := false
 	// TODO(jsimsa): Make sure the "$V23_ROOT/devtools/bin" directory
 	// exists. This is for backwards compatibility for instances of
-	// V23_ROOT that have been created before go/vcl/9511.
-	binDir := filepath.Join(root, "devtools", "bin")
+	// Vanadium root that have been created before go/vcl/9511.
+	binDir := filepath.Join(root, devtoolsBinDir)
 	if err := ctx.Run().MkdirAll(binDir, os.FileMode(0755)); err != nil {
 		return err
 	}
@@ -620,7 +640,7 @@ func installTools(ctx *tool.Context, dir string) error {
 	}
 	// TODO(jsimsa): Make sure the "$V23_ROOT/bin" directory is removed,
 	// forcing people to update their PATH. Remove this once all
-	// instances of V23_ROOT has been updated past go/vcl/9511.
+	// instances of Vanadium root has been updated past go/vcl/9511.
 	oldBinDir := filepath.Join(root, "bin")
 	if err := ctx.Run().RemoveAll(oldBinDir); err != nil {
 		return err
@@ -840,7 +860,7 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 		return err
 	}
 	// Replace absolute project paths with relative paths to make it
-	// possible to move V23_ROOT locally.
+	// possible to move the $V23_ROOT directory locally.
 	root, err := V23Root()
 	if err != nil {
 		return err
@@ -946,7 +966,7 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 	}
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
-	// V23_ROOT in an inconsistent state.
+	// $V23_ROOT directory in an inconsistent state.
 	tmpDir, err := ctx.Run().TempDir(path, "")
 	if err != nil {
 		return err
