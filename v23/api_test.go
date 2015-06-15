@@ -74,10 +74,10 @@ func setupAPITest(t *testing.T, ctx *tool.Context) testEnv {
 func teardownAPITest(t *testing.T, env testEnv) {
 	os.Setenv("V23_ROOT", env.oldRoot)
 	if err := env.fakeRoot.Cleanup(env.ctx); err != nil {
-		t.Fatalf("%v")
+		t.Fatalf("%v", err)
 	}
 	if err := env.gotoolsCleanup(); err != nil {
-		t.Fatalf("%v")
+		t.Fatalf("%v", err)
 	}
 	gotoolsBinPathFlag = ""
 }
@@ -160,8 +160,8 @@ func TestFunction() {
 	}
 }
 
-// TestPublicAPIMissingAPIFile ensures that the check will fail if a
-// 'required check' project has a missing .api file.
+// TestPublicAPIMissingAPIFile ensures that the check will fail if a 'required
+// check' project has a missing .api file and a non-empty public API.
 func TestPublicAPIMissingAPIFile(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 	env := setupAPITest(t, ctx)
@@ -193,6 +193,40 @@ func TestFunction() {
 		t.Fatalf("doAPICheck should have failed, but did not")
 	} else if !strings.Contains(buf.String(), "could not read the package's .api file") {
 		t.Fatalf("doAPICheck failed, but not for the expected reason: %s", buf.String())
+	}
+}
+
+// TestPublicAPIMissingAPIFileNoPublicAPI ensures that the check will pass if a
+// 'required check' project has a missing .api but the public API is empty.
+func TestPublicAPIMissingAPIFileNoPublicAPI(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	env := setupAPITest(t, ctx)
+	defer teardownAPITest(t, env)
+
+	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
+	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	branch := "my-branch"
+	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Write a go file with a public API and no corresponding .api file.
+	writeFileOrDie(t, ctx, filepath.Join(projectPath, "file.go"), `package main
+
+func testFunction() {
+}`)
+
+	commitMessage := "Commit file.go"
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CommitFile("file.go", commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := doAPICheck(&buf, ctx.Stderr(), []string{"test"}, true); err != nil {
+		t.Fatalf("doAPICheck failed: %v", err)
+	} else if output := buf.String(); output != "" {
+		t.Fatalf("doAPICheck should have passed, but did not: %s", output)
 	}
 }
 
@@ -270,14 +304,31 @@ func TestFunction1() {
 		t.Fatalf("should have succeeded but did not: %v", err)
 	}
 
-	// The new public API is empty, so there should be nothing in the .api file.
-	var contents bytes.Buffer
-	err := readAPIFileContents(filepath.Join(projectPath, ".api"), &contents)
+	contents, err := readAPIFileContents(filepath.Join(projectPath, ".api"))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	if got, want := contents.String(), "pkg main, func TestFunction1()\n"; got != want {
+	if got, want := string(contents), "pkg main, func TestFunction1()\n"; got != want {
 		t.Fatalf("expected %s, got %s", want, got)
+	}
+
+	// Now write a change that changes TestFunction1 to testFunction1.
+	// There should be no more public API left and the .api file should be
+	// removed.
+	writeFileOrDie(t, ctx, filepath.Join(projectPath, "file.go"), `package main
+
+func testFunction1() {
+}`)
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).CommitFile("file.go", commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	out.Reset()
+	if err := runAPIFix(cmdlineEnv, []string{"test"}); err != nil {
+		t.Fatalf("should have succeeded but did not: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projectPath, ".api")); !os.IsNotExist(err) {
+		t.Fatalf(".api file exists when it should have been removed: %v", err)
 	}
 }
