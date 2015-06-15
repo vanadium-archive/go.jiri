@@ -52,11 +52,13 @@ var cmdAPICheck = &cmdline.Command{
 	ArgsLong: "<projects> is a list of Vanadium projects to check. If none are specified, all projects that require a public API check upon presubmit are checked.",
 }
 
-func readAPIFileContents(path string, buf *bytes.Buffer) (e error) {
+func readAPIFileContents(path string) ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
 	file, err := os.Open(path)
-	defer collect.Error(file.Close, &e)
+	defer collect.Error(file.Close, &err)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	reader := bufio.NewReader(file)
 	for {
@@ -67,10 +69,10 @@ func readAPIFileContents(path string, buf *bytes.Buffer) (e error) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return
+	return buf.Bytes(), err
 }
 
 type packageChange struct {
@@ -127,15 +129,24 @@ func buildGotools(ctx *tool.Context) (string, func() error, error) {
 	return gotoolsBin, cleanup, nil
 }
 
+// getCurrentAPI runs the gotools api command against the given directory and
+// returns the bytes that should go into the .api file for that directory.
+func getCurrentAPI(ctx *tool.Context, gotoolsBin, dir string) ([]byte, error) {
+	var output bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = &output
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "run", gotoolsBin, "goapi", dir); err != nil {
+		return nil, err
+	}
+	return output.Bytes(), nil
+}
+
 func isFailedAPICheckFatal(projectName string, apiCheckProjects map[string]struct{}, apiFileError error) bool {
-	if pathError, ok := apiFileError.(*os.PathError); ok {
-		if pathError.Err == os.ErrNotExist {
-			if _, ok := apiCheckProjects[projectName]; !ok {
-				return false
-			}
+	if os.IsNotExist(apiFileError) {
+		if _, ok := apiCheckProjects[projectName]; !ok {
+			return false
 		}
 	}
-
 	return true
 }
 
@@ -203,11 +214,21 @@ func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, 
 			continue
 		}
 		for dir := range dirs {
+			// Read the API state in the working directory.
+			currentAPI, err := getCurrentAPI(ctx, gotoolsBin, dir)
+			if err != nil {
+				return nil, err
+			}
 			// Read the existing public API file.
 			apiFilePath := filepath.Join(dir, ".api")
-			var apiFileContents bytes.Buffer
-			apiFileError := readAPIFileContents(apiFilePath, &apiFileContents)
+			apiFileContents, apiFileError := readAPIFileContents(apiFilePath)
 			if apiFileError != nil {
+				if os.IsNotExist(apiFileError) && len(currentAPI) == 0 {
+					// The API file doesn't exist but the
+					// public API in the working directory
+					// is empty anyway.
+					continue
+				}
 				if !isFailedAPICheckFatal(projectName, apiCheckProjects, apiFileError) {
 					// We couldn't read the API file, but this project doesn't
 					// require one.  Just warn the user.
@@ -216,18 +237,11 @@ func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, 
 					continue
 				}
 			}
-			var out bytes.Buffer
-			opts := ctx.Run().Opts()
-			opts.Stdout = &out
-			if err := ctx.Run().CommandWithOpts(opts, "v23", "run", gotoolsBin, "goapi", dir); err != nil {
-				return nil, err
-			}
-			pkgName := packageName(dir)
-			if pkgName == "" {
-				pkgName = dir
-			}
-			if apiFileError != nil || out.String() != apiFileContents.String() {
-				apiBytes := out.Bytes()
+			if apiFileError != nil || !bytes.Equal(currentAPI, apiFileContents) {
+				pkgName := packageName(dir)
+				if pkgName == "" {
+					pkgName = dir
+				}
 				// The user has changed the public API or we
 				// couldn't read the public API in the first
 				// place.
@@ -235,9 +249,9 @@ func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, 
 					name:          pkgName,
 					projectName:   projectName,
 					apiFilePath:   apiFilePath,
-					oldAPI:        splitLinesToSet(apiFileContents.Bytes()),
-					newAPI:        splitLinesToSet(apiBytes),
-					newAPIContent: apiBytes,
+					oldAPI:        splitLinesToSet(apiFileContents),
+					newAPI:        splitLinesToSet(currentAPI),
+					newAPIContent: currentAPI,
 					apiFileError:  apiFileError,
 				})
 			}
@@ -336,7 +350,17 @@ func runAPIFix(env *cmdline.Env, args []string) error {
 		return err
 	}
 	for _, change := range changes {
-		if err := ctx.Run().WriteFile(change.apiFilePath, []byte(change.newAPIContent), 0644); err != nil {
+		if len(change.newAPIContent) == 0 {
+			if _, err := os.Stat(change.apiFilePath); !os.IsNotExist(err) {
+				if err != nil {
+					return fmt.Errorf("Stat(%s) failed: %v", change.apiFilePath, err)
+				}
+				// No API contents? Remove the file.
+				if err := ctx.Run().RemoveAll(change.apiFilePath); err != nil {
+					return err
+				}
+			}
+		} else if err := ctx.Run().WriteFile(change.apiFilePath, []byte(change.newAPIContent), 0644); err != nil {
 			return fmt.Errorf("WriteFile(%s) failed: %v", change.apiFilePath, err)
 		}
 		fmt.Fprintf(ctx.Stdout(), "Updated %s.\n", change.apiFilePath)
