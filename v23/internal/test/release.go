@@ -49,62 +49,6 @@ var (
 	}
 )
 
-// vanadiumReleaseTest updates binaries of staging cloud services and run tests for them.
-func vanadiumReleaseTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
-	if err != nil {
-		return nil, err
-	}
-
-	cleanup, err := initTest(ctx, testName, []string{})
-	if err != nil {
-		return nil, internalTestError{err, "Init"}
-	}
-	defer collect.Error(func() error { return cleanup() }, &e)
-
-	type step struct {
-		msg string
-		fn  func() error
-	}
-	adminCredDir, publisherCredDir := getCredDirOptValues(opts)
-	steps := []step{
-		step{
-			msg: fmt.Sprintf("Fetching credentials from %v (admin) and %v (publisher)\n", adminCredDir, publisherCredDir),
-			fn: func() error {
-				if _, err := os.Stat(adminCredDir); err != nil {
-					return err
-				}
-				if _, err := os.Stat(publisherCredDir); err != nil {
-					return err
-				}
-				return nil
-			},
-		},
-		step{
-			msg: "Build binaries\n",
-			fn:  func() error { return buildBinaries(ctx, root) },
-		},
-		step{
-			msg: "Update services\n",
-			fn:  func() error { return updateServices(ctx, root, adminCredDir, publisherCredDir) },
-		},
-		step{
-			msg: "Check services\n",
-			fn:  func() error { return checkServices(ctx) },
-		},
-		step{
-			msg: "Create snapshot\n",
-			fn:  func() error { return createSnapshot(ctx) },
-		},
-	}
-	for _, step := range steps {
-		if result, err := invoker(ctx, step.msg, step.fn); result != nil || err != nil {
-			return result, err
-		}
-	}
-	return &test.Result{Status: test.Passed}, nil
-}
-
 // vanadiumReleaseCandidate updates binaries of staging cloud services and run tests for them.
 func vanadiumReleaseCandidate(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	root, err := util.V23Root()
@@ -112,7 +56,7 @@ func vanadiumReleaseCandidate(ctx *tool.Context, testName string, opts ...Opt) (
 		return nil, err
 	}
 
-	cleanup, err := initTest(ctx, testName, []string{})
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -211,15 +155,6 @@ func getCredDirOptValues(opts []Opt) (string, string) {
 		}
 	}
 	return adminCredDir, publisherCredDir
-}
-
-// buildBinaries builds all vanadium binaries.
-func buildBinaries(ctx *tool.Context, root string) error {
-	args := []string{"go", "install", "v.io/..."}
-	if err := ctx.Run().Command("v23", args...); err != nil {
-		return err
-	}
-	return nil
 }
 
 // prepareBinaries builds all vanadium binaries and uploads them to Google Storage bucket.
