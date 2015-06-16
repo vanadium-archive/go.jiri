@@ -128,10 +128,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(filepath.Join(root, devtoolsBinDir)); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
+	if _, err := os.Stat(filepath.Join(root, devtoolsBinDir, "v23")); err == nil {
 		manifest.Tools = append(manifest.Tools, Tool{
 			Data:    "data",
 			Name:    "v23",
