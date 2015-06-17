@@ -630,7 +630,19 @@ func setupJavaDarwin(ctx *tool.Context) error {
 
 // setupJavaLinux sets up the java profile for linux.
 func setupJavaLinux(ctx *tool.Context) error {
-	return setupJavaCommon(ctx)
+	// Install JDK 1.7 if it isn't already installed.
+	if err := run(ctx, "javac", []string{"-version"}, nil); err != nil {
+		if err := installDeps(ctx, []string{"openjdk-7-jdk"}); err != nil {
+			return err
+		}
+	}
+	if err := setupJavaCommon(ctx); err != nil {
+		return err
+	}
+	if os.Getenv("JAVA_HOME") == "" {
+		fmt.Println("Please set JAVA_HOME environment variable to the root of your JDK directory.")
+	}
+	return nil
 }
 
 // setupThirdPartyDarwin sets up the third-party profile for darwin.
