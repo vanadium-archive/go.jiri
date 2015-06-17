@@ -571,7 +571,7 @@ func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 		makeEnv.Set("GOOS", "android")
 		makeEnv.Set("GOARCH", "arm")
 		makeEnv.Set("GOARM", "7")
-		return installGo15(ctx, androidGo, makeEnv)
+		return installGo15(ctx, androidGo, nil, makeEnv)
 	}
 	return atomicAction(ctx, installGoFn, androidGo, "Download and build Android Go")
 }
@@ -595,7 +595,10 @@ func setupJavaCommon(ctx *tool.Context) error {
 	javaRoot := filepath.Join(root, "third_party", "java")
 	javaGo := filepath.Join(javaRoot, "go")
 	installGoFn := func() error {
-		return installGo15(ctx, javaGo, envvar.VarsFromOS())
+		// Apply temporary Darwin-support patch to the Go release.
+		// TODO(spetrovic): Remove this once golang.org/cl/11127 is checked-in.
+		javaPatchFile := filepath.Join(javaRoot, "patches", "darwin_sharedlib.patch")
+		return installGo15(ctx, javaGo, []string{javaPatchFile}, envvar.VarsFromOS())
 	}
 	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
 }
@@ -919,7 +922,7 @@ func installGo14(ctx *tool.Context, goDir string, env *envvar.Vars) error {
 
 // installGo15 installs Go 1.5 at a given location, using the provided
 // environment during compilation.
-func installGo15(ctx *tool.Context, goDir string, env *envvar.Vars) error {
+func installGo15(ctx *tool.Context, goDir string, patchFiles []string, env *envvar.Vars) error {
 	// First install bootstrap Go 1.4 for the host.
 	tmpDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
@@ -934,7 +937,7 @@ func installGo15(ctx *tool.Context, goDir string, env *envvar.Vars) error {
 	if tmpDir, err = ctx.Run().TempDir("", ""); err != nil {
 		return err
 	}
-	remote, revision := "https://github.com/golang/go.git", "22e4b8167f14bdd33738cfdc21c3396b2341f8fd"
+	remote, revision := "https://github.com/golang/go.git", "d00e7ad640cf0bb91fff33aaac4bbb6da8d415c2"
 	if err := gitCloneRepo(ctx, remote, revision, tmpDir); err != nil {
 		return err
 	}
@@ -944,6 +947,12 @@ func installGo15(ctx *tool.Context, goDir string, env *envvar.Vars) error {
 	goSrcDir := filepath.Join(goDir, "src")
 	if err := ctx.Run().Chdir(goSrcDir); err != nil {
 		return err
+	}
+	// Apply patches, if any.
+	for _, patchFile := range patchFiles {
+		if err := run(ctx, "git", []string{"apply", patchFile}, nil); err != nil {
+			return err
+		}
 	}
 	makeBin := filepath.Join(goSrcDir, "make.bash")
 	env.Set("GOROOT_BOOTSTRAP", goBootstrapDir)
