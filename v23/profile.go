@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/tool"
@@ -601,7 +602,27 @@ func setupJavaCommon(ctx *tool.Context) error {
 
 // setupJavaDarwin sets up the java profile for mac.
 func setupJavaDarwin(ctx *tool.Context) error {
-	return setupJavaCommon(ctx)
+	// Prompt the user to install JDK 1.7+, if not already installed.
+	// (Note that JDK cannot be installed via Homebrew.)
+	javaHomeBin := "/usr/libexec/java_home"
+	if err := run(ctx, javaHomeBin, []string{"-t", "CommandLine", "-v", "1.7+"}, nil); err != nil {
+		run(ctx, javaHomeBin, []string{"-t", "CommandLine", "--request"}, nil)
+		// Wait for JDK to be installed.
+		fmt.Println("Please follow the OS X prompt instructions to install JDK 1.7+.")
+		for true {
+			time.Sleep(5 * time.Second)
+			if err = run(ctx, javaHomeBin, []string{"-t", "CommandLine", "-v", "1.7+"}, nil); err == nil {
+				break
+			}
+		}
+	}
+	if err := setupJavaCommon(ctx); err != nil {
+		return err
+	}
+	if os.Getenv("JAVA_HOME") == "" {
+		fmt.Println("Please set JAVA_HOME environment variable to the root of your JDK directory.")
+	}
+	return nil
 }
 
 // setupJavaLinux sets up the java profile for linux.
