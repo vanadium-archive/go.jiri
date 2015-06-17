@@ -623,7 +623,12 @@ func setupJavaDarwin(ctx *tool.Context) error {
 		return err
 	}
 	if os.Getenv("JAVA_HOME") == "" {
-		fmt.Println("Please set JAVA_HOME environment variable to the root of your JDK directory.")
+		var out bytes.Buffer
+		opts := ctx.Run().Opts()
+		opts.Stdout = &out
+		opts.Stderr = &out
+		ctx.Run().CommandWithOpts(opts, javaHomeBin, "-v", "1.7+")
+		fmt.Printf("Please set JAVA_HOME environment variable to the root of your JDK directory, which is likely one of:\n%s\n", out.String())
 	}
 	return nil
 }

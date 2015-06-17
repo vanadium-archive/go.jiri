@@ -17,7 +17,7 @@ import (
 
 const (
 	v23ProfileEnv = "V23_PROFILE"
-	javaEnv       = "JDK_HOME"
+	javaEnv       = "JAVA_HOME"
 )
 
 // VanadiumEnvironment returns the environment variables setting for
@@ -94,7 +94,7 @@ func setJavaEnv(env *envvar.Vars) error {
 		return nil
 	}
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
-	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", "linux"))
+	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", runtime.GOOS))
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
 	return nil
 }
