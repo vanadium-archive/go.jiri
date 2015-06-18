@@ -536,6 +536,11 @@ Usage:
 The v23 test run flags are:
  -blessings-root=dev.v.io
    The blessings root.
+ -clean-go=true
+   Specify whether to remove Go object files and binaries before running the
+   tests. Setting this flag to 'false' may lead to faster Go builds, but it may
+   also result in some source code changes not being reflected in the tests
+   (e.g., if the change was made in a different Go workspace).
  -num-test-workers=<runtime.NumCPU()>
    Set the number of test workers to use; use 1 to serialize all tests.
  -output-dir=

@@ -17,7 +17,7 @@ import (
 
 var (
 	// cleanGo is used to control whether the initTest function removes
-	// all stale Go object files and binaries. It is use to prevent the
+	// all stale Go object files and binaries. It is used to prevent the
 	// test of this package from interfering with other concurrently
 	// running tests that might be sharing the same object files.
 	cleanGo = true

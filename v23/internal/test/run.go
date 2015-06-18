@@ -140,17 +140,23 @@ type Opt interface {
 	Opt()
 }
 
+// AdminCredDirOpt is an option that specifies the security credentials
+// directory for admin tasks used in VanadiumReleaseTest.
+type AdminCredDirOpt string
+
+func (AdminCredDirOpt) Opt() {}
+
 // BlessingsRootOpt is an option that specifies the blessings root of the
 // services to check in VanadiumProdServicesTest.
 type BlessingsRootOpt string
 
 func (BlessingsRootOpt) Opt() {}
 
-// AdminCredDirOpt is an option that specifies the security credentials
-// directory for admin tasks used in VanadiumReleaseTest.
-type AdminCredDirOpt string
+// CleanGoOpt is an option that specifies whether to remove Go object
+// files and binaries before running the tests.
+type CleanGoOpt bool
 
-func (AdminCredDirOpt) Opt() {}
+func (CleanGoOpt) Opt() {}
 
 // NamespaceRootOpt is an option that specifies the namespace root of the
 // services to check in VanadiumProdServicesTest.
@@ -289,6 +295,8 @@ func runTests(ctx *tool.Context, tests []string, results map[string]*test.Result
 		switch typedOpt := opt.(type) {
 		case OutputDirOpt:
 			outputDir = string(typedOpt)
+		case CleanGoOpt:
+			cleanGo = bool(typedOpt)
 		}
 	}
 
