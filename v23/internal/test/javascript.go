@@ -176,6 +176,34 @@ func vanadiumJSVom(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 	return runJSTest(ctx, testName, testDir, target, nil, env)
 }
 
+// vanadiumJSSyncbaseBrowser runs the vanadium javascript syncbase test in a browser.
+func vanadiumJSSyncbaseBrowser(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, err
+	}
+	testDir := filepath.Join(root, "roadmap", "javascript", "syncbase")
+	target := "test-integration-browser"
+	env := map[string]string{}
+	setCommonJSEnv(env)
+	env["BROWSER_OUTPUT"] = xunit.ReportPath(testName)
+	return runJSTest(ctx, testName, testDir, target, nil, env)
+}
+
+// vanadiumJSSyncbaseNode runs the vanadium javascript syncbase test in nodejs.
+func vanadiumJSSyncbaseNode(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, err
+	}
+	testDir := filepath.Join(root, "roadmap", "javascript", "syncbase")
+	target := "test-integration-node"
+	env := map[string]string{}
+	setCommonJSEnv(env)
+	env["NODE_OUTPUT"] = xunit.ReportPath(testName)
+	return runJSTest(ctx, testName, testDir, target, nil, env)
+}
+
 func setCommonJSEnv(env map[string]string) {
 	env["XUNIT"] = "true"
 }
