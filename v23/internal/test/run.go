@@ -93,6 +93,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-go-rpc-stress":              vanadiumGoRPCStress,
 	"vanadium-go-rpc-load":                vanadiumGoRPCLoad,
 	"vanadium-integration-test":           vanadiumIntegrationTest,
+	"vanadium-java-test":                  vanadiumJavaTest,
 	"vanadium-js-build-extension":         vanadiumJSBuildExtension,
 	"vanadium-js-doc":                     vanadiumJSDoc,
 	"vanadium-js-browser-integration":     vanadiumJSBrowserIntegration,
