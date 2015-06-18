@@ -1035,6 +1035,11 @@ func TestDirtyBranch(t *testing.T) {
 	assertFileContent(t, ctx, modifiedFile, modifiedFileContent)
 	assertFileContent(t, ctx, stagedFile, stagedFileContent)
 	assertFileContent(t, ctx, untrackedFile, untrackedFileContent)
+	// As of git 2.4.3 "git stash pop" fails if there are uncommitted
+	// changes in the index. So we need to commit them first.
+	if err := ctx.Git().Commit(); err != nil {
+		t.Fatalf("%v", err)
+	}
 	assertStashSize(t, ctx, 1)
 	if err := ctx.Git().StashPop(); err != nil {
 		t.Fatalf("%v", err)
