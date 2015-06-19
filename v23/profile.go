@@ -595,10 +595,7 @@ func setupJavaCommon(ctx *tool.Context) error {
 	javaRoot := filepath.Join(root, "third_party", "java")
 	javaGo := filepath.Join(javaRoot, "go")
 	installGoFn := func() error {
-		// Apply temporary Darwin-support patch to the Go release.
-		// TODO(spetrovic): Remove this once golang.org/cl/11127 is checked-in.
-		javaPatchFile := filepath.Join(javaRoot, "patches", "darwin_sharedlib.patch")
-		return installGo15(ctx, javaGo, []string{javaPatchFile}, envvar.VarsFromOS())
+		return installGo15(ctx, javaGo, nil, envvar.VarsFromOS())
 	}
 	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
 }
@@ -954,7 +951,7 @@ func installGo15(ctx *tool.Context, goDir string, patchFiles []string, env *envv
 	if tmpDir, err = ctx.Run().TempDir("", ""); err != nil {
 		return err
 	}
-	remote, revision := "https://github.com/golang/go.git", "d00e7ad640cf0bb91fff33aaac4bbb6da8d415c2"
+	remote, revision := "https://github.com/golang/go.git", "cc6554f750ccaf63bcdcc478b2a60d71ca76d342"
 	if err := gitCloneRepo(ctx, remote, revision, tmpDir); err != nil {
 		return err
 	}
