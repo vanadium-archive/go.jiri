@@ -18,6 +18,7 @@ import (
 var (
 	adminCredDirFlag     string
 	blessingsRootFlag    string
+	cleanGoFlag          bool
 	namespaceRootFlag    string
 	numWorkersFlag       int
 	outputDirFlag        string
@@ -36,6 +37,7 @@ func init() {
 	cmdTestRun.Flags.StringVar(&outputDirFlag, "output-dir", "", "Directory to output test results into.")
 	cmdTestRun.Flags.IntVar(&partFlag, "part", -1, "Specify which part of the test to run.")
 	cmdTestRun.Flags.StringVar(&pkgsFlag, "pkgs", "", "Comma-separated list of Go package expressions that identify a subset of tests to run; only relevant for Go-based tests")
+	cmdTestRun.Flags.BoolVar(&cleanGoFlag, "clean-go", true, "Specify whether to remove Go object files and binaries before running the tests. Setting this flag to 'false' may lead to faster Go builds, but it may also result in some source code changes not being reflected in the tests (e.g., if the change was made in a different Go workspace).")
 }
 
 // cmdTest represents the "v23 test" command.
@@ -135,6 +137,7 @@ func optsFromFlags() (opts []v23test.Opt) {
 		v23test.NumWorkersOpt(numWorkersFlag),
 		v23test.OutputDirOpt(outputDirFlag),
 		v23test.PublisherCredDirOpt(publisherCredDirFlag),
+		v23test.CleanGoOpt(cleanGoFlag),
 	)
 	return
 }

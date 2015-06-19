@@ -9,6 +9,13 @@ import (
 	"testing"
 )
 
+func init() {
+	// Prevent the initTest() function from cleaning up Go object files
+	// and binaries when running tests of this package to avoid
+	// interference with concurrently running tests.
+	cleanGo = false
+}
+
 func TestOutputRegex(t *testing.T) {
 	testCases := []struct {
 		re    *regexp.Regexp

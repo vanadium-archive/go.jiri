@@ -20,13 +20,6 @@ import (
 	"v.io/x/devtools/internal/xunit"
 )
 
-func init() {
-	// Prevent the initTest() function from cleaning up Go object
-	// files and binaries to avoid interference with concurrently
-	// running tests.
-	cleanGo = false
-}
-
 // caseMatch checks whether the given test cases match modulo their
 // execution time.
 func caseMatch(c1, c2 xunit.TestCase) bool {
