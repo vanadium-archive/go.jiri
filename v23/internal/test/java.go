@@ -23,7 +23,7 @@ func vanadiumJavaTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	rootDir, err := util.V23Root()
-	javaDir := filepath.Join(rootDir, "roadmap", "java")
+	javaDir := filepath.Join(rootDir, "release", "java")
 	if err := ctx.Run().Chdir(javaDir); err != nil {
 		return nil, err
 	}
