@@ -15,6 +15,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/set"
 )
 
 var (
@@ -320,9 +321,7 @@ func runProjectPoll(env *cmdline.Env, args []string) error {
 			if !ok {
 				return fmt.Errorf("failed to find any projects for test %q", arg)
 			}
-			for _, project := range projects {
-				projectSet[project] = struct{}{}
-			}
+			set.String.Union(projectSet, set.String.FromSlice(projects))
 		}
 	}
 	update, err := util.PollProjects(ctx, manifestFlag, projectSet)

@@ -19,6 +19,7 @@ import (
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/metadata"
+	"v.io/x/lib/set"
 )
 
 // TestGoVanadiumEnvironment checks that the implementation of the
@@ -319,16 +320,9 @@ func TestComputeGoDeps(t *testing.T) {
 }
 
 func containsStrings(super, sub []string) bool {
-	superMap := make(map[string]bool)
-	for _, x := range super {
-		superMap[x] = true
-	}
-	for _, x := range sub {
-		if !superMap[x] {
-			return false
-		}
-	}
-	return true
+	subSet := set.String.FromSlice(sub)
+	set.String.Difference(subSet, set.String.FromSlice(super))
+	return len(subSet) == 0
 }
 
 func TestGoBuildWithMetaData(t *testing.T) {

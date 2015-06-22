@@ -35,6 +35,7 @@ import (
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
 	"v.io/x/lib/host"
+	"v.io/x/lib/set"
 )
 
 type taskStatus int
@@ -1366,9 +1367,7 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 			if err != nil {
 				return nil, err
 			}
-			for _, curPkg := range curPkgs {
-				existingPartsPkgs[curPkg] = struct{}{}
-			}
+			set.String.Union(existingPartsPkgs, set.String.FromSlice(curPkgs))
 		}
 	}
 
@@ -1656,11 +1655,7 @@ func prepareRegressionBinaries(ctx *tool.Context, in1, in2, out string, targetBi
 	if order != binSetNew {
 		in1, in2 = in2, in1
 	}
-	take2 := make(map[string]struct{})
-	for _, binary := range targetBinaries {
-		take2[binary] = struct{}{}
-	}
-
+	take2 := set.String.FromSlice(targetBinaries)
 	binaries := make(map[string]string)
 
 	// First take everything from in1.

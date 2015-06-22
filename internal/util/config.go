@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"v.io/x/devtools/internal/tool"
+	"v.io/x/lib/set"
 )
 
 // Config holds configuration common to vanadium tools.
@@ -151,12 +152,13 @@ func (c Config) GoWorkspaces() []string {
 }
 
 // Projects returns a list of projects included in the config.
-func (c Config) Projects() (projects []string) {
+func (c Config) Projects() []string {
+	var projects []string
 	for project, _ := range c.projectTests {
 		projects = append(projects, project)
 	}
 	sort.Strings(projects)
-	return
+	return projects
 }
 
 // ProjectTests returns a list of Jenkins tests associated with the
@@ -164,48 +166,44 @@ func (c Config) Projects() (projects []string) {
 func (c Config) ProjectTests(projects []string) []string {
 	testSet := map[string]struct{}{}
 	testGroups := c.testGroups
-
 	for _, project := range projects {
 		for _, test := range c.projectTests[project] {
 			if testGroup, ok := testGroups[test]; ok {
-				for _, test := range testGroup {
-					testSet[test] = struct{}{}
-				}
+				set.String.Union(testSet, set.String.FromSlice(testGroup))
 			} else {
 				testSet[test] = struct{}{}
 			}
 		}
 	}
-	sortedTests := []string{}
-	for test := range testSet {
-		sortedTests = append(sortedTests, test)
-	}
-	sort.Strings(sortedTests)
-	return sortedTests
+	tests := set.String.ToSlice(testSet)
+	sort.Strings(tests)
+	return tests
 }
 
 // SnapshotLabels returns a list of snapshot labels included in the
 // config.
-func (c Config) SnapshotLabels() (labels []string) {
+func (c Config) SnapshotLabels() []string {
+	var labels []string
 	for label, _ := range c.snapshotLabelTests {
 		labels = append(labels, label)
 	}
-	return
+	return labels
 }
 
 // SnapshotLabelTests returns a list of tests for the given label.
-func (c Config) SnapshotLabelTests(label string) (tests []string) {
+func (c Config) SnapshotLabelTests(label string) []string {
+	testSet := map[string]struct{}{}
 	testGroups := c.testGroups
 	for _, test := range c.snapshotLabelTests[label] {
 		if testGroup, ok := testGroups[test]; ok {
-			for _, test := range testGroup {
-				tests = append(tests, test)
-			}
+			set.String.Union(testSet, set.String.FromSlice(testGroup))
 		} else {
-			tests = append(tests, test)
+			testSet[test] = struct{}{}
 		}
 	}
-	return
+	tests := set.String.ToSlice(testSet)
+	sort.Strings(tests)
+	return tests
 }
 
 // TestDependencies returns a list of dependencies for the given test.
@@ -299,12 +297,8 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 		testParts:              map[string][]string{},
 		vdlWorkspaces:          []string{},
 	}
-	for _, project := range data.APICheckProjects {
-		config.apiCheckProjects[project] = struct{}{}
-	}
-	for _, project := range data.CopyrightCheckProjects {
-		config.copyrightCheckProjects[project] = struct{}{}
-	}
+	config.apiCheckProjects = set.String.FromSlice(data.APICheckProjects)
+	config.copyrightCheckProjects = set.String.FromSlice(data.CopyrightCheckProjects)
 	for _, workspace := range data.GoWorkspaces {
 		config.goWorkspaces = append(config.goWorkspaces, workspace)
 	}
@@ -343,13 +337,9 @@ func SaveConfig(ctx *tool.Context, config *Config) error {
 
 func saveConfig(ctx *tool.Context, config *Config, path string) error {
 	var data configSchema
-	for project, _ := range config.apiCheckProjects {
-		data.APICheckProjects = append(data.APICheckProjects, project)
-	}
+	data.APICheckProjects = set.String.ToSlice(config.apiCheckProjects)
 	sort.Strings(data.APICheckProjects)
-	for project, _ := range config.copyrightCheckProjects {
-		data.CopyrightCheckProjects = append(data.CopyrightCheckProjects, project)
-	}
+	data.CopyrightCheckProjects = set.String.ToSlice(config.copyrightCheckProjects)
 	sort.Strings(data.CopyrightCheckProjects)
 	for _, workspace := range config.goWorkspaces {
 		data.GoWorkspaces = append(data.GoWorkspaces, workspace)

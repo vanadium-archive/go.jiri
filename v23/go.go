@@ -24,6 +24,7 @@ import (
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/envvar"
 	"v.io/x/lib/metadata"
+	"v.io/x/lib/set"
 )
 
 // cmdGo represents the "v23 go" command.
@@ -353,20 +354,12 @@ var (
 	nonBoolTest = []string{
 		"bench", "benchtime", "blockprofile", "blockprofilerate", "covermode", "coverpkg", "coverprofile", "cpu", "cpuprofile", "memprofile", "memprofilerate", "outputdir", "parallel", "run", "timeout",
 	}
-	nonBoolGoBuild    = makeStringSet(append(nonBoolBuild, "o"))
-	nonBoolGoGenerate = makeStringSet([]string{"run"})
-	nonBoolGoInstall  = makeStringSet(nonBoolBuild)
-	nonBoolGoRun      = makeStringSet(append(nonBoolBuild, "exec"))
-	nonBoolGoTest     = makeStringSet(append(append(nonBoolBuild, nonBoolTest...), "exec"))
+	nonBoolGoBuild    = set.StringBool.FromSlice(append(nonBoolBuild, "o"))
+	nonBoolGoGenerate = set.StringBool.FromSlice([]string{"run"})
+	nonBoolGoInstall  = set.StringBool.FromSlice(nonBoolBuild)
+	nonBoolGoRun      = set.StringBool.FromSlice(append(nonBoolBuild, "exec"))
+	nonBoolGoTest     = set.StringBool.FromSlice(append(append(nonBoolBuild, nonBoolTest...), "exec"))
 )
-
-func makeStringSet(values []string) map[string]bool {
-	ret := make(map[string]bool)
-	for _, v := range values {
-		ret[v] = true
-	}
-	return ret
-}
 
 // computeGoDeps computes the transitive Go package dependencies for the given
 // set of pkgs.  The strategy is to run "go list <pkgs>" with a special format

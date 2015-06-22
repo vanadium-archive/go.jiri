@@ -17,6 +17,7 @@ import (
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/set"
 )
 
 var (
@@ -126,9 +127,7 @@ func runContributors(env *cmdline.Env, args []string) error {
 	}
 	projectNames := map[string]struct{}{}
 	if len(args) != 0 {
-		for _, arg := range args {
-			projectNames[arg] = struct{}{}
-		}
+		projectNames = set.String.FromSlice(args)
 	} else {
 		for name, _ := range projects {
 			projectNames[name] = struct{}{}

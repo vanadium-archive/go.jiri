@@ -23,6 +23,7 @@ import (
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/envvar"
+	"v.io/x/lib/set"
 )
 
 var (
@@ -67,10 +68,7 @@ var cmdProfileList = &cmdline.Command{
 }
 
 func runProfileList(env *cmdline.Env, _ []string) error {
-	profiles := []string{}
-	for p := range knownProfiles {
-		profiles = append(profiles, p)
-	}
+	profiles := set.String.ToSlice(knownProfiles)
 	sort.Strings(profiles)
 	for _, p := range profiles {
 		fmt.Fprintf(env.Stdout, "%s\n", p)

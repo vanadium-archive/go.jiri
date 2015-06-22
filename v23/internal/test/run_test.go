@@ -36,7 +36,7 @@ func TestProjectTests(t *testing.T) {
 
 	// Get tests for a project that is NOT in the config file.
 	// This should return empty tests.
-	got, expected = config.ProjectTests([]string{"non-exist-project"}), []string{}
+	got, expected = config.ProjectTests([]string{"non-exist-project"}), nil
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("want: %#v, got: %#v", expected, got)
 	}

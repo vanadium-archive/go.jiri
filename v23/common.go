@@ -9,6 +9,7 @@ import (
 
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
+	"v.io/x/lib/set"
 )
 
 // parseProjectNames identifies the set of projects that a v23 command
@@ -17,9 +18,7 @@ func parseProjectNames(ctx *tool.Context, args []string, projects map[string]uti
 	names := []string{}
 	if len(args) == 0 {
 		// Use the default set of projects.
-		for name, _ := range defaultProjects {
-			names = append(names, name)
-		}
+		names = set.String.ToSlice(defaultProjects)
 	} else {
 		for _, name := range args {
 			if _, ok := projects[name]; ok {
