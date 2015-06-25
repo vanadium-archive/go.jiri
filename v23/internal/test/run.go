@@ -111,6 +111,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-presubmit-result":           vanadiumPresubmitResult,
 	"vanadium-presubmit-test":             vanadiumPresubmitTest,
 	"vanadium-prod-services-test":         vanadiumProdServicesTest,
+	"vanadium-reader-test":                vanadiumReaderTest,
 	"vanadium-regression-test":            vanadiumRegressionTest,
 	"vanadium-release-candidate":          vanadiumReleaseCandidate,
 	"vanadium-release-candidate-snapshot": vanadiumReleaseCandidateSnapshot,

@@ -74,6 +74,11 @@ var (
 			github:       "git@github.com:vanadium/physical-lock.git",
 		},
 		Mirror{
+			name:         "reader",
+			googlesource: "https://vanadium.googlesource.com/release.projects.reader",
+			github:       "git@github.com:vanadium/reader.git",
+		},
+		Mirror{
 			name:         "third_party",
 			googlesource: "https://vanadium.googlesource.com/third_party",
 			github:       "git@github.com:vanadium/third_party.git",

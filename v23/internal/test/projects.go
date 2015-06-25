@@ -97,3 +97,8 @@ func vanadiumChatWebUITest(ctx *tool.Context, testName string, _ ...Opt) (*test.
 func vanadiumPipe2BrowserTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return runProjectTest(ctx, testName, "pipe2browser", "test", nil, []string{"web"})
 }
+
+// vanadiumReaderTest runs the tests for the reader example application.
+func vanadiumReaderTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return runProjectTest(ctx, testName, "reader", "test", nil, []string{"web"})
+}
