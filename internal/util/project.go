@@ -21,6 +21,8 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+var DevToolsProject = "release.go.x.devtools"
+
 // CL represents a changelist.
 type CL struct {
 	// Author identifies the author of the changelist.
@@ -95,8 +97,8 @@ type Tool struct {
 	// Package is the package path of the tool.
 	Package string `xml:"package,attr"`
 	// Project identifies the project that contains the tool. If not
-	// set, "https://vanadium.googlesource.com/release.go.tools" is used
-	// as the default.
+	// set, "https://vanadium.googlesource.com/<DevToolsProject>" is
+	// used as the default.
 	Project string `xml:"project,attr"`
 }
 
@@ -133,7 +135,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 			Data:    "data",
 			Name:    "v23",
 			Package: "v.io/x/devtools/v23",
-			Project: "release.go.x.devtools",
+			Project: DevToolsProject,
 		})
 	}
 	perm := os.FileMode(0755)
@@ -726,9 +728,9 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 			delete(tools, tool.Name)
 			continue
 		}
-		// Use "release.go.x.devtools" as the default project.
+		// Use <DevToolsProject> as the default project.
 		if tool.Project == "" {
-			tool.Project = "https://vanadium.googlesource.com/release.go.x.devtools"
+			tool.Project = "https://vanadium.googlesource.com/" + DevToolsProject
 		}
 		// Use "data" as the default data.
 		if tool.Data == "" {
@@ -1049,10 +1051,46 @@ type deleteOperation struct {
 
 func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 	if op.gc {
+		// Never delete the <DevToolsProject>.
+		if op.project.Name == DevToolsProject {
+			lines := []string{
+				fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
+				"however this project is required for correct operation of the v23",
+				"development tools and will thus not be deleted",
+			}
+			opts := runutil.Opts{Verbose: true}
+			ctx.Run().OutputWithOpts(opts, lines)
+			return nil
+		}
+		// Never delete projects with non-master branches, uncommitted
+		// work, or untracked content.
+		git := ctx.Git(tool.RootDirOpt(op.project.Path))
+		branches, _, err := git.GetBranches()
+		if err != nil {
+			return err
+		}
+		uncommitted, err := git.HasUncommittedChanges()
+		if err != nil {
+			return err
+		}
+		untracked, err := git.HasUntrackedFiles()
+		if err != nil {
+			return err
+		}
+		if len(branches) != 1 || uncommitted || untracked {
+			lines := []string{
+				fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
+				"however this project either contains non-master branches, uncommitted",
+				"work, or untracked files and will thus not be deleted",
+			}
+			opts := runutil.Opts{Verbose: true}
+			ctx.Run().OutputWithOpts(opts, lines)
+			return nil
+		}
 		return ctx.Run().RemoveAll(op.source)
 	}
 	lines := []string{
-		fmt.Sprintf("NOTE: this project was not found in the project manifest"),
+		fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
 		"it was not automatically removed to avoid deleting uncommitted work",
 		fmt.Sprintf(`if you no longer need it, invoke "rm -rf %v"`, op.source),
 		`or invoke "v23 update -gc" to remove all such local projects`,
