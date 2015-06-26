@@ -19,6 +19,11 @@ import (
 var (
 	mirrors = []Mirror{
 		Mirror{
+			name:         "blue",
+			googlesource: "https://vanadium.googlesource.com/roadmap.blue",
+			github:       "git@github.com:veyron/blue.git",
+		},
+		Mirror{
 			name:         "browser",
 			googlesource: "https://vanadium.googlesource.com/release.projects.browser",
 			github:       "git@github.com:vanadium/browser.git",
