@@ -531,6 +531,9 @@ func testCopyrightHelper(t *testing.T, ok bool) error {
 	if ok {
 		copyAssets(t, ctx, dataDir, filepath.Join(root.Dir, "test"))
 	}
+	// Whitelist the "test" project.
+	config := util.NewConfig(util.CopyrightCheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
+	root.WriteLocalToolsConfig(ctx, config)
 	// Create a review in the "test" project and check that the
 	// copyright check fails.
 	cwd, err := os.Getwd()

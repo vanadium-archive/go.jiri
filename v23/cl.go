@@ -552,6 +552,15 @@ func (r *review) checkCopyright() error {
 	if name == "" {
 		return fmt.Errorf("current project is not a 'v23' project")
 	}
+	// Check if the copyright check should be invoked for the current
+	// project.
+	config, err := util.LoadConfig(r.ctx)
+	if err != nil {
+		return err
+	}
+	if _, ok := config.CopyrightCheckProjects()[name]; !ok {
+		return nil
+	}
 	// Check the copyright headers and licensing files.
 	var out bytes.Buffer
 	if err := copyrightHelper(r.ctx.Stdout(), &out, []string{name}, false); err != nil {
@@ -588,12 +597,12 @@ func (r *review) checkGoAPI() error {
 	if name == "" {
 		return fmt.Errorf("current project is not a 'v23' project")
 	}
+	// Check if the api check should be invoked for the current project.
 	config, err := util.LoadConfig(r.ctx)
 	if err != nil {
 		return err
 	}
 	if _, ok := config.APICheckProjects()[name]; !ok {
-		// Skip the check for this project, it's not required.
 		return nil
 	}
 	var out bytes.Buffer
