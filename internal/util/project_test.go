@@ -55,7 +55,7 @@ func createLocalManifestCopy(t *testing.T, ctx *tool.Context, dir, manifestDir s
 	}
 	manifest := Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n", err, data)
+		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
 
 	// Store the manifest locally.
@@ -133,7 +133,7 @@ func deleteProject(t *testing.T, ctx *tool.Context, manifestDir, project string)
 	}
 	manifest := Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n", err, data)
+		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
 	manifest.Projects = append(manifest.Projects, Project{Exclude: true, Name: project})
 	commitManifest(t, ctx, &manifest, manifestDir)
@@ -162,7 +162,7 @@ func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project strin
 	}
 	manifest := Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n", err, data)
+		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
 	updated := false
 	for i, p := range manifest.Projects {
@@ -191,7 +191,7 @@ func moveProject(t *testing.T, ctx *tool.Context, manifestDir, project, dst stri
 	}
 	manifest := Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n", err, data)
+		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
 	updated := false
 	for i, p := range manifest.Projects {
@@ -212,7 +212,7 @@ func remoteProjectName(i int) string {
 	return "test-remote-project-" + fmt.Sprintf("%d", i+1)
 }
 
-func setupNewProject(t *testing.T, ctx *tool.Context, dir, name string) string {
+func setupNewProject(t *testing.T, ctx *tool.Context, dir, name string, ignore bool) string {
 	projectDir, perm := filepath.Join(dir, name), os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(projectDir, perm); err != nil {
 		t.Fatalf("%v", err)
@@ -227,6 +227,15 @@ func setupNewProject(t *testing.T, ctx *tool.Context, dir, name string) string {
 	}
 	if err := ctx.Git().Init(projectDir); err != nil {
 		t.Fatalf("%v", err)
+	}
+	if ignore {
+		ignoreFile := filepath.Join(projectDir, ".gitignore")
+		if err := ctx.Run().WriteFile(ignoreFile, []byte("/.v23"), os.FileMode(0644)); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := ctx.Git().Add(ignoreFile); err != nil {
+			t.Fatalf("%v", err)
+		}
 	}
 	if err := ctx.Git().Commit(); err != nil {
 		t.Fatalf("%v", err)
@@ -287,13 +296,13 @@ func TestUpdateUniverse(t *testing.T) {
 	defer ctx.Run().RemoveAll(rootDir)
 	localDir := filepath.Join(rootDir, "local")
 	remoteDir := filepath.Join(rootDir, "remote")
-	localManifest := setupNewProject(t, ctx, localDir, ".manifest")
+	localManifest := setupNewProject(t, ctx, localDir, ".manifest", false)
 	writeEmptyMetadata(t, ctx, localManifest)
-	remoteManifest := setupNewProject(t, ctx, remoteDir, "test-remote-manifest")
+	remoteManifest := setupNewProject(t, ctx, remoteDir, "test-remote-manifest", false)
 	addRemote(t, ctx, localManifest, "origin", remoteManifest)
 	numProjects, remoteProjects := 4, []string{}
 	for i := 0; i < numProjects; i++ {
-		remoteProject := setupNewProject(t, ctx, remoteDir, remoteProjectName(i))
+		remoteProject := setupNewProject(t, ctx, remoteDir, remoteProjectName(i), true)
 		remoteProjects = append(remoteProjects, remoteProject)
 	}
 	createRemoteManifest(t, ctx, remoteManifest, remoteProjects)
