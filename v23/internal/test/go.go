@@ -971,7 +971,7 @@ func init() {
 		// can crash some machines.
 		newExclusion("golang.org/x/net/ipv6", ".*", !isYosemite()),
 		// This test fails, seemingly because of xml name space changes.
-		newExclusion("golang.org/x/net/webadv", "TestMultistatusWriter", isCI()),
+		newExclusion("golang.org/x/net/webdav", "TestMultistatusWriter", isCI()),
 		// The following test is way out of date and doesn't work any more.
 		newExclusion("golang.org/x/tools", "TestCheck", true),
 		// The following two tests use too much memory.
