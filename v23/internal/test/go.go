@@ -963,12 +963,15 @@ func init() {
 		newExclusion("golang.org/x/mobile", ".*", true),
 		// This test relies on timing, which results in flakiness on GCE.
 		newExclusion("google.golang.org/appengine/internal", "TestDelayedLogFlushing", isCI()),
-		// The following test requires IPv6, which is not available on
-		// some of our continuous integration instances.
+		// The following tests require ICMP socket permissions which are not enabled
+		// by default on linux.
 		newExclusion("golang.org/x/net/icmp", "TestPingGoogle", isCI()),
+		newExclusion("golang.org/x/net/icmp", "TestNonPrivilegedPing", isCI()),
 		// Don't run this test on mac systems prior to Yosemite since it
 		// can crash some machines.
 		newExclusion("golang.org/x/net/ipv6", ".*", !isYosemite()),
+		// This test fails, seemingly because of xml name space changes.
+		newExclusion("golang.org/x/net/webadv", "TestMultistatusWriter", isCI()),
 		// The following test is way out of date and doesn't work any more.
 		newExclusion("golang.org/x/tools", "TestCheck", true),
 		// The following two tests use too much memory.
