@@ -31,6 +31,7 @@ func init() {
 const (
 	defaultFileMode = os.FileMode(0644)
 	hashbang        = "#!"
+	v23Ignore       = ".v23ignore"
 )
 
 var (
@@ -95,6 +96,11 @@ projects contain the appropriate copyright header and also if all
 projects contains the appropriate licensing files. Optionally, the
 command can be used to fix the appropriate copyright headers and
 licensing files.
+
+In order to ignore checked in third-party assets which have their own copyright
+and licensing headers a ".v23ignore" file can be added to a project. The
+".v23ignore" file is expected to contain a single regular expression pattern per
+line.
 `,
 	Children: []*cmdline.Command{cmdCopyrightCheck, cmdCopyrightFix},
 }
@@ -175,6 +181,7 @@ func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool
 	if strings.Contains(path, string(filepath.Separator)+"third_party"+string(filepath.Separator)) {
 		return nil
 	}
+
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
 	interpreter, err := detectInterpreter(path)
@@ -274,9 +281,17 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 	if err != nil {
 		return err
 	}
+
+	expressions, err := readV23Ignore(ctx, project)
+	if err != nil {
+		return err
+	}
+
 	for _, file := range files {
-		if err := checkFile(ctx, filepath.Join(project.Path, file), assets, fix); err != nil {
-			return err
+		if ignore := isIgnored(file, expressions); !ignore {
+			if err := checkFile(ctx, filepath.Join(project.Path, file), assets, fix); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -360,4 +375,50 @@ func loadAssets(ctx *tool.Context, dir string) (*copyrightAssets, error) {
 	}
 	result.Copyright = string(bytes)
 	return &result, nil
+}
+
+// isIgnored checks a path against patterns extracted from the .v23ignore file.
+func isIgnored(path string, expressions []*regexp.Regexp) bool {
+	for _, expression := range expressions {
+		if ok := expression.MatchString(path); ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func readV23Ignore(ctx *tool.Context, project util.Project) ([]*regexp.Regexp, error) {
+	// Grab the .v23ignore in from project.Path. Ignore file not found errors, not
+	// all projects will have one of these ignore files.
+	path := filepath.Join(project.Path, v23Ignore)
+	file, err := os.Open(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		return nil, nil
+	}
+	defer file.Close()
+
+	expressions := []*regexp.Regexp{}
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// TODO(jsimsa): Consider implementing conventions similar to .gitignore (e.g.
+		// leading '/' implies the regular expression should start with "^").
+		re, err := regexp.Compile(line)
+		if err != nil {
+			return nil, fmt.Errorf("Compile(%v) failed: %v", line, err)
+		}
+
+		expressions = append(expressions, re)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("Scan() failed: %v", err)
+	}
+
+	return expressions, nil
 }

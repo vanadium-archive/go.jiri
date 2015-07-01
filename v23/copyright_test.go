@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"v.io/x/devtools/internal/tool"
@@ -247,5 +248,70 @@ func TestCopyright(t *testing.T) {
 	}
 	if errOut.Len() != 0 {
 		t.Fatalf("unexpected error message: %q", errOut.String())
+	}
+
+	// Test .v23ignore functionality.
+	errOut.Reset()
+	// Add .v23ignore file.
+	ignoreFile := filepath.Join(projectPath, v23Ignore)
+	if err := ctx.Run().WriteFile(ignoreFile, []byte("public/fancy.js"), os.FileMode(0600)); err != nil {
+		t.Fatalf("%v", err)
+	}
+	publicDir := filepath.Join(projectPath, "public")
+	if err := ctx.Run().MkdirAll(publicDir, 0700); err != nil {
+		t.Fatalf("%v", err)
+	}
+	filename := filepath.Join(publicDir, "fancy.js")
+	if err := ctx.Run().WriteFile(filename, []byte("garbage"), os.FileMode(0600)); err != nil {
+		t.Fatalf("%v", err)
+	}
+	// Since the copyright check only applies to tracked files, we must run "git
+	// add" to have git track it. Without this, the test passes regardless of the
+	// subdir name.
+	if err := ctx.Git(tool.RootDirOpt(projectPath)).Add(filename); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := checkProject(ctx, project, assets, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("unexpected error message: %q", errOut.String())
+	}
+}
+
+func TestCopyrightIsIgnored(t *testing.T) {
+	lines := []string{
+		"public/bundle.*",
+		"build/",
+		"dist/min.js",
+	}
+	expressions := []*regexp.Regexp{}
+	for _, line := range lines {
+		expression, err := regexp.Compile(line)
+		if err != nil {
+			t.Fatalf("unexpected regexp.Compile(%v) failed: %v", line, err)
+		}
+
+		expressions = append(expressions, expression)
+	}
+
+	shouldIgnore := []string{
+		"public/bundle.js",
+		"public/bundle.css",
+		"dist/min.js",
+		"build/bar",
+	}
+
+	for _, path := range shouldIgnore {
+		if ignore := isIgnored(path, expressions); !ignore {
+			t.Errorf("isIgnored(%s, expressions) == %v, should be %v", path, ignore, true)
+		}
+	}
+
+	shouldNotIgnore := []string{"foo", "bar"}
+	for _, path := range shouldNotIgnore {
+		if ignore := isIgnored(path, expressions); ignore {
+			t.Errorf("isIgnored(%s, expressions) == %v, should be %v", path, ignore, false)
+		}
 	}
 }
