@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultWWWTestTimeout = 5 * time.Minute
+	defaultWWWTestTimeout = 10 * time.Minute
 )
 
 // Runs specified make target in WWW Makefile as a test.
