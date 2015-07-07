@@ -280,16 +280,42 @@ Usage:
 
 V23 profile - Manage vanadium profiles
 
-To facilitate development across different platforms, vanadium defines
-platform-independent profiles that map different platforms to a set of libraries
-and tools that can be used for a factor of vanadium development.
+To facilitate development across different host platforms, vanadium defines
+platform-independent "profiles" that map different platforms to a set of
+libraries and tools that can be used for a facet of vanadium development.
+
+Each profile can be in one of three states: absent, up-to-date, or out-of-date.
+The subcommands of the profile command realize the following transitions:
+
+  install:   absent => up-to-date
+  update:    out-of-date => up-to-date
+  uninstall: up-to-date or out-of-date => absent
+
+In addition, a profile can transition from being up-to-date to out-of-date by
+the virtue of a new version of the profile being released.
+
+To enable cross-compilation, a profile can be installed for multiple targets. If
+a profile supports multiple targets the above state transitions are applied on a
+profile + target basis.
 
 Usage:
    v23 profile <command>
 
 The v23 profile commands are:
+   install     Install the given vanadium profiles
    list        List known vanadium profiles
    setup       Set up the given vanadium profiles
+   uninstall   Uninstall the given vanadium profiles
+   update      Update the given vanadium profiles
+
+V23 profile install - Install the given vanadium profiles
+
+Install the given vanadium profiles.
+
+Usage:
+   v23 profile install <profiles>
+
+<profiles> is a list of profiles to install.
 
 V23 profile list - List known vanadium profiles
 
@@ -300,12 +326,31 @@ Usage:
 
 V23 profile setup - Set up the given vanadium profiles
 
-Set up the given vanadium profiles.
+Set up the given vanadium profiles. This command is identical to 'install' and
+is provided for backwards compatibility.
 
 Usage:
    v23 profile setup <profiles>
 
 <profiles> is a list of profiles to set up.
+
+V23 profile uninstall - Uninstall the given vanadium profiles
+
+Uninstall the given vanadium profiles.
+
+Usage:
+   v23 profile uninstall <profiles>
+
+<profiles> is a list of profiles to uninstall.
+
+V23 profile update - Update the given vanadium profiles
+
+Update the given vanadium profiles.
+
+Usage:
+   v23 profile update <profiles>
+
+<profiles> is a list of profiles to update.
 
 V23 project - Manage the vanadium projects
 
