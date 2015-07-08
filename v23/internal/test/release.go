@@ -213,10 +213,13 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			"--goos=linux",
 			"--goarch=amd64",
 		}
+		msg := "Push binaries\n"
 		args = append(args, serviceBinaries...)
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
+			test.Fail(ctx, msg)
 			return err
 		}
+		test.Pass(ctx, msg)
 	}
 
 	// A helper function to update a single app.
@@ -228,14 +231,18 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			"-parallelism=BYKIND",
 			appName + "/...",
 		}
+		msg := fmt.Sprintf("Update %q\n", appName)
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
+			test.Fail(ctx, msg)
 			return err
 		}
+		test.Pass(ctx, msg)
 		return nil
 	}
 
 	// A helper function to check a single app's build time.
 	checkBuildTimeFn := func(appName string) error {
+		msg := fmt.Sprintf("Verify build time for %q\n", appName)
 		now := time.Now()
 		adminCredentialsArg := fmt.Sprintf("--v23.credentials=%s", adminCredDir)
 		args := []string{
@@ -249,17 +256,21 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		opts := ctx.Run().Opts()
 		opts.Stdout = io.MultiWriter(opts.Stdout, &out)
 		if err := ctx.Run().TimedCommandWithOpts(defaultReleaseTestTimeout, opts, debugBin, args...); err != nil {
+			test.Fail(ctx, msg)
 			return err
 		}
 		// TODO(jingjin): check the build manifest label after changing the
 		// pre-release process to first cut the snapshot and then get the binaries
 		// for staging from the snapshot where we should be able to exactly match
 		// the build label.
-		buildTimeRE := regexp.MustCompile(fmt.Sprintf(`.*build\.Time:\s%sT.*`, now.Format("2006-01-02")))
+		expectedBuildTime := now.Format("2006-01-02")
+		buildTimeRE := regexp.MustCompile(fmt.Sprintf(`.*build\.Time:\s%sT.*`, expectedBuildTime))
 		statsOutput := out.String()
 		if !buildTimeRE.MatchString(statsOutput) {
-			return fmt.Errorf("Update failed.\nBuild time: %s", statsOutput)
+			test.Fail(ctx, msg)
+			return fmt.Errorf("Failed to verify build time.\nWant: %s\nGot: %s", expectedBuildTime, statsOutput)
 		}
+		test.Fail(ctx, msg)
 		return nil
 	}
 
