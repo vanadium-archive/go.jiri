@@ -97,10 +97,10 @@ func setJavaEnv(env *envvar.Vars, root string) error {
 	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", runtime.GOOS))
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
 
-	// Add Java Go 1.5 (installed via 'v23 profile setup java') to PATH.
+	// Add Java Go 1.5 (installed via 'v23 profile install java') to PATH.
 	javaGoDir := filepath.Join(root, "third_party", "java", "go")
 	if _, err := os.Stat(javaGoDir); err != nil {
-		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"v23 profile setup java\"?", javaGoDir)
+		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"v23 profile install java\"?", javaGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{filepath.Join(javaGoDir, "bin")}, path...)
@@ -122,10 +122,10 @@ func setAndroidEnv(env *envvar.Vars, root string) error {
 	env.Set("GOARM", "7")
 	env.Set("GOOS", "android")
 
-	// Add Android Go 1.5 (installed via 'v23 profile setup android') to PATH.
+	// Add Android Go 1.5 (installed via 'v23 profile install android') to PATH.
 	androidGoDir := filepath.Join(root, "third_party", "android", "go")
 	if _, err := os.Stat(androidGoDir); err != nil {
-		return fmt.Errorf("Couldn't find android Go installation directory %s: did you run \"v23 profile setup android\"?", androidGoDir)
+		return fmt.Errorf("Couldn't find android Go installation directory %s: did you run \"v23 profile install android\"?", androidGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{filepath.Join(androidGoDir, "bin")}, path...)

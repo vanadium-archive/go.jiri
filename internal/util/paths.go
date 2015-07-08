@@ -152,6 +152,15 @@ func VanadiumGitRepoHost() string {
 	return "https://vanadium.googlesource.com/"
 }
 
+// V23ProfilesFile returns the path to the v23 profiles file.
+func V23ProfilesFile() (string, error) {
+	root, err := V23Root()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, ".v23_profiles"), nil
+}
+
 // V23Root returns the root of the Vanadium universe.
 func V23Root() (string, error) {
 	root := os.Getenv(rootEnv)

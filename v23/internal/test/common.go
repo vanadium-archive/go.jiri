@@ -95,9 +95,9 @@ func initTest(ctx *tool.Context, testName string, profiles []string) (func() err
 		return nil, err
 	}
 
-	// Setup profiles.
+	// Install profiles.
 	for _, profile := range profiles {
-		if err := ctx.Run().Command("v23", "profile", "setup", profile); err != nil {
+		if err := ctx.Run().Command("v23", "profile", "install", profile); err != nil {
 			return nil, err
 		}
 	}

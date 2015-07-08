@@ -2,11 +2,24 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// IMPORTANT: When modifying existing profiles or creating new ones,
+// keep the following in mind.
+//
+// If an existing profile installation logic changes, the version
+// recorded in the <knownProfiles> variable should be incremented, the
+// old uninstall logic should be kept and trigger for instances of the
+// previous version, and new uninstall logic should be introduced.
+//
+// If new profile is introduced, make sure it is added to
+// <knownProfiles> and implementation of both the install and
+// uninstall logic is provided.
+
 package main
 
 import (
 	"bufio"
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -23,25 +36,77 @@ import (
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/envvar"
-	"v.io/x/lib/set"
 )
+
+type profilesSchema struct {
+	XMLName  xml.Name      `xml:"profiles"`
+	Profiles []profileInfo `xml:"profile"`
+}
+
+type profileInfos []profileInfo
+
+func (pis profileInfos) Len() int           { return len(pis) }
+func (pis profileInfos) Less(i, j int) bool { return pis[i].Name < pis[j].Name }
+func (pis profileInfos) Swap(i, j int)      { pis[i], pis[j] = pis[j], pis[i] }
+
+type profileTarget struct {
+	Arch    string `xml:"arch,attr"`
+	OS      string `xml:"os,attr"`
+	Version int    `xml:"version,attr"`
+}
+
+func (pt profileTarget) String() string {
+	return fmt.Sprintf("arch:%v os:%v", pt.Arch, pt.OS)
+}
+
+func (pt profileTarget) Equals(pt2 profileTarget) bool {
+	return pt.Arch == pt2.Arch && pt.OS == pt2.OS
+}
+
+type profileInfo struct {
+	Name    string          `xml:"name,attr"`
+	Targets []profileTarget `xml:"target"`
+	XMLName xml.Name        `xml:"profile"`
+	version int
+}
 
 var (
 	defaultDirPerm  = os.FileMode(0755)
 	defaultFilePerm = os.FileMode(0644)
-	knownProfiles   = map[string]struct{}{
-		"arm":         struct{}{},
-		"android":     struct{}{},
-		"java":        struct{}{},
-		"nodejs":      struct{}{},
-		"syncbase":    struct{}{},
-		"third-party": struct{}{},
-		"web":         struct{}{},
+	knownProfiles   = map[string]profileInfo{
+		"arm": profileInfo{
+			Name:    "arm",
+			version: 1,
+		},
+		"android": profileInfo{
+			Name:    "android",
+			version: 1,
+		},
+		"java": profileInfo{
+			Name:    "java",
+			version: 1,
+		},
+		"nodejs": profileInfo{
+			Name:    "nodejs",
+			version: 1,
+		},
+		"syncbase": profileInfo{
+			Name:    "syncbase",
+			version: 1,
+		},
+		"third-party": profileInfo{
+			Name:    "third-party",
+			version: 1,
+		},
+		"web": profileInfo{
+			Name:    "web",
+			version: 1,
+		},
 	}
 )
 
 const (
-	// Number of retries for profile setup.
+	// Number of retries for profile installation.
 	numRetries              = 3
 	actionCompletedFileName = ".vanadium_action_completed"
 )
@@ -51,123 +116,251 @@ var cmdProfile = &cmdline.Command{
 	Name:  "profile",
 	Short: "Manage vanadium profiles",
 	Long: `
-To facilitate development across different platforms, vanadium defines
-platform-independent profiles that map different platforms to a set
-of libraries and tools that can be used for a factor of vanadium
-development.
+To facilitate development across different host platforms, vanadium
+defines platform-independent "profiles" that map different platforms
+to a set of libraries and tools that can be used for a facet of
+vanadium development.
+
+Each profile can be in one of three states: absent, up-to-date, or
+out-of-date. The subcommands of the profile command realize the
+following transitions:
+
+  install:   absent => up-to-date
+  update:    out-of-date => up-to-date
+  uninstall: up-to-date or out-of-date => absent
+
+In addition, a profile can transition from being up-to-date to
+out-of-date by the virtue of a new version of the profile being
+released.
+
+To enable cross-compilation, a profile can be installed for multiple
+targets. If a profile supports multiple targets the above state
+transitions are applied on a profile + target basis.
 `,
-	Children: []*cmdline.Command{cmdProfileList, cmdProfileSetup},
+	Children: []*cmdline.Command{
+		cmdProfileInstall,
+		cmdProfileList,
+		cmdProfileSetup,
+		cmdProfileUninstall,
+		cmdProfileUpdate,
+	},
 }
 
-// cmdProfileList represents the "v23 profile list" command.
-var cmdProfileList = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runProfileList),
-	Name:   "list",
-	Short:  "List known vanadium profiles",
-	Long:   "List known vanadium profiles.",
+// addTarget adds the given target to the given profile.
+func addTarget(profiles map[string]profileInfo, target profileTarget, name string) {
+	profile, ok := profiles[name]
+	if !ok {
+		profile = knownProfiles[name]
+	}
+	profile.Targets = append(profile.Targets, target)
+	profiles[name] = profile
 }
 
-func runProfileList(env *cmdline.Env, _ []string) error {
-	profiles := set.String.ToSlice(knownProfiles)
-	sort.Strings(profiles)
-	for _, p := range profiles {
-		fmt.Fprintf(env.Stdout, "%s\n", p)
+// getTarget returns the target environment for the profile command.
+func getTarget() profileTarget {
+	target := profileTarget{
+		Arch: os.Getenv("GOARCH"),
+		OS:   os.Getenv("GOOS"),
+	}
+	if target.Arch == "" {
+		target.Arch = runtime.GOARCH
+	}
+	if target.OS == "" {
+		target.OS = runtime.GOOS
+	}
+	return target
+}
+
+// removeTarget removes the given target from the given profile.
+func removeTarget(profiles map[string]profileInfo, target profileTarget, name string) {
+	profile, ok := profiles[name]
+	if !ok {
+		return
+	}
+	for i, t := range profile.Targets {
+		if target.Equals(t) {
+			profile.Targets = append(profile.Targets[:i], profile.Targets[i+1:]...)
+			if len(profile.Targets) == 0 {
+				delete(profiles, name)
+			} else {
+				profiles[name] = profile
+			}
+			return
+		}
+	}
+}
+
+// lookupVersion returns the version for the given profile target
+// combination in the given collection of profiles.
+func lookupVersion(profiles map[string]profileInfo, target profileTarget, name string) int {
+	if profile, ok := profiles[name]; ok {
+		for _, t := range profile.Targets {
+			if target.Equals(t) {
+				return t.Version
+			}
+		}
+	}
+	return -1
+}
+
+// readV23Profiles reads information about installed v23 profiles into
+// memory.
+func readV23Profiles(ctx *tool.Context) (map[string]profileInfo, error) {
+	file, err := util.V23ProfilesFile()
+	if err != nil {
+		return nil, err
+	}
+	data, err := ctx.Run().ReadFile(file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]profileInfo{}, nil
+		}
+		return nil, err
+	}
+	var schema profilesSchema
+	if err := xml.Unmarshal(data, &schema); err != nil {
+		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(data), err)
+	}
+	profiles := profileInfos(schema.Profiles)
+	sort.Sort(profiles)
+	result := map[string]profileInfo{}
+	for _, profile := range profiles {
+		result[profile.Name] = profile
+	}
+	return result, nil
+}
+
+// writeV23Profiles writes information about installed v23 profiles to
+// disk.
+func writeV23Profiles(ctx *tool.Context, profiles map[string]profileInfo) error {
+	var schema profilesSchema
+	for _, profile := range profiles {
+		schema.Profiles = append(schema.Profiles, profile)
+	}
+	sort.Sort(profileInfos(schema.Profiles))
+	data, err := xml.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return fmt.Errorf("MarshalIndent() failed: %v", err)
+	}
+	file, err := util.V23ProfilesFile()
+	if err != nil {
+		return err
+	}
+	if err := ctx.Run().WriteFile(file, data, defaultFileMode); err != nil {
+		return err
 	}
 	return nil
 }
 
-// cmdProfileSetup represents the "v23 profile setup" command.
-var cmdProfileSetup = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runProfileSetup),
-	Name:     "setup",
-	Short:    "Set up the given vanadium profiles",
-	Long:     "Set up the given vanadium profiles.",
+// cmdProfileInstall represents the "v23 profile install" command.
+var cmdProfileInstall = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runProfileInstall),
+	Name:     "install",
+	Short:    "Install the given vanadium profiles",
+	Long:     "Install the given vanadium profiles.",
 	ArgsName: "<profiles>",
-	ArgsLong: "<profiles> is a list of profiles to set up.",
+	ArgsLong: "<profiles> is a list of profiles to install.",
 }
 
-func runProfileSetup(env *cmdline.Env, args []string) error {
-	// Check that the profiles to be set up exist.
+func runProfileInstall(env *cmdline.Env, args []string) error {
+	// Check that the profiles to be installed exist.
 	for _, arg := range args {
 		if _, ok := knownProfiles[arg]; !ok {
-			return env.UsageErrorf("profile %v does not exist", arg)
+			return env.UsageErrorf("profile %q does not exist", arg)
 		}
 	}
 
-	// Setup the profiles.
-	t := true
+	// Create contexts.
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
-		Verbose: &t,
+		Verbose: &verboseFlag,
 	})
+	t := true
+	verboseCtx := ctx.Clone(tool.ContextOpts{Verbose: &t})
+
+	// Find out what profiles are installed and what the operation
+	// target is.
+	profiles, err := readV23Profiles(ctx)
+	if err != nil {
+		return err
+	}
+	target := getTarget()
+
+	// Install the profiles.
 	for _, arg := range args {
-		setupFn := func() error {
+		// Check if the profile is installed for the given target.
+		if version := lookupVersion(profiles, target, arg); version != -1 {
+			fmt.Fprintf(ctx.Stdout(), "NOTE: profile %q is already installed for target %q\n", arg, target)
+			continue
+		}
+		// Install the profile for the given target.
+		installFn := func() error {
 			var err error
 			for i := 1; i <= numRetries; i++ {
 				fmt.Fprintf(ctx.Stdout(), fmt.Sprintf("Attempt #%d\n", i))
-				if err = setup(ctx, runtime.GOOS, arg); err == nil {
+				if err = install(verboseCtx, target, arg); err == nil {
 					return nil
 				}
 				fmt.Fprintf(ctx.Stdout(), "ERROR: %v\n", err)
 			}
 			return err
 		}
-		if err := ctx.Run().Function(setupFn, fmt.Sprintf("Set up profile %q", arg)); err != nil {
+		if err := verboseCtx.Run().Function(installFn, fmt.Sprintf("Install profile %q", arg)); err != nil {
+			return err
+		}
+		// Persist the information about the profile installation.
+		target.Version = knownProfiles[arg].version
+		addTarget(profiles, target, arg)
+		if err := writeV23Profiles(ctx, profiles); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-type unknownProfileErr string
-
-func (e unknownProfileErr) Error() string {
-	return fmt.Sprintf("unknown profile %q", e)
+func reportNotImplemented(ctx *tool.Context, profile string, target profileTarget) {
+	ctx.Run().Output([]string{fmt.Sprintf("profile %q is not implemented for target %q", profile, target)})
 }
 
-func reportNotImplemented(ctx *tool.Context, os, profile string) {
-	ctx.Run().Output([]string{fmt.Sprintf("profile %q is not implemented on %q", profile, os)})
-}
-
-func setup(ctx *tool.Context, os, profile string) error {
-	switch os {
+func install(ctx *tool.Context, target profileTarget, profile string) error {
+	switch target.OS {
 	case "darwin":
 		switch profile {
 		case "android":
-			return setupAndroidDarwin(ctx)
+			return installAndroidDarwin(ctx, target)
 		case "java":
-			return setupJavaDarwin(ctx)
+			return installJavaDarwin(ctx, target)
 		case "syncbase":
-			return setupSyncbaseDarwin(ctx)
-		case "third-party":
-			return setupThirdPartyDarwin(ctx)
+			return installSyncbaseDarwin(ctx, target)
 		case "nodejs":
-			return setupNodejsDarwin(ctx)
+			return installNodeJSDarwin(ctx, target)
+		case "third-party":
+			return installThirdPartyDarwin(ctx, target)
 		case "web":
-			return setupWebDarwin(ctx)
+			return installWebDarwin(ctx, target)
 		default:
-			reportNotImplemented(ctx, os, profile)
+			reportNotImplemented(ctx, profile, target)
 		}
 	case "linux":
 		switch profile {
 		case "android":
-			return setupAndroidLinux(ctx)
+			return installAndroidLinux(ctx, target)
 		case "arm":
-			return setupArmLinux(ctx)
+			return installArmLinux(ctx, target)
 		case "java":
-			return setupJavaLinux(ctx)
-		case "syncbase":
-			return setupSyncbaseLinux(ctx)
+			return installJavaLinux(ctx, target)
 		case "nodejs":
-			return setupNodejsLinux(ctx)
+			return installNodeJSLinux(ctx, target)
+		case "syncbase":
+			return installSyncbaseLinux(ctx, target)
 		case "web":
-			return setupWebLinux(ctx)
+			return installWebLinux(ctx, target)
 		default:
-			reportNotImplemented(ctx, os, profile)
+			reportNotImplemented(ctx, profile, target)
 		}
 	default:
-		reportNotImplemented(ctx, os, profile)
+		reportNotImplemented(ctx, profile, target)
 	}
 	return nil
 }
@@ -321,11 +514,11 @@ func run(ctx *tool.Context, bin string, args []string, env map[string]string) er
 	return err
 }
 
-// setupArmLinux sets up the arm profile for linux.
+// installArmLinux installs the arm profile for linux.
 //
 // For more on Go cross-compilation for arm/linux information see:
 // http://www.bootc.net/archives/2012/05/26/how-to-build-a-cross-compiler-for-your-raspberry-pi/
-func setupArmLinux(ctx *tool.Context) (e error) {
+func installArmLinux(ctx *tool.Context, target profileTarget) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -471,9 +664,9 @@ func setupArmLinux(ctx *tool.Context) (e error) {
 	return nil
 }
 
-// setupAndroidCommon prepares the shared cross-platform parts of the android
-// setup.
-func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
+// installAndroidCommon prepares the shared cross-platform parts of
+// the android setup.
+func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -539,7 +732,7 @@ func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 			fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		filename := "android-ndk-r9d-" + os + "-x86_64.tar.bz2"
+		filename := "android-ndk-r9d-" + target.OS + "-x86_64.tar.bz2"
 		remote := "https://dl.google.com/android/ndk/" + filename
 		local := filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
@@ -574,18 +767,19 @@ func setupAndroidCommon(ctx *tool.Context, os string) (e error) {
 	return atomicAction(ctx, installGoFn, androidGo, "Download and build Android Go")
 }
 
-// setupAndroidDarwin sets up the android profile for darwin.
-func setupAndroidDarwin(ctx *tool.Context) error {
-	return setupAndroidCommon(ctx, "darwin")
+// installAndroidDarwin installs the android profile for darwin.
+func installAndroidDarwin(ctx *tool.Context, target profileTarget) error {
+	return installAndroidCommon(ctx, target)
 }
 
-// setupAndroidLinux sets up the android profile for linux.
-func setupAndroidLinux(ctx *tool.Context) error {
-	return setupAndroidCommon(ctx, "linux")
+// installAndroidLinux installs the android profile for linux.
+func installAndroidLinux(ctx *tool.Context, target profileTarget) error {
+	return installAndroidCommon(ctx, target)
 }
 
-// setupJavaCommon contains cross-platform actions to setup the java profile.
-func setupJavaCommon(ctx *tool.Context) error {
+// installJavaCommon contains cross-platform actions to install the
+// java profile.
+func installJavaCommon(ctx *tool.Context, target profileTarget) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -598,7 +792,8 @@ func setupJavaCommon(ctx *tool.Context) error {
 	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
 }
 
-// Returns true iff the JDK already exists on the machine and is correctly setup.
+// hasJDK returns true iff the JDK already exists on the machine and
+// is correctly set up.
 func hasJDK() bool {
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
@@ -608,8 +803,8 @@ func hasJDK() bool {
 	return err == nil
 }
 
-// setupJavaDarwin sets up the java profile for mac.
-func setupJavaDarwin(ctx *tool.Context) error {
+// installJavaDarwin installs the java profile for darwin.
+func installJavaDarwin(ctx *tool.Context, target profileTarget) error {
 	if !hasJDK() {
 		// Prompt the user to install JDK 1.7+, if not already installed.
 		// (Note that JDK cannot be installed via Homebrew.)
@@ -627,28 +822,28 @@ func setupJavaDarwin(ctx *tool.Context) error {
 			}
 		}
 	}
-	if err := setupJavaCommon(ctx); err != nil {
+	if err := installJavaCommon(ctx, target); err != nil {
 		return err
 	}
 	return nil
 }
 
-// setupJavaLinux sets up the java profile for linux.
-func setupJavaLinux(ctx *tool.Context) error {
+// installJavaLinux installs the java profile for linux.
+func installJavaLinux(ctx *tool.Context, target profileTarget) error {
 	if !hasJDK() {
 		fmt.Printf("Couldn't find a valid JDK installation under JAVA_HOME (%s): installing a new JDK.\n", os.Getenv("JAVA_HOME"))
 		if err := installDeps(ctx, []string{"openjdk-7-jdk"}); err != nil {
 			return err
 		}
 	}
-	if err := setupJavaCommon(ctx); err != nil {
+	if err := installJavaCommon(ctx, target); err != nil {
 		return err
 	}
 	return nil
 }
 
-// setupThirdPartyDarwin sets up the third-party profile for darwin.
-func setupThirdPartyDarwin(ctx *tool.Context) error {
+// installThirdPartyDarwin installs the third-party profile for darwin.
+func installThirdPartyDarwin(ctx *tool.Context, target profileTarget) error {
 	if err := run(ctx, "brew", []string{"tap", "homebrew/dupes"}, nil); err != nil {
 		return err
 	}
@@ -673,24 +868,24 @@ func setupThirdPartyDarwin(ctx *tool.Context) error {
 	return nil
 }
 
-// setupNodejsDarwin sets up the nodejs profile for darwin.
-func setupNodejsDarwin(ctx *tool.Context) error {
-	return setupNodejsCommon(ctx)
+// installNodeJSDarwin installs the nodeJS profile for darwin.
+func installNodeJSDarwin(ctx *tool.Context, target profileTarget) error {
+	return installNodeJSCommon(ctx, target)
 }
 
-// setupNodejsLinux sets up the nodejs profile for linux.
-func setupNodejsLinux(ctx *tool.Context) error {
+// installNodeJSLinux installs the nodejs profile for linux.
+func installNodeJSLinux(ctx *tool.Context, target profileTarget) error {
 	// Install dependencies.
 	pkgs := []string{"g++"}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
 
-	return setupNodejsCommon(ctx)
+	return installNodeJSCommon(ctx, target)
 }
 
-// setupNodejsCommon sets up the nodejs profile.
-func setupNodejsCommon(ctx *tool.Context) error {
+// installNodeJSCommon installs the nodejs profile.
+func installNodeJSCommon(ctx *tool.Context, target profileTarget) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
@@ -714,38 +909,38 @@ func setupNodejsCommon(ctx *tool.Context) error {
 		}
 		return nil
 	}
-	if err := atomicAction(ctx, installNodeFn, nodeOutDir, "Build and install NodeJS"); err != nil {
+	if err := atomicAction(ctx, installNodeFn, nodeOutDir, "Build and install node.js"); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// setupWebDarwin sets up the web profile for darwin.
-func setupWebDarwin(ctx *tool.Context) error {
-	return setupWebCommon(ctx)
+// installWebDarwin installs the web profile for darwin.
+func installWebDarwin(ctx *tool.Context, target profileTarget) error {
+	return installWebCommon(ctx, target)
 }
 
-// setupWebLinux sets up the web profile for linux.
-func setupWebLinux(ctx *tool.Context) error {
+// installWebLinux installs the web profile for linux.
+func installWebLinux(ctx *tool.Context, target profileTarget) error {
 	// Install dependencies.
 	pkgs := []string{"g++", "libc6-i386", "zip"}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
 
-	return setupWebCommon(ctx)
+	return installWebCommon(ctx, target)
 }
 
-// setupWebCommon sets up the web profile.
-func setupWebCommon(ctx *tool.Context) error {
+// installWebCommon installs the web profile.
+func installWebCommon(ctx *tool.Context, target profileTarget) error {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
 
 	// Build and install NodeJS.
-	if err := setupNodejsCommon(ctx); err != nil {
+	if err := installNodeJSCommon(ctx, target); err != nil {
 		return err
 	}
 
@@ -782,8 +977,8 @@ func setupWebCommon(ctx *tool.Context) error {
 	return nil
 }
 
-// setupSyncbaseDarwin sets up the syncbase profile for darwin.
-func setupSyncbaseDarwin(ctx *tool.Context) error {
+// installSyncbaseDarwin installs the syncbase profile for darwin.
+func installSyncbaseDarwin(ctx *tool.Context, target profileTarget) error {
 	// Install dependencies.
 	pkgs := []string{
 		"autoconf", "automake", "libtool", "pkg-config",
@@ -791,11 +986,11 @@ func setupSyncbaseDarwin(ctx *tool.Context) error {
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
-	return setupSyncbaseCommon(ctx)
+	return installSyncbaseCommon(ctx, target)
 }
 
-// setupSyncbaseLinux sets up the syncbase profile for linux.
-func setupSyncbaseLinux(ctx *tool.Context) error {
+// installSyncbaseLinux installs the syncbase profile for linux.
+func installSyncbaseLinux(ctx *tool.Context, target profileTarget) error {
 	// Install dependencies.
 	pkgs := []string{
 		"autoconf", "automake", "g++", "g++-multilib", "gcc-multilib", "libtool", "pkg-config",
@@ -803,25 +998,20 @@ func setupSyncbaseLinux(ctx *tool.Context) error {
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
-	return setupSyncbaseCommon(ctx)
+	return installSyncbaseCommon(ctx, target)
 }
 
-// setupSyncbaseCommon sets up the syncbase profile.
-func setupSyncbaseCommon(ctx *tool.Context) (e error) {
+// installSyncbaseCommon installs the syncbase profile.
+func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return err
 	}
-
-	// TODO(rogulenko): get these var from a config file.
-	goos, goarch := runtime.GOOS, os.Getenv("GOARCH")
-	if goarch == "" {
-		goarch = runtime.GOARCH
-	}
-	var outPrefix string
-	if outPrefix, err = util.ThirdPartyCCodePath(goos, goarch); err != nil {
+	outPrefix, err := util.ThirdPartyCCodePath(target.OS, target.Arch)
+	if err != nil {
 		return err
 	}
+
 	// Build and install Snappy.
 	snappyOutDir := filepath.Join(outPrefix, "snappy")
 	installSnappyFn := func() error {
@@ -837,7 +1027,7 @@ func setupSyncbaseCommon(ctx *tool.Context) (e error) {
 			"--enable-shared=false",
 		}
 		env := map[string]string{}
-		if goarch == "386" {
+		if target.Arch == "386" {
 			env["CC"] = "gcc -m32"
 			env["CXX"] = "g++ -m32"
 		}
@@ -882,7 +1072,7 @@ func setupSyncbaseCommon(ctx *tool.Context) (e error) {
 			"CXXFLAGS": "-I" + filepath.Join(snappyOutDir, "include"),
 			"LDFLAGS":  "-L" + filepath.Join(snappyOutDir, "lib"),
 		}
-		if goarch == "386" {
+		if target.Arch == "386" {
 			env["CC"] = "gcc -m32"
 			env["CXX"] = "g++ -m32"
 		}
@@ -976,6 +1166,8 @@ func installGo15(ctx *tool.Context, goDir string, patchFiles []string, env *envv
 	return nil
 }
 
+// unsetGoEnv unsets Go environment variables in the given
+// environment.
 func unsetGoEnv(env *envvar.Vars) {
 	env.Set("CGO_ENABLED", "")
 	env.Set("CGO_CFLAGS", "")
@@ -1007,6 +1199,347 @@ func gitCloneRepo(ctx *tool.Context, remote, revision, outDir string) (e error) 
 	}
 	if err := run(ctx, "git", []string{"reset", "--hard", revision}, nil); err != nil {
 		return err
+	}
+	return nil
+}
+
+// cmdProfileList represents the "v23 profile list" command.
+//
+// TODO(jsimsa): Add support for listing installed profiles.
+var cmdProfileList = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runProfileList),
+	Name:   "list",
+	Short:  "List known vanadium profiles",
+	Long:   "List known vanadium profiles.",
+}
+
+func runProfileList(env *cmdline.Env, _ []string) error {
+	var profiles []string
+	for profile := range knownProfiles {
+		profiles = append(profiles, profile)
+	}
+	sort.Strings(profiles)
+	for _, p := range profiles {
+		fmt.Fprintf(env.Stdout, "%s\n", p)
+	}
+	return nil
+}
+
+// cmdProfileSetup represents the "v23 profile setup" command. This
+// command is identical to "v23 profile install" and is provided for
+// backwards compatibility.
+var cmdProfileSetup = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runProfileInstall),
+	Name:     "setup",
+	Short:    "Set up the given vanadium profiles",
+	Long:     "Set up the given vanadium profiles. This command is identical to 'install' and is provided for backwards compatibility.",
+	ArgsName: "<profiles>",
+	ArgsLong: "<profiles> is a list of profiles to set up.",
+}
+
+// cmdProfileUninstall represents the "v23 profile uninstall" command.
+var cmdProfileUninstall = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runProfileUninstall),
+	Name:     "uninstall",
+	Short:    "Uninstall the given vanadium profiles",
+	Long:     "Uninstall the given vanadium profiles.",
+	ArgsName: "<profiles>",
+	ArgsLong: "<profiles> is a list of profiles to uninstall.",
+}
+
+func runProfileUninstall(env *cmdline.Env, args []string) error {
+	// Check that the profiles to be uninstalled exist.
+	for _, arg := range args {
+		if _, ok := knownProfiles[arg]; !ok {
+			return env.UsageErrorf("profile %v does not exist", arg)
+		}
+	}
+
+	// Create contexts.
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	t := true
+	verboseCtx := ctx.Clone(tool.ContextOpts{Verbose: &t})
+
+	// Find out what profiles are installed and what the operation
+	// target is.
+	profiles, err := readV23Profiles(ctx)
+	if err != nil {
+		return err
+	}
+	target := getTarget()
+
+	// Uninstall the profiles.
+	for _, arg := range args {
+		// Check if the profile is installed for the given target.
+		version := lookupVersion(profiles, target, arg)
+		if version == -1 {
+			fmt.Fprintf(ctx.Stdout(), "NOTE: profile %q is not installed for target %q\n", arg, target)
+			continue
+		}
+		// Uninstall the profile for the given target.
+		uninstallFn := func() error {
+			return uninstall(verboseCtx, target, arg, version)
+		}
+		if err := verboseCtx.Run().Function(uninstallFn, fmt.Sprintf("Uninstall profile %q", arg)); err != nil {
+			return err
+		}
+		// Persist the information about the profile installation.
+		removeTarget(profiles, target, arg)
+		if err := writeV23Profiles(ctx, profiles); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func uninstall(ctx *tool.Context, target profileTarget, profile string, version int) error {
+	switch target.OS {
+	case "darwin":
+		switch profile {
+		case "android":
+			return uninstallAndroidDarwin(ctx, target, version)
+		case "java":
+			return uninstallJavaDarwin(ctx, target, version)
+		case "nodejs":
+			return uninstallNodeJSDarwin(ctx, target, version)
+		case "syncbase":
+			return uninstallSyncbaseDarwin(ctx, target, version)
+		case "third-party":
+			return uninstallThirdPartyDarwin(ctx, target, version)
+		case "web":
+			return uninstallWebDarwin(ctx, target, version)
+		default:
+			reportNotImplemented(ctx, profile, target)
+		}
+	case "linux":
+		switch profile {
+		case "android":
+			return uninstallAndroidLinux(ctx, target, version)
+		case "arm":
+			return uninstallArmLinux(ctx, target, version)
+		case "java":
+			return uninstallJavaLinux(ctx, target, version)
+		case "nodejs":
+			return uninstallNodeJSLinux(ctx, target, version)
+		case "syncbase":
+			return uninstallSyncbaseLinux(ctx, target, version)
+		case "web":
+			return uninstallWebLinux(ctx, target, version)
+		default:
+			reportNotImplemented(ctx, profile, target)
+		}
+	default:
+		reportNotImplemented(ctx, profile, target)
+	}
+	return nil
+}
+
+// uninstallAndroidDarwin uninstalls the android profile for darwin.
+func uninstallAndroidDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallAndroidCommon(ctx, target, version)
+}
+
+// uninstallAndroidLinux uninstalls the android profile for linux.
+func uninstallAndroidLinux(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallAndroidCommon(ctx, target, version)
+}
+
+// uninstallAndroidCommon uninstalls the android profile.
+func uninstallAndroidCommon(ctx *tool.Context, target profileTarget, version int) error {
+	// TODO(spetrovic): Implement.
+	return fmt.Errorf("not implemented")
+}
+
+// uninstallArmLinux uninstalls the arm profile for linux.
+func uninstallArmLinux(ctx *tool.Context, target profileTarget, version int) error {
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+	goRepoDir := filepath.Join(root, "third_party", "repos", "go_arm")
+	if err := ctx.Run().RemoveAll(goRepoDir); err != nil {
+		return err
+	}
+	xgccOutDir := filepath.Join(root, "third_party", "cout", "xgcc")
+	if err := ctx.Run().RemoveAll(xgccOutDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+// uninstallJavaDarwin uninstalls the java profile for darwin.
+func uninstallJavaDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallJavaCommon(ctx, target, version)
+}
+
+// uninstallJavaLinux uninstalls the java profile for linux.
+func uninstallJavaLinux(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallJavaCommon(ctx, target, version)
+}
+
+// uninstallJavaCommon uninstalls the java profile.
+func uninstallJavaCommon(ctx *tool.Context, target profileTarget, version int) error {
+	// TODO(spetrovic): Implement.
+	return fmt.Errorf("not implemented")
+}
+
+// uninstallNodeJSDarwin uninstalls the nodejs profile for darwin.
+func uninstallNodeJSDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallNodeJSCommon(ctx, target, version)
+}
+
+// uninstallNodeJSLinux uninstalls the nodejs profile for linux.
+func uninstallNodeJSLinux(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallNodeJSCommon(ctx, target, version)
+}
+
+// uninstallNodeJSCommon uninstalls the nodejs profile.
+func uninstallNodeJSCommon(ctx *tool.Context, target profileTarget, version int) error {
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+	nodeOutDir := filepath.Join(root, "third_party", "cout", "node")
+	if err := ctx.Run().RemoveAll(nodeOutDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+// uninstallSyncbaseDarwin uninstalls the syncbase profile for darwin.
+func uninstallSyncbaseDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallSyncbaseCommon(ctx, target, version)
+}
+
+// uninstallSyncbaseLinux uninstalls the syncbase profile for linux.
+func uninstallSyncbaseLinux(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallSyncbaseCommon(ctx, target, version)
+}
+
+// uninstallSyncbaseCommon uninstalls the syncbase profile.
+func uninstallSyncbaseCommon(ctx *tool.Context, target profileTarget, version int) error {
+	outPrefix, err := util.ThirdPartyCCodePath(target.OS, target.Arch)
+	if err != nil {
+		return err
+	}
+	snappyOutDir := filepath.Join(outPrefix, "snappy")
+	if err := ctx.Run().RemoveAll(snappyOutDir); err != nil {
+		return err
+	}
+	leveldbOutDir := filepath.Join(outPrefix, "leveldb")
+	if err := ctx.Run().RemoveAll(leveldbOutDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+// uninstallThirdPartyDarwin uninstalls the third-party profile for darwin.
+func uninstallThirdPartyDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	// TODO(jsimsa): Implement.
+	return fmt.Errorf("not implemented")
+}
+
+// uninstallWebDarwin uninstalls the web profile for darwin.
+func uninstallWebDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallWebCommon(ctx, target, version)
+}
+
+// uninstallWebLinux uninstalls the web profile for linux.
+func uninstallWebLinux(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallWebCommon(ctx, target, version)
+}
+
+// uninstallWebCommon uninstalls the web profile.
+func uninstallWebCommon(ctx *tool.Context, target profileTarget, version int) error {
+	// TODO(jsimsa): Implement.
+	return fmt.Errorf("not implemented")
+}
+
+// cmdProfileUpdate represents the "v23 profile update" command.
+var cmdProfileUpdate = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runProfileUpdate),
+	Name:     "update",
+	Short:    "Update the given vanadium profiles",
+	Long:     "Update the given vanadium profiles.",
+	ArgsName: "<profiles>",
+	ArgsLong: "<profiles> is a list of profiles to update.",
+}
+
+func runProfileUpdate(env *cmdline.Env, args []string) error {
+	// Check that the profiles to be updated exist.
+	for _, arg := range args {
+		if _, ok := knownProfiles[arg]; !ok {
+			return env.UsageErrorf("profile %v does not exist", arg)
+		}
+	}
+
+	// Create contexts.
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	t := true
+	verboseCtx := ctx.Clone(tool.ContextOpts{Verbose: &t})
+
+	// Find out what profiles are installed and what the operation
+	// target is.
+	profiles, err := readV23Profiles(ctx)
+	if err != nil {
+		return err
+	}
+	target := getTarget()
+
+	// Update the profiles.
+	for _, arg := range args {
+		version := lookupVersion(profiles, target, arg)
+		// Check if the profile is installed for the given target.
+		if version == -1 {
+			fmt.Fprintf(ctx.Stdout(), "NOTE: profile %q is not installed for target %q\n", arg, target)
+			continue
+		}
+		// Check if the profile installation for the given target is up-to-date.
+		if knownProfiles[arg].version == version {
+			fmt.Fprintf(ctx.Stdout(), "NOTE: profile %q is already up-to-date\n", arg)
+			continue
+		}
+		// Uninstall the old version.
+		uninstallFn := func() error {
+			return uninstall(verboseCtx, target, arg, version)
+		}
+		if err := verboseCtx.Run().Function(uninstallFn, fmt.Sprintf("Uninstall old version of profile %q", arg)); err != nil {
+			return err
+		}
+		// Persist the information about the profile installation.
+		removeTarget(profiles, target, arg)
+		if err := writeV23Profiles(ctx, profiles); err != nil {
+			return err
+		}
+		// Install the new version.
+		installFn := func() error {
+			var err error
+			for i := 1; i <= numRetries; i++ {
+				fmt.Fprintf(ctx.Stdout(), fmt.Sprintf("Attempt #%d\n", i))
+				if err = install(verboseCtx, target, arg); err == nil {
+					return nil
+				}
+				fmt.Fprintf(ctx.Stdout(), "ERROR: %v\n", err)
+			}
+			return err
+		}
+		if err := verboseCtx.Run().Function(installFn, fmt.Sprintf("Install new version of profile %q", arg)); err != nil {
+			return err
+		}
+		// Persist the information about the profile installation.
+		target.Version = knownProfiles[arg].version
+		addTarget(profiles, target, arg)
+		if err := writeV23Profiles(ctx, profiles); err != nil {
+			return err
+		}
 	}
 	return nil
 }

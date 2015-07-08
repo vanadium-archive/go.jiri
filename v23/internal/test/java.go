@@ -74,7 +74,7 @@ func getJDKLinux(ctx *tool.Context) (string, error) {
 	opts.Stderr = &out
 	ctx.Run().CommandWithOpts(opts, "readlink", "-f", javacBin)
 	if out.Len() == 0 {
-		return "", errors.New("Couldn't find a valid Java installation: did you run \"v23 profile setup java\"?")
+		return "", errors.New("Couldn't find a valid Java installation: did you run \"v23 profile install java\"?")
 	}
 	// Strip "/bin/javac" from the returned path.
 	return strings.TrimSuffix(out.String(), "/bin/javac\n"), nil
@@ -88,7 +88,7 @@ func getJDKDarwin(ctx *tool.Context) (string, error) {
 	opts.Stderr = &out
 	ctx.Run().CommandWithOpts(opts, javaHomeBin, "-t", "CommandLine", "-v", "1.7+")
 	if out.Len() == 0 {
-		return "", errors.New("Couldn't find a valid Java installation: did you run \"v23 profile setup java\"?")
+		return "", errors.New("Couldn't find a valid Java installation: did you run \"v23 profile install java\"?")
 	}
 	jdkLoc, _, err := bufio.NewReader(strings.NewReader(out.String())).ReadLine()
 	if err != nil {
