@@ -340,6 +340,7 @@ func runTests(ctx *tool.Context, tests []string, results map[string]*test.Result
 			err = checkTestReportFile(newCtx, t)
 		}
 		if err != nil {
+			fmt.Fprintf(newCtx.Stderr(), "%v\n", err)
 			r, err := generateXUnitReportForError(newCtx, t, err, out.String())
 			if err != nil {
 				return err
