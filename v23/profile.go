@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -92,10 +91,6 @@ var (
 		},
 		"syncbase": profileInfo{
 			Name:    "syncbase",
-			version: 1,
-		},
-		"third-party": profileInfo{
-			Name:    "third-party",
 			version: 1,
 		},
 		"web": profileInfo{
@@ -335,8 +330,6 @@ func install(ctx *tool.Context, target profileTarget, profile string) error {
 			return installSyncbaseDarwin(ctx, target)
 		case "nodejs":
 			return installNodeJSDarwin(ctx, target)
-		case "third-party":
-			return installThirdPartyDarwin(ctx, target)
 		case "web":
 			return installWebDarwin(ctx, target)
 		default:
@@ -842,32 +835,6 @@ func installJavaLinux(ctx *tool.Context, target profileTarget) error {
 	return nil
 }
 
-// installThirdPartyDarwin installs the third-party profile for darwin.
-func installThirdPartyDarwin(ctx *tool.Context, target profileTarget) error {
-	if err := run(ctx, "brew", []string{"tap", "homebrew/dupes"}, nil); err != nil {
-		return err
-	}
-	{
-		var out bytes.Buffer
-		opts := ctx.Run().Opts()
-		opts.Stdout = io.MultiWriter(&out, opts.Stdout)
-		opts.Stderr = io.MultiWriter(&out, opts.Stdout)
-		if err := ctx.Run().CommandWithOpts(opts, "brew", "install", "openssh", "--with-brewed-openssl", "--with-keychain-support"); err != nil {
-			return err
-		}
-	}
-	{
-		var out bytes.Buffer
-		opts := ctx.Run().Opts()
-		opts.Stdout = io.MultiWriter(&out, opts.Stdout)
-		opts.Stderr = io.MultiWriter(&out, opts.Stdout)
-		if err := ctx.Run().CommandWithOpts(opts, "brew", "install", "dbus"); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // installNodeJSDarwin installs the nodeJS profile for darwin.
 func installNodeJSDarwin(ctx *tool.Context, target profileTarget) error {
 	return installNodeJSCommon(ctx, target)
@@ -1308,8 +1275,6 @@ func uninstall(ctx *tool.Context, target profileTarget, profile string, version 
 			return uninstallNodeJSDarwin(ctx, target, version)
 		case "syncbase":
 			return uninstallSyncbaseDarwin(ctx, target, version)
-		case "third-party":
-			return uninstallThirdPartyDarwin(ctx, target, version)
 		case "web":
 			return uninstallWebDarwin(ctx, target, version)
 		default:
@@ -1435,12 +1400,6 @@ func uninstallSyncbaseCommon(ctx *tool.Context, target profileTarget, version in
 		return err
 	}
 	return nil
-}
-
-// uninstallThirdPartyDarwin uninstalls the third-party profile for darwin.
-func uninstallThirdPartyDarwin(ctx *tool.Context, target profileTarget, version int) error {
-	// TODO(jsimsa): Implement.
-	return fmt.Errorf("not implemented")
 }
 
 // uninstallWebDarwin uninstalls the web profile for darwin.
