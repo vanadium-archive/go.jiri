@@ -99,7 +99,13 @@ func vanadiumReleaseCandidate(ctx *tool.Context, testName string, opts ...Opt) (
 		},
 		step{
 			msg: "Check services\n",
-			fn:  func() error { return checkServices(ctx) },
+			fn: func() error {
+				// Wait 5 minutes.
+				fmt.Fprintf(ctx.Stdout(), "Wait for 5 minutes before checking services...\n")
+				time.Sleep(time.Minute * 5)
+
+				return checkServices(ctx)
+			},
 		},
 		step{
 			msg: "Update the 'latest' file\n",
@@ -310,7 +316,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		if err := ctx.Run().TimedCommand(defaultReleaseTestTimeout, deviceBin, args...); err != nil {
 			return err
 		}
-		if err := waitForMounttable(ctx, root, adminCredentialsArg, localMountTable); err != nil {
+		if err := waitForMounttable(ctx, root, adminCredentialsArg, localMountTable, `.*8151/devmgr.*`); err != nil {
 			return err
 		}
 		// TODO(jingjin): check build time for device manager.
@@ -323,7 +329,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		if err := updateAppFn(mounttableName); err != nil {
 			return err
 		}
-		if err := waitForMounttable(ctx, root, adminCredentialsArg, globalMountTable); err != nil {
+		if err := waitForMounttable(ctx, root, adminCredentialsArg, globalMountTable, `.+`); err != nil {
 			return err
 		}
 		if err := checkBuildTimeFn(mounttableName); err != nil {
@@ -382,9 +388,10 @@ func updateDeviceManagerEnvelope(ctx *tool.Context, root, credentialsArg, nsArg 
 	return nil
 }
 
-// waitForMounttable waits for the given mounttable to be up
-// (timeout: 5 minutes).
-func waitForMounttable(ctx *tool.Context, root, credentialsArg, mounttableRoot string) error {
+// waitForMounttable waits for the given mounttable to be up and optionally
+// checks output against outputRegexp if it is not empty.
+// (timeout: 5 minutes)
+func waitForMounttable(ctx *tool.Context, root, credentialsArg, mounttableRoot, outputRegexp string) error {
 	debugBin := filepath.Join(root, "release", "go", "bin", "debug")
 	args := []string{
 		credentialsArg,
@@ -392,8 +399,13 @@ func waitForMounttable(ctx *tool.Context, root, credentialsArg, mounttableRoot s
 		mounttableRoot + "/*",
 	}
 	up := false
+	outputRE := regexp.MustCompile(outputRegexp)
 	for i := 0; i < numRetries; i++ {
-		if err := ctx.Run().Command(debugBin, args...); err != nil {
+		var out bytes.Buffer
+		opts := ctx.Run().Opts()
+		opts.Stdout = io.MultiWriter(opts.Stdout, &out)
+		err := ctx.Run().CommandWithOpts(opts, debugBin, args...)
+		if err != nil || !outputRE.MatchString(out.String()) {
 			time.Sleep(retryPeriod)
 			continue
 		} else {
@@ -410,10 +422,6 @@ func waitForMounttable(ctx *tool.Context, root, credentialsArg, mounttableRoot s
 // checkServices runs "v23 test run vanadium-prod-services-test" against
 // staging.
 func checkServices(ctx *tool.Context) error {
-	// Wait 5 minutes.
-	fmt.Fprintf(ctx.Stdout(), "Wait for 5 minutes before checking")
-	time.Sleep(time.Minute * 5)
-
 	args := []string{
 		"test",
 		"run",
