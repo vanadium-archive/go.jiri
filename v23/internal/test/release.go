@@ -205,7 +205,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 
 	// Push all binaries.
 	{
-		fmt.Fprintln(ctx.Stdout(), "Pushing binaries...")
+		fmt.Fprintln(ctx.Stdout(), "\n\n### Pushing binaries ###")
 		args := []string{
 			publisherCredentialsArg,
 			nsArg,
@@ -270,13 +270,13 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			test.Fail(ctx, msg)
 			return fmt.Errorf("Failed to verify build time.\nWant: %s\nGot: %s", expectedBuildTime, statsOutput)
 		}
-		test.Fail(ctx, msg)
+		test.Pass(ctx, msg)
 		return nil
 	}
 
 	// Update services except for device manager and mounttable.
 	{
-		fmt.Fprintln(ctx.Stdout(), "Updating services other than device manager and mounttable...")
+		fmt.Fprintln(ctx.Stdout(), "\n\n### Updating services other than device manager and mounttable ###")
 		apps := []string{
 			"devmgr/apps/applicationd",
 			"devmgr/apps/binaryd",
@@ -297,7 +297,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 
 	// Update Device Manager.
 	{
-		fmt.Fprintln(ctx.Stdout(), "Updating device manager...")
+		fmt.Fprintln(ctx.Stdout(), "\n\n### Updating device manager ###")
 		if err := updateDeviceManagerEnvelope(ctx, root, publisherCredentialsArg, nsArg); err != nil {
 			return err
 		}
@@ -318,7 +318,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 
 	// Update mounttable last.
 	{
-		fmt.Fprintln(ctx.Stdout(), "Updating mounttable...")
+		fmt.Fprintln(ctx.Stdout(), "\n\n### Updating mounttable ###")
 		mounttableName := "devmgr/apps/mounttabled"
 		if err := updateAppFn(mounttableName); err != nil {
 			return err
