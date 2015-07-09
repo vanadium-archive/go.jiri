@@ -104,7 +104,7 @@ func TestTimedCommandOK(t *testing.T) {
 func TestTimedCommandFail(t *testing.T) {
 	var out bytes.Buffer
 	run := NewRun(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
-	bin, err := buildSlowHello(run)
+	bin, err := buildTestProgram(run, "slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
 	}
@@ -140,7 +140,7 @@ func TestTimedCommandWithOptsOK(t *testing.T) {
 func TestTimedCommandWithOptsFail(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
 	run := NewRun(nil, os.Stdin, &runOut, ioutil.Discard, false, false, true)
-	bin, err := buildSlowHello(run)
+	bin, err := buildTestProgram(run, "slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
 	}
@@ -272,13 +272,13 @@ func TestNested(t *testing.T) {
 	}
 }
 
-func buildSlowHello(run *Run) (string, error) {
+func buildTestProgram(run *Run, fileName string) (string, error) {
 	tmpDir, err := ioutil.TempDir("", "runtest")
 	if err != nil {
 		return "", fmt.Errorf("TempDir() failed: %v", err)
 	}
-	bin := filepath.Join(tmpDir, "slow_hello")
-	buildArgs := []string{"build", "-o", bin, "./testdata/slow_hello.go"}
+	bin := filepath.Join(tmpDir, fileName)
+	buildArgs := []string{"build", "-o", bin, fmt.Sprintf("./testdata/%s.go", fileName)}
 	opts := run.Opts()
 	opts.Verbose = false
 	if err := run.CommandWithOpts(opts, "go", buildArgs...); err != nil {

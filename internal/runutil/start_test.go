@@ -19,7 +19,7 @@ import (
 func TestStartCommandOK(t *testing.T) {
 	var out bytes.Buffer
 	start := NewStart(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
-	bin, err := buildSlowHello(NewRun(nil, os.Stdin, &out, ioutil.Discard, false, false, true))
+	bin, err := buildTestProgram(NewRun(nil, os.Stdin, &out, ioutil.Discard, false, false, true), "slow_hello2")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
 	}
