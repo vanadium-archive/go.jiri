@@ -66,6 +66,10 @@ func vanadiumWWWTutorialsCore(ctx *tool.Context, testName string, _ ...Opt) (*te
 	return commonVanadiumWWW(ctx, testName, "test-tutorials-core", defaultWWWTestTimeout)
 }
 
+func vanadiumWWWTutorialsExternal(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-external", defaultWWWTestTimeout)
+}
+
 func vanadiumWWWTutorialsJSNode(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-node", defaultWWWTestTimeout)
 }

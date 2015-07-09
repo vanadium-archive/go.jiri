@@ -121,6 +121,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-www-deploy-staging":         vanadiumWWWDeployStaging,
 	"vanadium-www-site":                   vanadiumWWWSite,
 	"vanadium-www-tutorials-core":         vanadiumWWWTutorialsCore,
+	"vanadium-www-tutorials-external":     vanadiumWWWTutorialsExternal,
 	"vanadium-www-tutorials-js-node":      vanadiumWWWTutorialsJSNode,
 	"vanadium-www-tutorials-js-web":       vanadiumWWWTutorialsJSWeb,
 }
