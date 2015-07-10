@@ -29,7 +29,7 @@ func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...Opt) (_ *te
 	}
 
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"web"})
+	cleanup, err := initTest(ctx, testName, []string{"nodejs"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}

@@ -28,7 +28,7 @@ func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout t
 	}
 
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"syncbase", "web"})
+	cleanup, err := initTest(ctx, testName, []string{"nodejs", "syncbase"})
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}

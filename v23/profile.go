@@ -85,16 +85,16 @@ var (
 			Name:    "java",
 			version: 1,
 		},
+		"nacl": profileInfo{
+			Name:    "nacl",
+			version: 1,
+		},
 		"nodejs": profileInfo{
 			Name:    "nodejs",
 			version: 1,
 		},
 		"syncbase": profileInfo{
 			Name:    "syncbase",
-			version: 1,
-		},
-		"web": profileInfo{
-			Name:    "web",
 			version: 1,
 		},
 	}
@@ -326,12 +326,12 @@ func install(ctx *tool.Context, target profileTarget, profile string) error {
 			return installAndroidDarwin(ctx, target)
 		case "java":
 			return installJavaDarwin(ctx, target)
-		case "syncbase":
-			return installSyncbaseDarwin(ctx, target)
+		case "nacl":
+			return installNaclDarwin(ctx, target)
 		case "nodejs":
 			return installNodeJSDarwin(ctx, target)
-		case "web":
-			return installWebDarwin(ctx, target)
+		case "syncbase":
+			return installSyncbaseDarwin(ctx, target)
 		default:
 			reportNotImplemented(ctx, profile, target)
 		}
@@ -343,12 +343,12 @@ func install(ctx *tool.Context, target profileTarget, profile string) error {
 			return installArmLinux(ctx, target)
 		case "java":
 			return installJavaLinux(ctx, target)
+		case "nacl":
+			return installNaclLinux(ctx, target)
 		case "nodejs":
 			return installNodeJSLinux(ctx, target)
 		case "syncbase":
 			return installSyncbaseLinux(ctx, target)
-		case "web":
-			return installWebLinux(ctx, target)
 		default:
 			reportNotImplemented(ctx, profile, target)
 		}
@@ -883,31 +883,26 @@ func installNodeJSCommon(ctx *tool.Context, target profileTarget) error {
 	return nil
 }
 
-// installWebDarwin installs the web profile for darwin.
-func installWebDarwin(ctx *tool.Context, target profileTarget) error {
-	return installWebCommon(ctx, target)
+// installNaclDarwin installs the nacl profile for darwin.
+func installNaclDarwin(ctx *tool.Context, target profileTarget) error {
+	return installNaclCommon(ctx, target)
 }
 
-// installWebLinux installs the web profile for linux.
-func installWebLinux(ctx *tool.Context, target profileTarget) error {
+// installNaclLinux installs the nacl profile for linux.
+func installNaclLinux(ctx *tool.Context, target profileTarget) error {
 	// Install dependencies.
 	pkgs := []string{"g++", "libc6-i386", "zip"}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
 
-	return installWebCommon(ctx, target)
+	return installNaclCommon(ctx, target)
 }
 
-// installWebCommon installs the web profile.
-func installWebCommon(ctx *tool.Context, target profileTarget) error {
+// installNaclCommon installs the nacl profile.
+func installNaclCommon(ctx *tool.Context, target profileTarget) error {
 	root, err := util.V23Root()
 	if err != nil {
-		return err
-	}
-
-	// Build and install NodeJS.
-	if err := installNodeJSCommon(ctx, target); err != nil {
 		return err
 	}
 
@@ -1271,12 +1266,12 @@ func uninstall(ctx *tool.Context, target profileTarget, profile string, version 
 			return uninstallAndroidDarwin(ctx, target, version)
 		case "java":
 			return uninstallJavaDarwin(ctx, target, version)
+		case "nacl":
+			return uninstallNaclDarwin(ctx, target, version)
 		case "nodejs":
 			return uninstallNodeJSDarwin(ctx, target, version)
 		case "syncbase":
 			return uninstallSyncbaseDarwin(ctx, target, version)
-		case "web":
-			return uninstallWebDarwin(ctx, target, version)
 		default:
 			reportNotImplemented(ctx, profile, target)
 		}
@@ -1288,12 +1283,12 @@ func uninstall(ctx *tool.Context, target profileTarget, profile string, version 
 			return uninstallArmLinux(ctx, target, version)
 		case "java":
 			return uninstallJavaLinux(ctx, target, version)
+		case "nacl":
+			return uninstallNaclLinux(ctx, target, version)
 		case "nodejs":
 			return uninstallNodeJSLinux(ctx, target, version)
 		case "syncbase":
 			return uninstallSyncbaseLinux(ctx, target, version)
-		case "web":
-			return uninstallWebLinux(ctx, target, version)
 		default:
 			reportNotImplemented(ctx, profile, target)
 		}
@@ -1352,6 +1347,29 @@ func uninstallJavaCommon(ctx *tool.Context, target profileTarget, version int) e
 	return fmt.Errorf("not implemented")
 }
 
+// uninstallNaclDarwin uninstalls the nacl profile for darwin.
+func uninstallNaclDarwin(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallNaclCommon(ctx, target, version)
+}
+
+// uninstallNaclLinux uninstalls the nacl profile for linux.
+func uninstallNaclLinux(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallNaclCommon(ctx, target, version)
+}
+
+// uninstallNaclCommon uninstalls the nacl profile.
+func uninstallNaclCommon(ctx *tool.Context, target profileTarget, version int) error {
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+	goPpapiRepoDir := filepath.Join(root, "third_party", "repos", "go_ppapi")
+	if err := ctx.Run().RemoveAll(goPpapiRepoDir); err != nil {
+		return err
+	}
+	return nil
+}
+
 // uninstallNodeJSDarwin uninstalls the nodejs profile for darwin.
 func uninstallNodeJSDarwin(ctx *tool.Context, target profileTarget, version int) error {
 	return uninstallNodeJSCommon(ctx, target, version)
@@ -1400,22 +1418,6 @@ func uninstallSyncbaseCommon(ctx *tool.Context, target profileTarget, version in
 		return err
 	}
 	return nil
-}
-
-// uninstallWebDarwin uninstalls the web profile for darwin.
-func uninstallWebDarwin(ctx *tool.Context, target profileTarget, version int) error {
-	return uninstallWebCommon(ctx, target, version)
-}
-
-// uninstallWebLinux uninstalls the web profile for linux.
-func uninstallWebLinux(ctx *tool.Context, target profileTarget, version int) error {
-	return uninstallWebCommon(ctx, target, version)
-}
-
-// uninstallWebCommon uninstalls the web profile.
-func uninstallWebCommon(ctx *tool.Context, target profileTarget, version int) error {
-	// TODO(jsimsa): Implement.
-	return fmt.Errorf("not implemented")
 }
 
 // cmdProfileUpdate represents the "v23 profile update" command.

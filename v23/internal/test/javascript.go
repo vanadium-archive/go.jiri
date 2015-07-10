@@ -23,7 +23,7 @@ const (
 // runJSTest is a harness for executing javascript tests.
 func runJSTest(ctx *tool.Context, testName, testDir, target string, cleanFn func() error, env map[string]string, extraDeps []string) (_ *test.Result, e error) {
 	// Initialize the test.
-	deps := append(extraDeps, "web")
+	deps := append(extraDeps, "nodejs")
 	cleanup, err := initTest(ctx, testName, deps)
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
@@ -72,7 +72,7 @@ func vanadiumJSBuildExtension(ctx *tool.Context, testName string, _ ...Opt) (*te
 	}
 	testDir := filepath.Join(root, "release", "javascript", "core")
 	target := "extension/vanadium.zip"
-	return runJSTest(ctx, testName, testDir, target, nil, nil, nil)
+	return runJSTest(ctx, testName, testDir, target, nil, nil, []string{"nacl"})
 }
 
 // vanadiumJSDoc (re)generates the content of the vanadium javascript
@@ -104,7 +104,7 @@ func vanadiumJSBrowserIntegration(ctx *tool.Context, testName string, _ ...Opt) 
 	env := map[string]string{}
 	setCommonJSEnv(env)
 	env["BROWSER_OUTPUT"] = xunit.ReportPath(testName)
-	return runJSTest(ctx, testName, testDir, target, nil, env, nil)
+	return runJSTest(ctx, testName, testDir, target, nil, env, []string{"nacl"})
 }
 
 // vanadiumJSNodeIntegration runs the vanadium javascript integration test in NodeJS environment using wspr.
@@ -132,7 +132,7 @@ func vanadiumJSUnit(ctx *tool.Context, testName string, _ ...Opt) (*test.Result,
 	env := map[string]string{}
 	setCommonJSEnv(env)
 	env["NODE_OUTPUT"] = xunit.ReportPath(testName)
-	return runJSTest(ctx, testName, testDir, target, nil, env, nil)
+	return runJSTest(ctx, testName, testDir, target, nil, env, []string{"nacl"})
 }
 
 // vanadiumJSVdl runs the vanadium javascript vdl test.
@@ -146,7 +146,7 @@ func vanadiumJSVdl(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 	env := map[string]string{}
 	setCommonJSEnv(env)
 	env["NODE_OUTPUT"] = xunit.ReportPath(testName)
-	return runJSTest(ctx, testName, testDir, target, nil, env, nil)
+	return runJSTest(ctx, testName, testDir, target, nil, env, []string{"nacl"})
 }
 
 // vanadiumJSVDLAudit checks that all VDL-based JS source files are up-to-date.
@@ -174,7 +174,7 @@ func vanadiumJSVom(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 	env := map[string]string{}
 	setCommonJSEnv(env)
 	env["NODE_OUTPUT"] = xunit.ReportPath(testName)
-	return runJSTest(ctx, testName, testDir, target, nil, env, nil)
+	return runJSTest(ctx, testName, testDir, target, nil, env, []string{"nacl"})
 }
 
 // vanadiumJSSyncbaseBrowser runs the vanadium javascript syncbase test in a browser.
@@ -188,7 +188,7 @@ func vanadiumJSSyncbaseBrowser(ctx *tool.Context, testName string, _ ...Opt) (*t
 	env := map[string]string{}
 	setCommonJSEnv(env)
 	env["BROWSER_OUTPUT"] = xunit.ReportPath(testName)
-	return runJSTest(ctx, testName, testDir, target, nil, env, []string{"syncbase"})
+	return runJSTest(ctx, testName, testDir, target, nil, env, []string{"nacl", "syncbase"})
 }
 
 // vanadiumJSSyncbaseNode runs the vanadium javascript syncbase test in nodejs.

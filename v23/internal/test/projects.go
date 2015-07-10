@@ -70,12 +70,12 @@ func vanadiumBrowserTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Re
 	env := map[string]string{
 		"XUNIT_OUTPUT_FILE": xunit.ReportPath(testName),
 	}
-	return runProjectTest(ctx, testName, "browser", "test", env, []string{"web"})
+	return runProjectTest(ctx, testName, "browser", "test", env, []string{"nacl", "nodejs"})
 }
 
 // vanadiumBrowserTestWeb runs the ui tests for the Vanadium browser.
 func vanadiumBrowserTestWeb(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return runProjectTest(ctx, testName, "browser", "test-ui", nil, []string{"web"})
+	return runProjectTest(ctx, testName, "browser", "test-ui", nil, []string{"nacl", "nodejs"})
 }
 
 // vanadiumChatShellTest runs the tests for the chat shell client.
@@ -85,20 +85,20 @@ func vanadiumChatShellTest(ctx *tool.Context, testName string, _ ...Opt) (*test.
 
 // vanadiumChatWebTest runs the tests for the chat web client.
 func vanadiumChatWebTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return runProjectTest(ctx, testName, "chat", "test-web", nil, []string{"web"})
+	return runProjectTest(ctx, testName, "chat", "test-web", nil, []string{"nacl", "nodejs"})
 }
 
 // vanadiumChatWebUITest runs the ui tests for the chat web client.
 func vanadiumChatWebUITest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return runProjectTest(ctx, testName, "chat", "test-ui", nil, []string{"web"})
+	return runProjectTest(ctx, testName, "chat", "test-ui", nil, []string{"nacl", "nodejs"})
 }
 
 // vanadiumPipe2BrowserTest runs the tests for pipe2browser.
 func vanadiumPipe2BrowserTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return runProjectTest(ctx, testName, "pipe2browser", "test", nil, []string{"web"})
+	return runProjectTest(ctx, testName, "pipe2browser", "test", nil, []string{"nacl", "nodejs"})
 }
 
 // vanadiumReaderTest runs the tests for the reader example application.
 func vanadiumReaderTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return runProjectTest(ctx, testName, "reader", "test", nil, []string{"web"})
+	return runProjectTest(ctx, testName, "reader", "test", nil, []string{"nacl", "nodejs"})
 }
