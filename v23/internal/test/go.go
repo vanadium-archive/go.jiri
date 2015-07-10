@@ -948,6 +948,8 @@ var (
 
 func init() {
 	goExclusions = []exclusion{
+		// Test for this package seem to hang on darwin.
+		newExclusion("v.io/x/devtools/internal/runutil", ".*", isDarwin()),
 		// This test triggers a bug in go 1.4.1 garbage collector.
 		//
 		// https://github.com/veyron/release-issues/issues/1494
