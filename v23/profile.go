@@ -79,7 +79,7 @@ var (
 		},
 		"android": profileInfo{
 			Name:    "android",
-			version: 1,
+			version: 2,
 		},
 		"java": profileInfo{
 			Name:    "java",
@@ -703,7 +703,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 		androidPkg{"Android SDK Platform-tools, revision 22", filepath.Join(sdkRoot, "platform-tools")},
 		androidPkg{"SDK Platform Android 4.4.2, API 19, revision 4", filepath.Join(sdkRoot, "platforms", "android-19")},
 		androidPkg{"Android SDK Build-tools, revision 21.0.2", filepath.Join(sdkRoot, "build-tools")},
-		androidPkg{"ARM EABI v7a System Image, Android API 19, revision 2", filepath.Join(sdkRoot, "system-images", "android-19")},
+		androidPkg{"ARM EABI v7a System Image, Android API 19, revision 3", filepath.Join(sdkRoot, "system-images", "android-19")},
 	}
 	for _, pkg := range androidPkgs {
 		if err := installAndroidPkg(ctx, sdkRoot, pkg); err != nil {
@@ -1310,8 +1310,12 @@ func uninstallAndroidLinux(ctx *tool.Context, target profileTarget, version int)
 
 // uninstallAndroidCommon uninstalls the android profile.
 func uninstallAndroidCommon(ctx *tool.Context, target profileTarget, version int) error {
-	// TODO(spetrovic): Implement.
-	return fmt.Errorf("not implemented")
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+	androidRoot := filepath.Join(root, "third_party", "android")
+	return ctx.Run().RemoveAll(androidRoot)
 }
 
 // uninstallArmLinux uninstalls the arm profile for linux.
