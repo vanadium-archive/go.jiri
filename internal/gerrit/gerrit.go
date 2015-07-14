@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -252,6 +253,53 @@ func (g *Gerrit) Query(query string) (_ []Change, e error) {
 	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
 	return parseQueryResults(res.Body)
+}
+
+// Submit submits the given changelist through Gerrit.
+func (g *Gerrit) Submit(changeID string) (e error) {
+	// Encode data needed for Submit.
+	data := struct {
+		WaitForMerge bool `json:"wait_for_merge"`
+	}{
+		WaitForMerge: true,
+	}
+	encodedBytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("Marshal(%#v) failed: %v", data, err)
+	}
+
+	// Call Submit API.
+	// https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#submit-change
+	url := fmt.Sprintf("%s/a/changes/%s/submit", g.host, changeID)
+	var body io.Reader
+	method, body := "POST", bytes.NewReader(encodedBytes)
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
+	}
+	req.Header.Add("Content-Type", "application/json;charset=UTF-8")
+	req.SetBasicAuth(g.username, g.password)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Do(%v) failed: %v", req, err)
+	}
+	defer collect.Error(func() error { return res.Body.Close() }, &e)
+
+	// Check response.
+	bytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	resContent := string(bytes)
+	// For a "TBR" CL, the response code is not 200 but the submit will still succeed.
+	// In those cases, the "error" message will be "change is new".
+	// We don't treat this case as error.
+	if res.StatusCode != http.StatusOK && strings.TrimSpace(resContent) != "change is new" {
+		return fmt.Errorf("Failed to submit CL %q:\n%s", changeID, resContent)
+	}
+
+	return nil
 }
 
 // formatParams formats parameters of a change list.
