@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -34,9 +33,9 @@ func assertCommitCount(t *testing.T, ctx *tool.Context, branch, baseBranch strin
 // assertFileContent asserts that the content of the given file
 // matches the expected content.
 func assertFileContent(t *testing.T, ctx *tool.Context, file, want string) {
-	got, err := ioutil.ReadFile(file)
+	got, err := ctx.Run().ReadFile(file)
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", file, err)
+		t.Fatalf("%v\n", err)
 	}
 	if string(got) != want {
 		t.Fatalf("unexpected content of file %v: got %v, want %v", file, got, want)
@@ -914,9 +913,9 @@ func TestEndToEnd(t *testing.T) {
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
-// TestPresubmitLabelInCommitMessage checks the PresubmitType label is correctly
-// processed for the commit message.
-func TestPresubmitLabelInCommitMessage(t *testing.T) {
+// TestLabelsInCommitMessage checks the labels are correctly processed
+// for the commit message.
+func TestLabelsInCommitMessage(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -929,12 +928,13 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Test setting -presubmit=none.
+	// Test setting -presubmit=none and autosubmit.
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
 	review, err := newReview(ctx, reviewOpts{
-		presubmit: gerrit.PresubmitTestTypeNone,
-		repo:      gerritPath,
+		autosubmit: true,
+		presubmit:  gerrit.PresubmitTestTypeNone,
+		repo:       gerritPath,
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -943,16 +943,17 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 	review.run()
 	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
-	// The last two lines of the gerrit commit message file should be:
+	// The last three lines of the gerrit commit message file should be:
+	// AutoSubmit
 	// PresubmitTest: none
 	// Change-Id: ...
 	gerritCommitMessageFile, err := review.getCommitMessageFilename()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	bytes, err := ioutil.ReadFile(gerritCommitMessageFile)
+	bytes, err := ctx.Run().ReadFile(gerritCommitMessageFile)
 	if err != nil {
-		t.Fatalf("ReadFile(%s) failed: %v", gerritCommitMessageFile, err)
+		t.Fatalf("%v\n", err)
 	}
 	content := string(bytes)
 	lines := strings.Split(content, "\n")
@@ -960,25 +961,51 @@ func TestPresubmitLabelInCommitMessage(t *testing.T) {
 	if got := lines[len(lines)-1]; !strings.HasPrefix(got, "Change-Id") {
 		t.Fatalf("no Change-Id line found: %s", got)
 	}
+	// Make sure the "AutoSubmit" label exists.
+	if autosubmitLabelRE.FindString(content) == "" {
+		t.Fatalf("AutoSubmit label doesn't exist in the commit message: %s", content)
+	}
 	// Make sure the "PresubmitTest" label exists.
 	if presubmitTestLabelRE.FindString(content) == "" {
 		t.Fatalf("PresubmitTest label doesn't exist in the commit message: %s", content)
 	}
 
-	// Test setting -presubmit=all.
+	// Test setting -presubmit=all but keep autosubmit=true.
+	review, err = newReview(ctx, reviewOpts{autosubmit: true, repo: gerritPath})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	review.run()
+	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	content = string(bytes)
+	// Make sure there is no PresubmitTest=none any more.
+	match := presubmitTestLabelRE.FindString(content)
+	if match != "" {
+		t.Fatalf("want no presubmit label line, got: %s", match)
+	}
+	// Make sure the "AutoSubmit" label still exists.
+	if autosubmitLabelRE.FindString(content) == "" {
+		t.Fatalf("AutoSubmit label doesn't exist in the commit message: %s", content)
+	}
+
+	// Test setting autosubmit=false.
 	review, err = newReview(ctx, reviewOpts{repo: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	review.run()
-	bytes, err = ioutil.ReadFile(gerritCommitMessageFile)
+	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
 	if err != nil {
-		t.Fatalf("ReadFile(%s) failed: %v", gerritCommitMessageFile, err)
+		t.Fatalf("%v\n", err)
 	}
-	// Make sure there is no PresubmitTest=none any more.
-	match := presubmitTestLabelRE.FindString(string(bytes))
+	content = string(bytes)
+	// Make sure there is no AutoSubmit label any more.
+	match = autosubmitLabelRE.FindString(content)
 	if match != "" {
-		t.Fatalf("want no presubmit label line, got: %s", match)
+		t.Fatalf("want no AutoSubmit label line, got: %s", match)
 	}
 }
 
@@ -1104,10 +1131,10 @@ func TestRunInSubdirectory(t *testing.T) {
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
-// TestProcessPresubmitLabel checks that the processPresubmitLabel function
-// works as expected.
-func TestProcessPresubmitLabel(t *testing.T) {
+// TestProcessLabels checks that the processLabels function works as expected.
+func TestProcessLabels(t *testing.T) {
 	testCases := []struct {
+		autosubmit      bool
 		presubmitType   gerrit.PresubmitTestType
 		originalMessage string
 		expectedMessage string
@@ -1118,9 +1145,21 @@ func TestProcessPresubmitLabel(t *testing.T) {
 			expectedMessage: "PresubmitTest: none\n",
 		},
 		{
+			autosubmit:      true,
+			presubmitType:   gerrit.PresubmitTestTypeNone,
+			originalMessage: "",
+			expectedMessage: "AutoSubmit\nPresubmitTest: none\n",
+		},
+		{
 			presubmitType:   gerrit.PresubmitTestTypeNone,
 			originalMessage: "review message\n",
 			expectedMessage: "review message\nPresubmitTest: none\n",
+		},
+		{
+			autosubmit:      true,
+			presubmitType:   gerrit.PresubmitTestTypeNone,
+			originalMessage: "review message\n",
+			expectedMessage: "review message\nAutoSubmit\nPresubmitTest: none\n",
 		},
 		{
 			presubmitType: gerrit.PresubmitTestTypeNone,
@@ -1129,6 +1168,18 @@ func TestProcessPresubmitLabel(t *testing.T) {
 Change-Id: I0000000000000000000000000000000000000000`,
 			expectedMessage: `review message
 
+PresubmitTest: none
+Change-Id: I0000000000000000000000000000000000000000`,
+		},
+		{
+			autosubmit:    true,
+			presubmitType: gerrit.PresubmitTestTypeNone,
+			originalMessage: `review message
+
+Change-Id: I0000000000000000000000000000000000000000`,
+			expectedMessage: `review message
+
+AutoSubmit
 PresubmitTest: none
 Change-Id: I0000000000000000000000000000000000000000`,
 		},
@@ -1165,13 +1216,14 @@ Change-Id: I0000000000000000000000000000000000000000`,
 	}
 	for _, test := range testCases {
 		review, err := newReview(ctx, reviewOpts{
-			presubmit: test.presubmitType,
-			repo:      gerritPath,
+			autosubmit: test.autosubmit,
+			presubmit:  test.presubmitType,
+			repo:       gerritPath,
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if got := review.processPresubmitLabel(test.originalMessage); got != test.expectedMessage {
+		if got := review.processLabels(test.originalMessage); got != test.expectedMessage {
 			t.Fatalf("want %s, got %s", test.expectedMessage, got)
 		}
 	}

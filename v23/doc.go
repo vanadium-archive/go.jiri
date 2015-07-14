@@ -123,6 +123,8 @@ Usage:
    v23 cl mail [flags]
 
 The v23 cl mail flags are:
+ -autosubmit=false
+   Automatically submit the changelist when feasiable.
  -cc=
    Comma-seperated list of emails or LDAPs to cc.
  -check-api=true
