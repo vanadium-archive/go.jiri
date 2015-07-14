@@ -26,6 +26,7 @@ import (
 const commitMessageFile = ".gerrit_commit_message"
 
 var (
+	autosubmitFlag  bool
 	apiFlag         bool
 	ccsFlag         string
 	copyrightFlag   bool
@@ -41,10 +42,24 @@ var (
 	uncommittedFlag bool
 )
 
+// Special labels stored in the commit message.
+var (
+	// Auto submit label.
+	autosubmitLabelRE *regexp.Regexp = regexp.MustCompile("AutoSubmit")
+
+	// Change-Ids start with 'I' and are followed by 40 characters of hex.
+	changeIDRE *regexp.Regexp = regexp.MustCompile("Change-Id: I[0123456789abcdefABCDEF]{40}")
+
+	// Presubmit test label.
+	// PresubmitTest: <type>
+	presubmitTestLabelRE *regexp.Regexp = regexp.MustCompile(`PresubmitTest:\s*(.*)`)
+)
+
 // init carries out the package initialization.
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
 	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", true, "Check for changes in the public Go API.")
+	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
@@ -306,37 +321,22 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		Verbose: &verboseFlag,
 	})
 	opts := reviewOpts{
-		ccs:       ccsFlag,
-		draft:     draftFlag,
-		edit:      editFlag,
-		presubmit: gerrit.PresubmitTestType(presubmitFlag),
-		reviewers: reviewersFlag,
+		autosubmit: autosubmitFlag,
+		ccs:        ccsFlag,
+		draft:      draftFlag,
+		edit:       editFlag,
+		presubmit:  gerrit.PresubmitTestType(presubmitFlag),
+		reviewers:  reviewersFlag,
 	}
 	review, err := newReview(ctx, opts)
 	if err != nil {
 		return err
 	}
 
-	// Ask users to confirm when they changed the presubmit flag.
-	commitMessageFileName, err := review.getCommitMessageFilename()
-	if err != nil {
+	if confirmed, err := confirmFlagChanges(ctx, review); err != nil {
 		return err
-	}
-	bytes, err := ioutil.ReadFile(commitMessageFileName)
-	if err == nil {
-		prevPresubmitType := string(gerrit.PresubmitTestTypeAll)
-		content := string(bytes)
-		matches := presubmitTestLabelRE.FindStringSubmatch(content)
-		if matches != nil {
-			prevPresubmitType = matches[1]
-		}
-		if presubmitFlag != prevPresubmitType {
-			fmt.Printf("Are you sure you want to change presubmit=%s to presubmit=%s? (y/n): ", prevPresubmitType, presubmitFlag)
-			var response string
-			if _, err := fmt.Scanf("%s\n", &response); err != nil || response != "y" {
-				return nil
-			}
-		}
+	} else if !confirmed {
+		return nil
 	}
 
 	return review.run()
@@ -352,8 +352,54 @@ func checkPresubmitFlag() bool {
 	return false
 }
 
+// confirmFlagChanges asks users to confirm if any of the
+// presubmit and autosubmit flags changes.
+func confirmFlagChanges(ctx *tool.Context, review *review) (bool, error) {
+	commitMessageFileName, err := review.getCommitMessageFilename()
+	if err != nil {
+		return false, err
+	}
+	bytes, err := ctx.Run().ReadFile(commitMessageFileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	content := string(bytes)
+	changes := []string{}
+
+	// Check presubmit label change.
+	prevPresubmitType := string(gerrit.PresubmitTestTypeAll)
+	matches := presubmitTestLabelRE.FindStringSubmatch(content)
+	if matches != nil {
+		prevPresubmitType = matches[1]
+	}
+	if presubmitFlag != prevPresubmitType {
+		changes = append(changes, fmt.Sprintf("- presubmit=%s to presubmit=%s", prevPresubmitType, presubmitFlag))
+	}
+
+	// Check autosubmit label change.
+	prevAutosubmit := autosubmitLabelRE.MatchString(content)
+	if autosubmitFlag != prevAutosubmit {
+		changes = append(changes, fmt.Sprintf("- autosubmit=%v to autosubmit=%v", prevAutosubmit, autosubmitFlag))
+
+	}
+
+	if len(changes) > 0 {
+		fmt.Printf("Are you sure you want to make the following changes:\n%s\n\ny/N: ", strings.Join(changes, "\n"))
+		var response string
+		if _, err := fmt.Scanf("%s\n", &response); err != nil || response != "y" {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // review holds the state of a review.
 type review struct {
+	// whether to auto submit this changelist.
+	autosubmit bool
 	// branch is the name of the git branch from which the review is created.
 	branch string
 	// ccs is the list of LDAPs or emails to cc on the review.
@@ -375,17 +421,16 @@ type review struct {
 }
 
 type reviewOpts struct {
-	ccs       string
-	draft     bool
-	edit      bool
-	presubmit gerrit.PresubmitTestType
-	repo      string
-	reviewers string
+	autosubmit bool
+	ccs        string
+	draft      bool
+	edit       bool
+	presubmit  gerrit.PresubmitTestType
+	repo       string
+	reviewers  string
 }
 
 // newReview is the review factory.
-//
-// TODO(jingjin): use optional arguments.
 func newReview(ctx *tool.Context, opts reviewOpts) (*review, error) {
 	branch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
@@ -396,6 +441,7 @@ func newReview(ctx *tool.Context, opts reviewOpts) (*review, error) {
 		opts.presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
 	}
 	return &review{
+		autosubmit:   opts.autosubmit,
 		branch:       branch,
 		ccs:          opts.ccs,
 		ctx:          ctx,
@@ -407,13 +453,6 @@ func newReview(ctx *tool.Context, opts reviewOpts) (*review, error) {
 		reviewers:    opts.reviewers,
 	}, nil
 }
-
-// Change-Ids start with 'I' and are followed by 40 characters of hex.
-var changeIDRE *regexp.Regexp = regexp.MustCompile("Change-Id: I[0123456789abcdefABCDEF]{40}")
-
-// Presubmit test label.
-// PresubmitTest: <type>
-var presubmitTestLabelRE *regexp.Regexp = regexp.MustCompile(`PresubmitTest:\s*(.*)`)
 
 // checkGoFormat checks if the code to be submitted needs to be
 // formatted with "go fmt".
@@ -710,17 +749,20 @@ func (r *review) ensureChangeID() error {
 	return nil
 }
 
-// processPresubmitLabel adds/removes the "PresubmitTest" label for
-// the given commit message.
-func (r *review) processPresubmitLabel(message string) string {
+// processLabels adds/removes labels for the given commit message.
+func (r *review) processLabels(message string) string {
 	// Find the Change-ID line.
 	changeIDLine := changeIDRE.FindString(message)
 
-	// Strip existing presubmit label and change-ID.
+	// Strip existing labels and change-ID.
+	message = autosubmitLabelRE.ReplaceAllLiteralString(message, "")
 	message = presubmitTestLabelRE.ReplaceAllLiteralString(message, "")
 	message = changeIDRE.ReplaceAllLiteralString(message, "")
 
-	// Insert presubmit label and change-ID back.
+	// Insert labels and change-ID back.
+	if r.autosubmit {
+		message += fmt.Sprintf("AutoSubmit\n")
+	}
 	if r.presubmit != gerrit.PresubmitTestTypeAll {
 		message += fmt.Sprintf("PresubmitTest: %s\n", r.presubmit)
 	}
@@ -800,15 +842,14 @@ func (r *review) run() (e error) {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	// Add/remove presubmit label to/from the commit message before
-	// asking users to edit it. We do this only when this is not the
-	// initial commit where the message is empty.
+	// Add/remove labels to/from the commit message before asking users to
+	// edit it. We do this only when this is not the initial commit
+	// where the message is empty.
 	//
-	// For the initial commit, the presubmit label will be processed
-	// after the message is edited by users, which happens in the
-	// updateReviewMessage method.
+	// For the initial commit, the labels will be processed after the message is
+	// edited by users, which happens in the updateReviewMessage method.
 	if message != "" {
-		message = r.processPresubmitLabel(message)
+		message = r.processLabels(message)
 	}
 	if err := r.createReviewBranch(message); err != nil {
 		return err
@@ -846,15 +887,14 @@ func (r *review) updateReviewMessage(filename string) error {
 	if err != nil {
 		return err
 	}
-	// For the initial commit where the commit message file doesn't
-	// exist, add/remove presubmit label after users finish editing the
-	// commit message.
+	// For the initial commit where the commit message file doesn't exist,
+	// add/remove labels after users finish editing the commit message.
 	//
 	// This behavior is consistent with how Change-ID is added for the
 	// initial commit so we don't confuse users.
 	if _, err := os.Stat(filename); err != nil {
 		if os.IsNotExist(err) {
-			newMessage = r.processPresubmitLabel(newMessage)
+			newMessage = r.processLabels(newMessage)
 			if err := r.ctx.Git().CommitAmend(newMessage); err != nil {
 				return err
 			}
