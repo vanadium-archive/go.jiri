@@ -18,6 +18,7 @@ import (
 )
 
 const Force = true
+const Verify = true
 
 type GitError struct {
 	args        []string
@@ -413,8 +414,12 @@ func (g *Git) Pull(remote, branch string) error {
 }
 
 // Push pushes the given branch to the given remote.
-func (g *Git) Push(remote, branch string) error {
-	return g.run("push", remote, branch)
+func (g *Git) Push(remote, branch string, verify bool) error {
+	args := []string{"push", remote, branch}
+	if !verify {
+		args = append(args, "--no-verify")
+	}
+	return g.run(args...)
 }
 
 // RebaseAbort aborts an in-progress rebase operation.
