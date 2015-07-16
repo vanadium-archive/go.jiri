@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
@@ -258,7 +259,7 @@ func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string)
 		return err
 	}
 	if remoteFlag {
-		if err := ctx.Git().Push("origin", "master"); err != nil {
+		if err := ctx.Git().Push("origin", "master", !gitutil.Verify); err != nil {
 			return err
 		}
 	}
