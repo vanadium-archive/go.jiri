@@ -657,8 +657,7 @@ func installArmLinux(ctx *tool.Context, target profileTarget) (e error) {
 	return nil
 }
 
-// installAndroidCommon prepares the shared cross-platform parts of
-// the android setup.
+// installAndroidCommon prepares the shared cross-platform parts of the android setup.
 func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 	root, err := util.V23Root()
 	if err != nil {
@@ -666,17 +665,33 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 	}
 
 	// Install dependencies.
-	pkgs := []string{"ant", "autoconf", "bzip2", "default-jdk", "gawk", "lib32z1", "lib32stdc++6"}
+	var pkgs []string
+	switch target.OS {
+	case "linux":
+		pkgs = []string{"ant", "autoconf", "bzip2", "default-jdk", "gawk", "lib32z1", "lib32stdc++6"}
+	case "darwin":
+		pkgs = []string{"ant", "autoconf", "gawk"}
+	default:
+		return fmt.Errorf("unsupported OS: %s", target.OS)
+	}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
 	}
 
 	androidRoot := filepath.Join(root, "third_party", "android")
+	var sdkRoot string
+	switch target.OS {
+	case "linux":
+		sdkRoot = filepath.Join(androidRoot, "android-sdk-linux")
+	case "darwin":
+		sdkRoot = filepath.Join(androidRoot, "android-sdk-macosx")
+	default:
+		return fmt.Errorf("unsupported OS: %s", target.OS)
+	}
 
 	// Download Android SDK.
-	sdkRoot := filepath.Join(androidRoot, "android-sdk-linux")
 	installSdkFn := func() error {
-		if err := ctx.Run().MkdirAll(sdkRoot, defaultDirPerm); err != nil {
+		if err := ctx.Run().MkdirAll(androidRoot, defaultDirPerm); err != nil {
 			return err
 		}
 		tmpDir, err := ctx.Run().TempDir("", "")
@@ -684,13 +699,30 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 			fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		remote := "https://dl.google.com/android/android-sdk_r23-linux.tgz"
-		local := filepath.Join(tmpDir, "android-sdk.tgz")
+		var filename string
+		switch target.OS {
+		case "linux":
+			filename = "android-sdk_r23-linux.tgz"
+		case "darwin":
+			filename = "android-sdk_r23-macosx.zip"
+		default:
+			return fmt.Errorf("unsupported OS: %s", target.OS)
+		}
+		remote, local := "https://dl.google.com/android/"+filename, filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
 		}
-		if err := run(ctx, "tar", []string{"-C", androidRoot, "-xzf", local}, nil); err != nil {
-			return err
+		switch target.OS {
+		case "linux":
+			if err := run(ctx, "tar", []string{"-C", androidRoot, "-xzf", local}, nil); err != nil {
+				return err
+			}
+		case "darwin":
+			if err := run(ctx, "unzip", []string{"-d", androidRoot, local}, nil); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported OS: %s", target.OS)
 		}
 		return nil
 	}
@@ -760,12 +792,12 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 	return atomicAction(ctx, installGoFn, androidGo, "Download and build Android Go")
 }
 
-// installAndroidDarwin installs the android profile for darwin.
+// installAndroidDarwin installs the android profile for Darwin.
 func installAndroidDarwin(ctx *tool.Context, target profileTarget) error {
 	return installAndroidCommon(ctx, target)
 }
 
-// installAndroidLinux installs the android profile for linux.
+// installAndroidLinux installs the android profile for Linux.
 func installAndroidLinux(ctx *tool.Context, target profileTarget) error {
 	return installAndroidCommon(ctx, target)
 }

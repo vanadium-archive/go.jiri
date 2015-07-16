@@ -93,20 +93,23 @@ func setJavaEnv(env *envvar.Vars, root string) error {
 	if jdkHome == "" {
 		return nil
 	}
+
+	// Compile using Java Go 1.5 (installed via 'v23 profile install java').
+	javaGoDir := filepath.Join(root, "third_party", "java", "go")
+
+	// Set Go-specific environment variables.
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
 	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", runtime.GOOS))
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
+	env.Set("GOROOT", javaGoDir)
 
-	// Update PATH and GOROOT to point to Java Go 1.5 (installed via
-	// 'v23 profile install java').
-	javaGoDir := filepath.Join(root, "third_party", "java", "go")
+	// Update PATH.
 	if _, err := os.Stat(javaGoDir); err != nil {
 		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"v23 profile install java\"?", javaGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{filepath.Join(javaGoDir, "bin")}, path...)
 	env.SetTokens("PATH", path, ":")
-	env.Set("GOROOT", javaGoDir)
 	return nil
 }
 
@@ -118,27 +121,27 @@ func setAndroidEnv(env *envvar.Vars, root string) error {
 	if err := setJavaEnv(env, root); err != nil {
 		return err
 	}
+	// Compile using Android Go 1.5 (installed via
+	// 'v23 profile install android').
+	androidGoDir := filepath.Join(root, "third_party", "android", "go")
 
-	// Set Go specific environment variables.
+	// Set Go-specific environment variables.
 	env.Set("GOARCH", "arm")
 	env.Set("GOARM", "7")
 	env.Set("GOOS", "android")
+	env.Set("GOROOT", androidGoDir)
 
-	// Update PATH and GOROOT to point to Android Go 1.5 (installed via
-	// 'v23 profile install android').
-	androidGoDir := filepath.Join(root, "third_party", "android", "go")
+	// Update PATH.
 	if _, err := os.Stat(androidGoDir); err != nil {
 		return fmt.Errorf("Couldn't find android Go installation directory %s: did you run \"v23 profile install android\"?", androidGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{filepath.Join(androidGoDir, "bin")}, path...)
 	env.SetTokens("PATH", path, ":")
-	env.Set("GOROOT", androidGoDir)
 	return nil
 }
 
-// setArmEnv sets the environment variables used for android
-// cross-compilation.
+// setArmEnv sets the environment variables used for arm cross-compilation.
 func setArmEnv(env *envvar.Vars, root string) error {
 	// Set Go specific environment variables.
 	env.Set("GOARCH", "arm")
