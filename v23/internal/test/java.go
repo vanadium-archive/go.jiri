@@ -60,7 +60,7 @@ func vanadiumJavaTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 	}
 	runOpts := ctx.Run().Opts()
 	runOpts.Env = env.ToMap()
-	if err := ctx.Run().CommandWithOpts(runOpts, filepath.Join(javaDir, "gradlew"), ":lib:test"); err != nil {
+	if err := ctx.Run().CommandWithOpts(runOpts, filepath.Join(javaDir, "gradlew"), "--info", ":lib:test"); err != nil {
 		return nil, err
 	}
 	return &test.Result{Status: test.Passed}, nil
