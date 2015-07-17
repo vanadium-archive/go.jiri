@@ -60,7 +60,7 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 			if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", mergeSrc, "-whitelist="+whitelist); err != nil {
 				return nil, internalTestError{err, "merge"}
 			}
-			if err := ctx.Git().CommitFile(whitelist, "updating list of emails"); err != nil {
+			if err := ctx.Git(infraDir).CommitFile(whitelist, "updating list of emails"); err != nil {
 				return nil, internalTestError{err, "commit"}
 			}
 		}
