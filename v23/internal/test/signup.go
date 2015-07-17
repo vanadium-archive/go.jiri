@@ -60,15 +60,24 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 			if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", mergeSrc, "-whitelist="+whitelist); err != nil {
 				return nil, internalTestError{err, "merge"}
 			}
-			if err := ctx.Git(infraDir).CommitFile(whitelist, "updating list of emails"); err != nil {
+			if err := ctx.Git(infraDir).Add(whitelist); err != nil {
 				return nil, internalTestError{err, "commit"}
 			}
 		}
 	}
 
-	// Push changes to master.
-	if err := ctx.Git(infraDir).Push("origin", "master", !gitutil.Verify); err != nil {
-		return nil, internalTestError{err, "push"}
+	// Push changes (if any exist) to master.
+	changed, err := ctx.Git(infraDir).HasUncommittedChanges()
+	if err != nil {
+		return nil, internalTestError{err, "changes"}
+	}
+	if changed {
+		if err := ctx.Git(infraDir).CommitWithMessage("updating list of emails"); err != nil {
+			return nil, internalTestError{err, "commit"}
+		}
+		if err := ctx.Git(infraDir).Push("origin", "update:master", !gitutil.Verify); err != nil {
+			return nil, internalTestError{err, "push"}
+		}
 	}
 
 	return &test.Result{Status: test.Passed}, nil
