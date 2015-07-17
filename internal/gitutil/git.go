@@ -251,7 +251,11 @@ func (g *Git) FilesWithUncommittedChanges() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	out2, err := g.runOutput("diff", "--cached", "--name-only", "--no-ext-diff")
+	if err != nil {
+		return nil, err
+	}
+	return append(out, out2...), nil
 }
 
 // GetBranches returns a slice of the local branches of the current

@@ -109,7 +109,7 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts Opts, path str
 				args = append(args, arg)
 			}
 		}
-		e.printf(e.opts.Stdout, strings.Join(args, " "))
+		e.printf(e.opts.Stdout, strings.Replace(strings.Join(args, " "), "%", "%%", -1))
 	}
 	if opts.DryRun {
 		e.printf(e.opts.Stdout, "OK")

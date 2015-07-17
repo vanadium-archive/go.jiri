@@ -908,13 +908,27 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	copyrightFlag, depcopFlag, apiFlag = false, false, false
-	review.run()
+	if err := review.run(); err != nil {
+		t.Fatalf("run() failed: %v", err)
+	}
 	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
 // TestLabelsInCommitMessage checks the labels are correctly processed
 // for the commit message.
+//
+// HACK ALERT: This test runs the review.run() function multiple
+// times. The function ends up pushing a commit to a fake "gerrit"
+// repository created by the setupTest() function. For the real gerrit
+// repository, it is possible to push to the refs/for/change reference
+// multiple times, because it is a special reference that "maps"
+// incoming commits to CL branches based on the commit message
+// Change-Id. The fake "gerrit" repository does not implement this
+// logic and thus the same reference cannot be pushed to multiple
+// times. To overcome this obstacle, the test takes advantage of the
+// fact that the reference name is a function of the reviewers and
+// uses different reviewers for different review runs.
 func TestLabelsInCommitMessage(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 	cwd, err := os.Getwd()
@@ -935,12 +949,15 @@ func TestLabelsInCommitMessage(t *testing.T) {
 		autosubmit: true,
 		presubmit:  gerrit.PresubmitTestTypeNone,
 		repo:       gerritPath,
+		reviewers:  "run1",
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	copyrightFlag, depcopFlag, apiFlag = false, false, false
-	review.run()
+	if err := review.run(); err != nil {
+		t.Fatalf("%v", err)
+	}
 	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	// The last three lines of the gerrit commit message file should be:
@@ -971,11 +988,19 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting -presubmit=all but keep autosubmit=true.
-	review, err = newReview(ctx, reviewOpts{autosubmit: true, repo: gerritPath})
+	review, err = newReview(ctx, reviewOpts{
+		autosubmit: true,
+		repo:       gerritPath,
+		reviewers:  "run2",
+	})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	review.run()
+	if err := review.run(); err != nil {
+		t.Fatalf("%v", err)
+	}
+	expectedRef = gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
 	if err != nil {
 		t.Fatalf("%v\n", err)
@@ -992,11 +1017,18 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting autosubmit=false.
-	review, err = newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err = newReview(ctx, reviewOpts{
+		repo:      gerritPath,
+		reviewers: "run3",
+	})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	review.run()
+	if err := review.run(); err != nil {
+		t.Fatalf("%v", err)
+	}
+	expectedRef = gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
 	if err != nil {
 		t.Fatalf("%v\n", err)
@@ -1017,13 +1049,13 @@ func TestDirtyBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	root, _, _, gerritPath := setupTest(t, ctx, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	files := []string{"file1", "file2", "file3"}
+	files := []string{"file1", "file2"}
 	commitFiles(t, ctx, files)
 	assertStashSize(t, ctx, 0)
 	stashedFile, stashedFileContent := "stashed-file", "stashed-file content"
@@ -1037,18 +1069,18 @@ func TestDirtyBranch(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	assertStashSize(t, ctx, 1)
-	modifiedFile, modifiedFileContent := "modified-file", "modified-file content"
+	modifiedFile, modifiedFileContent := "file1", "modified-file content"
 	if err := ctx.Run().WriteFile(modifiedFile, []byte(modifiedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", modifiedFile, modifiedFileContent, err)
 	}
-	stagedFile, stagedFileContent := "staged-file", "staged-file content"
+	stagedFile, stagedFileContent := "file2", "staged-file content"
 	if err := ctx.Run().WriteFile(stagedFile, []byte(stagedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", stagedFile, stagedFileContent, err)
 	}
 	if err := ctx.Git().Add(stagedFile); err != nil {
 		t.Fatalf("%v", err)
 	}
-	untrackedFile, untrackedFileContent := "untracked-file", "untracked-file content"
+	untrackedFile, untrackedFileContent := "file3", "untracked-file content"
 	if err := ctx.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
@@ -1057,9 +1089,9 @@ func TestDirtyBranch(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	copyrightFlag, depcopFlag, apiFlag = false, false, false
-	review.run()
-	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
-	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
+	if err := review.run(); err == nil {
+		t.Fatalf("run() didn't fail when it should")
+	}
 	assertFilesNotCommitted(t, ctx, []string{stagedFile})
 	assertFilesNotCommitted(t, ctx, []string{untrackedFile})
 	assertFileContent(t, ctx, modifiedFile, modifiedFileContent)
@@ -1109,7 +1141,9 @@ func TestRunInSubdirectory(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	copyrightFlag, depcopFlag, apiFlag = false, false, false
-	review.run()
+	if err := review.run(); err != nil {
+		t.Fatalf("run() failed: %v", err)
+	}
 	path := path.Join(repoPath, subdir)
 	want, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -1204,21 +1238,10 @@ Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
 	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, root)
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
 	for _, test := range testCases {
 		review, err := newReview(ctx, reviewOpts{
 			autosubmit: test.autosubmit,
 			presubmit:  test.presubmitType,
-			repo:       gerritPath,
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
