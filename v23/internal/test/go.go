@@ -956,11 +956,6 @@ func init() {
 		// question of whether we should be relying on this library at
 		// all.
 		newExclusion("github.com/howeyc/fsnotify", ".*", isDarwin()),
-		// These tests are not maintained very well and are broken on all
-		// platforms.
-		//
-		// TODO(spetrovic): Put these back in once the owners fixes them.
-		newExclusion("golang.org/x/mobile", ".*", true),
 		// This test relies on timing, which results in flakiness on GCE.
 		newExclusion("google.golang.org/appengine/internal", "TestDelayedLogFlushing", isCI()),
 		// The following tests require ICMP socket permissions which are not enabled

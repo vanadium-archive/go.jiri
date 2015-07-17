@@ -37,22 +37,14 @@ func main() {
 	fmt.Printf("USER: %q\n", os.Getenv("USER"))
 
 	fmt.Println("Excluded tests:")
-	excluded, err := test.ExcludedTests()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get exclusions: %s", err)
-		os.Exit(1)
-	}
+	excluded := test.ExcludedTests()
 	for _, t := range excluded {
 		fmt.Printf("%#v\n", t)
 	}
 
 	if *raceFlag {
 		fmt.Println("Excluded race tests:")
-		raceExcluded, err := test.ExcludedRaceTests()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to get race exclusions: %s", err)
-			os.Exit(1)
-		}
+		raceExcluded := test.ExcludedRaceTests()
 		for _, t := range raceExcluded {
 			fmt.Printf("%#v\n", t)
 		}

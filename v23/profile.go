@@ -696,7 +696,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 		}
 		tmpDir, err := ctx.Run().TempDir("", "")
 		if err != nil {
-			fmt.Errorf("TempDir() failed: %v", err)
+			return fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 		var filename string
@@ -754,7 +754,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 	installNdkFn := func() error {
 		tmpDir, err := ctx.Run().TempDir("", "")
 		if err != nil {
-			fmt.Errorf("TempDir() failed: %v", err)
+			return fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 		filename := "android-ndk-r9d-" + target.OS + "-x86_64.tar.bz2"
