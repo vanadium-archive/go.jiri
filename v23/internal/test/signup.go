@@ -37,8 +37,8 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 
 	// Create a feature branch in the infrastructure project.
 	infraDir := tool.RootDirOpt(filepath.Join(root, "infrastructure"))
-	if err := ctx.Git(infraDir).CheckoutBranch("update", !gitutil.Force); err != nil {
-		return nil, internalTestError{err, "checkout"}
+	if err := ctx.Git(infraDir).CreateAndCheckoutBranch("update"); err != nil {
+		return nil, internalTestError{err, "create"}
 	}
 	defer collect.Error(func() error {
 		if err := ctx.Git(infraDir).CheckoutBranch("master", gitutil.Force); err != nil {
