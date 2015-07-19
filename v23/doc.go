@@ -149,6 +149,8 @@ The v23 cl mail flags are:
    The type of presubmit tests to run. Valid values: none,all.
  -r=
    Comma-seperated list of emails or LDAPs to request review.
+ -remote-branch=master
+   Name of the remote branch the CL pertains to.
 
 V23 contributors - List vanadium project contributors
 

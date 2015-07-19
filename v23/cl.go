@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,23 +22,24 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-const commitMessageFile = ".gerrit_commit_message"
+const commitMessageFileName = ".gerrit_commit_message"
 
 var (
-	autosubmitFlag  bool
-	apiFlag         bool
-	ccsFlag         string
-	copyrightFlag   bool
-	draftFlag       bool
-	depcopFlag      bool
-	editFlag        bool
-	forceFlag       bool
-	gofmtFlag       bool
-	govetFlag       bool
-	govetBinaryFlag string
-	presubmitFlag   string
-	reviewersFlag   string
-	uncommittedFlag bool
+	autosubmitFlag   bool
+	apiFlag          bool
+	ccsFlag          string
+	copyrightFlag    bool
+	draftFlag        bool
+	depcopFlag       bool
+	editFlag         bool
+	forceFlag        bool
+	gofmtFlag        bool
+	govetFlag        bool
+	govetBinaryFlag  string
+	presubmitFlag    string
+	remoteBranchFlag string
+	reviewersFlag    string
+	uncommittedFlag  bool
 )
 
 // Special labels stored in the commit message.
@@ -60,6 +60,7 @@ func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
 	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", true, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
+	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
@@ -98,7 +99,7 @@ reports the difference and stops. Otherwise, it deletes the branch.
 	ArgsLong: "<branches> is a list of branches to cleanup.",
 }
 
-func cleanup(ctx *tool.Context, branches []string) (e error) {
+func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 	originalBranch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return err
@@ -151,7 +152,7 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 		// the master, when there are no differences
 		// or the only difference is the gerrit commit
 		// message file.
-		if len(files) != 0 && (len(files) != 1 || files[0] != commitMessageFile) {
+		if len(files) != 0 && (len(files) != 1 || files[0] != commitMessageFileName) {
 			return fmt.Errorf("unmerged changes in\n%s", strings.Join(files, "\n"))
 		}
 	}
@@ -179,7 +180,7 @@ func runCLCleanup(env *cmdline.Env, args []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	return cleanup(ctx, args)
+	return cleanupCL(ctx, args)
 }
 
 // cmdCLMail represents the "v23 cl mail" command.
@@ -320,26 +321,47 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	opts := reviewOpts{
-		autosubmit: autosubmitFlag,
-		ccs:        ccsFlag,
-		draft:      draftFlag,
-		edit:       editFlag,
-		presubmit:  gerrit.PresubmitTestType(presubmitFlag),
-		reviewers:  reviewersFlag,
+	opts := gerrit.CLOpts{
+		Autosubmit:   autosubmitFlag,
+		Ccs:          ccsFlag,
+		Draft:        draftFlag,
+		Edit:         editFlag,
+		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
+		RemoteBranch: remoteBranchFlag,
+		Reviewers:    reviewersFlag,
 	}
 	review, err := newReview(ctx, opts)
 	if err != nil {
 		return err
 	}
-
-	if confirmed, err := confirmFlagChanges(ctx, review); err != nil {
+	if confirmed, err := review.confirmFlagChanges(); err != nil {
 		return err
 	} else if !confirmed {
 		return nil
 	}
-
 	return review.run()
+}
+
+type review struct {
+	ctx          *tool.Context
+	reviewBranch string
+	gerrit.CLOpts
+}
+
+func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
+	branch, err := ctx.Git().CurrentBranchName()
+	if err != nil {
+		return nil, err
+	}
+	opts.Branch = branch
+	if opts.Presubmit == gerrit.PresubmitTestType("") {
+		opts.Presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
+	}
+	return &review{
+		ctx:          ctx,
+		reviewBranch: branch + "-REVIEW",
+		CLOpts:       opts,
+	}, nil
 }
 
 func checkPresubmitFlag() bool {
@@ -354,12 +376,12 @@ func checkPresubmitFlag() bool {
 
 // confirmFlagChanges asks users to confirm if any of the
 // presubmit and autosubmit flags changes.
-func confirmFlagChanges(ctx *tool.Context, review *review) (bool, error) {
-	commitMessageFileName, err := review.getCommitMessageFilename()
+func (review *review) confirmFlagChanges() (bool, error) {
+	file, err := review.getCommitMessageFileName()
 	if err != nil {
 		return false, err
 	}
-	bytes, err := ctx.Run().ReadFile(commitMessageFileName)
+	bytes, err := review.ctx.Run().ReadFile(file)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return true, nil
@@ -396,79 +418,21 @@ func confirmFlagChanges(ctx *tool.Context, review *review) (bool, error) {
 	return true, nil
 }
 
-// review holds the state of a review.
-type review struct {
-	// whether to auto submit this changelist.
-	autosubmit bool
-	// branch is the name of the git branch from which the review is created.
-	branch string
-	// ccs is the list of LDAPs or emails to cc on the review.
-	ccs string
-	// ctx is an instance of the command-line tool context.
-	ctx *tool.Context
-	// draft indicates whether to create a draft review.
-	draft bool
-	// edit indicates whether to edit the review message.
-	edit bool
-	// the type of presubmit tests to run.
-	presubmit gerrit.PresubmitTestType
-	// repo is the name of the gerrit repository.
-	repo string
-	// reviewBranch is the name of the temporary git branch used to send the review.
-	reviewBranch string
-	// reviewers is the list of LDAPs or emails to request a review from.
-	reviewers string
-}
-
-type reviewOpts struct {
-	autosubmit bool
-	ccs        string
-	draft      bool
-	edit       bool
-	presubmit  gerrit.PresubmitTestType
-	repo       string
-	reviewers  string
-}
-
-// newReview is the review factory.
-func newReview(ctx *tool.Context, opts reviewOpts) (*review, error) {
-	branch, err := ctx.Git().CurrentBranchName()
-	if err != nil {
-		return nil, err
-	}
-	reviewBranch := branch + "-REVIEW"
-	if opts.presubmit == gerrit.PresubmitTestType("") {
-		opts.presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
-	}
-	return &review{
-		autosubmit:   opts.autosubmit,
-		branch:       branch,
-		ccs:          opts.ccs,
-		ctx:          ctx,
-		draft:        opts.draft,
-		edit:         opts.edit,
-		presubmit:    opts.presubmit,
-		repo:         opts.repo,
-		reviewBranch: reviewBranch,
-		reviewers:    opts.reviewers,
-	}, nil
-}
-
 // checkGoFormat checks if the code to be submitted needs to be
 // formatted with "go fmt".
-func (r *review) checkGoFormat() error {
-	goFiles, err := r.modifiedGoFiles()
+func (review *review) checkGoFormat() error {
+	goFiles, err := review.modifiedGoFiles()
 	if err != nil || len(goFiles) == 0 {
 		return err
 	}
 	// Check if the formatting differs from gofmt.
 	var out bytes.Buffer
-	opts := r.ctx.Run().Opts()
+	opts := review.ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
 	args := []string{"run", "gofmt", "-l"}
 	args = append(args, goFiles...)
-	if err := r.ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
+	if err := review.ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
 		return err
 	}
 	if out.Len() != 0 {
@@ -478,20 +442,20 @@ func (r *review) checkGoFormat() error {
 }
 
 // checkGoVet checks if the code to submitted has any "go vet" violations.
-func (r *review) checkGoVet() (e error) {
-	vetBin, cleanup, err := buildGoVetBinary(r.ctx)
+func (review *review) checkGoVet() (e error) {
+	vetBin, cleanup, err := review.buildGoVetBinary()
 	if err != nil {
 		return err
 	}
 	defer collect.Error(cleanup, &e)
 
-	goFiles, err := r.modifiedGoFiles()
+	goFiles, err := review.modifiedGoFiles()
 	if err != nil || len(goFiles) == 0 {
 		return err
 	}
 	// Check if the files generate any "go vet" errors.
 	var out bytes.Buffer
-	opts := r.ctx.Run().Opts()
+	opts := review.ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
 	args := []string{"run", vetBin, "--composites=false"}
@@ -499,7 +463,7 @@ func (r *review) checkGoVet() (e error) {
 	// the same package per invocation.
 	var vetErrors []string
 	for _, file := range goFiles {
-		err := r.ctx.Run().CommandWithOpts(opts, "v23", append(args, file)...)
+		err := review.ctx.Run().CommandWithOpts(opts, "v23", append(args, file)...)
 		if err == nil {
 			continue
 		}
@@ -522,18 +486,17 @@ func (r *review) checkGoVet() (e error) {
 	return nil
 }
 
-func buildGoVetBinary(ctx *tool.Context) (vetBin string, cleanup func() error, e error) {
-	vetBin = govetBinaryFlag
-	cleanup = func() error { return nil }
+func (review *review) buildGoVetBinary() (vetBin string, cleanup func() error, e error) {
+	vetBin, cleanup = govetBinaryFlag, func() error { return nil }
 	if len(vetBin) == 0 {
-		// build the go vet binary.
-		tmpDir, err := ctx.Run().TempDir("", "")
+		// Build the go vet binary.
+		tmpDir, err := review.ctx.Run().TempDir("", "")
 		if err != nil {
 			return "", cleanup, err
 		}
-		cleanup = func() error { return ctx.Run().RemoveAll(tmpDir) }
+		cleanup = func() error { return review.ctx.Run().RemoveAll(tmpDir) }
 		vetBin = filepath.Join(tmpDir, "vet")
-		if err := ctx.Run().Command("v23", "go", "build", "-o", vetBin, "golang.org/x/tools/cmd/vet"); err != nil {
+		if err := review.ctx.Run().Command("v23", "go", "build", "-o", vetBin, "golang.org/x/tools/cmd/vet"); err != nil {
 			cleanup()
 			return "", cleanup, err
 		}
@@ -542,8 +505,8 @@ func buildGoVetBinary(ctx *tool.Context) (vetBin string, cleanup func() error, e
 }
 
 // modifiedGoFiles returns the modified go files in the change to be submitted.
-func (r *review) modifiedGoFiles() ([]string, error) {
-	files, err := r.ctx.Git().ModifiedFiles("master", r.branch)
+func (review *review) modifiedGoFiles() ([]string, error) {
+	files, err := review.ctx.Git().ModifiedFiles("master", review.CLOpts.Branch)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +514,7 @@ func (r *review) modifiedGoFiles() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Getwd() failed: %v", err)
 	}
-	topLevel, err := r.ctx.Git().TopLevel()
+	topLevel, err := review.ctx.Git().TopLevel()
 	if err != nil {
 		return nil, err
 	}
@@ -583,8 +546,8 @@ func (r *review) modifiedGoFiles() ([]string, error) {
 
 // checkCopyright checks if the submitted code introduces source code
 // without proper copyright.
-func (r *review) checkCopyright() error {
-	name, err := util.CurrentProjectName(r.ctx)
+func (review *review) checkCopyright() error {
+	name, err := util.CurrentProjectName(review.ctx)
 	if err != nil {
 		return err
 	}
@@ -593,7 +556,7 @@ func (r *review) checkCopyright() error {
 	}
 	// Check if the copyright check should be invoked for the current
 	// project.
-	config, err := util.LoadConfig(r.ctx)
+	config, err := util.LoadConfig(review.ctx)
 	if err != nil {
 		return err
 	}
@@ -602,7 +565,7 @@ func (r *review) checkCopyright() error {
 	}
 	// Check the copyright headers and licensing files.
 	var out bytes.Buffer
-	if err := copyrightHelper(r.ctx.Stdout(), &out, []string{name}, false); err != nil {
+	if err := copyrightHelper(review.ctx.Stdout(), &out, []string{name}, false); err != nil {
 		return err
 	}
 	if out.Len() != 0 {
@@ -616,20 +579,20 @@ func (r *review) checkCopyright() error {
 
 // checkDependencies checks if the code to be submitted meets the
 // dependency constraints.
-func (r *review) checkGoDependencies() error {
+func (review *review) checkGoDependencies() error {
 	var out bytes.Buffer
-	opts := r.ctx.Run().Opts()
+	opts := review.ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
-	if err := r.ctx.Run().CommandWithOpts(opts, "v23", "run", "godepcop", "check", "v.io/..."); err != nil {
+	if err := review.ctx.Run().CommandWithOpts(opts, "v23", "run", "godepcop", "check", "v.io/..."); err != nil {
 		return goDependencyError(out.String())
 	}
 	return nil
 }
 
 // checkGoAPI checks if the public Go API has changed.
-func (r *review) checkGoAPI() error {
-	name, err := util.CurrentProjectName(r.ctx)
+func (review *review) checkGoAPI() error {
+	name, err := util.CurrentProjectName(review.ctx)
 	if err != nil {
 		return err
 	}
@@ -637,7 +600,7 @@ func (r *review) checkGoAPI() error {
 		return fmt.Errorf("current project is not a 'v23' project")
 	}
 	// Check if the api check should be invoked for the current project.
-	config, err := util.LoadConfig(r.ctx)
+	config, err := util.LoadConfig(review.ctx)
 	if err != nil {
 		return err
 	}
@@ -645,7 +608,7 @@ func (r *review) checkGoAPI() error {
 		return nil
 	}
 	var out bytes.Buffer
-	if err := doAPICheck(&out, r.ctx.Stderr(), []string{name}, false); err != nil {
+	if err := doAPICheck(&out, review.ctx.Stderr(), []string{name}, false); err != nil {
 		return err
 	}
 	if out.Len() != 0 {
@@ -658,17 +621,17 @@ func (r *review) checkGoAPI() error {
 }
 
 // cleanup cleans up after the review.
-func (r *review) cleanup(stashed bool) error {
-	if err := r.ctx.Git().CheckoutBranch(r.branch, !gitutil.Force); err != nil {
+func (review *review) cleanup(stashed bool) error {
+	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, !gitutil.Force); err != nil {
 		return err
 	}
-	if r.ctx.Git().BranchExists(r.reviewBranch) {
-		if err := r.ctx.Git().DeleteBranch(r.reviewBranch, gitutil.Force); err != nil {
+	if review.ctx.Git().BranchExists(review.reviewBranch) {
+		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.Force); err != nil {
 			return err
 		}
 	}
 	if stashed {
-		if err := r.ctx.Git().StashPop(); err != nil {
+		if err := review.ctx.Git().StashPop(); err != nil {
 			return err
 		}
 	}
@@ -677,21 +640,21 @@ func (r *review) cleanup(stashed bool) error {
 
 // createReviewBranch creates a clean review branch from master and
 // squashes the commits into one, with the supplied message.
-func (r *review) createReviewBranch(message string) error {
-	if err := r.ctx.Git().Fetch("origin", "master"); err != nil {
+func (review *review) createReviewBranch(message string) error {
+	if err := review.ctx.Git().Fetch("origin", "master"); err != nil {
 		return err
 	}
-	if r.ctx.Git().BranchExists(r.reviewBranch) {
-		if err := r.ctx.Git().DeleteBranch(r.reviewBranch, gitutil.Force); err != nil {
+	if review.ctx.Git().BranchExists(review.reviewBranch) {
+		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.Force); err != nil {
 			return err
 		}
 	}
 	upstream := "origin/master"
-	if err := r.ctx.Git().CreateBranchWithUpstream(r.reviewBranch, upstream); err != nil {
+	if err := review.ctx.Git().CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
 		return err
 	}
-	if !r.ctx.DryRun() {
-		hasDiff, err := r.ctx.Git().BranchesDiffer(r.branch, r.reviewBranch)
+	if !review.ctx.DryRun() {
+		hasDiff, err := review.ctx.Git().BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
 		if err != nil {
 			return err
 		}
@@ -702,28 +665,28 @@ func (r *review) createReviewBranch(message string) error {
 	// If message is empty, replace it with the default.
 	if len(message) == 0 {
 		var err error
-		message, err = r.defaultCommitMessage()
+		message, err = review.defaultCommitMessage()
 		if err != nil {
 			return err
 		}
 	}
-	if err := r.ctx.Git().CheckoutBranch(r.reviewBranch, !gitutil.Force); err != nil {
+	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
 		return err
 	}
-	if err := r.ctx.Git().Merge(r.branch, true); err != nil {
+	if err := review.ctx.Git().Merge(review.CLOpts.Branch, true); err != nil {
 		return changeConflictError(err.Error())
 	}
-	c := r.ctx.Git().NewCommitter(r.edit)
-	if err := c.Commit(message); err != nil {
+	committer := review.ctx.Git().NewCommitter(review.CLOpts.Edit)
+	if err := committer.Commit(message); err != nil {
 		return err
 	}
 	return nil
 }
 
-// defaultCommitMessage creates the default commit message from the list of
-// commits on the branch.
-func (r *review) defaultCommitMessage() (string, error) {
-	commitMessages, err := r.ctx.Git().CommitMessages(r.branch, r.reviewBranch)
+// defaultCommitMessage creates the default commit message from the
+// list of commits on the branch.
+func (review *review) defaultCommitMessage() (string, error) {
+	commitMessages, err := review.ctx.Git().CommitMessages(review.CLOpts.Branch, review.reviewBranch)
 	if err != nil {
 		return "", err
 	}
@@ -737,8 +700,8 @@ func (r *review) defaultCommitMessage() (string, error) {
 
 // ensureChangeID makes sure that the last commit contains a Change-Id, and
 // returns an error if it does not.
-func (r *review) ensureChangeID() error {
-	latestCommitMessage, err := r.ctx.Git().LatestCommitMessage()
+func (review *review) ensureChangeID() error {
+	latestCommitMessage, err := review.ctx.Git().LatestCommitMessage()
 	if err != nil {
 		return err
 	}
@@ -750,7 +713,7 @@ func (r *review) ensureChangeID() error {
 }
 
 // processLabels adds/removes labels for the given commit message.
-func (r *review) processLabels(message string) string {
+func (review *review) processLabels(message string) string {
 	// Find the Change-ID line.
 	changeIDLine := changeIDRE.FindString(message)
 
@@ -760,11 +723,11 @@ func (r *review) processLabels(message string) string {
 	message = changeIDRE.ReplaceAllLiteralString(message, "")
 
 	// Insert labels and change-ID back.
-	if r.autosubmit {
+	if review.CLOpts.Autosubmit {
 		message += fmt.Sprintf("AutoSubmit\n")
 	}
-	if r.presubmit != gerrit.PresubmitTestTypeAll {
-		message += fmt.Sprintf("PresubmitTest: %s\n", r.presubmit)
+	if review.CLOpts.Presubmit != gerrit.PresubmitTestTypeAll {
+		message += fmt.Sprintf("PresubmitTest: %s\n", review.CLOpts.Presubmit)
 	}
 	if changeIDLine != "" && !strings.HasSuffix(message, "\n") {
 		message += "\n"
@@ -774,11 +737,11 @@ func (r *review) processLabels(message string) string {
 	return message
 }
 
-// run implements checks that the review passes all local checks and
-// then mails it to Gerrit.
-func (r *review) run() (e error) {
+// run implements checks that the review passes all local checks
+// and then mails it to Gerrit.
+func (review *review) run() (e error) {
 	if uncommittedFlag {
-		changes, err := r.ctx.Git().FilesWithUncommittedChanges()
+		changes, err := review.ctx.Git().FilesWithUncommittedChanges()
 		if err != nil {
 			return err
 		}
@@ -787,38 +750,34 @@ func (r *review) run() (e error) {
 		}
 	}
 	if gofmtFlag {
-		if err := r.checkGoFormat(); err != nil {
+		if err := review.checkGoFormat(); err != nil {
 			return err
 		}
 	}
 	if govetFlag {
-		if err := r.checkGoVet(); err != nil {
+		if err := review.checkGoVet(); err != nil {
 			return err
 		}
 	}
 	if apiFlag {
-		if err := r.checkGoAPI(); err != nil {
+		if err := review.checkGoAPI(); err != nil {
 			return err
 		}
 	}
 	if depcopFlag {
-		if err := r.checkGoDependencies(); err != nil {
+		if err := review.checkGoDependencies(); err != nil {
 			return err
 		}
 	}
 	if copyrightFlag {
-		if err := r.checkCopyright(); err != nil {
+		if err := review.checkCopyright(); err != nil {
 			return err
 		}
 	}
-	if r.branch == "master" {
+	if review.CLOpts.Branch == "master" {
 		return fmt.Errorf("cannot do a review from the 'master' branch.")
 	}
-	filename, err := r.getCommitMessageFilename()
-	if err != nil {
-		return err
-	}
-	stashed, err := r.ctx.Git().Stash()
+	stashed, err := review.ctx.Git().Stash()
 	if err != nil {
 		return err
 	}
@@ -826,17 +785,21 @@ func (r *review) run() (e error) {
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
-	defer collect.Error(func() error { return r.ctx.Run().Chdir(wd) }, &e)
-	topLevel, err := r.ctx.Git().TopLevel()
+	defer collect.Error(func() error { return review.ctx.Run().Chdir(wd) }, &e)
+	topLevel, err := review.ctx.Git().TopLevel()
 	if err != nil {
 		return err
 	}
-	if err := r.ctx.Run().Chdir(topLevel); err != nil {
+	if err := review.ctx.Run().Chdir(topLevel); err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return r.cleanup(stashed) }, &e)
+	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
 	message := ""
-	data, err := ioutil.ReadFile(filename)
+	filename, err := review.getCommitMessageFileName()
+	if err != nil {
+		return err
+	}
+	data, err := review.ctx.Run().ReadFile(filename)
 	if err == nil {
 		message = string(data)
 	} else if !os.IsNotExist(err) {
@@ -849,28 +812,28 @@ func (r *review) run() (e error) {
 	// For the initial commit, the labels will be processed after the message is
 	// edited by users, which happens in the updateReviewMessage method.
 	if message != "" {
-		message = r.processLabels(message)
+		message = review.processLabels(message)
 	}
-	if err := r.createReviewBranch(message); err != nil {
+	if err := review.createReviewBranch(message); err != nil {
 		return err
 	}
-	if err := r.updateReviewMessage(filename); err != nil {
+	if err := review.updateReviewMessage(filename); err != nil {
 		return err
 	}
-	if err := r.send(); err != nil {
+	if err := review.send(); err != nil {
 		return err
 	}
 	return nil
 }
 
 // send mails the current branch out for review.
-func (r *review) send() error {
-	if !r.ctx.DryRun() {
-		if err := r.ensureChangeID(); err != nil {
+func (review *review) send() error {
+	if !review.ctx.DryRun() {
+		if err := review.ensureChangeID(); err != nil {
 			return err
 		}
 	}
-	if err := gerrit.Push(r.ctx.Run(), r.repo, r.draft, r.reviewers, r.ccs, r.branch); err != nil {
+	if err := gerrit.Push(review.ctx.Run(), review.CLOpts); err != nil {
 		return gerritError(err.Error())
 	}
 	return nil
@@ -879,11 +842,11 @@ func (r *review) send() error {
 // updateReviewMessage writes the commit message to the specified
 // file. It then adds that file to the original branch, and makes sure
 // it is not on the review branch.
-func (r *review) updateReviewMessage(filename string) error {
-	if err := r.ctx.Git().CheckoutBranch(r.reviewBranch, !gitutil.Force); err != nil {
+func (review *review) updateReviewMessage(filename string) error {
+	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
 		return err
 	}
-	newMessage, err := r.ctx.Git().LatestCommitMessage()
+	newMessage, err := review.ctx.Git().LatestCommitMessage()
 	if err != nil {
 		return err
 	}
@@ -894,32 +857,32 @@ func (r *review) updateReviewMessage(filename string) error {
 	// initial commit so we don't confuse users.
 	if _, err := os.Stat(filename); err != nil {
 		if os.IsNotExist(err) {
-			newMessage = r.processLabels(newMessage)
-			if err := r.ctx.Git().CommitAmend(newMessage); err != nil {
+			newMessage = review.processLabels(newMessage)
+			if err := review.ctx.Git().CommitAmend(newMessage); err != nil {
 				return err
 			}
 		} else {
 			return err
 		}
 	}
-	if err := r.ctx.Git().CheckoutBranch(r.branch, !gitutil.Force); err != nil {
+	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, !gitutil.Force); err != nil {
 		return err
 	}
-	if err := r.ctx.Run().WriteFile(filename, []byte(newMessage), 0644); err != nil {
+	if err := review.ctx.Run().WriteFile(filename, []byte(newMessage), 0644); err != nil {
 		return fmt.Errorf("WriteFile(%v, %v) failed: %v", filename, newMessage, err)
 	}
-	if err := r.ctx.Git().CommitFile(filename, "Update gerrit commit message."); err != nil {
+	if err := review.ctx.Git().CommitFile(filename, "Update gerrit commit message."); err != nil {
 		return err
 	}
 	// Delete the commit message from review branch.
-	if err := r.ctx.Git().CheckoutBranch(r.reviewBranch, !gitutil.Force); err != nil {
+	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
 		return err
 	}
 	if _, err := os.Stat(filename); err == nil {
-		if err := r.ctx.Git().Remove(filename); err != nil {
+		if err := review.ctx.Git().Remove(filename); err != nil {
 			return err
 		}
-		if err := r.ctx.Git().CommitAmend(newMessage); err != nil {
+		if err := review.ctx.Git().CommitAmend(newMessage); err != nil {
 			return err
 		}
 	} else if !os.IsNotExist(err) {
@@ -928,12 +891,12 @@ func (r *review) updateReviewMessage(filename string) error {
 	return nil
 }
 
-// getCommitMessageFilename returns the name of the file that will get
+// getCommitMessageFileName returns the name of the file that will get
 // used for the Gerrit commit message.
-func (r *review) getCommitMessageFilename() (string, error) {
-	topLevel, err := r.ctx.Git().TopLevel()
+func (review *review) getCommitMessageFileName() (string, error) {
+	topLevel, err := review.ctx.Git().TopLevel()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(topLevel, commitMessageFile), nil
+	return filepath.Join(topLevel, commitMessageFileName), nil
 }

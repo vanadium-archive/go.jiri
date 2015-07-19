@@ -117,7 +117,7 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 		for _, branch := range branches {
 			state.branches = append(state.branches, branchState{
 				name:             branch,
-				hasGerritMessage: scm.HasFile(branch, commitMessageFile),
+				hasGerritMessage: scm.HasFile(branch, commitMessageFileName),
 			})
 		}
 		if checkDirty {

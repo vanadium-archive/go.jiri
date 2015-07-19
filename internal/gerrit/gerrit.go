@@ -45,6 +45,32 @@ type Review struct {
 	Comments map[string][]Comment `json:"comments,omitempty"`
 }
 
+// CLOpts records the review options.
+type CLOpts struct {
+	// Autosubmit determines if the CL should be auto-submitted when it
+	// meets the submission rules.
+	Autosubmit bool
+	// Branch identifies the local branch that contains the CL.
+	Branch string
+	// Ccs records the comma-separted list of users to cc on the CL.
+	Ccs string
+	// Draft determines if this CL is a draft.
+	Draft bool
+	// Edit determines if the user should be prompted to edit the commit
+	// message when the CL is exported to Gerrit.
+	Edit bool
+	// Presubmit determines what presubmit tests to run.
+	Presubmit PresubmitTestType
+	// Remote identifies the remote that the CL pertains to.
+	Remote string
+	// RemoteBranch identifies the remote branch the CL pertains to.
+	RemoteBranch string
+	// Reviewers records the comma-separated list of CL reviewers.
+	Reviewers string
+}
+
+// Gerrit records a hostname of a Gerrit instance and credentials that
+// can be used to access it.
 type Gerrit struct {
 	host     string
 	password string
@@ -99,7 +125,8 @@ func (g *Gerrit) PostReview(ref string, message string, labels map[string]string
 	return nil
 }
 
-// Change represents a changelist in Gerrit.
+// The following types reflect the schema Gerrit uses to represent
+// CLs.
 type Change struct {
 	Change_id        string
 	Current_revision string
@@ -111,7 +138,6 @@ type Change struct {
 	MultiPart        *MultiPartCLInfo
 	PresubmitTest    PresubmitTestType
 }
-
 type Revisions map[string]Revision
 type Revision struct {
 	Fetch  `json:"fetch"`
@@ -321,20 +347,19 @@ func formatParams(params, key string, email bool) []string {
 	return formattedParamsSlice
 }
 
-// Reference inputs a draft flag, a list of reviewers, a list of
-// ccers, and the branch name. It returns a matching string
+// Reference inputs CL options and returns a matching string
 // representation of a Gerrit reference.
-func Reference(draft bool, reviewers, ccs, branch string) string {
+func Reference(opts CLOpts) string {
 	var ref string
-	if draft {
-		ref = "refs/drafts/master"
+	if opts.Draft {
+		ref = "refs/drafts/" + opts.RemoteBranch
 	} else {
-		ref = "refs/for/master"
+		ref = "refs/for/" + opts.RemoteBranch
 	}
 
-	params := formatParams(reviewers, "r", true)
-	params = append(params, formatParams(ccs, "cc", true)...)
-	params = append(params, formatParams(branch, "topic", false)...)
+	params := formatParams(opts.Reviewers, "r", true)
+	params = append(params, formatParams(opts.Ccs, "cc", true)...)
+	params = append(params, formatParams(opts.Branch, "topic", false)...)
 
 	if len(params) > 0 {
 		ref = ref + "%" + strings.Join(params, ",")
@@ -343,9 +368,9 @@ func Reference(draft bool, reviewers, ccs, branch string) string {
 	return ref
 }
 
-// projectName returns the URL of the vanadium Gerrit project with
+// getRemoteURL returns the URL of the vanadium Gerrit project with
 // respect to the project identified by the current working directory.
-func projectName(run *runutil.Run) (string, error) {
+func getRemoteURL(run *runutil.Run) (string, error) {
 	args := []string{"config", "--get", "remote.origin.url"}
 	var stdout, stderr bytes.Buffer
 	opts := run.Opts()
@@ -358,17 +383,17 @@ func projectName(run *runutil.Run) (string, error) {
 }
 
 // Push pushes the current branch to Gerrit.
-func Push(run *runutil.Run, projectPathArg string, draft bool, reviewers, ccs, branch string) error {
-	projectPath := projectPathArg
-	if projectPathArg == "" {
+func Push(run *runutil.Run, clOpts CLOpts) error {
+	remote := clOpts.Remote
+	if remote == "" {
 		var err error
-		projectPath, err = projectName(run)
+		remote, err = getRemoteURL(run)
 		if err != nil {
 			return err
 		}
 	}
-	refspec := "HEAD:" + Reference(draft, reviewers, ccs, branch)
-	args := []string{"push", projectPath, refspec}
+	refspec := "HEAD:" + Reference(clOpts)
+	args := []string{"push", remote, refspec}
 	var stdout, stderr bytes.Buffer
 	opts := run.Opts()
 	opts.Stdout = &stdout

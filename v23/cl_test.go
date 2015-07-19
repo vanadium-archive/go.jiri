@@ -345,7 +345,7 @@ func PublicFunction() {}`
 	if err := ctx.Git().CommitFile(apiFile, "Commit "+apiFile); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(ctx, reviewOpts{})
+	review, err := newReview(ctx, gerrit.CLOpts{})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -398,7 +398,7 @@ func TestCleanupClean(t *testing.T) {
 	if err := ctx.Git().Commit(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := cleanup(ctx, []string{branch}); err != nil {
+	if err := cleanupCL(ctx, []string{branch}); err != nil {
 		t.Fatalf("cleanup() failed: %v", err)
 	}
 	if ctx.Git().BranchExists(branch) {
@@ -425,7 +425,7 @@ func TestCleanupDirty(t *testing.T) {
 	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := cleanup(ctx, []string{branch}); err == nil {
+	if err := cleanupCL(ctx, []string{branch}); err == nil {
 		t.Fatalf("cleanup did not fail when it should")
 	}
 	if err := ctx.Git().CheckoutBranch(branch, !gitutil.Force); err != nil {
@@ -450,7 +450,7 @@ func TestCreateReviewBranch(t *testing.T) {
 	}
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
-	review, err := newReview(ctx, reviewOpts{})
+	review, err := newReview(ctx, gerrit.CLOpts{})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -487,7 +487,7 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(ctx, reviewOpts{repo: branch})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: branch})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -547,7 +547,7 @@ func testCopyrightHelper(t *testing.T, ok bool) error {
 	if err := ctx.Run().Chdir(filepath.Join(root.Dir, "test")); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(ctx, reviewOpts{})
+	review, err := newReview(ctx, gerrit.CLOpts{})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -608,7 +608,7 @@ func testGoDependencyHelper(t *testing.T, ok bool) error {
 		constraint = "allow"
 	}
 	createTestGoDependencyConstraint(t, ctx, repoPath, constraint)
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -670,7 +670,7 @@ func main() {}`
 	if err := ctx.Git().CommitFile(file, commitMessage); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -699,16 +699,6 @@ func TestGoFormatOK(t *testing.T) {
 // by TestGoVetError and TestGoVetOK.
 func testGoVetHelper(t *testing.T, ok bool) error {
 	ctx := tool.NewDefaultContext()
-
-	// build the go vet binary and set the flag.
-	vetBin, cleanup, err := buildGoVetBinary(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	govetBinaryFlag = vetBin
-	defer func() { govetBinaryFlag = "" }()
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
@@ -758,10 +748,19 @@ func main() {
 	if err := ctx.Git().CommitFile(file, commitMessage); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
+
+	// Build the go vet binary and set the flag.
+	vetBin, cleanup, err := review.buildGoVetBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	govetBinaryFlag = vetBin
+	defer func() { govetBinaryFlag = "" }()
 	return review.checkGoVet()
 }
 
@@ -800,21 +799,21 @@ func TestSendReview(t *testing.T) {
 	commitFiles(t, ctx, files)
 	{
 		// Test with draft = false, no reviewiers, and no ccs.
-		review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+		review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+		expectedRef := gerrit.Reference(review.CLOpts)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = true, no reviewers, and no ccs.
-		review, err := newReview(ctx, reviewOpts{
-			draft: true,
-			repo:  gerritPath,
+		review, err := newReview(ctx, gerrit.CLOpts{
+			Draft:  true,
+			Remote: gerritPath,
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -822,14 +821,14 @@ func TestSendReview(t *testing.T) {
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+		expectedRef := gerrit.Reference(review.CLOpts)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = false, reviewers, and no ccs.
-		review, err := newReview(ctx, reviewOpts{
-			repo:      gerritPath,
-			reviewers: "reviewer1,reviewer2@example.org",
+		review, err := newReview(ctx, gerrit.CLOpts{
+			Remote:    gerritPath,
+			Reviewers: "reviewer1,reviewer2@example.org",
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -837,16 +836,16 @@ func TestSendReview(t *testing.T) {
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+		expectedRef := gerrit.Reference(review.CLOpts)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = true, reviewers, and ccs.
-		review, err := newReview(ctx, reviewOpts{
-			ccs:       "cc1@example.org,cc2",
-			draft:     true,
-			repo:      gerritPath,
-			reviewers: "reviewer3@example.org,reviewer4",
+		review, err := newReview(ctx, gerrit.CLOpts{
+			Ccs:       "cc1@example.org,cc2",
+			Draft:     true,
+			Remote:    gerritPath,
+			Reviewers: "reviewer3@example.org,reviewer4",
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -854,7 +853,7 @@ func TestSendReview(t *testing.T) {
 		if err := review.send(); err != nil {
 			t.Fatalf("failed to send a review: %v", err)
 		}
-		expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+		expectedRef := gerrit.Reference(review.CLOpts)
 		assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	}
 }
@@ -875,7 +874,7 @@ func TestSendReviewNoChangeID(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	commitFiles(t, ctx, []string{"file1"})
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -903,7 +902,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -911,7 +910,7 @@ func TestEndToEnd(t *testing.T) {
 	if err := review.run(); err != nil {
 		t.Fatalf("run() failed: %v", err)
 	}
-	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	expectedRef := gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
@@ -945,11 +944,11 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	// Test setting -presubmit=none and autosubmit.
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, ctx, files)
-	review, err := newReview(ctx, reviewOpts{
-		autosubmit: true,
-		presubmit:  gerrit.PresubmitTestTypeNone,
-		repo:       gerritPath,
-		reviewers:  "run1",
+	review, err := newReview(ctx, gerrit.CLOpts{
+		Autosubmit: true,
+		Presubmit:  gerrit.PresubmitTestTypeNone,
+		Remote:     gerritPath,
+		Reviewers:  "run1",
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -958,13 +957,13 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err := review.run(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	expectedRef := gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	// The last three lines of the gerrit commit message file should be:
 	// AutoSubmit
 	// PresubmitTest: none
 	// Change-Id: ...
-	gerritCommitMessageFile, err := review.getCommitMessageFilename()
+	gerritCommitMessageFile, err := review.getCommitMessageFileName()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -988,10 +987,10 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting -presubmit=all but keep autosubmit=true.
-	review, err = newReview(ctx, reviewOpts{
-		autosubmit: true,
-		repo:       gerritPath,
-		reviewers:  "run2",
+	review, err = newReview(ctx, gerrit.CLOpts{
+		Autosubmit: true,
+		Remote:     gerritPath,
+		Reviewers:  "run2",
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -999,7 +998,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err := review.run(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	expectedRef = gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	expectedRef = gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
 	if err != nil {
@@ -1017,9 +1016,9 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting autosubmit=false.
-	review, err = newReview(ctx, reviewOpts{
-		repo:      gerritPath,
-		reviewers: "run3",
+	review, err = newReview(ctx, gerrit.CLOpts{
+		Remote:    gerritPath,
+		Reviewers: "run3",
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -1027,7 +1026,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err := review.run(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	expectedRef = gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	expectedRef = gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
 	if err != nil {
@@ -1084,7 +1083,7 @@ func TestDirtyBranch(t *testing.T) {
 	if err := ctx.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -1136,7 +1135,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err := ctx.Run().Chdir(subdir); err != nil {
 		t.Fatalf("Chdir(%v) failed: %v", subdir, err)
 	}
-	review, err := newReview(ctx, reviewOpts{repo: gerritPath})
+	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -1160,7 +1159,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	if got != want {
 		t.Fatalf("unexpected working directory: got %v, want %v", got, want)
 	}
-	expectedRef := gerrit.Reference(review.draft, review.reviewers, review.ccs, review.branch)
+	expectedRef := gerrit.Reference(review.CLOpts)
 	fmt.Printf("%v\n", expectedRef)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
@@ -1239,9 +1238,9 @@ Change-Id: I0000000000000000000000000000000000000000`,
 	}
 	ctx := tool.NewDefaultContext()
 	for _, test := range testCases {
-		review, err := newReview(ctx, reviewOpts{
-			autosubmit: test.autosubmit,
-			presubmit:  test.presubmitType,
+		review, err := newReview(ctx, gerrit.CLOpts{
+			Autosubmit: test.autosubmit,
+			Presubmit:  test.presubmitType,
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
