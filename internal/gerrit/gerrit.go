@@ -26,6 +26,7 @@ import (
 )
 
 var (
+	autosubmitRE    = regexp.MustCompile("AutoSubmit")
 	remoteRE        = regexp.MustCompile("remote:[^\n]*")
 	multiPartRE     = regexp.MustCompile(`MultiPart:\s*(\d+)\s*/\s*(\d+)`)
 	presubmitTestRE = regexp.MustCompile(`PresubmitTest:\s*(.*)`)
@@ -128,15 +129,19 @@ func (g *Gerrit) PostReview(ref string, message string, labels map[string]string
 // The following types reflect the schema Gerrit uses to represent
 // CLs.
 type Change struct {
+	// CL data.
 	Change_id        string
 	Current_revision string
 	Project          string
 	Topic            string
 	Revisions        Revisions
 	Owner            Owner
-	Labels           map[string]struct{}
-	MultiPart        *MultiPartCLInfo
-	PresubmitTest    PresubmitTestType
+	Labels           map[string]map[string]interface{}
+
+	// Custom labels.
+	AutoSubmit    bool
+	MultiPart     *MultiPartCLInfo
+	PresubmitTest PresubmitTestType
 }
 type Revisions map[string]Revision
 type Revision struct {
@@ -213,6 +218,7 @@ func parseQueryResults(reader io.Reader) ([]Change, error) {
 		}
 		change.MultiPart = multiPartCLInfo
 		change.PresubmitTest = parsePresubmitTestType(clMessage)
+		change.AutoSubmit = autosubmitRE.FindStringSubmatch(clMessage) != nil
 		newChanges = append(newChanges, change)
 	}
 	return newChanges, nil
