@@ -54,7 +54,7 @@ func Oncall(ctx *tool.Context, targetTime time.Time) (*OncallShift, error) {
 	layout := "Jan 2, 2006 3:04:05 PM"
 	for i := len(rotation.Shifts) - 1; i >= 0; i-- {
 		shift := rotation.Shifts[i]
-		t, err := time.Parse(layout, shift.Date)
+		t, err := time.ParseInLocation(layout, shift.Date, targetTime.Location())
 		if err != nil {
 			return nil, fmt.Errorf("Parse(%q, %v) failed: %v", layout, shift.Date, err)
 		}
