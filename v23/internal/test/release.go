@@ -38,14 +38,25 @@ var (
 	defaultReleaseTestTimeout = time.Minute * 5
 
 	serviceBinaries = []string{
-		"binaryd",
 		"applicationd",
-		"proxyd",
+		"binaryd",
+		"deviced",
+		"groupsd",
 		"identityd",
 		"mounttabled",
-		"roled",
-		"deviced",
+		"proxyd",
 		"proxyd:vlab-proxyd",
+		"roled",
+	}
+
+	deviceManagerApplications = []string{
+		"devmgr/apps/applicationd",
+		"devmgr/apps/binaryd",
+		"devmgr/apps/groupsd",
+		"devmgr/apps/identityd",
+		"devmgr/apps/proxyd",
+		"devmgr/apps/roled",
+		"devmgr/apps/VLabProxy",
 	}
 )
 
@@ -283,15 +294,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 	// Update services except for device manager and mounttable.
 	{
 		fmt.Fprintln(ctx.Stdout(), "\n\n### Updating services other than device manager and mounttable ###")
-		apps := []string{
-			"devmgr/apps/applicationd",
-			"devmgr/apps/binaryd",
-			"devmgr/apps/identityd",
-			"devmgr/apps/proxyd",
-			"devmgr/apps/roled",
-			"devmgr/apps/VLabProxy",
-		}
-		for _, app := range apps {
+		for _, app := range deviceManagerApplications {
 			if err := updateAppFn(app); err != nil {
 				return err
 			}
