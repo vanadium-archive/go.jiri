@@ -39,6 +39,7 @@ var (
 	presubmitFlag    string
 	remoteBranchFlag string
 	reviewersFlag    string
+	topicFlag        string
 	uncommittedFlag  bool
 )
 
@@ -72,6 +73,7 @@ func init() {
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
+	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", "CL topic, defaults to <username>-<branchname>.")
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
 }
 
@@ -321,7 +323,7 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	opts := gerrit.CLOpts{
+	review, err := newReview(ctx, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
 		Ccs:          ccsFlag,
 		Draft:        draftFlag,
@@ -329,8 +331,8 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
 		Reviewers:    reviewersFlag,
-	}
-	review, err := newReview(ctx, opts)
+		Topic:        topicFlag,
+	})
 	if err != nil {
 		return err
 	}
@@ -354,6 +356,9 @@ func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
 		return nil, err
 	}
 	opts.Branch = branch
+	if opts.Topic == "" {
+		opts.Topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), branch) // use <username>-<branchname> as the default
+	}
 	if opts.Presubmit == gerrit.PresubmitTestType("") {
 		opts.Presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
 	}

@@ -151,6 +151,8 @@ The v23 cl mail flags are:
    Comma-seperated list of emails or LDAPs to request review.
  -remote-branch=master
    Name of the remote branch the CL pertains to.
+ -topic=
+   CL topic, defaults to <username>-<branchname>.
 
 V23 contributors - List vanadium project contributors
 

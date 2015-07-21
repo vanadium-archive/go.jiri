@@ -68,6 +68,8 @@ type CLOpts struct {
 	RemoteBranch string
 	// Reviewers records the comma-separated list of CL reviewers.
 	Reviewers string
+	// Topic records the CL topic.
+	Topic string
 }
 
 // Gerrit records a hostname of a Gerrit instance and credentials that
@@ -365,7 +367,7 @@ func Reference(opts CLOpts) string {
 
 	params := formatParams(opts.Reviewers, "r", true)
 	params = append(params, formatParams(opts.Ccs, "cc", true)...)
-	params = append(params, formatParams(opts.Branch, "topic", false)...)
+	params = append(params, formatParams(opts.Topic, "topic", false)...)
 
 	if len(params) > 0 {
 		ref = ref + "%" + strings.Join(params, ",")
