@@ -25,6 +25,9 @@ type Config struct {
 	// goWorkspaces identifies V23_ROOT subdirectories that contain a
 	// Go workspace.
 	goWorkspaces []string
+	// jenkinsMatrixJobs identifies the set of matrix (multi-configutation) jobs
+	// in Jenkins.
+	jenkinsMatrixJobs map[string]JenkinsMatrixJobInfo
 	// projectTests maps vanadium projects to sets of tests that should be
 	// executed to test changes in the given project.
 	projectTests map[string][]string
@@ -69,6 +72,12 @@ func (CopyrightCheckProjectsOpt) configOpt() {}
 type GoWorkspacesOpt []string
 
 func (GoWorkspacesOpt) configOpt() {}
+
+// JenkinsMatrixJobsOpt is the type that can be used to pass the Config factory
+// a Jenkins matrix jobs option.
+type JenkinsMatrixJobsOpt map[string]JenkinsMatrixJobInfo
+
+func (JenkinsMatrixJobsOpt) configOpt() {}
 
 // ProjectTestsOpt is the type that can be used to pass the Config
 // factory a project tests option.
@@ -117,6 +126,8 @@ func NewConfig(opts ...ConfigOpt) *Config {
 			c.copyrightCheckProjects = map[string]struct{}(typedOpt)
 		case GoWorkspacesOpt:
 			c.goWorkspaces = []string(typedOpt)
+		case JenkinsMatrixJobsOpt:
+			c.jenkinsMatrixJobs = map[string]JenkinsMatrixJobInfo(typedOpt)
 		case ProjectTestsOpt:
 			c.projectTests = map[string][]string(typedOpt)
 		case SnapshotLabelTestsOpt:
@@ -149,6 +160,11 @@ func (c Config) CopyrightCheckProjects() map[string]struct{} {
 // GoWorkspaces returns the Go workspaces included in the config.
 func (c Config) GoWorkspaces() []string {
 	return c.goWorkspaces
+}
+
+// JenkinsMatrixJobs returns the set of Jenkins matrix jobs.
+func (c Config) JenkinsMatrixJobs() map[string]JenkinsMatrixJobInfo {
+	return c.jenkinsMatrixJobs
 }
 
 // Projects returns a list of projects included in the config.
@@ -222,16 +238,17 @@ func (c Config) VDLWorkspaces() []string {
 }
 
 type configSchema struct {
-	APICheckProjects       []string               `xml:"apiCheckProjects>project"`
-	CopyrightCheckProjects []string               `xml:"copyrightCheckProjects>project"`
-	GoWorkspaces           []string               `xml:"goWorkspaces>workspace"`
-	ProjectTests           testGroupSchemas       `xml:"projectTests>project"`
-	SnapshotLabelTests     testGroupSchemas       `xml:"snapshotLabelTests>snapshot"`
-	TestDependencies       dependencyGroupSchemas `xml:"testDependencies>test"`
-	TestGroups             testGroupSchemas       `xml:"testGroups>group"`
-	TestParts              partGroupSchemas       `xml:"testParts>test"`
-	VDLWorkspaces          []string               `xml:"vdlWorkspaces>workspace"`
-	XMLName                xml.Name               `xml:"config"`
+	APICheckProjects       []string                `xml:"apiCheckProjects>project"`
+	CopyrightCheckProjects []string                `xml:"copyrightCheckProjects>project"`
+	GoWorkspaces           []string                `xml:"goWorkspaces>workspace"`
+	JenkinsMatrixJobs      jenkinsMatrixJobsSchema `xml:"jenkinsMatrixJobs>job"`
+	ProjectTests           testGroupSchemas        `xml:"projectTests>project"`
+	SnapshotLabelTests     testGroupSchemas        `xml:"snapshotLabelTests>snapshot"`
+	TestDependencies       dependencyGroupSchemas  `xml:"testDependencies>test"`
+	TestGroups             testGroupSchemas        `xml:"testGroups>group"`
+	TestParts              partGroupSchemas        `xml:"testParts>test"`
+	VDLWorkspaces          []string                `xml:"vdlWorkspaces>workspace"`
+	XMLName                xml.Name                `xml:"config"`
 }
 
 type dependencyGroupSchema struct {
@@ -244,6 +261,24 @@ type dependencyGroupSchemas []dependencyGroupSchema
 func (d dependencyGroupSchemas) Len() int           { return len(d) }
 func (d dependencyGroupSchemas) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 func (d dependencyGroupSchemas) Less(i, j int) bool { return d[i].Name < d[j].Name }
+
+type JenkinsMatrixJobInfo struct {
+	HasArch  bool `xml:"arch,attr"`
+	HasOS    bool `xml:"OS,attr"`
+	HasParts bool `xml:"parts,attr"`
+	// ShowOS determines whether to show OS label in job summary.
+	// It is possible that a job (e.g. vanadium-go-race) has an OS axis but
+	// the axis only has a single value in order to constrain where its
+	// sub-builds run. In such cases, we do not want to show the OS label.
+	ShowOS bool   `xml:"showOS,attr"`
+	Name   string `xml:",chardata"`
+}
+
+type jenkinsMatrixJobsSchema []JenkinsMatrixJobInfo
+
+func (jobs jenkinsMatrixJobsSchema) Len() int           { return len(jobs) }
+func (jobs jenkinsMatrixJobsSchema) Swap(i, j int)      { jobs[i], jobs[j] = jobs[j], jobs[i] }
+func (jobs jenkinsMatrixJobsSchema) Less(i, j int) bool { return jobs[i].Name < jobs[j].Name }
 
 type partGroupSchema struct {
 	Name  string   `xml:"name,attr"`
@@ -290,6 +325,7 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 		apiCheckProjects:       map[string]struct{}{},
 		copyrightCheckProjects: map[string]struct{}{},
 		goWorkspaces:           []string{},
+		jenkinsMatrixJobs:      map[string]JenkinsMatrixJobInfo{},
 		projectTests:           map[string][]string{},
 		snapshotLabelTests:     map[string][]string{},
 		testDependencies:       map[string][]string{},
@@ -303,6 +339,9 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 		config.goWorkspaces = append(config.goWorkspaces, workspace)
 	}
 	sort.Strings(config.goWorkspaces)
+	for _, job := range data.JenkinsMatrixJobs {
+		config.jenkinsMatrixJobs[job.Name] = job
+	}
 	for _, project := range data.ProjectTests {
 		config.projectTests[project.Name] = project.Tests
 	}
@@ -345,6 +384,10 @@ func saveConfig(ctx *tool.Context, config *Config, path string) error {
 		data.GoWorkspaces = append(data.GoWorkspaces, workspace)
 	}
 	sort.Strings(data.GoWorkspaces)
+	for _, job := range config.jenkinsMatrixJobs {
+		data.JenkinsMatrixJobs = append(data.JenkinsMatrixJobs, job)
+	}
+	sort.Sort(data.JenkinsMatrixJobs)
 	for name, tests := range config.projectTests {
 		data.ProjectTests = append(data.ProjectTests, testGroupSchema{
 			Name:  name,
