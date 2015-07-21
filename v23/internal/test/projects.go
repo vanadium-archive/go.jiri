@@ -102,3 +102,7 @@ func vanadiumPipe2BrowserTest(ctx *tool.Context, testName string, _ ...Opt) (*te
 func vanadiumReaderTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
 	return runProjectTest(ctx, testName, "reader", "test", nil, []string{"nacl", "nodejs"})
 }
+
+func vanadiumTravelTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return runProjectTest(ctx, testName, "travel", "test", nil, nil)
+}
