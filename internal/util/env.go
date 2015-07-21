@@ -116,11 +116,6 @@ func setJavaEnv(env *envvar.Vars, root string) error {
 // setAndroidEnv sets the environment variables used for android
 // cross-compilation.
 func setAndroidEnv(env *envvar.Vars, root string) error {
-	// Set the environment variables needed for building Go shared
-	// libraries for Java.
-	if err := setJavaEnv(env, root); err != nil {
-		return err
-	}
 	// Compile using Android Go 1.5 (installed via
 	// 'v23 profile install android').
 	androidGoDir := filepath.Join(root, "third_party", "android", "go")
