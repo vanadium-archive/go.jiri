@@ -21,14 +21,14 @@ const (
 )
 
 // Runs specified make target in WWW Makefile as a test.
-func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout time.Duration) (_ *test.Result, e error) {
+func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout time.Duration, extraDeps []string) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"nodejs", "syncbase"})
+	cleanup, err := initTest(ctx, testName, append([]string{"nodejs", "syncbase"}, extraDeps...))
 	if err != nil {
 		return nil, internalTestError{err, "Init"}
 	}
@@ -59,31 +59,35 @@ func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout t
 }
 
 func vanadiumWWWSite(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-site", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "test-site", defaultWWWTestTimeout, nil)
 }
 
 func vanadiumWWWTutorialsCore(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-tutorials-core", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-core", defaultWWWTestTimeout, nil)
 }
 
 func vanadiumWWWTutorialsExternal(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-tutorials-external", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-external", defaultWWWTestTimeout, nil)
+}
+
+func vanadiumWWWTutorialsJava(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-java", defaultWWWTestTimeout, []string{"java"})
 }
 
 func vanadiumWWWTutorialsJSNode(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-node", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-node", defaultWWWTestTimeout, nil)
 }
 
 func vanadiumWWWTutorialsJSWeb(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-web", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "test-tutorials-js-web", defaultWWWTestTimeout, nil)
 }
 
 func vanadiumWWWDeployStaging(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "deploy-staging", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "deploy-staging", defaultWWWTestTimeout, nil)
 }
 
 func vanadiumWWWDeployProduction(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return commonVanadiumWWW(ctx, testName, "deploy-production", defaultWWWTestTimeout)
+	return commonVanadiumWWW(ctx, testName, "deploy-production", defaultWWWTestTimeout, nil)
 }
 
 // vanadiumWWWConfigDeployHelper updates remote instance configuration and restarts remote nginx, auth, and proxy services.

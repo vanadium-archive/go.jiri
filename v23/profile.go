@@ -802,6 +802,23 @@ func installAndroidLinux(ctx *tool.Context, target profileTarget) error {
 	return installAndroidCommon(ctx, target)
 }
 
+// installGradle downloads and unzips Gradle into the given directory.
+func installGradle(ctx *tool.Context, targetDir string) (e error) {
+	if err := ctx.Run().MkdirAll(targetDir, 0755); err != nil {
+		return err
+	}
+	zipFilename := "gradle-2.5-bin.zip"
+	remote, local := "https://services.gradle.org/distributions/"+zipFilename, filepath.Join(targetDir, zipFilename)
+	if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return ctx.Run().RemoveAll(local) }, &e)
+	if err := run(ctx, "unzip", []string{"-d", targetDir, local}, nil); err != nil {
+		return err
+	}
+	return ctx.Run().Symlink(filepath.Join(targetDir, "gradle-2.5", "bin", "gradle"), filepath.Join(targetDir, "gradle"))
+}
+
 // installJavaCommon contains cross-platform actions to install the
 // java profile.
 func installJavaCommon(ctx *tool.Context, target profileTarget) error {
@@ -811,10 +828,17 @@ func installJavaCommon(ctx *tool.Context, target profileTarget) error {
 	}
 	javaRoot := filepath.Join(root, "third_party", "java")
 	javaGo := filepath.Join(javaRoot, "go")
+	gradleDir := filepath.Join(javaRoot, "gradle")
 	installGoFn := func() error {
 		return installGo15(ctx, javaGo, nil, envvar.VarsFromOS())
 	}
-	return atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go")
+	installGradleFn := func() error {
+		return installGradle(ctx, gradleDir)
+	}
+	if err := atomicAction(ctx, installGoFn, javaGo, "Download and build Java Go"); err != nil {
+		return err
+	}
+	return atomicAction(ctx, installGradleFn, gradleDir, "Download and unzip Gradle")
 }
 
 // hasJDK returns true iff the JDK already exists on the machine and
@@ -1377,10 +1401,17 @@ func uninstallJavaLinux(ctx *tool.Context, target profileTarget, version int) er
 	return uninstallJavaCommon(ctx, target, version)
 }
 
-// uninstallJavaCommon uninstalls the java profile.
+// uninstallJavaCommon uninstalls the java profile. Currently this means
+// uninstalling Gradle, in the future we will take care of removing any JDK
+// installed by `v23 profile install java`.
 func uninstallJavaCommon(ctx *tool.Context, target profileTarget, version int) error {
-	// TODO(spetrovic): Implement.
-	return fmt.Errorf("not implemented")
+	// TODO(spetrovic): Implement JDK removal.
+	root, err := util.V23Root()
+	if err != nil {
+		return err
+	}
+	gradleRoot := filepath.Join(root, "third_party", "java", "gradle")
+	return ctx.Run().RemoveAll(gradleRoot)
 }
 
 // uninstallNaclDarwin uninstalls the nacl profile for darwin.
