@@ -409,7 +409,8 @@ func (review *review) confirmFlagChanges() (bool, error) {
 	}
 
 	if len(changes) > 0 {
-		fmt.Printf("Are you sure you want to make the following changes:\n%s\n\ny/N: ", strings.Join(changes, "\n"))
+		fmt.Printf("Changes:\n%s\n", strings.Join(changes, "\n"))
+		fmt.Print("Are you sure you want to make the above changes? y/N:")
 		var response string
 		if _, err := fmt.Scanf("%s\n", &response); err != nil || response != "y" {
 			return false, nil
