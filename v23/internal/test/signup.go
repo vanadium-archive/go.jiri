@@ -24,15 +24,11 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	}
 
 	// Fetch emails addresses.
-	var buffer bytes.Buffer
-	{
-		credentials := os.Getenv("CREDENTIALS")
-		fetchSrc := filepath.Join(root, "infrastructure", "signup", "fetch.go")
-		opts := ctx.Run().Opts()
-		opts.Stdout = &buffer
-		if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, "-credentials="+credentials); err != nil {
-			return nil, internalTestError{err, "fetch"}
-		}
+	credentials := os.Getenv("CREDENTIALS")
+
+	data, err := fetchFieldValues(ctx, credentials, "email")
+	if err != nil {
+		return nil, internalTestError{err, "fetch"}
 	}
 
 	// Create a feature branch in the infrastructure project.
@@ -56,7 +52,7 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 		mergeSrc := filepath.Join(root, "infrastructure", "signup", "merge.go")
 		for _, whitelist := range whitelists {
 			opts := ctx.Run().Opts()
-			opts.Stdin = bytes.NewReader(buffer.Bytes())
+			opts.Stdin = bytes.NewReader(data)
 			if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", mergeSrc, "-whitelist="+whitelist); err != nil {
 				return nil, internalTestError{err, "merge"}
 			}
@@ -81,4 +77,45 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	}
 
 	return &test.Result{Status: test.Passed}, nil
+}
+
+func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, internalTestError{err, "VanadiumRoot"}
+	}
+
+	credentials := os.Getenv("CREDENTIALS")
+
+	data, err := fetchFieldValues(ctx, credentials, "github")
+	if err != nil {
+		return nil, internalTestError{err, "fetch"}
+	}
+
+	// Add them to @vanadium/developers
+	github := filepath.Join(root, "infrastructure", "signup", "github.go")
+	githubOpts := ctx.Run().Opts()
+	githubOpts.Stdin = bytes.NewReader(data)
+	if err := ctx.Run().CommandWithOpts(githubOpts, "v23", "go", "run", github, "-credentials="+credentials); err != nil {
+		return nil, internalTestError{err, "github"}
+	}
+
+	return &test.Result{Status: test.Passed}, nil
+}
+
+func fetchFieldValues(ctx *tool.Context, credentials string, field string) ([]byte, error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, internalTestError{err, "VanadiumRoot"}
+	}
+
+	var buffer bytes.Buffer
+
+	fetchSrc := filepath.Join(root, "infrastructure", "signup", "fetch.go")
+	opts := ctx.Run().Opts()
+	opts.Stdout = &buffer
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, "-credentials="+credentials, "-field="+field); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
