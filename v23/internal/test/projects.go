@@ -104,5 +104,5 @@ func vanadiumReaderTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Res
 }
 
 func vanadiumTravelTest(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	return runProjectTest(ctx, testName, "travel", "test", nil, nil)
+	return runProjectTest(ctx, testName, "travel", "test", nil, []string{"nodejs"})
 }
