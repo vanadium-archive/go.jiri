@@ -21,7 +21,23 @@ var (
 		"projectC": struct{}{},
 		"projectD": struct{}{},
 	}
-	goWorkspaces = []string{"test-go-workspace"}
+	goWorkspaces      = []string{"test-go-workspace"}
+	jenkinsMatrixJobs = map[string]JenkinsMatrixJobInfo{
+		"test-job-A": JenkinsMatrixJobInfo{
+			HasArch:  false,
+			HasOS:    true,
+			HasParts: true,
+			ShowOS:   false,
+			Name:     "test-job-A",
+		},
+		"test-job-B": JenkinsMatrixJobInfo{
+			HasArch:  true,
+			HasOS:    false,
+			HasParts: false,
+			ShowOS:   false,
+			Name:     "test-job-B",
+		},
+	}
 	projectTests = map[string][]string{
 		"test-project":  []string{"test-test-A", "test-test-group"},
 		"test-project2": []string{"test-test-D"},
@@ -50,6 +66,9 @@ func testConfigAPI(t *testing.T, c *Config) {
 		t.Fatalf("unexpected results: got %v, want %v", got, want)
 	}
 	if got, want := c.GoWorkspaces(), goWorkspaces; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected result: got %v, want %v", got, want)
+	}
+	if got, want := c.JenkinsMatrixJobs(), jenkinsMatrixJobs; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
 	if got, want := c.Projects(), []string{"test-project", "test-project2"}; !reflect.DeepEqual(got, want) {
@@ -86,6 +105,7 @@ func TestConfigAPI(t *testing.T) {
 		APICheckProjectsOpt(apiCheckProjects),
 		CopyrightCheckProjectsOpt(copyrightCheckProjects),
 		GoWorkspacesOpt(goWorkspaces),
+		JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
 		TestDependenciesOpt(testDependencies),
@@ -119,6 +139,7 @@ func TestConfigSerialization(t *testing.T) {
 		APICheckProjectsOpt(apiCheckProjects),
 		CopyrightCheckProjectsOpt(copyrightCheckProjects),
 		GoWorkspacesOpt(goWorkspaces),
+		JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
 		ProjectTestsOpt(projectTests),
 		SnapshotLabelTestsOpt(snapshotLabelTests),
 		TestDependenciesOpt(testDependencies),
