@@ -103,6 +103,32 @@ func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test
 	return &test.Result{Status: test.Passed}, nil
 }
 
+func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, internalTestError{err, "VanadiumRoot"}
+	}
+
+	// Fetch emails addresses.
+	credentials := os.Getenv("CREDENTIALS")
+	data, err := fetchFieldValues(ctx, credentials, "email")
+	if err != nil {
+		return nil, internalTestError{err, "fetch"}
+	}
+
+	// Add them to Google Group.
+	keyFile := os.Getenv("KEYFILE")
+	serviceAccount := os.Getenv("SERVICE_ACCOUNT")
+	opts := ctx.Run().Opts()
+	opts.Stdin = bytes.NewReader(data)
+	groupSrc := filepath.Join(root, "infrastructure", "signup", "group.go")
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", groupSrc, "-keyFile="+keyFile, "-account="+serviceAccount); err != nil {
+		return nil, internalTestError{err, "group"}
+	}
+
+	return &test.Result{Status: test.Passed}, nil
+}
+
 func fetchFieldValues(ctx *tool.Context, credentials string, field string) ([]byte, error) {
 	root, err := util.V23Root()
 	if err != nil {
