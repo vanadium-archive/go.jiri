@@ -382,7 +382,7 @@ func TestCleanupClean(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	root, _, _, _ := setupTest(t, ctx, true)
+	root, repoPath, originPath, _ := setupTest(t, ctx, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -392,10 +392,11 @@ func TestCleanupClean(t *testing.T) {
 	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := ctx.Git().Merge(branch, true); err != nil {
+	if err := ctx.Run().Chdir(originPath); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := ctx.Git().Commit(); err != nil {
+	commitFiles(t, ctx, []string{"file1", "file2"})
+	if err := ctx.Run().Chdir(repoPath); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := cleanupCL(ctx, []string{branch}); err != nil {

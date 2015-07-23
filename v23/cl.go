@@ -59,9 +59,9 @@ var (
 // init carries out the package initialization.
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
+	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", true, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
-	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
@@ -72,6 +72,7 @@ func init() {
 	cmdCLMail.Flags.StringVar(&govetBinaryFlag, "go-vet-binary", "", "Specify the path to the go vet binary to use.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
+	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
 	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", "CL topic, defaults to <username>-<branchname>.")
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
@@ -123,7 +124,7 @@ func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 		}
 		return nil
 	}, &e)
-	if err := ctx.Git().Pull("origin", "master"); err != nil {
+	if err := ctx.Git().Fetch("origin", remoteBranchFlag); err != nil {
 		return err
 	}
 	for _, branch := range branches {
@@ -143,10 +144,11 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 		return err
 	}
 	if !forceFlag {
-		if err := ctx.Git().Merge("master", false); err != nil {
+		trackingBranch := "origin/" + remoteBranchFlag
+		if err := ctx.Git().Merge(trackingBranch, false); err != nil {
 			return err
 		}
-		files, err := ctx.Git().ModifiedFiles("master", branch)
+		files, err := ctx.Git().ModifiedFiles(trackingBranch, branch)
 		if err != nil {
 			return err
 		}
@@ -205,23 +207,27 @@ type apiError struct {
 	project        string
 }
 
-func (a apiError) Error() string {
+func (e apiError) Error() string {
 	result := "changelist changes the public Go API without updating the corresponding .api file(s)\n\n"
-	result += "For a detailed account of these changes, run 'v23 api check " + a.project + "'\n"
-	result += "If these changes are intentional, run 'v23 api fix " + a.project + "'\n"
+	result += "For a detailed account of these changes, run 'v23 api check " + e.project + "'\n"
+	result += "If these changes are intentional, run 'v23 api fix " + e.project + "'\n"
 	result += "to update the corresponding .api files. Then add the updated .api files to\n"
 	result += "your changelist and re-run the mail command.\n\n"
-	result += a.apiCheckOutput
+	result += e.apiCheckOutput
 	return result
 }
 
-type changeConflictError string
+type changeConflictError struct {
+	localBranch  string
+	message      string
+	remoteBranch string
+}
 
-func (s changeConflictError) Error() string {
-	result := "changelist conflicts with the remote master branch\n\n"
-	result += "To resolve this problem, run 'v23 update; git merge master',\n"
+func (e changeConflictError) Error() string {
+	result := "changelist conflicts with the remote " + e.remoteBranch + " branch\n\n"
+	result += "To resolve this problem, run 'git pull origin " + e.remoteBranch + ":" + e.localBranch + "',\n"
 	result += "resolve the conflicts identified below, and then try again.\n"
-	result += string(s)
+	result += e.message
 	return result
 }
 
@@ -230,11 +236,11 @@ type copyrightError struct {
 	project string
 }
 
-func (s copyrightError) Error() string {
+func (e copyrightError) Error() string {
 	result := "changelist does not adhere to the copyright conventions\n\n"
-	result += "To resolve this problem, run 'v23 copyright fix " + s.project + "' to\n"
+	result += "To resolve this problem, run 'v23 copyright fix " + e.project + "' to\n"
 	result += "fix the following violations:\n"
-	result += s.message
+	result += e.message
 	return result
 }
 
@@ -246,36 +252,36 @@ func (_ emptyChangeError) Error() string {
 
 type gerritError string
 
-func (s gerritError) Error() string {
+func (e gerritError) Error() string {
 	result := "sending code review failed\n\n"
-	result += string(s)
+	result += string(e)
 	return result
 }
 
 type goDependencyError string
 
-func (s goDependencyError) Error() string {
+func (e goDependencyError) Error() string {
 	result := "changelist introduces dependency violations\n\n"
 	result += "To resolve this problem, fix the following violations:\n"
-	result += string(s)
+	result += string(e)
 	return result
 }
 
 type goFormatError string
 
-func (s goFormatError) Error() string {
+func (e goFormatError) Error() string {
 	result := "changelist does not adhere to the Go formatting conventions\n\n"
 	result += "To resolve this problem, run 'gofmt -w' for the following file(s):\n"
-	result += string(s)
+	result += string(e)
 	return result
 }
 
 type goVetError []string
 
-func (s goVetError) Error() string {
+func (e goVetError) Error() string {
 	result := "changelist contains 'go vet' violation(s)\n\n"
 	result += "To resolve this problem, fix the following violations:\n"
-	result += "  " + strings.Join(s, "\n  ")
+	result += "  " + strings.Join(e, "\n  ")
 	return result
 }
 
@@ -288,9 +294,9 @@ func (_ noChangeIDError) Error() string {
 
 type uncommittedChangesError []string
 
-func (s uncommittedChangesError) Error() string {
+func (e uncommittedChangesError) Error() string {
 	result := "uncommitted local changes in files:\n"
-	result += "  " + strings.Join(s, "\n  ")
+	result += "  " + strings.Join(e, "\n  ")
 	return result
 }
 
@@ -361,6 +367,9 @@ func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
 	}
 	if opts.Presubmit == gerrit.PresubmitTestType("") {
 		opts.Presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
+	}
+	if opts.RemoteBranch == "" {
+		opts.RemoteBranch = "master" // use master as the default
 	}
 	return &review{
 		ctx:          ctx,
@@ -512,7 +521,7 @@ func (review *review) buildGoVetBinary() (vetBin string, cleanup func() error, e
 
 // modifiedGoFiles returns the modified go files in the change to be submitted.
 func (review *review) modifiedGoFiles() ([]string, error) {
-	files, err := review.ctx.Git().ModifiedFiles("master", review.CLOpts.Branch)
+	files, err := review.ctx.Git().ModifiedFiles(review.CLOpts.RemoteBranch, review.CLOpts.Branch)
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +656,7 @@ func (review *review) cleanup(stashed bool) error {
 // createReviewBranch creates a clean review branch from master and
 // squashes the commits into one, with the supplied message.
 func (review *review) createReviewBranch(message string) error {
-	if err := review.ctx.Git().Fetch("origin", "master"); err != nil {
+	if err := review.ctx.Git().Fetch("origin", review.CLOpts.RemoteBranch); err != nil {
 		return err
 	}
 	if review.ctx.Git().BranchExists(review.reviewBranch) {
@@ -655,7 +664,7 @@ func (review *review) createReviewBranch(message string) error {
 			return err
 		}
 	}
-	upstream := "origin/master"
+	upstream := "origin/" + review.CLOpts.RemoteBranch
 	if err := review.ctx.Git().CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
 		return err
 	}
@@ -680,7 +689,11 @@ func (review *review) createReviewBranch(message string) error {
 		return err
 	}
 	if err := review.ctx.Git().Merge(review.CLOpts.Branch, true); err != nil {
-		return changeConflictError(err.Error())
+		return changeConflictError{
+			localBranch:  review.CLOpts.Branch,
+			remoteBranch: review.CLOpts.RemoteBranch,
+			message:      err.Error(),
+		}
 	}
 	committer := review.ctx.Git().NewCommitter(review.CLOpts.Edit)
 	if err := committer.Commit(message); err != nil {

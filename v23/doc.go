@@ -109,6 +109,8 @@ Usage:
 The v23 cl cleanup flags are:
  -f=false
    Ignore unmerged changes.
+ -remote-branch=master
+   Name of the remote branch the CL pertains to.
 
 V23 cl mail - Mail a changelist based on the current branch to Gerrit for review
 
