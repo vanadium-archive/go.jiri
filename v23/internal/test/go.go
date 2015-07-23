@@ -1624,6 +1624,7 @@ func downloadVanadiumBinaries(ctx *tool.Context, bin string, date time.Time) (bi
 		"-date-prefix", dateStr,
 		"-key-file", os.Getenv("V23_KEY_FILE"),
 		"download",
+		"-attempts=3",
 		"-output-dir", binDir); err != nil {
 		exiterr, ok := err.(*exec.ExitError)
 		if !ok {
