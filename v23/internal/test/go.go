@@ -952,6 +952,9 @@ func init() {
 		//
 		// https://github.com/veyron/release-issues/issues/1494
 		newExclusion("v.io/x/ref/runtime/internal/rpc/stream/vc", "TestConcurrentFlows", isDarwin() && is386()),
+		// This test "crashes" Macs and is being investigated in
+		// https://github.com/vanadium/issues/issues/618.
+		newExclusion("v.io/x/ref/services/device/deviced/internal/impl/applife", "TestLifeOfAnApp", isDarwin()),
 		// The fsnotify package tests are flaky on darwin. This begs the
 		// question of whether we should be relying on this library at
 		// all.
