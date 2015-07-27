@@ -174,7 +174,10 @@ func buildWorker(ctx *tool.Context, args []string, pkgs <-chan string, results c
 	opts.Verbose = false
 	for pkg := range pkgs {
 		var out bytes.Buffer
-		args := append([]string{"go", "build", "-o", filepath.Join(binDirPath(), path.Base(pkg))}, args...)
+		// The "leveldb" tag is needed to compile the levelDB-based
+		// storage engine for the groups service. See v.io/i/632 for more
+		// details.
+		args := append([]string{"go", "build", "-tags=leveldb", "-o", filepath.Join(binDirPath(), path.Base(pkg))}, args...)
 		args = append(args, pkg)
 		opts.Stdout = &out
 		opts.Stderr = &out
@@ -734,7 +737,11 @@ func testWorker(ctx *tool.Context, timeout string, args, nonTestArgs []string, t
 	opts.Verbose = false
 	for task := range tasks {
 		// Run the test.
-		taskArgs := append([]string{"go", "test", "-timeout", timeout, "-v"}, args...)
+		//
+		// The "leveldb" tag is needed to compile the levelDB-based
+		// storage engine for the groups service. See v.io/i/632 for more
+		// details.
+		taskArgs := append([]string{"go", "test", "-tags=leveldb", "-timeout", timeout, "-v"}, args...)
 		if len(task.specificTests) != 0 {
 			taskArgs = append(taskArgs, "-run", fmt.Sprintf("%s", strings.Join(task.specificTests, "|")))
 		}
@@ -779,7 +786,9 @@ func testWorker(ctx *tool.Context, timeout string, args, nonTestArgs []string, t
 // buildTestDeps builds dependencies for the given test packages
 func buildTestDeps(ctx *tool.Context, pkgs []string) error {
 	fmt.Fprintf(ctx.Stdout(), "building test dependencies ... ")
-	args := append([]string{"go", "test", "-i"}, pkgs...)
+	// The "leveldb" tag is needed to compile the levelDB-based storage
+	// engine for the groups service. See v.io/i/632 for more details.
+	args := append([]string{"go", "test", "-tags=leveldb", "-i"}, pkgs...)
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stderr = &out
@@ -1537,7 +1546,10 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 
 	// Build all v.io binaries.  We are going to check the binaries at head
 	// against those from a previous date.
-	if err := ctx.Run().Command("v23", "go", "install", "v.io/..."); err != nil {
+	//
+	// The "leveldb" tag is needed to compile the levelDB-based storage
+	// engine for the groups service. See v.io/i/632 for more details.
+	if err := ctx.Run().Command("v23", "go", "install", "-tags=leveldb", "v.io/..."); err != nil {
 		return nil, internalTestError{err, "Install"}
 	}
 	root, err := util.V23Root()

@@ -177,7 +177,10 @@ func getCredDirOptValues(opts []Opt) (string, string) {
 // prepareBinaries builds all vanadium binaries and uploads them to Google Storage bucket.
 func prepareBinaries(ctx *tool.Context, root, rcLabel string) error {
 	// Build binaries.
-	args := []string{"go", "install", "v.io/..."}
+	//
+	// The "leveldb" tag is needed to compile the levelDB-based storage
+	// engine for the groups service. See v.io/i/632 for more details.
+	args := []string{"go", "install", "-tags=leveldb", "v.io/..."}
 	if err := ctx.Run().Command("v23", args...); err != nil {
 		return err
 	}

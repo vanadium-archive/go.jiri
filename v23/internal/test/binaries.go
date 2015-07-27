@@ -31,7 +31,10 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 	}
 
 	// Build all v.io binaries.
-	if err := ctx.Run().Command("v23", "go", "install", "v.io/..."); err != nil {
+	//
+	// The "leveldb" tag is needed to compile the levelDB-based storage
+	// engine for the groups service. See v.io/i/632 for more details.
+	if err := ctx.Run().Command("v23", "go", "install", "-tags=leveldb", "v.io/..."); err != nil {
 		return nil, internalTestError{err, "Install"}
 	}
 
