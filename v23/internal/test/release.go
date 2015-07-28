@@ -28,10 +28,11 @@ const (
 	manifestEnvVar          = "SNAPSHOT_MANIFEST"
 	numRetries              = 30
 	objNameForDeviceManager = "devices/vanadium-cell-master/devmgr/device"
+	propertiesFile          = ".release_candidate_properties"
 	retryPeriod             = 10 * time.Second
 	stagingBlessingsRoot    = "dev.staging.v.io" // TODO(jingjin): use a better name and update prod.go.
 	snapshotName            = "rc"
-	snapshotManifestFile    = ".release_candidate_snapshot_manifest"
+	testsEnvVar             = "TESTS"
 )
 
 var (
@@ -515,15 +516,24 @@ func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts .
 		return nil, internalTestError{fmt.Errorf("EvalSymlinks(%s) failed: %v", symlink, err), "Resolve Snapshot Symlink"}
 	}
 
-	// Write to a file.
+	// Get manifest file's relative path to the root manifest dir.
 	manifestDir, err := util.ManifestDir()
 	if err != nil {
 		return nil, err
 	}
 	relativePath := strings.TrimPrefix(target, manifestDir+string(filepath.Separator))
-	content := fmt.Sprintf("%s=%s", manifestEnvVar, relativePath)
-	if err := ctx.Run().WriteFile(filepath.Join(root, snapshotManifestFile), []byte(content), os.FileMode(0644)); err != nil {
-		return nil, internalTestError{err, "Record Snapshot Manifest Target"}
+
+	// Get all the tests to run.
+	config, err := util.LoadConfig(ctx)
+	if err != nil {
+		return nil, internalTestError{err, "LoadConfig"}
+	}
+	tests := config.GroupTests([]string{"go", "java", "javascript", "projects", "third_party-go"})
+
+	// Write to the properties file.
+	content := fmt.Sprintf("%s=%s\n%s=%s", manifestEnvVar, relativePath, testsEnvVar, strings.Join(tests, " "))
+	if err := ctx.Run().WriteFile(filepath.Join(root, propertiesFile), []byte(content), os.FileMode(0644)); err != nil {
+		return nil, internalTestError{err, "Record Properties"}
 	}
 
 	return &test.Result{Status: test.Passed}, nil

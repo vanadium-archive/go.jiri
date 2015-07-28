@@ -157,6 +157,21 @@ func (c Config) CopyrightCheckProjects() map[string]struct{} {
 	return c.copyrightCheckProjects
 }
 
+// GroupTests returns a list of Jenkins tests associated with the
+// given test groups.
+func (c Config) GroupTests(groups []string) []string {
+	testSet := map[string]struct{}{}
+	testGroups := c.testGroups
+	for _, group := range groups {
+		if testGroup, ok := testGroups[group]; ok {
+			set.String.Union(testSet, set.String.FromSlice(testGroup))
+		}
+	}
+	tests := set.String.ToSlice(testSet)
+	sort.Strings(tests)
+	return tests
+}
+
 // GoWorkspaces returns the Go workspaces included in the config.
 func (c Config) GoWorkspaces() []string {
 	return c.goWorkspaces

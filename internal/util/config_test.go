@@ -68,6 +68,9 @@ func testConfigAPI(t *testing.T, c *Config) {
 	if got, want := c.GoWorkspaces(), goWorkspaces; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
+	if got, want := c.GroupTests([]string{"test-test-group"}), []string{"test-test-B", "test-test-C"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected result: got %v, want %v", got, want)
+	}
 	if got, want := c.JenkinsMatrixJobs(), jenkinsMatrixJobs; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
