@@ -25,8 +25,9 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 
 	// Fetch emails addresses.
 	credentials := os.Getenv("CREDENTIALS")
+	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "email")
+	data, err := fetchFieldValues(ctx, credentials, "email", sheetID)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -86,8 +87,9 @@ func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test
 	}
 
 	credentials := os.Getenv("CREDENTIALS")
+	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "github")
+	data, err := fetchFieldValues(ctx, credentials, "github", sheetID)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -111,7 +113,9 @@ func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 
 	// Fetch emails addresses.
 	credentials := os.Getenv("CREDENTIALS")
-	data, err := fetchFieldValues(ctx, credentials, "email")
+	sheetID := os.Getenv("SHEET_ID")
+
+	data, err := fetchFieldValues(ctx, credentials, "email", sheetID)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -129,7 +133,7 @@ func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	return &test.Result{Status: test.Passed}, nil
 }
 
-func fetchFieldValues(ctx *tool.Context, credentials string, field string) ([]byte, error) {
+func fetchFieldValues(ctx *tool.Context, credentials string, field string, sheetID string) ([]byte, error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -140,7 +144,7 @@ func fetchFieldValues(ctx *tool.Context, credentials string, field string) ([]by
 	fetchSrc := filepath.Join(root, "infrastructure", "signup", "fetch.go")
 	opts := ctx.Run().Opts()
 	opts.Stdout = &buffer
-	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, "-credentials="+credentials, "-field="+field); err != nil {
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, "-credentials="+credentials, "-field="+field, "-sheet-id="+sheetID); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
