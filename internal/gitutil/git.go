@@ -16,11 +16,6 @@ import (
 	"v.io/x/devtools/internal/runutil"
 )
 
-const (
-	Force  = true
-	Verify = true
-)
-
 type GitError struct {
 	args        []string
 	output      string
@@ -57,8 +52,8 @@ func New(r *runutil.Run, rootDir string) *Git {
 }
 
 // Add adds a file to staging.
-func (g *Git) Add(fileName string) error {
-	return g.run("add", fileName)
+func (g *Git) Add(file string) error {
+	return g.run("add", file)
 }
 
 // AddRemote adds a new remote with the given name and path.
@@ -66,10 +61,10 @@ func (g *Git) AddRemote(name, path string) error {
 	return g.run("remote", "add", name, path)
 }
 
-// BranchExists tests whether a branch with the given name exists in the local
-// repository.
-func (g *Git) BranchExists(branchName string) bool {
-	return g.run("show-branch", branchName) == nil
+// BranchExists tests whether a branch with the given name exists in
+// the local repository.
+func (g *Git) BranchExists(branch string) bool {
+	return g.run("show-branch", branch) == nil
 }
 
 // BranchesDiffer tests whether two branches have any changes between them.
@@ -86,13 +81,21 @@ func (g *Git) BranchesDiffer(branch1, branch2 string) (bool, error) {
 	return true, nil
 }
 
-// CheckoutBranch checks out a branch.
-func (g *Git) CheckoutBranch(branchName string, force bool) error {
-	if force {
-		return g.run("checkout", "-f", branchName)
-	} else {
-		return g.run("checkout", branchName)
+// CheckoutBranch checks out the given branch.
+func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
+	args := []string{"checkout"}
+	force := false
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case ForceOpt:
+			force = bool(typedOpt)
+		}
 	}
+	if force {
+		args = append(args, "-f")
+	}
+	args = append(args, branch)
+	return g.run(args...)
 }
 
 // Clone clones the given repository to the given local path.
@@ -201,20 +204,20 @@ func (g *Git) CountCommits(branch, base string) (int, error) {
 }
 
 // CreateBranch creates a new branch with the given name.
-func (g *Git) CreateBranch(branchName string) error {
-	return g.run("branch", branchName)
+func (g *Git) CreateBranch(branch string) error {
+	return g.run("branch", branch)
 }
 
-// CreateAndCheckoutBranch creates a branch with the given name and
-// checks it out.
-func (g *Git) CreateAndCheckoutBranch(branchName string) error {
-	return g.run("checkout", "-b", branchName)
+// CreateAndCheckoutBranch creates a new branch with the given name
+// and checks it out.
+func (g *Git) CreateAndCheckoutBranch(branch string) error {
+	return g.run("checkout", "-b", branch)
 }
 
 // CreateBranchWithUpstream creates a new branch and sets the upstream
 // repository to the given upstream.
-func (g *Git) CreateBranchWithUpstream(branchName, upstream string) error {
-	return g.run("branch", branchName, upstream)
+func (g *Git) CreateBranchWithUpstream(branch, upstream string) error {
+	return g.run("branch", branch, upstream)
 }
 
 // CurrentBranchName returns the name of the current branch.
@@ -242,12 +245,22 @@ func (g *Git) CurrentRevision() (string, error) {
 }
 
 // DeleteBranch deletes the given branch.
-func (g *Git) DeleteBranch(branchName string, force bool) error {
-	if force {
-		return g.run("branch", "-D", branchName)
-	} else {
-		return g.run("branch", "-d", branchName)
+func (g *Git) DeleteBranch(branch string, opts ...DeleteBranchOpt) error {
+	args := []string{"branch"}
+	force := false
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case ForceOpt:
+			force = bool(typedOpt)
+		}
 	}
+	if force {
+		args = append(args, "-D")
+	} else {
+		args = append(args, "-d")
+	}
+	args = append(args, branch)
+	return g.run(args...)
 }
 
 // Fetch fetches refs and tags from the given remote.
@@ -367,17 +380,23 @@ func (g *Git) Log(branch, base, format string) ([][]string, error) {
 // commit.
 func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	args := []string{"merge"}
+	squash := false
+	strategyOption := ""
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case SquashOpt:
-			if bool(typedOpt) {
-				args = append(args, "--squash")
-			} else {
-				args = append(args, "--no-squash")
-			}
+			squash = bool(typedOpt)
 		case StrategyOpt:
-			args = append(args, fmt.Sprintf("--strategy-option=%v", string(typedOpt)))
+			strategyOption = string(typedOpt)
 		}
+	}
+	if squash {
+		args = append(args, "--squash")
+	} else {
+		args = append(args, "--no-squash")
+	}
+	if strategyOption != "" {
+		args = append(args, fmt.Sprintf("--strategy-option=%v", strategyOption))
 	}
 	args = append(args, branch)
 	if out, err := g.runOutput(args...); err != nil {
@@ -439,11 +458,21 @@ func (g *Git) Pull(remote, branch string) error {
 }
 
 // Push pushes the given branch to the given remote.
-func (g *Git) Push(remote, branch string, verify bool) error {
-	args := []string{"push", remote, branch}
-	if !verify {
+func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
+	args := []string{"push"}
+	verify := true
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case VerifyOpt:
+			verify = bool(typedOpt)
+		}
+	}
+	if verify {
+		args = append(args, "--verify")
+	} else {
 		args = append(args, "--no-verify")
 	}
+	args = append(args, remote, branch)
 	return g.run(args...)
 }
 

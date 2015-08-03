@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
@@ -206,5 +205,5 @@ func pull(ctx *tool.Context, mirror Mirror, projects string) error {
 func push(ctx *tool.Context, mirror Mirror, projects string) error {
 	dirname := filepath.Join(projects, mirror.name)
 	opts := tool.RootDirOpt(dirname)
-	return ctx.Git(opts).Push(mirror.github, "master", gitutil.Verify)
+	return ctx.Git(opts).Push(mirror.github, "master")
 }

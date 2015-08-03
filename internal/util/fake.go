@@ -146,7 +146,7 @@ func (root FakeV23Root) AddTool(ctx *tool.Context, tool Tool) error {
 // repository.
 func (root FakeV23Root) DisableRemoteManifestPush(ctx *tool.Context) error {
 	dir := tool.RootDirOpt(filepath.Join(root.remote, manifestProject))
-	if err := ctx.Git(dir).CheckoutBranch("master", false); err != nil {
+	if err := ctx.Git(dir).CheckoutBranch("master"); err != nil {
 		return err
 	}
 	return nil
@@ -161,7 +161,7 @@ func (root FakeV23Root) EnableRemoteManifestPush(ctx *tool.Context) error {
 			return err
 		}
 	}
-	if err := ctx.Git(dir).CheckoutBranch("non-master", false); err != nil {
+	if err := ctx.Git(dir).CheckoutBranch("non-master"); err != nil {
 		return err
 	}
 	return nil

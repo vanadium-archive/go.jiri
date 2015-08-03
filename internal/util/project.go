@@ -383,10 +383,10 @@ func ApplyToLocalMaster(ctx *tool.Context, project Project, fn func() error) (e 
 		if stashed {
 			defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
 		}
-		if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+		if err := ctx.Git().CheckoutBranch("master"); err != nil {
 			return err
 		}
-		defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch, !gitutil.Force) }, &e)
+		defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch) }, &e)
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
@@ -513,7 +513,7 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 		return err
 	}
 	if curBranchName != "master" {
-		if err := ctx.Git().CheckoutBranch("master", gitutil.Force); err != nil {
+		if err := ctx.Git().CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -536,7 +536,7 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 			continue
 		}
 		if cleanupBranches {
-			if err := ctx.Git().DeleteBranch(branch, gitutil.Force); err != nil {
+			if err := ctx.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 				return nil
 			}
 		}

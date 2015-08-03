@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -206,9 +205,9 @@ func listCommitters(ctx *tool.Context) (_ []string, e error) {
 	if stashed {
 		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
 	}
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		return nil, err
 	}
-	defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch, !gitutil.Force) }, &e)
+	defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch) }, &e)
 	return ctx.Git().Committers()
 }

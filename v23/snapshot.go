@@ -259,7 +259,7 @@ func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string)
 		return err
 	}
 	if remoteFlag {
-		if err := ctx.Git().Push("origin", "master", !gitutil.Verify); err != nil {
+		if err := ctx.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
 			return err
 		}
 	}
