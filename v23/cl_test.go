@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"v.io/x/devtools/internal/gerrit"
-	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 )
@@ -82,7 +81,7 @@ func assertFilesPushedToRef(t *testing.T, ctx *tool.Context, repoPath, gerritPat
 		t.Fatalf("Chdir(%v) failed: %v", gerritPath, err)
 	}
 	assertCommitCount(t, ctx, pushedRef, "master", 1)
-	if err := ctx.Git().CheckoutBranch(pushedRef, !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(pushedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertFilesCommitted(t, ctx, files)
@@ -398,7 +397,7 @@ func TestCleanupClean(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	commitFiles(t, ctx, []string{"file1", "file2"})
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := ctx.Run().Chdir(originPath); err != nil {
@@ -432,13 +431,13 @@ func TestCleanupDirty(t *testing.T) {
 	}
 	files := []string{"file1", "file2"}
 	commitFiles(t, ctx, files)
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := cleanupCL(ctx, []string{branch}); err == nil {
 		t.Fatalf("cleanup did not fail when it should")
 	}
-	if err := ctx.Git().CheckoutBranch(branch, !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertFilesCommitted(t, ctx, files)
@@ -475,7 +474,7 @@ func TestCreateReviewBranch(t *testing.T) {
 	if !ctx.Git().BranchExists(review.reviewBranch) {
 		t.Fatalf("review branch not found")
 	}
-	if err := ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(review.reviewBranch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertCommitCount(t, ctx, review.reviewBranch, "master", 1)
@@ -1327,13 +1326,13 @@ func TestCLSync(t *testing.T) {
 	}
 
 	// Add the "test" file to the master.
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	commitFiles(t, ctx, []string{"test"})
 
 	// Sync the dependent CLs.
-	if err := ctx.Git().CheckoutBranch("feature2", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch("feature2"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := syncCL(ctx); err != nil {
@@ -1342,7 +1341,7 @@ func TestCLSync(t *testing.T) {
 
 	// Check that the "test" file exists in the dependent CLs.
 	for _, branch := range []string{"feature1", "feature2"} {
-		if err := ctx.Git().CheckoutBranch(branch, !gitutil.Force); err != nil {
+		if err := ctx.Git().CheckoutBranch(branch); err != nil {
 			t.Fatalf("%v", err)
 		}
 		if _, err := os.Stat("test"); err != nil {

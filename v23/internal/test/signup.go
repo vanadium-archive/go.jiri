@@ -38,10 +38,10 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 		return nil, internalTestError{err, "create"}
 	}
 	defer collect.Error(func() error {
-		if err := ctx.Git(infraDir).CheckoutBranch("master", gitutil.Force); err != nil {
+		if err := ctx.Git(infraDir).CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
 			return internalTestError{err, "checkout"}
 		}
-		if err := ctx.Git(infraDir).DeleteBranch("update", gitutil.Force); err != nil {
+		if err := ctx.Git(infraDir).DeleteBranch("update", gitutil.ForceOpt(true)); err != nil {
 			return internalTestError{err, "delete"}
 		}
 		return nil
@@ -72,7 +72,7 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 		if err := ctx.Git(infraDir).CommitWithMessage("updating list of emails"); err != nil {
 			return nil, internalTestError{err, "commit"}
 		}
-		if err := ctx.Git(infraDir).Push("origin", "update:master", !gitutil.Verify); err != nil {
+		if err := ctx.Git(infraDir).Push("origin", "update:master", gitutil.VerifyOpt(false)); err != nil {
 			return nil, internalTestError{err, "push"}
 		}
 	}

@@ -156,13 +156,13 @@ func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 	if stashed {
 		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
 	}
-	if err := ctx.Git().CheckoutBranch(remoteBranchFlag, !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(remoteBranchFlag); err != nil {
 		return err
 	}
 	checkoutOriginalBranch := true
 	defer collect.Error(func() error {
 		if checkoutOriginalBranch {
-			return ctx.Git().CheckoutBranch(originalBranch, !gitutil.Force)
+			return ctx.Git().CheckoutBranch(originalBranch)
 		}
 		return nil
 	}, &e)
@@ -182,7 +182,7 @@ func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 }
 
 func cleanupBranch(ctx *tool.Context, branch string) error {
-	if err := ctx.Git().CheckoutBranch(branch, !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(branch); err != nil {
 		return err
 	}
 	if !forceFlag {
@@ -198,15 +198,15 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 			return fmt.Errorf("unmerged changes in\n%s", strings.Join(files, "\n"))
 		}
 	}
-	if err := ctx.Git().CheckoutBranch(remoteBranchFlag, !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(remoteBranchFlag); err != nil {
 		return err
 	}
-	if err := ctx.Git().DeleteBranch(branch, gitutil.Force); err != nil {
+	if err := ctx.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 		return err
 	}
 	reviewBranch := branch + "-REVIEW"
 	if ctx.Git().BranchExists(reviewBranch) {
-		if err := ctx.Git().DeleteBranch(reviewBranch, gitutil.Force); err != nil {
+		if err := ctx.Git().DeleteBranch(reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -728,11 +728,11 @@ func (review *review) checkGoAPI() error {
 
 // cleanup cleans up after the review.
 func (review *review) cleanup(stashed bool) error {
-	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, !gitutil.Force); err != nil {
+	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch); err != nil {
 		return err
 	}
 	if review.ctx.Git().BranchExists(review.reviewBranch) {
-		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.Force); err != nil {
+		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -757,7 +757,7 @@ func (review *review) createReviewBranch(message string) (e error) {
 		return err
 	}
 	if review.ctx.Git().BranchExists(review.reviewBranch) {
-		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.Force); err != nil {
+		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -765,17 +765,17 @@ func (review *review) createReviewBranch(message string) (e error) {
 	if err := review.ctx.Git().CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
 		return err
 	}
-	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
+	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
 	// Register a cleanup handler in case of subsequent errors.
 	cleanup := true
 	defer collect.Error(func() error {
 		if !cleanup {
-			return review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, !gitutil.Force)
+			return review.ctx.Git().CheckoutBranch(review.CLOpts.Branch)
 		}
-		review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, gitutil.Force)
-		review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.Force)
+		review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, gitutil.ForceOpt(true))
+		review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true))
 		return nil
 	}, &e)
 
@@ -836,7 +836,7 @@ func (review *review) squashBranches(branches []string, message string) error {
 		// that the commit hash of the squashed commit stays the same as
 		// long as the squashed sequence of commits does not change. If
 		// this was not the case, consecutive invocations of "v23 cl mail"
-		// could fail is some, but not all, of the dependent CLs submitted
+		// could fail if some, but not all, of the dependent CLs submitted
 		// to Gerrit have changed.
 		output, err := review.ctx.Git().Log(branches[i], branches[i]+"^", "%ad%n%cd")
 		if err != nil {
@@ -1041,7 +1041,7 @@ func (review *review) send() error {
 
 // updateReviewMessage writes the commit message to the given file.
 func (review *review) updateReviewMessage(file string) error {
-	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
+	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
 	newMessage, err := review.ctx.Git().LatestCommitMessage()
@@ -1126,8 +1126,8 @@ func newCL(ctx *tool.Context, args []string) error {
 	cleanup := true
 	defer func() {
 		if cleanup {
-			ctx.Git().CheckoutBranch(originalBranch, gitutil.Force)
-			ctx.Git().DeleteBranch(newBranch, gitutil.Force)
+			ctx.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
+			ctx.Git().DeleteBranch(newBranch, gitutil.ForceOpt(true))
 		}
 	}()
 
@@ -1203,7 +1203,7 @@ func syncCL(ctx *tool.Context) (e error) {
 	}
 	defer func() {
 		if cleanup {
-			ctx.Git().CheckoutBranch(originalBranch, gitutil.Force)
+			ctx.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
 		}
 	}()
 
@@ -1218,7 +1218,7 @@ func syncCL(ctx *tool.Context) (e error) {
 	// Bring all CLs in the sequence of dependent CLs leading to the
 	// current branch up to date with the <remoteBranchFlag> branch.
 	for i := 1; i < len(branches); i++ {
-		if err := ctx.Git().CheckoutBranch(branches[i], !gitutil.Force); err != nil {
+		if err := ctx.Git().CheckoutBranch(branches[i]); err != nil {
 			return err
 		}
 		if err := ctx.Git().Merge(branches[i-1]); err != nil {
