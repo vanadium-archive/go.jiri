@@ -140,9 +140,13 @@ func (ctx Context) Gerrit(host, username, password string) *gerrit.Gerrit {
 type gitOpt interface {
 	gitOpt()
 }
+type AuthorDateOpt string
+type CommitterDateOpt string
 type RootDirOpt string
 
-func (RootDirOpt) gitOpt() {}
+func (AuthorDateOpt) gitOpt()    {}
+func (CommitterDateOpt) gitOpt() {}
+func (RootDirOpt) gitOpt()       {}
 
 // Git returns a new git instance.
 //
@@ -151,13 +155,24 @@ func (RootDirOpt) gitOpt() {}
 // commands will use the current directory as the repository root.
 func (ctx Context) Git(opts ...gitOpt) *gitutil.Git {
 	rootDir := ""
+	gitCtx := &ctx
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
+		case AuthorDateOpt:
+			opts := ContextOpts{}
+			opts.Env = ctx.Env()
+			opts.Env["GIT_AUTHOR_DATE"] = string(typedOpt)
+			gitCtx = ctx.Clone(opts)
+		case CommitterDateOpt:
+			opts := ContextOpts{}
+			opts.Env = ctx.Env()
+			opts.Env["GIT_COMMITTER_DATE"] = string(typedOpt)
+			gitCtx = ctx.Clone(opts)
 		case RootDirOpt:
 			rootDir = string(typedOpt)
 		}
 	}
-	return gitutil.New(ctx.run, rootDir)
+	return gitutil.New(gitCtx.run, rootDir)
 }
 
 // Jenkins returns a new Jenkins instance that can be used to

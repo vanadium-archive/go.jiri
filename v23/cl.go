@@ -22,17 +22,20 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-const commitMessageFileName = ".gerrit_commit_message"
+const (
+	commitMessageFileName  = ".gerrit_commit_message"
+	dependencyPathFileName = ".dependency_path"
+)
 
 var (
 	autosubmitFlag   bool
-	apiFlag          bool
 	ccsFlag          string
 	copyrightFlag    bool
 	draftFlag        bool
-	depcopFlag       bool
 	editFlag         bool
 	forceFlag        bool
+	goapiFlag        bool
+	godepcopFlag     bool
 	gofmtFlag        bool
 	govetFlag        bool
 	govetBinaryFlag  string
@@ -60,13 +63,13 @@ var (
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
 	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
-	cmdCLMail.Flags.BoolVar(&apiFlag, "check-api", true, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
-	cmdCLMail.Flags.BoolVar(&depcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
+	cmdCLMail.Flags.BoolVar(&goapiFlag, "check-goapi", true, "Check for changes in the public Go API.")
+	cmdCLMail.Flags.BoolVar(&godepcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
 	cmdCLMail.Flags.BoolVar(&govetFlag, "check-govet", true, "Check that no go vet violations exist.")
 	cmdCLMail.Flags.StringVar(&govetBinaryFlag, "go-vet-binary", "", "Specify the path to the go vet binary to use.")
@@ -76,6 +79,43 @@ func init() {
 	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
 	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", "CL topic, defaults to <username>-<branchname>.")
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
+	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
+}
+
+func getCommitMessageFileName(ctx *tool.Context, branch string) (string, error) {
+	topLevel, err := ctx.Git().TopLevel()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(topLevel, util.MetadataDirName(), branch, commitMessageFileName), nil
+}
+
+func getDependencyPathFileName(ctx *tool.Context, branch string) (string, error) {
+	topLevel, err := ctx.Git().TopLevel()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(topLevel, util.MetadataDirName(), branch, dependencyPathFileName), nil
+}
+
+func getDependentCLs(ctx *tool.Context, branch string) ([]string, error) {
+	file, err := getDependencyPathFileName(ctx, branch)
+	if err != nil {
+		return nil, err
+	}
+	data, err := ctx.Run().ReadFile(file)
+	var branches []string
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		if branch != remoteBranchFlag {
+			branches = []string{remoteBranchFlag}
+		}
+	} else {
+		branches = strings.Split(string(data), "\n")
+	}
+	return branches, nil
 }
 
 // cmdCL represents the "v23 cl" command.
@@ -83,20 +123,22 @@ var cmdCL = &cmdline.Command{
 	Name:     "cl",
 	Short:    "Manage vanadium changelists",
 	Long:     "Manage vanadium changelists.",
-	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail},
+	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync},
 }
 
 // cmdCLCleanup represents the "v23 cl cleanup" command.
 //
-// TODO(jsimsa): Make this part of the "submit" command".
+// TODO(jsimsa): Replace this with a "submit" command that talks to
+// Gerrit to submit the CL and then (optionally) removes it locally.
 var cmdCLCleanup = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runCLCleanup),
 	Name:   "cleanup",
-	Short:  "Clean up branches that have been merged",
+	Short:  "Clean up changelists that have been merged",
 	Long: `
-The cleanup command checks that the given branches have been merged
-into the master branch. If a branch differs from the master, it
-reports the difference and stops. Otherwise, it deletes the branch.
+Command "cleanup" checks that the given branches have been merged into
+the corresponding remote branch. If a branch differs from the
+corresponding remote branch, the command reports the difference and
+stops. Otherwise, it deletes the given branches.
 `,
 	ArgsName: "<branches>",
 	ArgsLong: "<branches> is a list of branches to cleanup.",
@@ -114,7 +156,7 @@ func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 	if stashed {
 		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
 	}
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(remoteBranchFlag, !gitutil.Force); err != nil {
 		return err
 	}
 	checkoutOriginalBranch := true
@@ -145,22 +187,18 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 	}
 	if !forceFlag {
 		trackingBranch := "origin/" + remoteBranchFlag
-		if err := ctx.Git().Merge(trackingBranch, false); err != nil {
+		if err := ctx.Git().Merge(trackingBranch); err != nil {
 			return err
 		}
 		files, err := ctx.Git().ModifiedFiles(trackingBranch, branch)
 		if err != nil {
 			return err
 		}
-		// A feature branch is considered merged with
-		// the master, when there are no differences
-		// or the only difference is the gerrit commit
-		// message file.
-		if len(files) != 0 && (len(files) != 1 || files[0] != commitMessageFileName) {
+		if len(files) != 0 {
 			return fmt.Errorf("unmerged changes in\n%s", strings.Join(files, "\n"))
 		}
 	}
-	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+	if err := ctx.Git().CheckoutBranch(remoteBranchFlag, !gitutil.Force); err != nil {
 		return err
 	}
 	if err := ctx.Git().DeleteBranch(branch, gitutil.Force); err != nil {
@@ -191,14 +229,15 @@ func runCLCleanup(env *cmdline.Env, args []string) error {
 var cmdCLMail = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runCLMail),
 	Name:   "mail",
-	Short:  "Mail a changelist based on the current branch to Gerrit for review",
+	Short:  "Mail a changelist for review",
 	Long: `
-Squashes all commits of a local branch into a single "changelist" and
-mails this changelist to Gerrit as a single commit. First time the
-command is invoked, it generates a Change-Id for the changelist, which
-is appended to the commit message. Consecutive invocations of the
-command use the same Change-Id by default, informing Gerrit that the
-incomming commit is an update of an existing changelist.
+Command "mail" squashes all commits of a local branch into a single
+"changelist" and mails this changelist to Gerrit as a single
+commit. First time the command is invoked, it generates a Change-Id
+for the changelist, which is appended to the commit
+message. Consecutive invocations of the command use the same Change-Id
+by default, informing Gerrit that the incomming commit is an update of
+an existing changelist.
 `,
 }
 
@@ -319,16 +358,35 @@ var defaultMessageHeader = `
 
 // runCLMail is a wrapper that sets up and runs a review instance.
 func runCLMail(env *cmdline.Env, _ []string) error {
-	// Sanity checks for the presubmitFlag.
-	if !checkPresubmitFlag() {
-		return env.UsageErrorf("Invalid value for -presubmit flag. Valid values: %s.",
-			strings.Join(gerrit.PresubmitTestTypes(), ","))
-	}
 	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
 		Color:   &colorFlag,
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
+
+	// Sanity checks for the <presubmitFlag> flag.
+	if !checkPresubmitFlag() {
+		return env.UsageErrorf("invalid value for the -presubmit flag. Valid values: %s.",
+			strings.Join(gerrit.PresubmitTestTypes(), ","))
+	}
+
+	// Sync all CLs in the sequence of dependent CLs ending in the
+	// current branch.
+	if err := syncCL(ctx); err != nil {
+		return err
+	}
+
+	// Make sure that all CLs in the above sequence (possibly except for
+	// the current branch) have been exported to Gerrit. This is needed
+	// to make sure we have commit messages for all but the last CL.
+	//
+	// NOTE: The alternative here is to prompt the user for multiple
+	// commit messages, which seems less user friendly.
+	if err := checkDependents(ctx); err != nil {
+		return err
+	}
+
+	// Create and run the review.
 	review, err := newReview(ctx, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
 		Ccs:          ccsFlag,
@@ -348,6 +406,40 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		return nil
 	}
 	return review.run()
+}
+
+// checkDependents makes sure that all CLs in the sequence of
+// dependent CLs leading to (but not including) the current branch
+// have been exported to Gerrit.
+func checkDependents(ctx *tool.Context) (e error) {
+	originalBranch, err := ctx.Git().CurrentBranchName()
+	if err != nil {
+		return err
+	}
+	branches, err := getDependentCLs(ctx, originalBranch)
+	if err != nil {
+		return err
+	}
+	for i := 1; i < len(branches); i++ {
+		file, err := getCommitMessageFileName(ctx, branches[i])
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stat(file); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+			return fmt.Errorf(`Failed to export the branch %q to Gerrit because its ancestor %q has not been exported to Gerrit yet.
+The following steps are needed before the operation can be retried:
+$ git checkout %v
+$ v23 cl mail
+$ git checkout %v
+# retry the original command
+`, originalBranch, branches[i], branches[i], originalBranch)
+		}
+	}
+
+	return nil
 }
 
 type review struct {
@@ -379,8 +471,7 @@ func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
 }
 
 func checkPresubmitFlag() bool {
-	validPresubmitTestTypes := gerrit.PresubmitTestTypes()
-	for _, t := range validPresubmitTestTypes {
+	for _, t := range gerrit.PresubmitTestTypes() {
 		if presubmitFlag == t {
 			return true
 		}
@@ -391,7 +482,7 @@ func checkPresubmitFlag() bool {
 // confirmFlagChanges asks users to confirm if any of the
 // presubmit and autosubmit flags changes.
 func (review *review) confirmFlagChanges() (bool, error) {
-	file, err := review.getCommitMessageFileName()
+	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
 	if err != nil {
 		return false, err
 	}
@@ -653,9 +744,15 @@ func (review *review) cleanup(stashed bool) error {
 	return nil
 }
 
-// createReviewBranch creates a clean review branch from master and
-// squashes the commits into one, with the supplied message.
-func (review *review) createReviewBranch(message string) error {
+// createReviewBranch creates a clean review branch from the remote
+// branch this CL pertains to and then iterates over the sequence of
+// dependent CLs leading to the current branch, creating one commit
+// per CL by squashing all commits of each individual CL. The commit
+// message for all but that last CL is derived from their
+// <commitMessageFileName>, while the <message> argument is used as
+// the commit message for the last commit.
+func (review *review) createReviewBranch(message string) (e error) {
+	// Create the review branch.
 	if err := review.ctx.Git().Fetch("origin", review.CLOpts.RemoteBranch); err != nil {
 		return err
 	}
@@ -668,6 +765,21 @@ func (review *review) createReviewBranch(message string) error {
 	if err := review.ctx.Git().CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
 		return err
 	}
+	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
+		return err
+	}
+	// Register a cleanup handler in case of subsequent errors.
+	cleanup := true
+	defer collect.Error(func() error {
+		if !cleanup {
+			return review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, !gitutil.Force)
+		}
+		review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, gitutil.Force)
+		review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.Force)
+		return nil
+	}, &e)
+
+	// Report an error if the CL is empty.
 	if !review.ctx.DryRun() {
 		hasDiff, err := review.ctx.Git().BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
 		if err != nil {
@@ -677,7 +789,8 @@ func (review *review) createReviewBranch(message string) error {
 			return emptyChangeError(struct{}{})
 		}
 	}
-	// If message is empty, replace it with the default.
+
+	// If <message> is empty, replace it with the default message.
 	if len(message) == 0 {
 		var err error
 		message, err = review.defaultCommitMessage()
@@ -685,19 +798,73 @@ func (review *review) createReviewBranch(message string) error {
 			return err
 		}
 	}
-	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
+
+	// Iterate over all dependent CLs leading to (and including) the
+	// current branch, creating one commit in the review branch per CL
+	// by squashing all commits of each individual CL.
+	branches, err := getDependentCLs(review.ctx, review.CLOpts.Branch)
+	if err != nil {
 		return err
 	}
-	if err := review.ctx.Git().Merge(review.CLOpts.Branch, true); err != nil {
-		return changeConflictError{
-			localBranch:  review.CLOpts.Branch,
-			remoteBranch: review.CLOpts.RemoteBranch,
-			message:      err.Error(),
+	branches = append(branches, review.CLOpts.Branch)
+	if err := review.squashBranches(branches, message); err != nil {
+		return err
+	}
+
+	cleanup = false
+	return nil
+}
+
+// squashBranches iterates over the given list of branches, creating
+// one commit per branch in the current branch by squashing all
+// commits of each individual branch.
+func (review *review) squashBranches(branches []string, message string) error {
+	for i := 1; i < len(branches); i++ {
+		// The "theirs" merge strategy option is used to prevent git from
+		// reporting spurious conflicts resulting from the fact that each
+		// branch is squashed into a single commit, which removes the
+		// history needed to perform a conflict-free merge.
+		if err := review.ctx.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("theirs")); err != nil {
+			return changeConflictError{
+				localBranch:  branches[i],
+				remoteBranch: review.CLOpts.RemoteBranch,
+				message:      err.Error(),
+			}
 		}
-	}
-	committer := review.ctx.Git().NewCommitter(review.CLOpts.Edit)
-	if err := committer.Commit(message); err != nil {
-		return err
+		// Fetch the timestamp of the last commit of <branches[i]> and use
+		// it to create the squashed commit. This is needed to make sure
+		// that the commit hash of the squashed commit stays the same as
+		// long as the squashed sequence of commits does not change. If
+		// this was not the case, consecutive invocations of "v23 cl mail"
+		// could fail is some, but not all, of the dependent CLs submitted
+		// to Gerrit have changed.
+		output, err := review.ctx.Git().Log(branches[i], branches[i]+"^", "%ad%n%cd")
+		if err != nil {
+			return err
+		}
+		if len(output) < 1 || len(output[0]) < 2 {
+			return fmt.Errorf("unexpected output length: %v", output)
+		}
+		authorDate := tool.AuthorDateOpt(output[0][0])
+		committerDate := tool.CommitterDateOpt(output[0][1])
+		if i < len(branches)-1 {
+			file, err := getCommitMessageFileName(review.ctx, branches[i])
+			if err != nil {
+				return err
+			}
+			message, err := review.ctx.Run().ReadFile(file)
+			if err != nil {
+				return err
+			}
+			if err := review.ctx.Git(authorDate, committerDate).CommitWithMessage(string(message)); err != nil {
+				return err
+			}
+		} else {
+			committer := review.ctx.Git(authorDate, committerDate).NewCommitter(review.CLOpts.Edit)
+			if err := committer.Commit(message); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -768,33 +935,25 @@ func (review *review) run() (e error) {
 			return uncommittedChangesError(changes)
 		}
 	}
-	if gofmtFlag {
-		if err := review.checkGoFormat(); err != nil {
-			return err
+	checks := []struct {
+		flag bool
+		fn   func() error
+	}{
+		{copyrightFlag, func() error { return review.checkCopyright() }},
+		{goapiFlag, func() error { return review.checkGoAPI() }},
+		{godepcopFlag, func() error { return review.checkGoDependencies() }},
+		{gofmtFlag, func() error { return review.checkGoFormat() }},
+		{govetFlag, func() error { return review.checkGoVet() }},
+	}
+	for _, check := range checks {
+		if check.flag {
+			if err := check.fn(); err != nil {
+				return err
+			}
 		}
 	}
-	if govetFlag {
-		if err := review.checkGoVet(); err != nil {
-			return err
-		}
-	}
-	if apiFlag {
-		if err := review.checkGoAPI(); err != nil {
-			return err
-		}
-	}
-	if depcopFlag {
-		if err := review.checkGoDependencies(); err != nil {
-			return err
-		}
-	}
-	if copyrightFlag {
-		if err := review.checkCopyright(); err != nil {
-			return err
-		}
-	}
-	if review.CLOpts.Branch == "master" {
-		return fmt.Errorf("cannot do a review from the 'master' branch.")
+	if review.CLOpts.Branch == remoteBranchFlag {
+		return fmt.Errorf("cannot do a review from the %q branch.", remoteBranchFlag)
 	}
 	stashed, err := review.ctx.Git().Stash()
 	if err != nil {
@@ -814,29 +973,51 @@ func (review *review) run() (e error) {
 	}
 	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
 	message := ""
-	filename, err := review.getCommitMessageFileName()
+	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
 	if err != nil {
 		return err
 	}
-	data, err := review.ctx.Run().ReadFile(filename)
-	if err == nil {
+	data, err := review.ctx.Run().ReadFile(file)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		// CLs exported to Gerrit prior to v.io/c/13993 might have the
+		// commit message file stored in a different location. Check if
+		// the file exists there, and if so, read it into memory and then
+		// get rid of it.
+		file := filepath.Join(topLevel, commitMessageFileName)
+		data, err := review.ctx.Run().ReadFile(file)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		} else {
+			message = string(data)
+			if err := review.ctx.Git().Remove(file); err != nil {
+				return err
+			}
+			if err := review.ctx.Git().CommitWithMessage("removing outdated commit message file"); err != nil {
+				return err
+			}
+		}
+	} else {
 		message = string(data)
-	} else if !os.IsNotExist(err) {
-		return err
 	}
-	// Add/remove labels to/from the commit message before asking users to
-	// edit it. We do this only when this is not the initial commit
+	// Add/remove labels to/from the commit message before asking users
+	// to edit it. We do this only when this is not the initial commit
 	// where the message is empty.
 	//
-	// For the initial commit, the labels will be processed after the message is
-	// edited by users, which happens in the updateReviewMessage method.
+	// For the initial commit, the labels will be processed after the
+	// message is edited by users, which happens in the
+	// updateReviewMessage method.
 	if message != "" {
 		message = review.processLabels(message)
 	}
 	if err := review.createReviewBranch(message); err != nil {
 		return err
 	}
-	if err := review.updateReviewMessage(filename); err != nil {
+	if err := review.updateReviewMessage(file); err != nil {
 		return err
 	}
 	if err := review.send(); err != nil {
@@ -858,10 +1039,8 @@ func (review *review) send() error {
 	return nil
 }
 
-// updateReviewMessage writes the commit message to the specified
-// file. It then adds that file to the original branch, and makes sure
-// it is not on the review branch.
-func (review *review) updateReviewMessage(filename string) error {
+// updateReviewMessage writes the commit message to the given file.
+func (review *review) updateReviewMessage(file string) error {
 	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
 		return err
 	}
@@ -874,48 +1053,187 @@ func (review *review) updateReviewMessage(filename string) error {
 	//
 	// This behavior is consistent with how Change-ID is added for the
 	// initial commit so we don't confuse users.
-	if _, err := os.Stat(filename); err != nil {
+	if _, err := os.Stat(file); err != nil {
 		if os.IsNotExist(err) {
 			newMessage = review.processLabels(newMessage)
-			if err := review.ctx.Git().CommitAmend(newMessage); err != nil {
+			if err := review.ctx.Git().CommitAmendWithMessage(newMessage); err != nil {
 				return err
 			}
 		} else {
 			return err
 		}
 	}
-	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, !gitutil.Force); err != nil {
+	topLevel, err := review.ctx.Git().TopLevel()
+	if err != nil {
 		return err
 	}
-	if err := review.ctx.Run().WriteFile(filename, []byte(newMessage), 0644); err != nil {
-		return fmt.Errorf("WriteFile(%v, %v) failed: %v", filename, newMessage, err)
-	}
-	if err := review.ctx.Git().CommitFile(filename, "Update gerrit commit message."); err != nil {
+	newMetadataDir := filepath.Join(topLevel, util.MetadataDirName(), review.CLOpts.Branch)
+	if err := review.ctx.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
-	// Delete the commit message from review branch.
-	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch, !gitutil.Force); err != nil {
-		return err
-	}
-	if _, err := os.Stat(filename); err == nil {
-		if err := review.ctx.Git().Remove(filename); err != nil {
-			return err
-		}
-		if err := review.ctx.Git().CommitAmend(newMessage); err != nil {
-			return err
-		}
-	} else if !os.IsNotExist(err) {
+	if err := review.ctx.Run().WriteFile(file, []byte(newMessage), 0644); err != nil {
 		return err
 	}
 	return nil
 }
 
-// getCommitMessageFileName returns the name of the file that will get
-// used for the Gerrit commit message.
-func (review *review) getCommitMessageFileName() (string, error) {
-	topLevel, err := review.ctx.Git().TopLevel()
-	if err != nil {
-		return "", err
+// cmdCLNew represents the "v23 cl new" command.
+var cmdCLNew = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runCLNew),
+	Name:   "new",
+	Short:  "Create a new local branch for a changelist",
+	Long: fmt.Sprintf(`
+Command "new" creates a new local branch for a changelist. In
+particular, it forks a new branch with the given name from the current
+branch and records the relationship between the current branch and the
+new branch in the %v metadata directory. The information recorded in
+the %v metadata directory tracks dependencies between CLs and is used
+by the "v23 cl sync" and "v23 cl mail" commands.
+`, util.MetadataDirName(), util.MetadataDirName()),
+	ArgsName: "<name>",
+	ArgsLong: "<name> is the changelist name.",
+}
+
+func runCLNew(env *cmdline.Env, args []string) error {
+	if got, want := len(args), 1; got != want {
+		return env.UsageErrorf("unexpected number of arguments: got %v, want %v", got, want)
 	}
-	return filepath.Join(topLevel, commitMessageFileName), nil
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	return newCL(ctx, args)
+}
+
+func newCL(ctx *tool.Context, args []string) error {
+	topLevel, err := ctx.Git().TopLevel()
+	if err != nil {
+		return err
+	}
+	originalBranch, err := ctx.Git().CurrentBranchName()
+	if err != nil {
+		return err
+	}
+
+	// Create a new branch using the current branch.
+	newBranch := args[0]
+	if err := ctx.Git().CreateAndCheckoutBranch(newBranch); err != nil {
+		return err
+	}
+
+	// Register a cleanup handler in case of subsequent errors.
+	cleanup := true
+	defer func() {
+		if cleanup {
+			ctx.Git().CheckoutBranch(originalBranch, gitutil.Force)
+			ctx.Git().DeleteBranch(newBranch, gitutil.Force)
+		}
+	}()
+
+	// Record the dependent CLs for the new branch. The dependent CLs
+	// are recorded in a <dependencyPathFileName> file as a
+	// newline-separated list of branch names.
+	branches, err := getDependentCLs(ctx, originalBranch)
+	if err != nil {
+		return err
+	}
+	branches = append(branches, originalBranch)
+	newMetadataDir := filepath.Join(topLevel, util.MetadataDirName(), newBranch)
+	if err := ctx.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
+		return err
+	}
+	file, err := getDependencyPathFileName(ctx, newBranch)
+	if err != nil {
+		return err
+	}
+	if err := ctx.Run().WriteFile(file, []byte(strings.Join(branches, "\n")), os.FileMode(0644)); err != nil {
+		return err
+	}
+
+	cleanup = false
+	return nil
+}
+
+// cmdCLSync represents the "v23 cl sync" command.
+var cmdCLSync = &cmdline.Command{
+	Runner: cmdline.RunnerFunc(runCLSync),
+	Name:   "sync",
+	Short:  "Bring a changelist up to date",
+	Long: fmt.Sprintf(`
+Command "sync" brings the CL identified by the current branch up to
+date with the branch tracking the remote branch this CL pertains
+to. To do that, the command uses the information recorded in the %v
+metadata directory to identify the sequence of dependent CLs leading
+to the current branch. The command then iterates over this sequence
+bringing each of the CLs up to date with its ancestor. The end result
+of this process is that all CLs in the sequence are up to date with
+the branch that tracks the remote branch this CL pertains to.
+
+NOTE: It is possible that the command cannot automatically merge
+changes in an ancestor into its dependent. When that occurs, the
+command is aborted and prints instructions that need to be followed
+before the command can be retried.
+`, util.MetadataDirName()),
+}
+
+func runCLSync(env *cmdline.Env, _ []string) error {
+	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
+		Color:   &colorFlag,
+		DryRun:  &dryRunFlag,
+		Verbose: &verboseFlag,
+	})
+	return syncCL(ctx)
+}
+
+func syncCL(ctx *tool.Context) (e error) {
+	stashed, err := ctx.Git().Stash()
+	if err != nil {
+		return err
+	}
+	if stashed {
+		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
+	}
+
+	// Register a cleanup handler in case of subsequent errors.
+	cleanup := true
+	originalBranch, err := ctx.Git().CurrentBranchName()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cleanup {
+			ctx.Git().CheckoutBranch(originalBranch, gitutil.Force)
+		}
+	}()
+
+	// Identify the dependents CLs leading to (and including) the
+	// current branch.
+	branches, err := getDependentCLs(ctx, originalBranch)
+	if err != nil {
+		return err
+	}
+	branches = append(branches, originalBranch)
+
+	// Bring all CLs in the sequence of dependent CLs leading to the
+	// current branch up to date with the <remoteBranchFlag> branch.
+	for i := 1; i < len(branches); i++ {
+		if err := ctx.Git().CheckoutBranch(branches[i], !gitutil.Force); err != nil {
+			return err
+		}
+		if err := ctx.Git().Merge(branches[i-1]); err != nil {
+			return fmt.Errorf(`Failed to automatically merge branch %v into branch %v: %v
+The following steps are needed before the operation can be retried:
+$ git checkout %v
+$ git merge %v
+# resolve all conflicts
+$ git commit -a
+$ git checkout %v
+# retry the original operation
+`, branches[i], branches[i-1], err, branches[i], branches[i-1], originalBranch)
+		}
+	}
+
+	cleanup = false
+	return nil
 }

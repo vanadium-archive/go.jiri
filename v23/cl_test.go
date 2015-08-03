@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path"
@@ -216,6 +217,14 @@ var commitMsgHook string = `
 MSG="$1"
 echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 `
+
+func disableChecks() {
+	copyrightFlag = false
+	goapiFlag = false
+	godepcopFlag = false
+	gofmtFlag = false
+	govetFlag = false
+}
 
 // installCommitMsgHook links the gerrit commit-msg hook into a different repo.
 func installCommitMsgHook(t *testing.T, ctx *tool.Context, repoPath string) {
@@ -907,7 +916,7 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag, apiFlag = false, false, false
+	disableChecks()
 	if err := review.run(); err != nil {
 		t.Fatalf("run() failed: %v", err)
 	}
@@ -954,7 +963,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag, apiFlag = false, false, false
+	disableChecks()
 	if err := review.run(); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -964,11 +973,11 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	// AutoSubmit
 	// PresubmitTest: none
 	// Change-Id: ...
-	gerritCommitMessageFile, err := review.getCommitMessageFileName()
+	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	bytes, err := ctx.Run().ReadFile(gerritCommitMessageFile)
+	bytes, err := ctx.Run().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -1001,7 +1010,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 	expectedRef = gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
-	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
+	bytes, err = ctx.Run().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -1029,7 +1038,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 	expectedRef = gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
-	bytes, err = ctx.Run().ReadFile(gerritCommitMessageFile)
+	bytes, err = ctx.Run().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -1088,7 +1097,7 @@ func TestDirtyBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag, apiFlag = false, false, false
+	disableChecks()
 	if err := review.run(); err == nil {
 		t.Fatalf("run() didn't fail when it should")
 	}
@@ -1140,7 +1149,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	copyrightFlag, depcopFlag, apiFlag = false, false, false
+	disableChecks()
 	if err := review.run(); err != nil {
 		t.Fatalf("run() failed: %v", err)
 	}
@@ -1248,6 +1257,96 @@ Change-Id: I0000000000000000000000000000000000000000`,
 		}
 		if got := review.processLabels(test.originalMessage); got != test.expectedMessage {
 			t.Fatalf("want %s, got %s", test.expectedMessage, got)
+		}
+	}
+}
+
+// TestCLNew checks the operation of the "v23 cl new" command.
+func TestCLNew(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	root, _, _, _ := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
+
+	// Create some dependent CLs.
+	if err := newCL(ctx, []string{"feature1"}); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := newCL(ctx, []string{"feature2"}); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Check that their dependency paths have been recorded correctly.
+	testCases := []struct {
+		branch string
+		data   []byte
+	}{
+		{
+			branch: "feature1",
+			data:   []byte("master"),
+		},
+		{
+			branch: "feature2",
+			data:   []byte("master\nfeature1"),
+		},
+	}
+	for _, testCase := range testCases {
+		file, err := getDependencyPathFileName(ctx, testCase.branch)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		data, err := ctx.Run().ReadFile(file)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		if bytes.Compare(data, testCase.data) != 0 {
+			t.Fatalf("unexpected data:\ngot\n%v\nwant\n%v", string(data), string(testCase.data))
+		}
+	}
+}
+
+// TestCLSync checks the operation of the "v23 cl sync" command.
+func TestCLSync(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	root, _, _, _ := setupTest(t, ctx, true)
+	defer teardownTest(t, ctx, cwd, root)
+
+	// Create some dependent CLs.
+	if err := newCL(ctx, []string{"feature1"}); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := newCL(ctx, []string{"feature2"}); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Add the "test" file to the master.
+	if err := ctx.Git().CheckoutBranch("master", !gitutil.Force); err != nil {
+		t.Fatalf("%v", err)
+	}
+	commitFiles(t, ctx, []string{"test"})
+
+	// Sync the dependent CLs.
+	if err := ctx.Git().CheckoutBranch("feature2", !gitutil.Force); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := syncCL(ctx); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Check that the "test" file exists in the dependent CLs.
+	for _, branch := range []string{"feature1", "feature2"} {
+		if err := ctx.Git().CheckoutBranch(branch, !gitutil.Force); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if _, err := os.Stat("test"); err != nil {
+			t.Fatalf("Stat() failed: %v", err)
 		}
 	}
 }

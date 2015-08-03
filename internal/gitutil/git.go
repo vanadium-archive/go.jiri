@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package gitutil provides Go wrappers for various Git commands.
 package gitutil
 
 import (
@@ -17,8 +16,10 @@ import (
 	"v.io/x/devtools/internal/runutil"
 )
 
-const Force = true
-const Verify = true
+const (
+	Force  = true
+	Verify = true
+)
 
 type GitError struct {
 	args        []string
@@ -104,14 +105,21 @@ func (g *Git) Commit() error {
 	return g.run("commit", "--allow-empty", "--allow-empty-message", "--no-edit")
 }
 
-// CommitAmend amends the previous commit with the currently staged changes,
-// and the given message.  Empty commits are allowed.
-func (g *Git) CommitAmend(message string) error {
+// CommitAmend amends the previous commit with the currently staged
+// changes. Empty commits are allowed.
+func (g *Git) CommitAmend() error {
+	return g.run("commit", "--amend", "--allow-empty", "--no-edit")
+}
+
+// CommitAmendWithMessage amends the previous commit with the
+// currently staged changes, and the given message. Empty commits are
+// allowed.
+func (g *Git) CommitAmendWithMessage(message string) error {
 	return g.run("commit", "--amend", "--allow-empty", "-m", message)
 }
 
-// CommitAndEdit commits all files in staging and allows the user to edit the
-// commit message.
+// CommitAndEdit commits all files in staging and allows the user to
+// edit the commit message.
 func (g *Git) CommitAndEdit() error {
 	args := []string{"commit", "--allow-empty"}
 	var stderr bytes.Buffer
@@ -131,8 +139,8 @@ func (g *Git) CommitFile(fileName, message string) error {
 	return g.CommitWithMessage(message)
 }
 
-// CommitMessages returns the concatenation of all commit messages on <branch>
-// that are not also on <baseBranch>.
+// CommitMessages returns the concatenation of all commit messages on
+// <branch> that are not also on <baseBranch>.
 func (g *Git) CommitMessages(branch, baseBranch string) (string, error) {
 	out, err := g.runOutput("log", "--no-merges", baseBranch+".."+branch)
 	if err != nil {
@@ -141,13 +149,15 @@ func (g *Git) CommitMessages(branch, baseBranch string) (string, error) {
 	return strings.Join(out, "\n"), nil
 }
 
-// CommitWithMessage commits all files in staging with the given message.
+// CommitWithMessage commits all files in staging with the given
+// message.
 func (g *Git) CommitWithMessage(message string) error {
 	return g.run("commit", "--allow-empty", "--allow-empty-message", "-m", message)
 }
 
-// CommitWithMessage commits all files in staging and allows the user to edit
-// the commit message. The given message will be used as the default.
+// CommitWithMessage commits all files in staging and allows the user
+// to edit the commit message. The given message will be used as the
+// default.
 func (g *Git) CommitWithMessageAndEdit(message string) error {
 	args := []string{"commit", "--allow-empty", "-e", "-m", message}
 	var stderr bytes.Buffer
@@ -169,7 +179,8 @@ func (g *Git) Committers() ([]string, error) {
 	return out, nil
 }
 
-// CountCommits returns the number of commits on <branch> that are not on <base>.
+// CountCommits returns the number of commits on <branch> that are not
+// on <base>.
 func (g *Git) CountCommits(branch, base string) (int, error) {
 	args := []string{"rev-list", "--count", branch}
 	if base != "" {
@@ -194,8 +205,8 @@ func (g *Git) CreateBranch(branchName string) error {
 	return g.run("branch", branchName)
 }
 
-// CreateAndCheckoutBranch creates a branch with the given name and checks it
-// out.
+// CreateAndCheckoutBranch creates a branch with the given name and
+// checks it out.
 func (g *Git) CreateAndCheckoutBranch(branchName string) error {
 	return g.run("checkout", "-b", branchName)
 }
@@ -320,7 +331,8 @@ func (g *Git) IsFileCommitted(file string) bool {
 	return g.run("ls-files", file, "--error-unmatch") == nil
 }
 
-// LatestCommitMessage returns the latest commit message on the current branch.
+// LatestCommitMessage returns the latest commit message on the
+// current branch.
 func (g *Git) LatestCommitMessage() (string, error) {
 	out, err := g.runOutput("log", "-n", "1", "--format=format:%B")
 	if err != nil {
@@ -350,13 +362,22 @@ func (g *Git) Log(branch, base, format string) ([][]string, error) {
 	return result, nil
 }
 
-// Merge merge all commits from <branch> to the current branch. If
+// Merge merges all commits from <branch> to the current branch. If
 // <squash> is set, then all merged commits are squashed into a single
 // commit.
-func (g *Git) Merge(branch string, squash bool) error {
+func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	args := []string{"merge"}
-	if squash {
-		args = append(args, "--squash")
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case SquashOpt:
+			if bool(typedOpt) {
+				args = append(args, "--squash")
+			} else {
+				args = append(args, "--no-squash")
+			}
+		case StrategyOpt:
+			args = append(args, fmt.Sprintf("--strategy-option=%v", string(typedOpt)))
+		}
 	}
 	args = append(args, branch)
 	if out, err := g.runOutput(args...); err != nil {
@@ -383,8 +404,8 @@ func (g *Git) MergeInProgress() (bool, error) {
 	return true, nil
 }
 
-// ModifiedFiles returns a slice of filenames that have changed between
-// <baseBranch> and <currentBranch>.
+// ModifiedFiles returns a slice of filenames that have changed
+// between <baseBranch> and <currentBranch>.
 func (g *Git) ModifiedFiles(baseBranch, currentBranch string) ([]string, error) {
 	out, err := g.runOutput("diff", "--name-only", baseBranch+".."+currentBranch)
 	if err != nil {
@@ -403,10 +424,10 @@ func (g *Git) Pull(remote, branch string) error {
 	if err != nil {
 		return err
 	}
-	// Starting with git 1.8, "git pull <remote> <branch>" does not create the
-	// branch "<remote>/<branch>" locally. To avoid the need to account for this,
-	// run "git pull", which fails but creates the missing branch, for git 1.7 and
-	// older.
+	// Starting with git 1.8, "git pull <remote> <branch>" does not
+	// create the branch "<remote>/<branch>" locally. To avoid the need
+	// to account for this, run "git pull", which fails but creates the
+	// missing branch, for git 1.7 and older.
 	if major < 2 && minor < 8 {
 		// This command is expected to fail (with desirable side effects).
 		// Use exec.Command instead of runner to prevent this failure from
@@ -459,9 +480,9 @@ func (g *Git) Reset(target string) error {
 	return g.run("reset", "--hard", target)
 }
 
-// Stash attempts to stash any unsaved changes. It returns true if anything was
-// actually stashed, otherwise false. An error is returned if the stash command
-// fails.
+// Stash attempts to stash any unsaved changes. It returns true if
+// anything was actually stashed, otherwise false. An error is
+// returned if the stash command fails.
 func (g *Git) Stash() (bool, error) {
 	oldSize, err := g.StashSize()
 	if err != nil {
@@ -555,9 +576,8 @@ func (g *Git) Version() (int, int, error) {
 func (g *Git) disableDryRun() runutil.Opts {
 	opts := g.r.Opts()
 	if opts.DryRun {
-		// Disable the dry run option as this function has no
-		// effect and doing so results in more informative
-		// "dry run" output.
+		// Disable the dry run option as this function has no effect and
+		// doing so results in more informative "dry run" output.
 		opts.DryRun = false
 		opts.Verbose = true
 	}
@@ -565,8 +585,6 @@ func (g *Git) disableDryRun() runutil.Opts {
 }
 
 func (g *Git) commandWithOpts(opts runutil.Opts, args ...string) error {
-	// http://git-scm.com/docs/git
-	//
 	if g.rootDir != "" {
 		opts.Dir = g.rootDir
 	}

@@ -91,15 +91,17 @@ Usage:
    v23 cl <command>
 
 The v23 cl commands are:
-   cleanup     Clean up branches that have been merged
-   mail        Mail a changelist based on the current branch to Gerrit for
-               review
+   cleanup     Clean up changelists that have been merged
+   mail        Mail a changelist for review
+   new         Create a new local branch for a changelist
+   sync        Bring a changelist up to date
 
-V23 cl cleanup - Clean up branches that have been merged
+V23 cl cleanup - Clean up changelists that have been merged
 
-The cleanup command checks that the given branches have been merged into the
-master branch. If a branch differs from the master, it reports the difference
-and stops. Otherwise, it deletes the branch.
+Command "cleanup" checks that the given branches have been merged into the
+corresponding remote branch. If a branch differs from the corresponding remote
+branch, the command reports the difference and stops. Otherwise, it deletes the
+given branches.
 
 Usage:
    v23 cl cleanup [flags] <branches>
@@ -112,14 +114,14 @@ The v23 cl cleanup flags are:
  -remote-branch=master
    Name of the remote branch the CL pertains to.
 
-V23 cl mail - Mail a changelist based on the current branch to Gerrit for review
+V23 cl mail - Mail a changelist for review
 
-Squashes all commits of a local branch into a single "changelist" and mails this
-changelist to Gerrit as a single commit. First time the command is invoked, it
-generates a Change-Id for the changelist, which is appended to the commit
-message. Consecutive invocations of the command use the same Change-Id by
-default, informing Gerrit that the incomming commit is an update of an existing
-changelist.
+Command "mail" squashes all commits of a local branch into a single "changelist"
+and mails this changelist to Gerrit as a single commit. First time the command
+is invoked, it generates a Change-Id for the changelist, which is appended to
+the commit message. Consecutive invocations of the command use the same
+Change-Id by default, informing Gerrit that the incomming commit is an update of
+an existing changelist.
 
 Usage:
    v23 cl mail [flags]
@@ -129,10 +131,10 @@ The v23 cl mail flags are:
    Automatically submit the changelist when feasiable.
  -cc=
    Comma-seperated list of emails or LDAPs to cc.
- -check-api=true
-   Check for changes in the public Go API.
  -check-copyright=true
    Check copyright headers.
+ -check-goapi=true
+   Check for changes in the public Go API.
  -check-godepcop=true
    Check that no godepcop violations exist.
  -check-gofmt=true
@@ -155,6 +157,41 @@ The v23 cl mail flags are:
    Name of the remote branch the CL pertains to.
  -topic=
    CL topic, defaults to <username>-<branchname>.
+
+V23 cl new - Create a new local branch for a changelist
+
+Command "new" creates a new local branch for a changelist. In particular, it
+forks a new branch with the given name from the current branch and records the
+relationship between the current branch and the new branch in the .v23 metadata
+directory. The information recorded in the .v23 metadata directory tracks
+dependencies between CLs and is used by the "v23 cl sync" and "v23 cl mail"
+commands.
+
+Usage:
+   v23 cl new <name>
+
+<name> is the changelist name.
+
+V23 cl sync - Bring a changelist up to date
+
+Command "sync" brings the CL identified by the current branch up to date with
+the branch tracking the remote branch this CL pertains to. To do that, the
+command uses the information recorded in the .v23 metadata directory to identify
+the sequence of dependent CLs leading to the current branch. The command then
+iterates over this sequence bringing each of the CLs up to date with its
+ancestor. The end result of this process is that all CLs in the sequence are up
+to date with the branch that tracks the remote branch this CL pertains to.
+
+NOTE: It is possible that the command cannot automatically merge changes in an
+ancestor into its dependent. When that occurs, the command is aborted and prints
+instructions that need to be followed before the command can be retried.
+
+Usage:
+   v23 cl sync [flags]
+
+The v23 cl sync flags are:
+ -remote-branch=master
+   Name of the remote branch the CL pertains to.
 
 V23 contributors - List vanadium project contributors
 

@@ -27,15 +27,6 @@ func AliasesFilePath(ctx *tool.Context) (string, error) {
 	return filepath.Join(dataDir, "aliases.v1.xml"), nil
 }
 
-// OncallRotationPath returns the path to the oncall rotation file.
-func OncallRotationPath(ctx *tool.Context) (string, error) {
-	dataDir, err := DataDirPath(ctx, tool.Name)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dataDir, "oncall.v1.xml"), nil
-}
-
 // ConfigFilePath returns the path to the tools configuration file.
 func ConfigFilePath(ctx *tool.Context) (string, error) {
 	dataDir, err := DataDirPath(ctx, tool.Name)
@@ -103,6 +94,21 @@ func ManifestFile(name string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, name), nil
+}
+
+// MetadataDir returns the name of the directory in which v23 stores
+// project specific metadata.
+func MetadataDirName() string {
+	return metadataDirName
+}
+
+// OncallRotationPath returns the path to the oncall rotation file.
+func OncallRotationPath(ctx *tool.Context) (string, error) {
+	dataDir, err := DataDirPath(ctx, tool.Name)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dataDir, "oncall.v1.xml"), nil
 }
 
 // RemoteSnapshotDir returns the path to the remote snapshot directory.
