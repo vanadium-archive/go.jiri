@@ -18,6 +18,14 @@ import (
 )
 
 func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupProxyHelper(ctx, "old_schema.go", testName)
+}
+
+func vanadiumSignupProxyNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupProxyHelper(ctx, "new_schema.go", testName)
+}
+
+func vanadiumSignupProxyHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -27,7 +35,7 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "email", sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "email", schema, sheetID)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -81,6 +89,14 @@ func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 }
 
 func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupGithubHelper(ctx, "old_schema.go", testName)
+}
+
+func vanadiumSignupGithubNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupGithubHelper(ctx, "new_schema.go", testName)
+}
+
+func vanadiumSignupGithubHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -89,7 +105,7 @@ func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "github", sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "github", schema, sheetID)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -106,6 +122,14 @@ func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test
 }
 
 func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupGroupHelper(ctx, "old_schema.go", testName)
+}
+
+func vanadiumSignupGroupNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupGroupHelper(ctx, "new_schema.go", testName)
+}
+
+func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -115,7 +139,7 @@ func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "email", sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "email", schema, sheetID)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -133,7 +157,7 @@ func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.
 	return &test.Result{Status: test.Passed}, nil
 }
 
-func fetchFieldValues(ctx *tool.Context, credentials string, field string, sheetID string) ([]byte, error) {
+func fetchFieldValues(ctx *tool.Context, credentials, field, schema, sheetID string) ([]byte, error) {
 	root, err := util.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -142,9 +166,10 @@ func fetchFieldValues(ctx *tool.Context, credentials string, field string, sheet
 	var buffer bytes.Buffer
 
 	fetchSrc := filepath.Join(root, "infrastructure", "signup", "fetch.go")
+	schemaSrc := filepath.Join(root, "infrastructure", "signup", schema)
 	opts := ctx.Run().Opts()
 	opts.Stdout = &buffer
-	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, "-credentials="+credentials, "-field="+field, "-sheet-id="+sheetID); err != nil {
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, schemaSrc, "-credentials="+credentials, "-field="+field, "-sheet-id="+sheetID); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
