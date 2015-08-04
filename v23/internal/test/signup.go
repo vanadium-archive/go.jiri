@@ -111,10 +111,11 @@ func vanadiumSignupGithubHelper(ctx *tool.Context, schema, testName string) (_ *
 	}
 
 	// Add them to @vanadium/developers
+	githubCredentials := os.Getenv("GITHUB_CREDENTIALS")
 	github := filepath.Join(root, "infrastructure", "signup", "github.go")
 	githubOpts := ctx.Run().Opts()
 	githubOpts.Stdin = bytes.NewReader(data)
-	if err := ctx.Run().CommandWithOpts(githubOpts, "v23", "go", "run", github, "-credentials="+credentials); err != nil {
+	if err := ctx.Run().CommandWithOpts(githubOpts, "v23", "go", "run", github, "-credentials="+githubCredentials); err != nil {
 		return nil, internalTestError{err, "github"}
 	}
 
