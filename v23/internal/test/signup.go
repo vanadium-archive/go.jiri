@@ -88,6 +88,66 @@ func vanadiumSignupProxyHelper(ctx *tool.Context, schema, testName string) (_ *t
 	return &test.Result{Status: test.Passed}, nil
 }
 
+func vanadiumSignupWelcomeNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	root, err := util.V23Root()
+	if err != nil {
+		return nil, internalTestError{err, "VanadiumRoot"}
+	}
+
+	credentials := os.Getenv("CREDENTIALS")
+	emailCredentials := os.Getenv("EMAIL_CREDENTIALS")
+	sheetID := os.Getenv("SHEET_ID")
+
+	data, err := fetchFieldValues(ctx, credentials, "email", "new_schema.go", sheetID)
+	if err != nil {
+		return nil, internalTestError{err, "fetch"}
+	}
+
+	welcome := filepath.Join(root, "infrastructure", "signup", "welcome.go")
+	welcomeOpts := ctx.Run().Opts()
+	welcomeOpts.Stdin = bytes.NewReader(data)
+	sentlist := filepath.Join(root, "infrastructure", "signup", "sentlist.json")
+	nda := filepath.Join(root, "infrastructure", "signup", "google-agreement.pdf")
+	if err := ctx.Run().CommandWithOpts(welcomeOpts, "v23", "go", "run", welcome, "-credentials="+emailCredentials, "-sentlist="+sentlist, "-nda="+nda); err != nil {
+		return nil, internalTestError{err, "welcome"}
+	}
+
+	// Create a feature branch in the infrastructure project.
+	infraDir := tool.RootDirOpt(filepath.Join(root, "infrastructure"))
+	if err := ctx.Git(infraDir).CreateAndCheckoutBranch("update"); err != nil {
+		return nil, internalTestError{err, "create"}
+	}
+	defer collect.Error(func() error {
+		if err := ctx.Git(infraDir).CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
+			return internalTestError{err, "checkout"}
+		}
+		if err := ctx.Git(infraDir).DeleteBranch("update", gitutil.ForceOpt(true)); err != nil {
+			return internalTestError{err, "delete"}
+		}
+		return nil
+	}, &e)
+
+	if err := ctx.Git(infraDir).Add(sentlist); err != nil {
+		return nil, internalTestError{err, "commit"}
+	}
+
+	// Push changes (if any exist) to master.
+	changed, err := ctx.Git(infraDir).HasUncommittedChanges()
+	if err != nil {
+		return nil, internalTestError{err, "changes"}
+	}
+	if changed {
+		if err := ctx.Git(infraDir).CommitWithMessage("infrastructure/signup: updating sentlist"); err != nil {
+			return nil, internalTestError{err, "commit"}
+		}
+		if err := ctx.Git(infraDir).Push("origin", "update:master", gitutil.VerifyOpt(false)); err != nil {
+			return nil, internalTestError{err, "push"}
+		}
+	}
+
+	return &test.Result{Status: test.Passed}, nil
+}
+
 func vanadiumSignupGithub(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
 	return vanadiumSignupGithubHelper(ctx, "old_schema.go", testName)
 }
