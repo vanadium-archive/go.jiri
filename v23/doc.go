@@ -155,6 +155,8 @@ The v23 cl mail flags are:
    Comma-seperated list of emails or LDAPs to request review.
  -remote-branch=master
    Name of the remote branch the CL pertains to.
+ -set-topic=true
+   Set Gerrit CL topic.
  -topic=
    CL topic, defaults to <username>-<branchname>.
 

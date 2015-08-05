@@ -226,6 +226,7 @@ func disableChecks() {
 	godepcopFlag = false
 	gofmtFlag = false
 	govetFlag = false
+	setTopicFlag = false
 }
 
 // installCommitMsgHook links the gerrit commit-msg hook into a different repo.

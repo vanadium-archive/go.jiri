@@ -42,6 +42,7 @@ var (
 	presubmitFlag    string
 	remoteBranchFlag string
 	reviewersFlag    string
+	setTopicFlag     bool
 	topicFlag        string
 	uncommittedFlag  bool
 )
@@ -52,7 +53,7 @@ var (
 	autosubmitLabelRE *regexp.Regexp = regexp.MustCompile("AutoSubmit")
 
 	// Change-Ids start with 'I' and are followed by 40 characters of hex.
-	changeIDRE *regexp.Regexp = regexp.MustCompile("Change-Id: I[0123456789abcdefABCDEF]{40}")
+	changeIDRE *regexp.Regexp = regexp.MustCompile("Change-Id: (I[0123456789abcdefABCDEF]{40})")
 
 	// Presubmit test label.
 	// PresubmitTest: <type>
@@ -77,6 +78,7 @@ func init() {
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
+	cmdCLMail.Flags.BoolVar(&setTopicFlag, "set-topic", true, "Set Gerrit CL topic.")
 	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", "CL topic, defaults to <username>-<branchname>.")
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
 	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
@@ -435,7 +437,6 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
 		Reviewers:    reviewersFlag,
-		Topic:        topicFlag,
 	})
 	if err != nil {
 		return err
@@ -1063,6 +1064,11 @@ func (review *review) run() (e error) {
 	if err := review.send(); err != nil {
 		return err
 	}
+	if setTopicFlag {
+		if err := review.setTopic(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -1075,6 +1081,33 @@ func (review *review) send() error {
 	}
 	if err := gerrit.Push(review.ctx.Run(), review.CLOpts); err != nil {
 		return gerritError(err.Error())
+	}
+	return nil
+}
+
+// setTopic sets the topic for the CL corresponding to the branch the
+// review was created for.
+func (review *review) setTopic() error {
+	// Read the commit message and extract the Change-Id.
+	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
+	if err != nil {
+		return err
+	}
+	bytes, err := review.ctx.Run().ReadFile(file)
+	if err != nil {
+		return err
+	}
+	changeID := changeIDRE.FindSubmatch(bytes)
+	if changeID == nil || len(changeID) < 2 {
+		return fmt.Errorf("could not find Change-Id in:\n%s", bytes)
+	}
+	host := util.VanadiumGerritHost()
+	cred, err := gerrit.HostCredential(review.ctx.Run(), host)
+	if err != nil {
+		return err
+	}
+	if err := review.ctx.Gerrit(host, cred.Username, cred.Password).SetTopic(string(changeID[1]), review.CLOpts); err != nil {
+		return err
 	}
 	return nil
 }
