@@ -17,7 +17,6 @@ import (
 
 var (
 	jenkinsHost = "http://localhost:8001/jenkins"
-	netrcFile   = filepath.Join(os.Getenv("HOME"), ".netrc")
 )
 
 // requireEnv makes sure that the given environment variables are set.
@@ -53,7 +52,6 @@ func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...Opt) (_ *tes
 	}
 	args = append(args,
 		"-host", jenkinsHost,
-		"-netrc", netrcFile,
 		"query",
 		"-log-file", logfile,
 		"-manifest", "tools",
@@ -87,7 +85,6 @@ func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...Opt) (_ *tes
 	name := os.Getenv("TEST")
 	args = append(args,
 		"-host", jenkinsHost,
-		"-netrc", netrcFile,
 		"test",
 		"-build-number", os.Getenv("BUILD_NUMBER"),
 		"-manifest", "tools",
@@ -139,7 +136,6 @@ func vanadiumPresubmitResult(ctx *tool.Context, testName string, _ ...Opt) (_ *t
 	}
 	args = append(args,
 		"-host", jenkinsHost,
-		"-netrc", netrcFile,
 		"result",
 		"-build-number", os.Getenv("BUILD_NUMBER"),
 		"-manifest", "tools",
