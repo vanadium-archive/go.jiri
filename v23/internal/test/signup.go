@@ -7,7 +7,6 @@ package test
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -249,7 +248,8 @@ func vanadiumSignupWelcomeStepTwoNew(ctx *tool.Context, testName string, _ ...Op
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
 
-	emailCredentials := os.Getenv("EMAIL_CREDENTIALS")
+	emailUsername := os.Getenv("EMAIL_USERNAME")
+	emailPassword := os.Getenv("EMAIL_PASSWORD")
 	emails := strings.Split(os.Getenv("EMAILS"), " ")
 	bucket := os.Getenv("NDA_BUCKET")
 
@@ -261,13 +261,8 @@ func vanadiumSignupWelcomeStepTwoNew(ctx *tool.Context, testName string, _ ...Op
 
 	// Use the Google Apps SMTP relay to send the welcome email, this has been
 	// pre-configured to allow authentiated v.io accounts to send mail.
-	credentials, err := readEmailCredentials(ctx, emailCredentials)
-	if err != nil {
-		return nil, internalTestError{err, "readEmailCredentials"}
-	}
-
-	mailer := gomail.NewMailer("smtp-relay.gmail.com", credentials.Email, credentials.Password, 587)
-	messages := []string{"sendWelcomeEmail errors:"}
+	mailer := gomail.NewMailer("smtp-relay.gmail.com", emailUsername, emailPassword, 587)
+	messages := []string{}
 	for _, email := range emails {
 		if err := sendWelcomeEmail(mailer, email, attachment); err != nil {
 			messages = append(messages, err.Error())
@@ -276,7 +271,7 @@ func vanadiumSignupWelcomeStepTwoNew(ctx *tool.Context, testName string, _ ...Op
 
 	// Log any errors from sending the email messages.
 	if len(messages) > 0 {
-		message := strings.Join(messages, "\n")
+		message := strings.Join(messages, "\n\n")
 		err := errors.New(message)
 		return nil, internalTestError{err, "sendWelcomeEmail"}
 	}
@@ -392,24 +387,4 @@ func sendWelcomeEmail(mailer *gomail.Mailer, email string, attachment string) er
 	}
 
 	return nil
-}
-
-type emailCredentials struct {
-	Email    string `json:"email_username"`
-	Password string `json:"email_password"`
-}
-
-func readEmailCredentials(ctx *tool.Context, path string) (emailCredentials, error) {
-	var credentials emailCredentials
-
-	data, err := ctx.Run().ReadFile(path)
-	if err != nil {
-		return credentials, err
-	}
-
-	if err := json.Unmarshal(data, &credentials); err != nil {
-		return credentials, fmt.Errorf("Unmarshal(%v) failed: %v", data, err)
-	}
-
-	return credentials, nil
 }
