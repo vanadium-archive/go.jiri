@@ -455,9 +455,13 @@ type Credential struct {
 // function uses best effort to scan common locations where the
 // credentials could exist.
 func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
+	// Check the host URL is valid.
 	url, err := url.Parse(host)
 	if err != nil {
 		return nil, fmt.Errorf("Parse(%q) failed: %v", host, err)
+	}
+	if url.Host == "" {
+		return nil, fmt.Errorf("%q has no host", host)
 	}
 
 	// Look for the host credentials in the .netrc file.
