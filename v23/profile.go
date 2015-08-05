@@ -1044,7 +1044,10 @@ func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 			fmt.Sprintf("--prefix=%v", snappyOutDir),
 			"--enable-shared=false",
 		}
-		env := map[string]string{}
+		env := map[string]string{
+			// NOTE(nlacasse): The -fPIC flag is needed to compile Syncbase Mojo service.
+			"CXXFLAGS": " -fPIC",
+		}
 		if target.Arch == "386" {
 			env["CC"] = "gcc -m32"
 			env["CXX"] = "g++ -m32"
@@ -1086,8 +1089,9 @@ func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 			return err
 		}
 		env := map[string]string{
-			"PREFIX":   leveldbLibDir,
-			"CXXFLAGS": "-I" + filepath.Join(snappyOutDir, "include"),
+			"PREFIX": leveldbLibDir,
+			// NOTE(nlacasse): The -fPIC flag is needed to compile Syncbase Mojo service.
+			"CXXFLAGS": "-I" + filepath.Join(snappyOutDir, "include") + " -fPIC",
 			"LDFLAGS":  "-L" + filepath.Join(snappyOutDir, "lib"),
 		}
 		if target.Arch == "386" {
