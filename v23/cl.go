@@ -113,7 +113,7 @@ func getDependentCLs(ctx *tool.Context, branch string) ([]string, error) {
 			branches = []string{remoteBranchFlag}
 		}
 	} else {
-		branches = strings.Split(string(data), "\n")
+		branches = strings.Split(strings.TrimSpace(string(data)), "\n")
 	}
 	return branches, nil
 }
