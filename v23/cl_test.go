@@ -207,6 +207,9 @@ func createRepo(t *testing.T, ctx *tool.Context, workingDir, prefix string) stri
 	if err := ctx.Git().Init(repoPath); err != nil {
 		t.Fatalf("%v", err)
 	}
+	if err := ctx.Run().MkdirAll(filepath.Join(repoPath, util.MetadataDirName()), os.FileMode(0755)); err != nil {
+		t.Fatalf("%v", err)
+	}
 	return repoPath
 }
 

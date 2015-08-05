@@ -53,6 +53,18 @@ func (r *Run) MkdirAll(dir string, mode os.FileMode) error {
 	return r.helper(func() error { return os.MkdirAll(dir, mode) }, fmt.Sprintf("mkdir -p %q", dir))
 }
 
+// ReadDir is a wrapper around ioutil.ReadDir that handles options
+// such as "verbose" or "dry run".
+func (r *Run) ReadDir(dirname string) ([]os.FileInfo, error) {
+	var fileInfos []os.FileInfo
+	var err error
+	r.helper(func() error {
+		fileInfos, err = ioutil.ReadDir(dirname)
+		return err
+	}, fmt.Sprintf("ls %q", dirname))
+	return fileInfos, err
+}
+
 // ReadFile is a wrapper around ioutil.ReadFile that handles options
 // such as "verbose" or "dry run".
 func (r *Run) ReadFile(filename string) ([]byte, error) {

@@ -210,6 +210,46 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 			return err
 		}
 	}
+	// Delete branch metadata.
+	topLevel, err := ctx.Git().TopLevel()
+	if err != nil {
+		return err
+	}
+	metadataDir := filepath.Join(topLevel, util.MetadataDirName())
+	if err := ctx.Run().RemoveAll(filepath.Join(metadataDir, branch)); err != nil {
+		return err
+	}
+	// Remove the branch from all dependency paths.
+	fileInfos, err := ctx.Run().ReadDir(metadataDir)
+	if err != nil {
+		return err
+	}
+	for _, fileInfo := range fileInfos {
+		if !fileInfo.IsDir() {
+			continue
+		}
+		file, err := getDependencyPathFileName(ctx, fileInfo.Name())
+		if err != nil {
+			return err
+		}
+		data, err := ctx.Run().ReadFile(file)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+			continue
+		}
+		branches := strings.Split(string(data), "\n")
+		for i, tmpBranch := range branches {
+			if branch == tmpBranch {
+				data := []byte(strings.Join(append(branches[:i], branches[i+1:]...), "\n"))
+				if err := ctx.Run().WriteFile(file, data, os.FileMode(0644)); err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
 	return nil
 }
 
