@@ -976,7 +976,7 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		if err := ctx.Git().Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
-		if strings.HasPrefix(op.project.Remote, VanadiumGitRepoHost()) {
+		if strings.HasPrefix(op.project.Remote, VanadiumGitHost()) {
 			// Setup the repository for Gerrit code reviews.
 			//
 			// TODO(jsimsa): Decide what to do in case we would want to update the

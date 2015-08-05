@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -113,6 +114,35 @@ func (g *Gerrit) PostReview(ref string, message string, labels map[string]string
 
 	// Post the review.
 	method, body := "POST", bytes.NewReader(encodedBytes)
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
+	}
+	req.Header.Add("Content-Type", "application/json;charset=UTF-8")
+	req.SetBasicAuth(g.username, g.password)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Do(%v) failed: %v", req, err)
+	}
+	defer collect.Error(func() error { return res.Body.Close() }, &e)
+
+	return nil
+}
+
+type Topic struct {
+	Topic string `json:"topic"`
+}
+
+// SetTopic sets the topic of the given Gerrit reference.
+func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
+	topic := Topic{opts.Topic}
+	data, err := json.Marshal(topic)
+	if err != nil {
+		return fmt.Errorf("Marshal(%#v) failed: %v", topic, err)
+	}
+
+	url := fmt.Sprintf("%s/a/changes/%s/topic", g.host, cl)
+	method, body := "POST", bytes.NewReader(data)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
@@ -367,7 +397,6 @@ func Reference(opts CLOpts) string {
 
 	params := formatParams(opts.Reviewers, "r", true)
 	params = append(params, formatParams(opts.Ccs, "cc", true)...)
-	params = append(params, formatParams(opts.Topic, "topic", false)...)
 
 	if len(params) > 0 {
 		ref = ref + "%" + strings.Join(params, ",")
@@ -415,4 +444,114 @@ func Push(run *runutil.Run, clOpts CLOpts) error {
 		}
 	}
 	return nil
+}
+
+type Credential struct {
+	Username string
+	Password string
+}
+
+// HostCredential returns credentials for the given Gerrit host. The
+// function uses best effort to scan common locations where the
+// credentials could exist.
+func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
+	url, err := url.Parse(host)
+	if err != nil {
+		return nil, fmt.Errorf("Parse(%q) failed: %v", host, err)
+	}
+
+	// Look for the host credentials in the .netrc file.
+	netrcPath := filepath.Join(os.Getenv("HOME"), ".netrc")
+	file, err := os.Open(netrcPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("Open(%q) failed: %v", netrcPath, err)
+		}
+	} else {
+		defer collect.Error(func() error { return file.Close() }, &e)
+		creds, err := parseNetrcFile(file)
+		if err != nil {
+			return nil, err
+		}
+		cred, ok := creds[url.Host]
+		if ok {
+			return cred, nil
+		}
+	}
+
+	// Look for the host credentials in the git cookie file.
+	args := []string{"config", "--get", "http.cookiefile"}
+	var stdout, stderr bytes.Buffer
+	opts := run.Opts()
+	opts.Stdout = &stdout
+	opts.Stderr = &stderr
+	if err := run.CommandWithOpts(opts, "git", args...); err == nil {
+		cookieFilePath := stdout.String()
+		file, err := os.Open(cookieFilePath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, fmt.Errorf("Open(%q) failed: %v", cookieFilePath, err)
+			}
+		} else {
+			defer collect.Error(func() error { return file.Close() }, &e)
+			creds, err := parseGitCookieFile(file)
+			if err != nil {
+				return nil, err
+			}
+			cred, ok := creds[url.Host]
+			if ok {
+				return cred, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("cannot find credentials for %q", host)
+}
+
+// parseGitCookieFile parses the content of the given git cookie file
+// and returns credentials stored in the file indexed by hosts.
+func parseGitCookieFile(reader io.Reader) (map[string]*Credential, error) {
+	creds := map[string]*Credential{}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, "\t")
+		if len(parts) != 7 {
+			continue
+		}
+		tokens := strings.Split(parts[6], "=")
+		if len(tokens) != 2 {
+			continue
+		}
+		creds[parts[0]] = &Credential{
+			Username: tokens[0],
+			Password: tokens[1],
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("Scan() failed: %v", err)
+	}
+	return creds, nil
+}
+
+// parseNetrcFile parses the content of the given netrc file and
+// returns credentials stored in the file indexed by hosts.
+func parseNetrcFile(reader io.Reader) (map[string]*Credential, error) {
+	creds := map[string]*Credential{}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, " ")
+		if len(parts) != 6 || parts[0] != "machine" || parts[2] != "login" || parts[4] != "password" {
+			continue
+		}
+		creds[parts[1]] = &Credential{
+			Username: parts[3],
+			Password: parts[5],
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("Scan() failed: %v", err)
+	}
+	return creds, nil
 }

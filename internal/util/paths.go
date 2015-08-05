@@ -152,9 +152,15 @@ func ThirdPartyCCodePath(os, arch string) (string, error) {
 	return filepath.Join(root, "third_party", "cout", fmt.Sprintf("%s_%s", os, arch)), nil
 }
 
-// VanadiumGitRepoHost returns the URL that hosts Vanadium git
+// VanadiumGerritHost returns the URL that hosts Vanadium Gerrit code
+// review system.
+func VanadiumGerritHost() string {
+	return "https://vanadium-review.googlesource.com/"
+}
+
+// VanadiumGitHost returns the URL that hosts Vanadium git
 // repositories.
-func VanadiumGitRepoHost() string {
+func VanadiumGitHost() string {
 	return "https://vanadium.googlesource.com/"
 }
 

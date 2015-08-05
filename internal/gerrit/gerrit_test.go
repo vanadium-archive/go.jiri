@@ -207,3 +207,100 @@ func TestParseMultiPartMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestParseValidGitCookieFile(t *testing.T) {
+	// Valid content.
+	gitCookieFileContent := `
+vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12345
+vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=54321
+	`
+	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContent))
+	expected := map[string]*Credential{
+		"vanadium.googlesource.com": &Credential{
+			Username: "git-jsimsa.google.com",
+			Password: "12345",
+		},
+		"vanadium-review.googlesource.com": &Credential{
+			Username: "git-jsimsa.google.com",
+			Password: "54321",
+		},
+	}
+	if err != nil {
+		t.Fatalf("want no errors, got: %v", err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Fatalf("want: %#v, got: %#v", expected, got)
+	}
+}
+
+func TestParseInvalidGitCookieFile(t *testing.T) {
+	// Content with invalid entries which should be skipped.
+	gitCookieFileContentWithInvalidEntries := `
+vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com
+vanadium-review.googlesource.com FALSE / TRUE 2147483647 o git-jsimsa.google.com=54321
+vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12345
+vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o
+	`
+	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContentWithInvalidEntries))
+	expected := map[string]*Credential{
+		"vanadium.googlesource.com": &Credential{
+			Username: "git-jsimsa.google.com",
+			Password: "12345",
+		},
+	}
+	if err != nil {
+		t.Fatalf("want no errors, got: %v", err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Fatalf("want: %#v, got: %#v", expected, got)
+	}
+}
+
+func TestParseValidNetRcFile(t *testing.T) {
+	// Valid content.
+	netrcFileContent := `
+machine vanadium.googlesource.com login git-jingjin.google.com password 12345
+machine vanadium-review.googlesource.com login git-jingjin.google.com password 54321
+	`
+	got, err := parseNetrcFile(strings.NewReader(netrcFileContent))
+	expected := map[string]*Credential{
+		"vanadium.googlesource.com": &Credential{
+			Username: "git-jingjin.google.com",
+			Password: "12345",
+		},
+		"vanadium-review.googlesource.com": &Credential{
+			Username: "git-jingjin.google.com",
+			Password: "54321",
+		},
+	}
+	if err != nil {
+		t.Fatalf("want no errors, got: %v", err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Fatalf("want: %#v, got: %#v", expected, got)
+	}
+}
+
+func TestParseInvalidNetRcFile(t *testing.T) {
+	// Content with invalid entries which should be skipped.
+	netRcFileContentWithInvalidEntries := `
+machine vanadium.googlesource.com login git-jingjin.google.com password
+machine_blah vanadium3.googlesource.com login git-jingjin.google.com password 12345
+machine vanadium2.googlesource.com login_blah git-jingjin.google.com password 12345
+machine vanadium4.googlesource.com login git-jingjin.google.com password_blah 12345
+machine vanadium-review.googlesource.com login git-jingjin.google.com password 54321
+	`
+	got, err := parseNetrcFile(strings.NewReader(netRcFileContentWithInvalidEntries))
+	expected := map[string]*Credential{
+		"vanadium-review.googlesource.com": &Credential{
+			Username: "git-jingjin.google.com",
+			Password: "54321",
+		},
+	}
+	if err != nil {
+		t.Fatalf("want no errors, got: %v", err)
+	}
+	if !reflect.DeepEqual(expected, got) {
+		t.Fatalf("want: %#v, got: %#v", expected, got)
+	}
+}
