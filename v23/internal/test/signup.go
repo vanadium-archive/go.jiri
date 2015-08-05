@@ -264,6 +264,10 @@ func vanadiumSignupWelcomeStepTwoNew(ctx *tool.Context, testName string, _ ...Op
 	mailer := gomail.NewMailer("smtp-relay.gmail.com", emailUsername, emailPassword, 587)
 	messages := []string{}
 	for _, email := range emails {
+		if strings.TrimSpace(email) == "" {
+			continue
+		}
+
 		if err := sendWelcomeEmail(mailer, email, attachment); err != nil {
 			messages = append(messages, err.Error())
 		}
