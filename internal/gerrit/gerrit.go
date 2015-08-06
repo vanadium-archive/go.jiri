@@ -142,7 +142,7 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 	}
 
 	url := fmt.Sprintf("%s/a/changes/%s/topic", g.host, cl)
-	method, body := "POST", bytes.NewReader(data)
+	method, body := "PUT", bytes.NewReader(data)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
