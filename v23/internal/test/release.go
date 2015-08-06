@@ -264,7 +264,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 	// A helper function to check a single app's build time.
 	checkBuildTimeFn := func(appName string) error {
 		msg := fmt.Sprintf("Verify build time for %q\n", appName)
-		now := time.Now()
+		now := time.Now().UTC()
 		adminCredentialsArg := fmt.Sprintf("--v23.credentials=%s", adminCredDir)
 		args := []string{
 			adminCredentialsArg,
