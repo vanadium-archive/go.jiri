@@ -8,7 +8,5 @@
        guarantee, but it's better to be safe than sorry.  -->
   <pkg allow="v.io/x/devtools/..."/>
   <pkg allow="v.io/x/lib/..."/>
-  <pkg allow="gopkg.in/gomail.v1/..."/>
-  <pkg allow="gopkg.in/alexcesaro/quotedprintable.v2/..."/>
   <pkg deny="..."/>
 </godepcop>
