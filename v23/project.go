@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -115,9 +116,18 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 			return
 		}
 		for _, branch := range branches {
+			file := filepath.Join(state.project.Path, util.MetadataDirName(), branch, commitMessageFileName)
+			hasFile := true
+			if _, err := os.Stat(file); err != nil {
+				if !os.IsNotExist(err) {
+					ch <- err
+					return
+				}
+				hasFile = false
+			}
 			state.branches = append(state.branches, branchState{
 				name:             branch,
-				hasGerritMessage: scm.HasFile(branch, commitMessageFileName),
+				hasGerritMessage: hasFile,
 			})
 		}
 		if checkDirty {

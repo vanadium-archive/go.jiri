@@ -303,11 +303,6 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	return branches, current, nil
 }
 
-// HasFile checks whether the given branch contains the given file.
-func (g *Git) HasFile(branch, file string) bool {
-	return g.run("cat-file", "-e", branch+":"+file) == nil
-}
-
 // HasUncommittedChanges checks whether the current branch contains
 // any uncommitted changes.
 func (g *Git) HasUncommittedChanges() (bool, error) {
