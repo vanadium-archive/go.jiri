@@ -304,3 +304,6 @@ machine vanadium-review.googlesource.com login git-jingjin.google.com password 5
 		t.Fatalf("want: %#v, got: %#v", expected, got)
 	}
 }
+
+// TODO(jsimsa): Add a test for the HostCredential function that
+// exercises the logic that read the .netrc and git cookie file.

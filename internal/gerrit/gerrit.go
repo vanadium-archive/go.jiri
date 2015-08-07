@@ -490,7 +490,7 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 	opts.Stdout = &stdout
 	opts.Stderr = &stderr
 	if err := run.CommandWithOpts(opts, "git", args...); err == nil {
-		cookieFilePath := stdout.String()
+		cookieFilePath := strings.TrimSpace(stdout.String())
 		file, err := os.Open(cookieFilePath)
 		if err != nil {
 			if !os.IsNotExist(err) {
