@@ -352,8 +352,7 @@ func coverageWorker(ctx *tool.Context, timeout string, args []string, pkgs <-cha
 		if err != nil {
 			panic(fmt.Sprintf("TempFile() failed: %v", err))
 		}
-		args := append([]string{
-			"go", "test", "-cover", "-coverprofile",
+		args := append([]string{"go", "test", "-tags=leveldb", "-cover", "-coverprofile",
 			coverageFile.Name(), "-timeout", timeout, "-v",
 		}, args...)
 		args = append(args, pkg)
