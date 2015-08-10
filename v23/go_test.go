@@ -342,8 +342,8 @@ func TestGoBuildWithMetaData(t *testing.T) {
 	}
 	// Run the v23 binary.
 	buf.Reset()
-	if err := ctx.Run().CommandWithOpts(opts, testbin, "-v23.metadata"); err != nil {
-		t.Errorf("run of v23 -v23.metadata failed: %v\n%s", err, buf.String())
+	if err := ctx.Run().CommandWithOpts(opts, testbin, "-metadata"); err != nil {
+		t.Errorf("run of v23 -metadata failed: %v\n%s", err, buf.String())
 	}
 	// Decode the output metadata and spot-check some values.
 	outData := buf.Bytes()
