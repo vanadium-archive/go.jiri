@@ -142,59 +142,6 @@ func copyAssets(t *testing.T, ctx *tool.Context, srcDir, dstDir string) {
 	}
 }
 
-// createTestGoDependencyPackages creates test Go dependency packages.
-func createTestGoDependencyPackages(t *testing.T, ctx *tool.Context, rootDir string) {
-	fooDir := filepath.Join(rootDir, "src", "v.io", "foo")
-	if err := ctx.Run().MkdirAll(fooDir, os.FileMode(0755)); err != nil {
-		t.Fatalf("MkdirAll(%v) failed: %v", fooDir, err)
-	}
-	fooFile := filepath.Join(fooDir, "foo.go")
-	fooData := `package foo
-
-func Foo() string {
-	return "hello"
-}
-`
-	if err := ctx.Run().WriteFile(fooFile, []byte(fooData), os.FileMode(0644)); err != nil {
-		t.Fatalf("WriteFile(%v) failed: %v", fooFile, err)
-	}
-	if err := ctx.Git().CommitFile(fooFile, "commit foo.go"); err != nil {
-		t.Fatalf("%v", err)
-	}
-	barDir := filepath.Join(rootDir, "src", "v.io", "bar")
-	if err := ctx.Run().MkdirAll(barDir, os.FileMode(0755)); err != nil {
-		t.Fatalf("MkdirAll(%v) failed: %v", barDir, err)
-	}
-	barFile := filepath.Join(barDir, "bar.go")
-	barData := `package bar
-
-import "v.io/foo"
-
-func Bar() string {
-	return foo.Foo()
-}
-`
-	if err := ctx.Run().WriteFile(barFile, []byte(barData), os.FileMode(0644)); err != nil {
-		t.Fatalf("WriteFile(%v) failed: %v", barFile, err)
-	}
-	if err := ctx.Git().CommitFile(barFile, "commit bar.go"); err != nil {
-		t.Fatalf("%v", err)
-	}
-}
-
-// createTestGoDependencyConstraint creates a test Go dependency
-// constraint.
-func createTestGoDependencyConstraint(t *testing.T, ctx *tool.Context, rootDir, command string) {
-	depFile := filepath.Join(rootDir, "src", "v.io", "bar", ".godepcop")
-	depData := `<godepcop><pkg ` + command + `="..."/></godepcop>`
-	if err := ctx.Run().WriteFile(depFile, []byte(depData), os.FileMode(0644)); err != nil {
-		t.Fatalf("WriteFile(%v) failed: %v", depFile, err)
-	}
-	if err := ctx.Git().CommitFile(depFile, "commit .godepcop"); err != nil {
-		t.Fatalf("%v", err)
-	}
-}
-
 // createRepo creates a new repository in the given working directory.
 func createRepo(t *testing.T, ctx *tool.Context, workingDir, prefix string) string {
 	repoPath, err := ctx.Run().TempDir(workingDir, "repo-"+prefix)
@@ -223,7 +170,6 @@ echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 func disableChecks() {
 	copyrightFlag = false
 	goapiFlag = false
-	godepcopFlag = false
 	gofmtFlag = false
 	govetFlag = false
 	setTopicFlag = false
@@ -587,62 +533,6 @@ func TestCopyrightError(t *testing.T) {
 func TestCopyrightOK(t *testing.T) {
 	if err := testCopyrightHelper(t, true); err != nil {
 		t.Fatalf("copyright check failed: %v", err)
-	}
-}
-
-// testGoDependencyHelper is a function that contains the logic shared
-// by TestGoDependencyError and TestGoDependencyOK.
-func testGoDependencyHelper(t *testing.T, ok bool) error {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, root)
-
-	oldRoot := os.Getenv("V23_ROOT")
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("V23_ROOT", oldRoot)
-	oldGoPath := os.Getenv("GOPATH")
-	if err := os.Setenv("GOPATH", repoPath); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("GOPATH", oldGoPath)
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
-	createTestGoDependencyPackages(t, ctx, repoPath)
-	constraint := "deny"
-	if ok {
-		constraint = "allow"
-	}
-	createTestGoDependencyConstraint(t, ctx, repoPath, constraint)
-	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	return review.checkGoDependencies()
-}
-
-// TestGoDependencyError checks that the Go dependency check fails for
-// a CL that introduces a dependency violation.
-func TestGoDependencyError(t *testing.T) {
-	if err := testGoDependencyHelper(t, false); err == nil {
-		t.Fatalf("go dependency check did not fail when it should")
-	} else if _, ok := err.(goDependencyError); !ok {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestGoDependencyOK checks that the Go dependency check succeeds for
-// a CL that does not introduce a dependency violation.
-func TestGoDependencyOK(t *testing.T) {
-	if err := testGoDependencyHelper(t, true); err != nil {
-		t.Fatalf("go dependency check failed: %v", err)
 	}
 }
 

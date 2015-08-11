@@ -35,7 +35,6 @@ var (
 	editFlag         bool
 	forceFlag        bool
 	goapiFlag        bool
-	godepcopFlag     bool
 	gofmtFlag        bool
 	govetFlag        bool
 	govetBinaryFlag  string
@@ -70,7 +69,6 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
 	cmdCLMail.Flags.BoolVar(&goapiFlag, "check-goapi", true, "Check for changes in the public Go API.")
-	cmdCLMail.Flags.BoolVar(&godepcopFlag, "check-godepcop", true, "Check that no godepcop violations exist.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
 	cmdCLMail.Flags.BoolVar(&govetFlag, "check-govet", true, "Check that no go vet violations exist.")
 	cmdCLMail.Flags.StringVar(&govetBinaryFlag, "go-vet-binary", "", "Specify the path to the go vet binary to use.")
@@ -335,15 +333,6 @@ type gerritError string
 
 func (e gerritError) Error() string {
 	result := "sending code review failed\n\n"
-	result += string(e)
-	return result
-}
-
-type goDependencyError string
-
-func (e goDependencyError) Error() string {
-	result := "changelist introduces dependency violations\n\n"
-	result += "To resolve this problem, fix the following violations:\n"
 	result += string(e)
 	return result
 }
@@ -724,19 +713,6 @@ func (review *review) checkCopyright() error {
 	return nil
 }
 
-// checkDependencies checks if the code to be submitted meets the
-// dependency constraints.
-func (review *review) checkGoDependencies() error {
-	var out bytes.Buffer
-	opts := review.ctx.Run().Opts()
-	opts.Stdout = &out
-	opts.Stderr = &out
-	if err := review.ctx.Run().CommandWithOpts(opts, "v23", "run", "godepcop", "check", "v.io/..."); err != nil {
-		return goDependencyError(out.String())
-	}
-	return nil
-}
-
 // checkGoAPI checks if the public Go API has changed.
 func (review *review) checkGoAPI() error {
 	name, err := util.CurrentProjectName(review.ctx)
@@ -982,7 +958,6 @@ func (review *review) run() (e error) {
 	}{
 		{copyrightFlag, func() error { return review.checkCopyright() }},
 		{goapiFlag, func() error { return review.checkGoAPI() }},
-		{godepcopFlag, func() error { return review.checkGoDependencies() }},
 		{gofmtFlag, func() error { return review.checkGoFormat() }},
 		{govetFlag, func() error { return review.checkGoVet() }},
 	}

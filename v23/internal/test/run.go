@@ -85,6 +85,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-go-binaries":                vanadiumGoBinaries,
 	"vanadium-go-build":                   vanadiumGoBuild,
 	"vanadium-go-cover":                   vanadiumGoCoverage,
+	"vanadium-go-depcop":                  vanadiumGoDepcop,
 	"vanadium-go-generate":                vanadiumGoGenerate,
 	"vanadium-go-race":                    vanadiumGoRace,
 	"vanadium-go-snapshot":                vanadiumGoSnapshot,

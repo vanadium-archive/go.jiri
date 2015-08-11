@@ -135,8 +135,6 @@ The v23 cl mail flags are:
    Check copyright headers.
  -check-goapi=true
    Check for changes in the public Go API.
- -check-godepcop=true
-   Check that no godepcop violations exist.
  -check-gofmt=true
    Check that no go fmt violations exist.
  -check-govet=true

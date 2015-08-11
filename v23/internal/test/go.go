@@ -1234,6 +1234,41 @@ func vanadiumGoCoverage(ctx *tool.Context, testName string, opts ...Opt) (_ *tes
 	return goCoverage(ctx, testName, pkgs)
 }
 
+// vanadiumGoDepcop runs Go dependency checks for vanadium projects.
+func vanadiumGoDepcop(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, nil)
+	if err != nil {
+		return nil, internalTestError{err, "init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Build the godepcop tool in a temporary directory.
+	tmpDir, err := ctx.Run().TempDir("", "godepcop-test")
+	if err != nil {
+		return nil, internalTestError{err, "godepcop-build"}
+	}
+	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
+	binary := filepath.Join(tmpDir, "godepcop")
+	if err := ctx.Run().Command("v23", "go", "build", "-o", binary, "v.io/x/devtools/godepcop"); err != nil {
+		return nil, internalTestError{err, "godepcop-build"}
+	}
+
+	// Run the godepcop tool.
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Stderr = &out
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "run", binary, "check", "v.io/..."); err != nil {
+		if err := xunit.CreateFailureReport(ctx, testName, "RunGoDepcop", "CheckDependencies", "dependencies check failure", out.String()); err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(ctx.Stderr(), "%v", out.String())
+		return &test.Result{Status: test.Failed}, nil
+	}
+	return &test.Result{Status: test.Passed}, nil
+}
+
 // vanadiumGoGenerate checks that files created by 'go generate' are
 // up-to-date.
 func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
