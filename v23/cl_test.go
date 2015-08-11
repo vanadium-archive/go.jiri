@@ -169,7 +169,6 @@ echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 
 func disableChecks() {
 	copyrightFlag = false
-	goapiFlag = false
 	gofmtFlag = false
 	govetFlag = false
 	setTopicFlag = false
@@ -249,86 +248,6 @@ func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util
 	}
 	if err := root.Cleanup(ctx); err != nil {
 		t.Fatalf("%v", err)
-	}
-}
-
-// testAPIHelper is a function that contains the logic shared
-// by TestAPIError and TestAPIOK.
-func testGoAPIHelper(t *testing.T, ok bool, check bool) error {
-	ctx := tool.NewDefaultContext()
-	env := setupAPITest(t, ctx)
-	defer teardownAPITest(t, env)
-
-	if check {
-		config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-		env.fakeRoot.WriteLocalToolsConfig(ctx, config)
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	defer func() {
-		if err := ctx.Run().Chdir(cwd); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
-	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
-	if err := ctx.Run().Chdir(projectPath); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
-	file, fileContent := filepath.Join(projectPath, "file.go"), `package whatever
-
-func PublicFunction() {}`
-	fmt.Println(fileContent)
-	if err := ctx.Run().WriteFile(file, []byte(fileContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", file, fileContent, err)
-	}
-	if err := ctx.Git().CommitFile(file, "Commit "+file); err != nil {
-		t.Fatalf("%v", err)
-	}
-	apiFile, apiFileContent := filepath.Join(projectPath, ".api"), ""
-	if ok {
-		apiFileContent = "pkg whatever, func PublicFunction()\n"
-	}
-	fmt.Println(apiFileContent)
-	if err := ctx.Run().WriteFile(apiFile, []byte(apiFileContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", apiFile, apiFileContent, err)
-	}
-	if err := ctx.Git().CommitFile(apiFile, "Commit "+apiFile); err != nil {
-		t.Fatalf("%v", err)
-	}
-	review, err := newReview(ctx, gerrit.CLOpts{})
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	return review.checkGoAPI()
-}
-
-func TestAPIError(t *testing.T) {
-	if err := testGoAPIHelper(t, false, true); err == nil {
-		t.Fatalf("go api check did not fail when it should")
-	} else if _, ok := err.(apiError); !ok {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestAPIOK(t *testing.T) {
-	if err := testGoAPIHelper(t, true, true); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestAPISkip(t *testing.T) {
-	// Run the API helper in a failure mode. However, no failure should be
-	// reported because this check is skipped.
-	if err := testGoAPIHelper(t, false, false); err != nil {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

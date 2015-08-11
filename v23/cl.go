@@ -34,7 +34,6 @@ var (
 	draftFlag        bool
 	editFlag         bool
 	forceFlag        bool
-	goapiFlag        bool
 	gofmtFlag        bool
 	govetFlag        bool
 	govetBinaryFlag  string
@@ -68,7 +67,6 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
-	cmdCLMail.Flags.BoolVar(&goapiFlag, "check-goapi", true, "Check for changes in the public Go API.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
 	cmdCLMail.Flags.BoolVar(&govetFlag, "check-govet", true, "Check that no go vet violations exist.")
 	cmdCLMail.Flags.StringVar(&govetBinaryFlag, "go-vet-binary", "", "Specify the path to the go vet binary to use.")
@@ -279,21 +277,6 @@ message. Consecutive invocations of the command use the same Change-Id
 by default, informing Gerrit that the incomming commit is an update of
 an existing changelist.
 `,
-}
-
-type apiError struct {
-	apiCheckOutput string
-	project        string
-}
-
-func (e apiError) Error() string {
-	result := "changelist changes the public Go API without updating the corresponding .api file(s)\n\n"
-	result += "For a detailed account of these changes, run 'v23 api check " + e.project + "'\n"
-	result += "If these changes are intentional, run 'v23 api fix " + e.project + "'\n"
-	result += "to update the corresponding .api files. Then add the updated .api files to\n"
-	result += "your changelist and re-run the mail command.\n\n"
-	result += e.apiCheckOutput
-	return result
 }
 
 type changeConflictError struct {
@@ -713,36 +696,6 @@ func (review *review) checkCopyright() error {
 	return nil
 }
 
-// checkGoAPI checks if the public Go API has changed.
-func (review *review) checkGoAPI() error {
-	name, err := util.CurrentProjectName(review.ctx)
-	if err != nil {
-		return err
-	}
-	if name == "" {
-		return fmt.Errorf("current project is not a 'v23' project")
-	}
-	// Check if the api check should be invoked for the current project.
-	config, err := util.LoadConfig(review.ctx)
-	if err != nil {
-		return err
-	}
-	if _, ok := config.APICheckProjects()[name]; !ok {
-		return nil
-	}
-	var out bytes.Buffer
-	if err := doAPICheck(&out, review.ctx.Stderr(), []string{name}, false); err != nil {
-		return err
-	}
-	if out.Len() != 0 {
-		return apiError{
-			apiCheckOutput: out.String(),
-			project:        name,
-		}
-	}
-	return nil
-}
-
 // cleanup cleans up after the review.
 func (review *review) cleanup(stashed bool) error {
 	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch); err != nil {
@@ -957,7 +910,6 @@ func (review *review) run() (e error) {
 		fn   func() error
 	}{
 		{copyrightFlag, func() error { return review.checkCopyright() }},
-		{goapiFlag, func() error { return review.checkGoAPI() }},
 		{gofmtFlag, func() error { return review.checkGoFormat() }},
 		{govetFlag, func() error { return review.checkGoVet() }},
 	}

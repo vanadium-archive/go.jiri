@@ -133,8 +133,6 @@ The v23 cl mail flags are:
    Comma-seperated list of emails or LDAPs to cc.
  -check-copyright=true
    Check copyright headers.
- -check-goapi=true
-   Check for changes in the public Go API.
  -check-gofmt=true
    Check that no go fmt violations exist.
  -check-govet=true

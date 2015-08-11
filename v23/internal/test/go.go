@@ -1182,6 +1182,32 @@ func thirdPartyPkgs() ([]string, error) {
 	return pkgs, nil
 }
 
+// vanadiumGoAPI checks the public Go api for vanadium projects.
+func vanadiumGoAPI(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, nil)
+	if err != nil {
+		return nil, internalTestError{err, "init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Run the v23 api check.
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Stderr = &out
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "api", "check"); err != nil {
+		report := fmt.Sprintf(`%v\nIf the above changes to public Go API are intentional, run "v23 api fix",
+to update the corresponding .api files and commit the changes.\n`, out.String())
+		if err := xunit.CreateFailureReport(ctx, testName, "RunV23API", "CheckGoAPI", "public api check failure", report); err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(ctx.Stderr(), "%v", report)
+		return &test.Result{Status: test.Failed}, nil
+	}
+	return &test.Result{Status: test.Passed}, nil
+}
+
 // vanadiumGoBench runs Go benchmarks for vanadium projects.
 func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
 	// Initialize the test.
