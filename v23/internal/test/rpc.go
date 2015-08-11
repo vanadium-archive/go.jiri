@@ -348,7 +348,7 @@ func readStressStats(out string) (*stressStats, *stressStats, error) {
 func readStressStatsHelper(re *regexp.Regexp, out string, numStats int) (*stressStats, error) {
 	matches := re.FindAllSubmatch([]byte(out), -1)
 	if len(matches) != numStats {
-		return nil, fmt.Errorf("invalid number of stats: %d != $d", len(matches), numStats)
+		return nil, fmt.Errorf("invalid number of stats: %d != %qd", len(matches), numStats)
 	}
 	var merged stressStats
 	for _, match := range matches {
@@ -457,7 +457,7 @@ func readLoadStats(out string, numStats int) (*loadStats, error) {
 	re := regexp.MustCompile(`load stats:({.*})`)
 	matches := re.FindAllSubmatch([]byte(out), -1)
 	if len(matches) != numStats {
-		return nil, fmt.Errorf("invalid number of stats: %d != $d", len(matches), numStats)
+		return nil, fmt.Errorf("invalid number of stats: %d != %d", len(matches), numStats)
 	}
 	var merged loadStats
 	for _, match := range matches {

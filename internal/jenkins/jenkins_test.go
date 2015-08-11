@@ -59,7 +59,7 @@ func TestQueuedBuildParseRefs(t *testing.T) {
 	}
 	for _, test := range testCases {
 		if got, want := test.queuedBuild.ParseRefs(), test.expectedRefs; got != want {
-			t.Fatalf("want %q, got $q", want, got)
+			t.Fatalf("want %q, got %q", want, got)
 		}
 	}
 }
