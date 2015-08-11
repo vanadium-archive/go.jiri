@@ -117,31 +117,6 @@ func commitFiles(t *testing.T, ctx *tool.Context, fileNames []string) {
 	}
 }
 
-// copyAssets copies the copyright assets from the source directory to
-// the target directory.
-func copyAssets(t *testing.T, ctx *tool.Context, srcDir, dstDir string) {
-	assets, err := loadAssets(ctx, srcDir)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	for name, data := range assets.MatchFiles {
-		path := filepath.Join(dstDir, name)
-		if err := ctx.Run().WriteFile(path, []byte(data), os.FileMode(0644)); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-	for name, data := range assets.MatchPrefixFiles {
-		path := filepath.Join(dstDir, name)
-		if err := ctx.Run().WriteFile(path, []byte(data), os.FileMode(0644)); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-	path := filepath.Join(dstDir, "COPYRIGHT")
-	if err := ctx.Run().WriteFile(path, []byte(assets.Copyright), os.FileMode(0644)); err != nil {
-		t.Fatalf("%v", err)
-	}
-}
-
 // createRepo creates a new repository in the given working directory.
 func createRepo(t *testing.T, ctx *tool.Context, workingDir, prefix string) string {
 	repoPath, err := ctx.Run().TempDir(workingDir, "repo-"+prefix)
@@ -168,7 +143,6 @@ echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 `
 
 func disableChecks() {
-	copyrightFlag = false
 	gofmtFlag = false
 	govetFlag = false
 	setTopicFlag = false
@@ -376,82 +350,6 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	}
 	if _, ok := err.(emptyChangeError); !ok {
 		t.Fatalf("unexpected error type: %v", err)
-	}
-}
-
-// testCopyrightHelper is a function that contains the logic shared by
-// TestCopyrightError and TestCopyrightOK.
-func testCopyrightHelper(t *testing.T, ok bool) error {
-	// Setup a fake V23_ROOT, copy the copyright assets into its
-	// tools/data directory, and create a "test" project that does not
-	// contain the assets.
-	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeV23Root(ctx)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
-		t.Fatalf("%v", err)
-	}
-	root.AddProject(ctx, util.Project{
-		Name:   "test",
-		Path:   "test",
-		Remote: root.Projects["test"],
-	})
-	root.UpdateUniverse(ctx, false)
-	dataDir, err := util.DataDirPath(ctx, "v23")
-	if err != nil {
-		t.Fatalf("%v", err)
-
-	}
-	copyAssets(t, ctx, dataDir, filepath.Join(root.Dir, "tools", filepath.Base(dataDir)))
-	if ok {
-		copyAssets(t, ctx, dataDir, filepath.Join(root.Dir, "test"))
-	}
-	// Whitelist the "test" project.
-	config := util.NewConfig(util.CopyrightCheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-	root.WriteLocalToolsConfig(ctx, config)
-	// Create a review in the "test" project and check that the
-	// copyright check fails.
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	defer func() {
-		if err := ctx.Run().Chdir(cwd); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
-	if err := ctx.Run().Chdir(filepath.Join(root.Dir, "test")); err != nil {
-		t.Fatalf("%v", err)
-	}
-	review, err := newReview(ctx, gerrit.CLOpts{})
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	oldRoot := os.Getenv("V23_ROOT")
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("V23_ROOT", oldRoot)
-	return review.checkCopyright()
-}
-
-// TestCopyrightError checks that the copyright check fails for a CL
-// that introduces a copyright violation.
-func TestCopyrightError(t *testing.T) {
-	if err := testCopyrightHelper(t, false); err == nil {
-		t.Fatalf("copyright check did not fail when it should")
-	} else if _, ok := err.(copyrightError); !ok {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestCopyrightOK checks that the copyright check succeeds for a CL
-// that does not introduce a copyright violation.
-func TestCopyrightOK(t *testing.T) {
-	if err := testCopyrightHelper(t, true); err != nil {
-		t.Fatalf("copyright check failed: %v", err)
 	}
 }
 

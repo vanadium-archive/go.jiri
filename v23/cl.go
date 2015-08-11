@@ -30,7 +30,6 @@ const (
 var (
 	autosubmitFlag   bool
 	ccsFlag          string
-	copyrightFlag    bool
 	draftFlag        bool
 	editFlag         bool
 	forceFlag        bool
@@ -64,7 +63,6 @@ func init() {
 	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
-	cmdCLMail.Flags.BoolVar(&copyrightFlag, "check-copyright", true, "Check copyright headers.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
 	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
@@ -289,19 +287,6 @@ func (e changeConflictError) Error() string {
 	result := "changelist conflicts with the remote " + e.remoteBranch + " branch\n\n"
 	result += "To resolve this problem, run 'git pull origin " + e.remoteBranch + ":" + e.localBranch + "',\n"
 	result += "resolve the conflicts identified below, and then try again.\n"
-	result += e.message
-	return result
-}
-
-type copyrightError struct {
-	message string
-	project string
-}
-
-func (e copyrightError) Error() string {
-	result := "changelist does not adhere to the copyright conventions\n\n"
-	result += "To resolve this problem, run 'v23 copyright fix " + e.project + "' to\n"
-	result += "fix the following violations:\n"
 	result += e.message
 	return result
 }
@@ -663,39 +648,6 @@ func (review *review) modifiedGoFiles() ([]string, error) {
 	return goFiles, nil
 }
 
-// checkCopyright checks if the submitted code introduces source code
-// without proper copyright.
-func (review *review) checkCopyright() error {
-	name, err := util.CurrentProjectName(review.ctx)
-	if err != nil {
-		return err
-	}
-	if name == "" {
-		return fmt.Errorf("current project is not a 'v23' project")
-	}
-	// Check if the copyright check should be invoked for the current
-	// project.
-	config, err := util.LoadConfig(review.ctx)
-	if err != nil {
-		return err
-	}
-	if _, ok := config.CopyrightCheckProjects()[name]; !ok {
-		return nil
-	}
-	// Check the copyright headers and licensing files.
-	var out bytes.Buffer
-	if err := copyrightHelper(review.ctx.Stdout(), &out, []string{name}, false); err != nil {
-		return err
-	}
-	if out.Len() != 0 {
-		return copyrightError{
-			message: out.String(),
-			project: name,
-		}
-	}
-	return nil
-}
-
 // cleanup cleans up after the review.
 func (review *review) cleanup(stashed bool) error {
 	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch); err != nil {
@@ -909,7 +861,6 @@ func (review *review) run() (e error) {
 		flag bool
 		fn   func() error
 	}{
-		{copyrightFlag, func() error { return review.checkCopyright() }},
 		{gofmtFlag, func() error { return review.checkGoFormat() }},
 		{govetFlag, func() error { return review.checkGoVet() }},
 	}

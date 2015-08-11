@@ -131,8 +131,6 @@ The v23 cl mail flags are:
    Automatically submit the changelist when feasiable.
  -cc=
    Comma-seperated list of emails or LDAPs to cc.
- -check-copyright=true
-   Check copyright headers.
  -check-gofmt=true
    Check that no go fmt violations exist.
  -check-govet=true

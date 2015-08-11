@@ -79,6 +79,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-chat-shell-test":            vanadiumChatShellTest,
 	"vanadium-chat-web-test":              vanadiumChatWebTest,
 	"vanadium-chat-web-ui-test":           vanadiumChatWebUITest,
+	"vanadium-copyright":                  vanadiumCopyright,
 	"vanadium-create-instance-test":       vanadiumCreateInstanceTest,
 	"vanadium-github-mirror":              vanadiumGitHubMirror,
 	"vanadium-go-api":                     vanadiumGoAPI,
