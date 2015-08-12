@@ -14,6 +14,8 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+const sleepTime = 10 * time.Second
+
 var (
 	gcFlag       bool
 	attemptsFlag int
@@ -109,6 +111,10 @@ func runUpdate(env *cmdline.Env, _ []string) error {
 			break
 		} else {
 			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
+		}
+		if i < attemptsFlag {
+			fmt.Fprintf(ctx.Stdout(), "Wait for %v before next attempt...\n", sleepTime)
+			time.Sleep(sleepTime)
 		}
 	}
 	return err
