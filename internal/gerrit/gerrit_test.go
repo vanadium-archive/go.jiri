@@ -213,6 +213,7 @@ func TestParseValidGitCookieFile(t *testing.T) {
 	gitCookieFileContent := `
 vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12345
 vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=54321
+.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12321
 	`
 	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContent))
 	expected := map[string]*Credential{
@@ -223,6 +224,10 @@ vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com
 		"vanadium-review.googlesource.com": &Credential{
 			Username: "git-jsimsa.google.com",
 			Password: "54321",
+		},
+		".googlesource.com": &Credential{
+			Username: "git-jsimsa.google.com",
+			Password: "12321",
 		},
 	}
 	if err != nil {

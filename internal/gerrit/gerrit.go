@@ -506,6 +506,14 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 			if ok {
 				return cred, nil
 			}
+			// Account for site-wide credentials. Namely, the git cookie
+			// file can contain credentials of the form ".<name>", which
+			// should match any host "*.<name>".
+			for host, cred := range creds {
+				if strings.HasPrefix(host, ".") && strings.HasSuffix(url.Host, host) {
+					return cred, nil
+				}
+			}
 		}
 	}
 
