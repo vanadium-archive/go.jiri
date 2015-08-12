@@ -950,8 +950,9 @@ func newExclusion(pkg, name string, exclude bool) exclusion {
 }
 
 var (
-	goExclusions     []exclusion
-	goRaceExclusions []exclusion
+	goExclusions          []exclusion
+	goRaceExclusions      []exclusion
+	integrationExclusions []exclusion
 )
 
 func init() {
@@ -960,9 +961,6 @@ func init() {
 		//
 		// https://github.com/veyron/release-issues/issues/1494
 		newExclusion("v.io/x/ref/runtime/internal/rpc/stream/vc", "TestConcurrentFlows", isDarwin() && is386()),
-		// TODO(jingjin): re-enable this test when the following issue is resolved.
-		// https://github.com/vanadium/issues/issues/639
-		newExclusion("v.io/x/ref/services/device", "TestV23DeviceManagerMultiUser", isDarwin()),
 		// The fsnotify package tests are flaky on darwin. This begs the
 		// question of whether we should be relying on this library at
 		// all.
@@ -1009,6 +1007,12 @@ func init() {
 	goRaceExclusions = []exclusion{
 		// This test takes too long in --race mode.
 		newExclusion("v.io/x/devtools/v23", "TestV23Generate", true),
+	}
+
+	integrationExclusions = []exclusion{
+		// TODO(jingjin): re-enable this test when the following issue is resolved.
+		// https://github.com/vanadium/issues/issues/639
+		newExclusion("v.io/x/ref/services/device", "TestV23DeviceManagerMultiUser", isDarwin()),
 	}
 }
 
@@ -1509,7 +1513,7 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_
 	env := ctx.Env()
 	env["V23_BIN_DIR"] = binDirPath()
 	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
-	return goTestAndReport(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+	return goTestAndReport(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, exclusionsOpt(integrationExclusions), pkgs)
 }
 
 // binOrder determines if the regression tests use
