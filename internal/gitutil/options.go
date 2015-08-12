@@ -20,6 +20,10 @@ type PushOpt interface {
 	pushOpt()
 }
 
+type ResetOpt interface {
+	resetOpt()
+}
+
 type ForceOpt bool
 
 func (ForceOpt) checkoutOpt()     {}
@@ -28,6 +32,10 @@ func (ForceOpt) deleteBranchOpt() {}
 type MessageOpt string
 
 func (MessageOpt) commitOpt() {}
+
+type ModeOpt string
+
+func (ModeOpt) resetOpt() {}
 
 type SquashOpt bool
 

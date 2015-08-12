@@ -740,13 +740,19 @@ func (review *review) createReviewBranch(message string) (e error) {
 // squashBranches iterates over the given list of branches, creating
 // one commit per branch in the current branch by squashing all
 // commits of each individual branch.
-func (review *review) squashBranches(branches []string, message string) error {
+//
+// TODO(jsimsa): Consider using "git rebase --onto" to avoid having to
+// deal with merge conflicts.
+func (review *review) squashBranches(branches []string, message string) (e error) {
 	for i := 1; i < len(branches); i++ {
-		// The "theirs" merge strategy option is used to prevent git from
-		// reporting spurious conflicts resulting from the fact that each
-		// branch is squashed into a single commit, which removes the
-		// history needed to perform a conflict-free merge.
-		if err := review.ctx.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("theirs")); err != nil {
+		// We want to merge the <branches[i]> branch on top of the review
+		// branch, forcing all conflicts to be reviewed in favor of the
+		// <branches[i]> branch. Unfortunately, git merge does not offer a
+		// strategy that would do that for us. The solution implemented
+		// here is based on:
+		//
+		// http://stackoverflow.com/questions/173919/is-there-a-theirs-version-of-git-merge-s-ours
+		if err := review.ctx.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("ours")); err != nil {
 			return changeConflictError{
 				localBranch:  branches[i],
 				remoteBranch: review.CLOpts.RemoteBranch,
@@ -786,6 +792,22 @@ func (review *review) squashBranches(branches []string, message string) error {
 			if err := committer.Commit(message); err != nil {
 				return err
 			}
+		}
+		tmpBranch := review.reviewBranch + "-" + branches[i] + "-TMP"
+		if err := review.ctx.Git().CreateBranch(tmpBranch); err != nil {
+			return err
+		}
+		defer collect.Error(func() error {
+			return review.ctx.Git().DeleteBranch(tmpBranch, gitutil.ForceOpt(true))
+		}, &e)
+		if err := review.ctx.Git().Reset(branches[i]); err != nil {
+			return err
+		}
+		if err := review.ctx.Git().Reset(tmpBranch, gitutil.ModeOpt("soft")); err != nil {
+			return err
+		}
+		if err := review.ctx.Git(authorDate, committerDate).CommitAmend(); err != nil {
+			return err
 		}
 	}
 	return nil

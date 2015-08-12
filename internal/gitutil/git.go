@@ -376,13 +376,13 @@ func (g *Git) Log(branch, base, format string) ([][]string, error) {
 func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	args := []string{"merge"}
 	squash := false
-	strategyOption := ""
+	strategy := ""
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case SquashOpt:
 			squash = bool(typedOpt)
 		case StrategyOpt:
-			strategyOption = string(typedOpt)
+			strategy = string(typedOpt)
 		}
 	}
 	if squash {
@@ -390,8 +390,8 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	} else {
 		args = append(args, "--no-squash")
 	}
-	if strategyOption != "" {
-		args = append(args, fmt.Sprintf("--strategy-option=%v", strategyOption))
+	if strategy != "" {
+		args = append(args, fmt.Sprintf("--strategy=%v", strategy))
 	}
 	args = append(args, branch)
 	if out, err := g.runOutput(args...); err != nil {
@@ -500,8 +500,17 @@ func (g *Git) RepoName() (string, error) {
 
 // Reset resets the current branch to the target, discarding any
 // uncommitted changes.
-func (g *Git) Reset(target string) error {
-	return g.run("reset", "--hard", target)
+func (g *Git) Reset(target string, opts ...ResetOpt) error {
+	args := []string{"reset"}
+	mode := "hard"
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case ModeOpt:
+			mode = string(typedOpt)
+		}
+	}
+	args = append(args, fmt.Sprintf("--%v", mode), target)
+	return g.run(args...)
 }
 
 // Stash attempts to stash any unsaved changes. It returns true if
