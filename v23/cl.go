@@ -5,14 +5,11 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/gerrit"
@@ -33,9 +30,6 @@ var (
 	draftFlag        bool
 	editFlag         bool
 	forceFlag        bool
-	gofmtFlag        bool
-	govetFlag        bool
-	govetBinaryFlag  string
 	presubmitFlag    string
 	remoteBranchFlag string
 	reviewersFlag    string
@@ -65,9 +59,6 @@ func init() {
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
-	cmdCLMail.Flags.BoolVar(&gofmtFlag, "check-gofmt", true, "Check that no go fmt violations exist.")
-	cmdCLMail.Flags.BoolVar(&govetFlag, "check-govet", true, "Check that no go vet violations exist.")
-	cmdCLMail.Flags.StringVar(&govetBinaryFlag, "go-vet-binary", "", "Specify the path to the go vet binary to use.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
@@ -305,24 +296,6 @@ func (e gerritError) Error() string {
 	return result
 }
 
-type goFormatError string
-
-func (e goFormatError) Error() string {
-	result := "changelist does not adhere to the Go formatting conventions\n\n"
-	result += "To resolve this problem, run 'gofmt -w' for the following file(s):\n"
-	result += string(e)
-	return result
-}
-
-type goVetError []string
-
-func (e goVetError) Error() string {
-	result := "changelist contains 'go vet' violation(s)\n\n"
-	result += "To resolve this problem, fix the following violations:\n"
-	result += "  " + strings.Join(e, "\n  ")
-	return result
-}
-
 type noChangeIDError struct{}
 
 func (_ noChangeIDError) Error() string {
@@ -520,132 +493,6 @@ func (review *review) confirmFlagChanges() (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-// checkGoFormat checks if the code to be submitted needs to be
-// formatted with "go fmt".
-func (review *review) checkGoFormat() error {
-	goFiles, err := review.modifiedGoFiles()
-	if err != nil || len(goFiles) == 0 {
-		return err
-	}
-	// Check if the formatting differs from gofmt.
-	var out bytes.Buffer
-	opts := review.ctx.Run().Opts()
-	opts.Stdout = &out
-	opts.Stderr = &out
-	args := []string{"run", "gofmt", "-l"}
-	args = append(args, goFiles...)
-	if err := review.ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
-		return err
-	}
-	if out.Len() != 0 {
-		return goFormatError(out.String())
-	}
-	return nil
-}
-
-// checkGoVet checks if the code to submitted has any "go vet" violations.
-func (review *review) checkGoVet() (e error) {
-	vetBin, cleanup, err := review.buildGoVetBinary()
-	if err != nil {
-		return err
-	}
-	defer collect.Error(cleanup, &e)
-
-	goFiles, err := review.modifiedGoFiles()
-	if err != nil || len(goFiles) == 0 {
-		return err
-	}
-	// Check if the files generate any "go vet" errors.
-	var out bytes.Buffer
-	opts := review.ctx.Run().Opts()
-	opts.Stdout = &out
-	opts.Stderr = &out
-	args := []string{"run", vetBin, "--composites=false"}
-	// We vet one file at a time, because go vet only allows vetting of files of
-	// the same package per invocation.
-	var vetErrors []string
-	for _, file := range goFiles {
-		err := review.ctx.Run().CommandWithOpts(opts, "v23", append(args, file)...)
-		if err == nil {
-			continue
-		}
-		// A non-zero exit status means we should have a go vet violation.
-		exiterr, ok := err.(*exec.ExitError)
-		if !ok {
-			return err
-		}
-		status, ok := exiterr.Sys().(syscall.WaitStatus)
-		if !ok {
-			return err
-		}
-		if status.ExitStatus() != 0 {
-			vetErrors = append(vetErrors, out.String())
-		}
-	}
-	if len(vetErrors) > 0 {
-		return goVetError(vetErrors)
-	}
-	return nil
-}
-
-func (review *review) buildGoVetBinary() (vetBin string, cleanup func() error, e error) {
-	vetBin, cleanup = govetBinaryFlag, func() error { return nil }
-	if len(vetBin) == 0 {
-		// Build the go vet binary.
-		tmpDir, err := review.ctx.Run().TempDir("", "")
-		if err != nil {
-			return "", cleanup, err
-		}
-		cleanup = func() error { return review.ctx.Run().RemoveAll(tmpDir) }
-		vetBin = filepath.Join(tmpDir, "vet")
-		if err := review.ctx.Run().Command("v23", "go", "build", "-o", vetBin, "golang.org/x/tools/cmd/vet"); err != nil {
-			cleanup()
-			return "", cleanup, err
-		}
-	}
-	return vetBin, cleanup, nil
-}
-
-// modifiedGoFiles returns the modified go files in the change to be submitted.
-func (review *review) modifiedGoFiles() ([]string, error) {
-	files, err := review.ctx.Git().ModifiedFiles(review.CLOpts.RemoteBranch, review.CLOpts.Branch)
-	if err != nil {
-		return nil, err
-	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("Getwd() failed: %v", err)
-	}
-	topLevel, err := review.ctx.Git().TopLevel()
-	if err != nil {
-		return nil, err
-	}
-	goFiles := []string{}
-	for _, file := range files {
-		path := filepath.Join(topLevel, file)
-		// Skip non-Go files.
-		if !strings.HasSuffix(file, ".go") {
-			continue
-		}
-		// Skip Go files deleted by the change.
-		if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
-			continue
-		}
-		// Skip Go files with a "testdata" component in the path.
-		if strings.Contains(path, "testdata"+string(filepath.Separator)) {
-			continue
-		}
-		relativeFile, err := filepath.Rel(wd, path)
-		if err == nil {
-			file = relativeFile
-		} else {
-			file = path
-		}
-		goFiles = append(goFiles, file)
-	}
-	return goFiles, nil
 }
 
 // cleanup cleans up after the review.
@@ -877,20 +724,6 @@ func (review *review) run() (e error) {
 		}
 		if len(changes) != 0 {
 			return uncommittedChangesError(changes)
-		}
-	}
-	checks := []struct {
-		flag bool
-		fn   func() error
-	}{
-		{gofmtFlag, func() error { return review.checkGoFormat() }},
-		{govetFlag, func() error { return review.checkGoVet() }},
-	}
-	for _, check := range checks {
-		if check.flag {
-			if err := check.fn(); err != nil {
-				return err
-			}
 		}
 	}
 	if review.CLOpts.Branch == remoteBranchFlag {

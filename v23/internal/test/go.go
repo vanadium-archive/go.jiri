@@ -224,14 +224,14 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *t
 	}
 
 	// Install dependencies.
-	if err := installGoCover(ctx); err != nil {
-		return nil, err
+	if err := installGoTool(ctx, "cover"); err != nil {
+		return nil, internalTestError{err, "install-go-cover"}
 	}
 	if err := installGoCoverCobertura(ctx); err != nil {
-		return nil, err
+		return nil, internalTestError{err, "install-gocover-cobertura"}
 	}
 	if err := installGo2XUnit(ctx); err != nil {
-		return nil, err
+		return nil, internalTestError{err, "install-go2xunit"}
 	}
 
 	// Build dependencies of test packages.
@@ -804,7 +804,7 @@ func buildTestDeps(ctx *tool.Context, pkgs []string) error {
 // TODO(jsimsa): Unify the installation functions by moving the
 // gocover-cobertura and go2xunit tools into the third_party
 // project.
-func installGoCover(ctx *tool.Context) error {
+func installGoTool(ctx *tool.Context, tool string) error {
 	// Check if the tool exists.
 	var out bytes.Buffer
 	cmd := exec.Command("go", "tool")
@@ -815,14 +815,14 @@ func installGoCover(ctx *tool.Context) error {
 	}
 	scanner := bufio.NewScanner(&out)
 	for scanner.Scan() {
-		if scanner.Text() == "cover" {
+		if scanner.Text() == tool {
 			return nil
 		}
 	}
 	if scanner.Err() != nil {
 		return fmt.Errorf("Scan() failed: %v", scanner.Err())
 	}
-	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/cover"); err != nil {
+	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/"+tool); err != nil {
 		return err
 	}
 	return nil
@@ -1197,7 +1197,10 @@ func vanadiumCopyright(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Re
 	opts.Stdout = &out
 	opts.Stderr = &out
 	if err := ctx.Run().CommandWithOpts(opts, "v23", "copyright", "check"); err != nil {
-		report := fmt.Sprintf(`%v\nTo fix the above copyright violations run "v23 copyright fix" and commit the changes.\n`, out.String())
+		report := fmt.Sprintf(`%v
+
+To fix the above copyright violations run "v23 copyright fix" and commit the changes.
+`, out.String())
 		if err := xunit.CreateFailureReport(ctx, testName, "RunCopyright", "CheckCopyright", "copyright check failure", report); err != nil {
 			return nil, err
 		}
@@ -1222,8 +1225,11 @@ func vanadiumGoAPI(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result
 	opts.Stdout = &out
 	opts.Stderr = &out
 	if err := ctx.Run().CommandWithOpts(opts, "v23", "api", "check"); err != nil {
-		report := fmt.Sprintf(`%v\nIf the above changes to public Go API are intentional, run "v23 api fix",
-to update the corresponding .api files and commit the changes.\n`, out.String())
+		report := fmt.Sprintf(`%v
+
+If the above changes to public Go API are intentional, run "v23 api fix",
+to update the corresponding .api files and commit the changes.
+`, out.String())
 		if err := xunit.CreateFailureReport(ctx, testName, "RunV23API", "CheckGoAPI", "public api check failure", report); err != nil {
 			return nil, err
 		}
@@ -1315,6 +1321,34 @@ func vanadiumGoDepcop(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Res
 			return nil, err
 		}
 		fmt.Fprintf(ctx.Stderr(), "%v", out.String())
+		return &test.Result{Status: test.Failed}, nil
+	}
+	return &test.Result{Status: test.Passed}, nil
+}
+
+// vanadiumGoFormat runs Go format check for vanadium projects.
+func vanadiumGoFormat(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, nil)
+	if err != nil {
+		return nil, internalTestError{err, "init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Run the gofmt tool.
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Stderr = &out
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "fmt", "v.io/..."); err != nil {
+		report := fmt.Sprintf(`The following files do not adhere to the Go formatting conventions:
+%v
+To resolve this problem, run "gofmt -w <file>" for each of them and commit the changes.
+`, out.String())
+		if err := xunit.CreateFailureReport(ctx, testName, "RunGoFmt", "CheckFormat", "format check failure", report); err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(ctx.Stderr(), "%v", report)
 		return &test.Result{Status: test.Failed}, nil
 	}
 	return &test.Result{Status: test.Passed}, nil
@@ -1486,6 +1520,54 @@ func identifyPackagesToTest(ctx *tool.Context, testName string, opts []Opt, allP
 		}
 	}
 	return pkgsOpt(rest), nil
+}
+
+// vanadiumGoVet runs go vet checks for vanadium projects.
+func vanadiumGoVet(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, nil)
+	if err != nil {
+		return nil, internalTestError{err, "init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Build the govet tool in a temporary directory.
+	if err := installGoTool(ctx, "vet"); err != nil {
+		return nil, internalTestError{err, "install-go-vet"}
+	}
+
+	// Run the go vet tool.
+	var out bytes.Buffer
+	opts := ctx.Run().Opts()
+	opts.Stdout = &out
+	opts.Stderr = &out
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "vet", "v.io/..."); err != nil {
+		if err := xunit.CreateFailureReport(ctx, testName, "RunGoVet", "GoVetChecks", "go vet check failure", out.String()); err != nil {
+			return nil, err
+		}
+		fmt.Fprintf(ctx.Stderr(), "%v", out.String())
+		return &test.Result{Status: test.Failed}, nil
+	}
+	return &test.Result{Status: test.Passed}, nil
+}
+
+// vanadiumGoTest runs Go tests for vanadium projects.
+func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
+	// Initialize the test.
+	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
+	if err != nil {
+		return nil, internalTestError{err, "Init"}
+	}
+	defer collect.Error(func() error { return cleanup() }, &e)
+
+	// Test the Vanadium Go packages.
+	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
+	if err != nil {
+		return nil, err
+	}
+	args := argsOpt([]string{})
+	suffix := suffixOpt(genTestNameSuffix("GoTest"))
+	return goTestAndReport(ctx, testName, suffix, exclusionsOpt(goExclusions), getNumWorkersOpt(opts), pkgs, args)
 }
 
 // vanadiumIntegrationTest runs integration tests for Vanadium
@@ -1817,23 +1899,4 @@ func genTestNameSuffix(baseSuffix string) string {
 		return fmt.Sprintf("[%s]", suffix)
 	}
 	return fmt.Sprintf("[%s - %s]", baseSuffix, suffix)
-}
-
-// vanadiumGoTest runs Go tests for vanadium projects.
-func vanadiumGoTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
-	// Initialize the test.
-	cleanup, err := initTest(ctx, testName, []string{"syncbase"})
-	if err != nil {
-		return nil, internalTestError{err, "Init"}
-	}
-	defer collect.Error(func() error { return cleanup() }, &e)
-
-	// Test the Vanadium Go packages.
-	pkgs, err := validateAgainstDefaultPackages(ctx, opts, []string{"v.io/..."})
-	if err != nil {
-		return nil, err
-	}
-	args := argsOpt([]string{})
-	suffix := suffixOpt(genTestNameSuffix("GoTest"))
-	return goTestAndReport(ctx, testName, suffix, exclusionsOpt(goExclusions), getNumWorkersOpt(opts), pkgs, args)
 }

@@ -142,12 +142,6 @@ MSG="$1"
 echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 `
 
-func disableChecks() {
-	gofmtFlag = false
-	govetFlag = false
-	setTopicFlag = false
-}
-
 // installCommitMsgHook links the gerrit commit-msg hook into a different repo.
 func installCommitMsgHook(t *testing.T, ctx *tool.Context, repoPath string) {
 	hookLocation := path.Join(repoPath, ".git/hooks/commit-msg")
@@ -353,155 +347,6 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	}
 }
 
-// testGoFormatHelper is a function that contains the logic shared
-// by TestGoFormatError and TestGoFormatOK.
-func testGoFormatHelper(t *testing.T, ok bool) error {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, root)
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
-	file, fileContent := "file.go", `package main
-
-func main() {}`
-	if ok {
-		fileContent = fileContent + "\n"
-	}
-	fmt.Println(fileContent)
-	if err := ctx.Run().WriteFile(file, []byte(fileContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", file, fileContent, err)
-	}
-	// Make an invalid Go file in a testdata/ directory.
-	const testdata = "testdata"
-	ignoredFile, ignoredContent := filepath.Join(testdata, "ignored.go"), "// No package decl"
-	if err := ctx.Run().MkdirAll(testdata, 0744); err != nil {
-		t.Fatalf("MkdirAll(%v) failed: %v", testdata, err)
-	}
-	if err := ctx.Run().WriteFile(ignoredFile, []byte(ignoredContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", ignoredFile, ignoredContent, err)
-	}
-	commitMessage := "Commit " + file
-	if err := ctx.Git().CommitFile(file, commitMessage); err != nil {
-		t.Fatalf("%v", err)
-	}
-	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	return review.checkGoFormat()
-}
-
-// TestGoFormatError checks that the Go format check fails for a CL
-// containing an incorrectly format file.
-func TestGoFormatError(t *testing.T) {
-	if err := testGoFormatHelper(t, false); err == nil {
-		t.Fatalf("go format check did not fail when it should")
-	} else if _, ok := err.(goFormatError); !ok {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestGoFormatOK checks that the Go format check succeeds for a CL
-// that does not contain incorrectly format file.
-func TestGoFormatOK(t *testing.T) {
-	if err := testGoFormatHelper(t, true); err != nil {
-		t.Fatalf("go format check failed: %v", err)
-	}
-}
-
-// testGoVetHelper is a function that contains the logic shared
-// by TestGoVetError and TestGoVetOK.
-func testGoVetHelper(t *testing.T, ok bool) error {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, gerritPath := setupTest(t, ctx, true)
-	defer teardownTest(t, ctx, cwd, root)
-	branch := "my-branch"
-	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	file := "file.go"
-	validFileContent := `package main
-
-import "fmt"
-
-func main() {}
-`
-	invalidFileContent := `package main
-
-import "fmt"
-
-func main() {
-	fmt.Printf("%v")
-}
-`
-
-	fileContent := validFileContent
-	if !ok {
-		fileContent = invalidFileContent
-	}
-
-	fmt.Println(fileContent)
-	if err := ctx.Run().WriteFile(file, []byte(fileContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", file, fileContent, err)
-	}
-	// Make an invalid Go file in a testdata/ directory.
-	const testdata = "testdata"
-	ignoredFile, ignoredContent := filepath.Join(testdata, "ignored.go"), invalidFileContent
-	if err := ctx.Run().MkdirAll(testdata, 0744); err != nil {
-		t.Fatalf("MkdirAll(%v) failed: %v", testdata, err)
-	}
-	if err := ctx.Run().WriteFile(ignoredFile, []byte(ignoredContent), 0644); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", ignoredFile, ignoredContent, err)
-	}
-	commitMessage := "Commit " + file
-	if err := ctx.Git().CommitFile(file, commitMessage); err != nil {
-		t.Fatalf("%v", err)
-	}
-	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	// Build the go vet binary and set the flag.
-	vetBin, cleanup, err := review.buildGoVetBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	govetBinaryFlag = vetBin
-	defer func() { govetBinaryFlag = "" }()
-	return review.checkGoVet()
-}
-
-// TestGoVetError checks that the Go vet check fails for a CL
-// contains go vet violations.
-func TestGoVetError(t *testing.T) {
-	if err := testGoVetHelper(t, false); err == nil {
-		t.Fatalf("go vet check did not fail when it should")
-	} else if _, ok := err.(goVetError); !ok {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestGoVetOK checks that the Go vet check succeeds for a CL
-// that does not contain go vet violations.
-func TestGoVetOK(t *testing.T) {
-	if err := testGoVetHelper(t, true); err != nil {
-		t.Fatalf("go vet check failed: %v", err)
-	}
-}
-
 // TestSendReview checks the various options for sending a review.
 func TestSendReview(t *testing.T) {
 	ctx := tool.NewDefaultContext()
@@ -626,7 +471,7 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	disableChecks()
+	setTopicFlag = false
 	if err := review.run(); err != nil {
 		t.Fatalf("run() failed: %v", err)
 	}
@@ -673,7 +518,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	disableChecks()
+	setTopicFlag = false
 	if err := review.run(); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -807,7 +652,7 @@ func TestDirtyBranch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	disableChecks()
+	setTopicFlag = false
 	if err := review.run(); err == nil {
 		t.Fatalf("run() didn't fail when it should")
 	}
@@ -859,7 +704,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	disableChecks()
+	setTopicFlag = false
 	if err := review.run(); err != nil {
 		t.Fatalf("run() failed: %v", err)
 	}
