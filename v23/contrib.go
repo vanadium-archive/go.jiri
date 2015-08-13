@@ -166,7 +166,7 @@ func runContributors(env *cmdline.Env, args []string) error {
 					email: strings.TrimSpace(matches[3]),
 					name:  strings.TrimSpace(matches[2]),
 				}
-				if c.email == "jenkins.veyron@gmail.com" {
+				if c.email == "jenkins.veyron@gmail.com" || c.email == "jenkins.veyron.rw@gmail.com" {
 					continue
 				}
 				c.email, c.name = canonicalize(aliases, c.email, c.name)
