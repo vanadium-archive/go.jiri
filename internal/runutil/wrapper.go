@@ -6,7 +6,7 @@ package runutil
 
 // TODO(jsimsa): Write wrappers for additional functions from the Go
 // standard libraries "os" and "ioutil" that our tools use: Chmod(),
-// Create(), Open(), OpenFile(), ...
+// Create(), OpenFile(), ...
 
 import (
 	"fmt"
@@ -32,9 +32,8 @@ func (r *Run) helper(fn func() error, format string, args ...interface{}) error 
 func (r *Run) Chdir(dir string) error {
 	opts := r.opts
 	if opts.DryRun {
-		// Disable the dry run option as this function has no
-		// effect and doing so results in more informative
-		// "dry run" output.
+		// Disable the dry run option as this function has no effect and
+		// doing so results in more informative "dry run" output.
 		opts.DryRun = false
 		opts.Verbose = true
 	}
@@ -51,6 +50,18 @@ func (r *Run) Chmod(dir string, mode os.FileMode) error {
 // as "verbose" or "dry run".
 func (r *Run) MkdirAll(dir string, mode os.FileMode) error {
 	return r.helper(func() error { return os.MkdirAll(dir, mode) }, fmt.Sprintf("mkdir -p %q", dir))
+}
+
+// Open is a wrapper around os.Open that handles options such as
+// "verbose" or "dry run".
+func (r *Run) Open(name string) (*os.File, error) {
+	var file *os.File
+	var err error
+	r.helper(func() error {
+		file, err = os.Open(name)
+		return err
+	}, fmt.Sprintf("open %q", name))
+	return file, err
 }
 
 // ReadDir is a wrapper around ioutil.ReadDir that handles options
@@ -105,6 +116,25 @@ func (r *Run) Rename(src, dst string) error {
 		}
 		return nil
 	}, fmt.Sprintf("mv %q %q", src, dst))
+}
+
+// Stat is a wrapper around os.Stat that handles options such as
+// "verbose" or "dry run".
+func (r *Run) Stat(name string) (os.FileInfo, error) {
+	var fileInfo os.FileInfo
+	var err error
+	opts := r.opts
+	if opts.DryRun {
+		// Disable the dry run option as this function has no effect and
+		// doing so results in more informative "dry run" output.
+		opts.DryRun = false
+		opts.Verbose = true
+	}
+	r.FunctionWithOpts(opts, func() error {
+		fileInfo, err = os.Stat(name)
+		return err
+	}, fmt.Sprintf("stat %q", name))
+	return fileInfo, err
 }
 
 // Symlink is a wrapper around os.Symlink that handles options such as

@@ -304,7 +304,7 @@ func TestFunction1() {
 		t.Fatalf("should have succeeded but did not: %v", err)
 	}
 
-	contents, err := readAPIFileContents(filepath.Join(projectPath, ".api"))
+	contents, err := readAPIFileContents(ctx, filepath.Join(projectPath, ".api"))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -328,7 +328,9 @@ func testFunction1() {
 	if err := runAPIFix(cmdlineEnv, []string{"test"}); err != nil {
 		t.Fatalf("should have succeeded but did not: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(projectPath, ".api")); !os.IsNotExist(err) {
+	if _, err := ctx.Run().Stat(filepath.Join(projectPath, ".api")); err == nil {
 		t.Fatalf(".api file exists when it should have been removed: %v", err)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("%v", err)
 	}
 }

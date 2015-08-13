@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -156,13 +155,13 @@ func TestList(t *testing.T) {
 }
 
 func checkReadme(t *testing.T, ctx *tool.Context, project, message string) {
-	if _, err := os.Stat(project); err != nil {
+	if _, err := ctx.Run().Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(project, "README")
-	data, err := ioutil.ReadFile(readmeFile)
+	data, err := ctx.Run().ReadFile(readmeFile)
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", readmeFile, err)
+		t.Fatalf("%v", err)
 	}
 	if got, want := data, []byte(message); bytes.Compare(got, want) != 0 {
 		t.Fatalf("unexpected content %v:\ngot\n%s\nwant\n%s\n", project, got, want)

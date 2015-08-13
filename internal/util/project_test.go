@@ -33,7 +33,7 @@ func addRemote(t *testing.T, ctx *tool.Context, localProject, name, remoteProjec
 }
 
 func checkReadme(t *testing.T, ctx *tool.Context, project, message string) {
-	if _, err := os.Stat(project); err != nil {
+	if _, err := ctx.Run().Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(project, "README")
@@ -405,7 +405,7 @@ func TestUpdateUniverse(t *testing.T) {
 	checkDeleteFn := func(i int, revision string) {
 		if i == 3 {
 			localProject := filepath.Join(localDir, localProjectName(i))
-			if _, err := os.Stat(localProject); err == nil {
+			if _, err := ctx.Run().Stat(localProject); err == nil {
 				t.Fatalf("project %v has not been deleted", localProject)
 			} else {
 				if !os.IsNotExist(err) {

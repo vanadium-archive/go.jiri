@@ -102,7 +102,7 @@ func vanadiumPresubmitTest(ctx *tool.Context, testName string, _ ...Opt) (_ *tes
 		return nil, err
 	}
 	for _, file := range testResultFiles {
-		fileInfo, err := os.Stat(file)
+		fileInfo, err := ctx.Run().Stat(file)
 		if err != nil {
 			return nil, err
 		}

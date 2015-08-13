@@ -610,7 +610,7 @@ func installArmLinux(ctx *tool.Context, target profileTarget) (e error) {
 		// crosstool-ng build creates the tool output directory with no write
 		// permissions. Change it so that atomicAction can create the
 		// "action completed" file.
-		dirinfo, err := os.Stat(xgccToolDir)
+		dirinfo, err := ctx.Run().Stat(xgccToolDir)
 		if err != nil {
 			return err
 		}
@@ -843,18 +843,18 @@ func installJavaCommon(ctx *tool.Context, target profileTarget) error {
 
 // hasJDK returns true iff the JDK already exists on the machine and
 // is correctly set up.
-func hasJDK() bool {
+func hasJDK(ctx *tool.Context) bool {
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
 		return false
 	}
-	_, err := os.Stat(filepath.Join(javaHome, "include", "jni.h"))
+	_, err := ctx.Run().Stat(filepath.Join(javaHome, "include", "jni.h"))
 	return err == nil
 }
 
 // installJavaDarwin installs the java profile for darwin.
 func installJavaDarwin(ctx *tool.Context, target profileTarget) error {
-	if !hasJDK() {
+	if !hasJDK(ctx) {
 		// Prompt the user to install JDK 1.7+, if not already installed.
 		// (Note that JDK cannot be installed via Homebrew.)
 		javaHomeBin := "/usr/libexec/java_home"
@@ -879,7 +879,7 @@ func installJavaDarwin(ctx *tool.Context, target profileTarget) error {
 
 // installJavaLinux installs the java profile for linux.
 func installJavaLinux(ctx *tool.Context, target profileTarget) error {
-	if !hasJDK() {
+	if !hasJDK(ctx) {
 		fmt.Printf("Couldn't find a valid JDK installation under JAVA_HOME (%s): installing a new JDK.\n", os.Getenv("JAVA_HOME"))
 		if err := installDeps(ctx, []string{"openjdk-7-jdk"}); err != nil {
 			return err

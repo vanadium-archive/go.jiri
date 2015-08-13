@@ -840,7 +840,7 @@ func installGoCoverCobertura(ctx *tool.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(bin); err != nil {
+	if _, err := ctx.Run().Stat(bin); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -863,7 +863,7 @@ func installGo2XUnit(ctx *tool.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(bin); err != nil {
+	if _, err := ctx.Run().Stat(bin); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -1795,12 +1795,10 @@ var noSnapshotErr = fmt.Errorf("no snapshots for specified date.")
 func downloadVanadiumBinaries(ctx *tool.Context, bin string, date time.Time) (binDir string, e error) {
 	dateStr := date.Format("2006-01-02")
 	binDir = filepath.Join(regTestBinDirPath(), dateStr)
-	_, err := os.Stat(binDir)
-	if err == nil {
+	if _, err := ctx.Run().Stat(binDir); err == nil {
 		return binDir, nil
-	}
-	if !os.IsNotExist(err) {
-		return "", fmt.Errorf("Stat() failed: %v", err)
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
 	if err := ctx.Run().Command(bin,
 		"-date-prefix", dateStr,

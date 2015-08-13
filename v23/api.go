@@ -52,11 +52,10 @@ var cmdAPICheck = &cmdline.Command{
 	ArgsLong: "<projects> is a list of Vanadium projects to check. If none are specified, all projects that require a public API check upon presubmit are checked.",
 }
 
-func readAPIFileContents(path string) ([]byte, error) {
+func readAPIFileContents(ctx *tool.Context, path string) (_ []byte, e error) {
 	var buf bytes.Buffer
-	var err error
-	file, err := os.Open(path)
-	defer collect.Error(file.Close, &err)
+	file, err := ctx.Run().Open(path)
+	defer collect.Error(file.Close, &e)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +220,7 @@ func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, 
 			}
 			// Read the existing public API file.
 			apiFilePath := filepath.Join(dir, ".api")
-			apiFileContents, apiFileError := readAPIFileContents(apiFilePath)
+			apiFileContents, apiFileError := readAPIFileContents(ctx, apiFilePath)
 			if apiFileError != nil {
 				if os.IsNotExist(apiFileError) && len(currentAPI) == 0 {
 					// The API file doesn't exist but the
@@ -351,9 +350,9 @@ func runAPIFix(env *cmdline.Env, args []string) error {
 	}
 	for _, change := range changes {
 		if len(change.newAPIContent) == 0 {
-			if _, err := os.Stat(change.apiFilePath); !os.IsNotExist(err) {
+			if _, err := ctx.Run().Stat(change.apiFilePath); !os.IsNotExist(err) {
 				if err != nil {
-					return fmt.Errorf("Stat(%s) failed: %v", change.apiFilePath, err)
+					return err
 				}
 				// No API contents? Remove the file.
 				if err := ctx.Run().RemoveAll(change.apiFilePath); err != nil {

@@ -396,7 +396,7 @@ func checkDependents(ctx *tool.Context) (e error) {
 		if err != nil {
 			return err
 		}
-		if _, err := os.Stat(file); err != nil {
+		if _, err := ctx.Run().Stat(file); err != nil {
 			if !os.IsNotExist(err) {
 				return err
 			}
@@ -859,7 +859,7 @@ func (review *review) updateReviewMessage(file string) error {
 	//
 	// This behavior is consistent with how Change-ID is added for the
 	// initial commit so we don't confuse users.
-	if _, err := os.Stat(file); err != nil {
+	if _, err := review.ctx.Run().Stat(file); err != nil {
 		if os.IsNotExist(err) {
 			newMessage = review.processLabels(newMessage)
 			if err := review.ctx.Git().CommitAmendWithMessage(newMessage); err != nil {

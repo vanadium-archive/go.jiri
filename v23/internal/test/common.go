@@ -148,10 +148,10 @@ func findTestResultFiles(ctx *tool.Context, testName string) ([]string, error) {
 
 	// Collect javascript test results.
 	jsDir := filepath.Join(root, "release", "javascript", "core", "test_out")
-	if _, err := os.Stat(jsDir); err == nil {
-		fileInfoList, err := ioutil.ReadDir(jsDir)
+	if _, err := ctx.Run().Stat(jsDir); err == nil {
+		fileInfoList, err := ctx.Run().ReadDir(jsDir)
 		if err != nil {
-			return nil, fmt.Errorf("ReadDir(%v) failed: %v", jsDir, err)
+			return nil, err
 		}
 		for _, fileInfo := range fileInfoList {
 			name := fileInfo.Name()

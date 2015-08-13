@@ -95,9 +95,9 @@ func TestGoVDLGeneration(t *testing.T) {
 	if err := runGo(cmdlineEnv, []string{"env", "GOPATH"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())
 	}
-	if _, err := os.Stat(outFile); err != nil {
+	if _, err := ctx.Run().Stat(outFile); err != nil {
 		if !os.IsNotExist(err) {
-			t.Fatalf("Stat(%v) failed: %v", outFile, err)
+			t.Fatalf("%v", err)
 		}
 	} else {
 		t.Fatalf("file %v exists and it should not.", outFile)
@@ -106,8 +106,8 @@ func TestGoVDLGeneration(t *testing.T) {
 	if err := runGo(cmdlineEnv, []string{"build", "testpkg"}); err != nil {
 		t.Fatalf("%v\n==STDOUT==\n%s\n==STDERR==\n%s", err, stdout.String(), stderr.String())
 	}
-	if _, err := os.Stat(outFile); err != nil {
-		t.Fatalf("Stat(%v) failed: %v", outFile, err)
+	if _, err := ctx.Run().Stat(outFile); err != nil {
+		t.Fatalf("%v", err)
 	}
 }
 

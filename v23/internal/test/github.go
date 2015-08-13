@@ -144,9 +144,9 @@ func sync(ctx *tool.Context, mirror Mirror, projects string) (*xunit.TestSuite, 
 	dirname := filepath.Join(projects, mirror.name)
 
 	// If dirname does not exist `git clone` otherwise `git pull`.
-	if _, err := os.Stat(dirname); err != nil {
+	if _, err := ctx.Run().Stat(dirname); err != nil {
 		if !os.IsNotExist(err) {
-			return nil, internalTestError{err, "Stat"}
+			return nil, internalTestError{err, "stat"}
 		}
 
 		err := clone(ctx, mirror, projects)

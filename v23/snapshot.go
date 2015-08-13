@@ -151,7 +151,7 @@ func checkSnapshotDir(ctx *tool.Context) (e error) {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(snapshotDir); err != nil {
+	if _, err := ctx.Run().Stat(snapshotDir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -353,7 +353,7 @@ func runSnapshotList(env *cmdline.Env, args []string) error {
 	failed := false
 	for _, label := range args {
 		labelDir := filepath.Join(snapshotDir, "labels", label)
-		if _, err := os.Stat(labelDir); err != nil {
+		if _, err := ctx.Run().Stat(labelDir); err != nil {
 			if !os.IsNotExist(err) {
 				return err
 			}

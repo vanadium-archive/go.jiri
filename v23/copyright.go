@@ -184,7 +184,7 @@ func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool
 
 	// Peak at the first line of the file looking for the interpreter
 	// directive (e.g. #!/bin/bash).
-	interpreter, err := detectInterpreter(path)
+	interpreter, err := detectInterpreter(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool
 						copyright = directiveLine + copyright
 					}
 					data := append([]byte(copyright), data...)
-					info, err := os.Stat(path)
+					info, err := ctx.Run().Stat(path)
 					if err != nil {
 						return err
 					}
@@ -299,12 +299,12 @@ func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAsse
 
 // detectInterpret returns the interpreter directive of the given
 // file, if it contains one.
-func detectInterpreter(path string) (_ string, e error) {
-	file, err := os.Open(path)
+func detectInterpreter(ctx *tool.Context, path string) (_ string, e error) {
+	file, err := ctx.Run().Open(path)
 	if err != nil {
-		return "", fmt.Errorf("Open(%v) failed: %v", path, err)
+		return "", err
 	}
-	defer collect.Error(func() error { return file.Close() }, &e)
+	defer collect.Error(file.Close, &e)
 	// Only consider the first 256 bytes to account for binary files
 	// with lines too long to fit into a memory buffer.
 	data := make([]byte, 256)
@@ -392,7 +392,7 @@ func readV23Ignore(ctx *tool.Context, project util.Project) ([]*regexp.Regexp, e
 	// Grab the .v23ignore in from project.Path. Ignore file not found errors, not
 	// all projects will have one of these ignore files.
 	path := filepath.Join(project.Path, v23Ignore)
-	file, err := os.Open(path)
+	file, err := ctx.Run().Open(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err

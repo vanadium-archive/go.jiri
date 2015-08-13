@@ -130,7 +130,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(filepath.Join(root, devtoolsBinDir, "v23")); err == nil {
+	if _, err := ctx.Run().Stat(filepath.Join(root, devtoolsBinDir, "v23")); err == nil {
 		manifest.Tools = append(manifest.Tools, Tool{
 			Data:    "data",
 			Name:    "v23",
@@ -207,7 +207,7 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 		return "", nil
 	}
 	metadataDir := filepath.Join(topLevel, metadataDirName)
-	if _, err := os.Stat(metadataDir); err == nil {
+	if _, err := ctx.Run().Stat(metadataDir); err == nil {
 		metadataFile := filepath.Join(metadataDir, metadataFileName)
 		bytes, err := ctx.Run().ReadFile(metadataFile)
 		if err != nil {
@@ -560,7 +560,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		return err
 	}
 	metadataDir := filepath.Join(path, metadataDirName)
-	if _, err := os.Stat(metadataDir); err == nil {
+	if _, err := ctx.Run().Stat(metadataDir); err == nil {
 		metadataFile := filepath.Join(metadataDir, metadataFileName)
 		bytes, err := ctx.Run().ReadFile(metadataFile)
 		if err != nil {
@@ -580,11 +580,11 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		projects[project.Name] = project
 		return nil
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("Stat(%v) failed: %v", metadataDir, err)
+		return err
 	}
-	fileInfos, err := ioutil.ReadDir(path)
+	fileInfos, err := ctx.Run().ReadDir(path)
 	if err != nil {
-		return fmt.Errorf("ReadDir(%v) failed: %v", path, err)
+		return err
 	}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
@@ -818,7 +818,7 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 		return err
 	}
 	for _, op := range ops {
-		if err := op.Test(); err != nil {
+		if err := op.Test(ctx); err != nil {
 			return err
 		}
 	}
@@ -922,7 +922,7 @@ type operation interface {
 	// String returns a string representation of the operation.
 	String() string
 	// Test checks whether the operation would fail.
-	Test() error
+	Test(ctx *tool.Context) error
 }
 
 // commonOperation represents a project operation.
@@ -949,7 +949,7 @@ func (commonOperation) String() string {
 	return ""
 }
 
-func (commonOperation) Test() error {
+func (commonOperation) Test(*tool.Context) error {
 	return nil
 }
 
@@ -1029,11 +1029,11 @@ func (op createOperation) String() string {
 	return fmt.Sprintf("create project %q in %q and advance it to %q", op.project.Name, op.destination, op.project.Revision)
 }
 
-func (op createOperation) Test() error {
+func (op createOperation) Test(ctx *tool.Context) error {
 	// Check the local file system.
-	if _, err := os.Stat(op.destination); err != nil {
+	if _, err := ctx.Run().Stat(op.destination); err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("Stat(%v) failed: %v", op.destination, err)
+			return err
 		}
 	} else {
 		return fmt.Errorf("cannot create %q as it already exists", op.destination)
@@ -1104,12 +1104,12 @@ func (op deleteOperation) String() string {
 	return fmt.Sprintf("delete project %q from %q", op.project.Name, op.source)
 }
 
-func (op deleteOperation) Test() error {
-	if _, err := os.Stat(op.source); err != nil {
+func (op deleteOperation) Test(ctx *tool.Context) error {
+	if _, err := ctx.Run().Stat(op.source); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot delete %q as it does not exist", op.source)
 		}
-		return fmt.Errorf("Stat(%v) failed: %v", op.source, err)
+		return err
 	}
 	return nil
 }
@@ -1146,16 +1146,16 @@ func (op moveOperation) String() string {
 	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q", op.project.Name, op.source, op.destination, op.project.Revision)
 }
 
-func (op moveOperation) Test() error {
-	if _, err := os.Stat(op.source); err != nil {
+func (op moveOperation) Test(ctx *tool.Context) error {
+	if _, err := ctx.Run().Stat(op.source); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot move %q to %q as the source does not exist", op.source, op.destination)
 		}
-		return fmt.Errorf("Stat(%v) failed: %v", op.source, err)
+		return err
 	}
-	if _, err := os.Stat(op.destination); err != nil {
+	if _, err := ctx.Run().Stat(op.destination); err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("Stat(%v) failed: %v", op.destination, err)
+			return err
 		}
 	} else {
 		return fmt.Errorf("cannot move %q to %q as the destination already exists", op.source, op.destination)
@@ -1188,7 +1188,7 @@ func (op updateOperation) String() string {
 	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, op.project.Revision)
 }
 
-func (op updateOperation) Test() error {
+func (op updateOperation) Test(ctx *tool.Context) error {
 	return nil
 }
 

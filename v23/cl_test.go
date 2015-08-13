@@ -46,7 +46,7 @@ func assertFileContent(t *testing.T, ctx *tool.Context, file, want string) {
 // in the current branch.
 func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
 	for _, file := range files {
-		if _, err := os.Stat(file); err != nil {
+		if _, err := ctx.Run().Stat(file); err != nil {
 			if os.IsNotExist(err) {
 				t.Fatalf("expected file %v to exist but it did not", file)
 			}
@@ -62,7 +62,7 @@ func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
 // committed in the current branch.
 func assertFilesNotCommitted(t *testing.T, ctx *tool.Context, files []string) {
 	for _, file := range files {
-		if _, err := os.Stat(file); err != nil {
+		if _, err := ctx.Run().Stat(file); err != nil {
 			if os.IsNotExist(err) {
 				t.Fatalf("expected file %v to exist but it did not", file)
 			}
@@ -900,8 +900,8 @@ func TestCLSync(t *testing.T) {
 		if err := ctx.Git().CheckoutBranch(branch); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if _, err := os.Stat("test"); err != nil {
-			t.Fatalf("Stat() failed: %v", err)
+		if _, err := ctx.Run().Stat("test"); err != nil {
+			t.Fatalf("%v", err)
 		}
 	}
 }

@@ -92,10 +92,10 @@ func vanadiumReleaseCandidate(ctx *tool.Context, testName string, opts ...Opt) (
 		step{
 			msg: fmt.Sprintf("Checking existence of credentials in %v (admin) and %v (publisher)\n", adminCredDir, publisherCredDir),
 			fn: func() error {
-				if _, err := os.Stat(adminCredDir); err != nil {
+				if _, err := ctx.Run().Stat(adminCredDir); err != nil {
 					return err
 				}
-				if _, err := os.Stat(publisherCredDir); err != nil {
+				if _, err := ctx.Run().Stat(publisherCredDir); err != nil {
 					return err
 				}
 				return nil

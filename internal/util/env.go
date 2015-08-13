@@ -50,7 +50,7 @@ func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	if err := setVdlPath(ctx, env, root, config); err != nil {
 		return nil, err
 	}
-	if err := setSyncbaseEnv(env, root); err != nil {
+	if err := setSyncbaseEnv(ctx, env, root); err != nil {
 		return nil, err
 	}
 	if profile := os.Getenv(v23ProfileEnv); profile != "" {
@@ -60,22 +60,22 @@ This can override values of existing environment variables.
 		switch profile {
 		case "android":
 			// Cross-compilation for android on linux.
-			if err := setAndroidEnv(env, root); err != nil {
+			if err := setAndroidEnv(ctx, env, root); err != nil {
 				return nil, err
 			}
 		case "arm":
 			// Cross-compilation for arm on linux.
-			if err := setArmEnv(env, root); err != nil {
+			if err := setArmEnv(ctx, env, root); err != nil {
 				return nil, err
 			}
 		case "java":
 			// Building of a Go shared library for Java.
-			if err := setJavaEnv(env, root); err != nil {
+			if err := setJavaEnv(ctx, env, root); err != nil {
 				return nil, err
 			}
 		case "nacl":
 			// Cross-compilation for nacl.
-			if err := setNaclEnv(env, root); err != nil {
+			if err := setNaclEnv(ctx, env, root); err != nil {
 				return nil, err
 			}
 		default:
@@ -88,7 +88,7 @@ This can override values of existing environment variables.
 // setJavaEnv sets the environment variables used for building a Go
 // shared library that is invoked from Java code. If Java is not
 // installed on the host, this function is a no-op.
-func setJavaEnv(env *envvar.Vars, root string) error {
+func setJavaEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	jdkHome := os.Getenv(javaEnv)
 	if jdkHome == "" {
 		return nil
@@ -104,7 +104,7 @@ func setJavaEnv(env *envvar.Vars, root string) error {
 	env.Set("GOROOT", javaGoDir)
 
 	// Update PATH.
-	if _, err := os.Stat(javaGoDir); err != nil {
+	if _, err := ctx.Run().Stat(javaGoDir); err != nil {
 		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"v23 profile install java\"?", javaGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
@@ -115,7 +115,7 @@ func setJavaEnv(env *envvar.Vars, root string) error {
 
 // setAndroidEnv sets the environment variables used for android
 // cross-compilation.
-func setAndroidEnv(env *envvar.Vars, root string) error {
+func setAndroidEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	// Compile using Android Go 1.5 (installed via
 	// 'v23 profile install android').
 	androidGoDir := filepath.Join(root, "third_party", "android", "go")
@@ -127,7 +127,7 @@ func setAndroidEnv(env *envvar.Vars, root string) error {
 	env.Set("GOROOT", androidGoDir)
 
 	// Update PATH.
-	if _, err := os.Stat(androidGoDir); err != nil {
+	if _, err := ctx.Run().Stat(androidGoDir); err != nil {
 		return fmt.Errorf("Couldn't find android Go installation directory %s: did you run \"v23 profile install android\"?", androidGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
@@ -137,7 +137,7 @@ func setAndroidEnv(env *envvar.Vars, root string) error {
 }
 
 // setArmEnv sets the environment variables used for arm cross-compilation.
-func setArmEnv(env *envvar.Vars, root string) error {
+func setArmEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	// Set Go specific environment variables.
 	env.Set("GOARCH", "arm")
 	env.Set("GOARM", "6")
@@ -187,7 +187,7 @@ func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, works
 			// account for Go workspaces that span multiple v23 projects,
 			// such as: $V23_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := os.Stat(filepath.Join(absWorkspace)); err == nil {
+				if _, err := ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
 					path = append(path, absWorkspace)
 					break
 				}
@@ -200,7 +200,7 @@ func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, works
 
 // setNaclEnv sets the environment variables used for nacl
 // cross-compilation.
-func setNaclEnv(env *envvar.Vars, root string) error {
+func setNaclEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	env.Set("GOARCH", "amd64p32")
 	env.Set("GOOS", "nacl")
 
@@ -216,7 +216,7 @@ func setNaclEnv(env *envvar.Vars, root string) error {
 
 // setSyncbaseEnv adds the LevelDB third-party C++ libraries Vanadium
 // Go code depends on to the CGO_CFLAGS and CGO_LDFLAGS variables.
-func setSyncbaseEnv(env *envvar.Vars, root string) error {
+func setSyncbaseEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	libs := []string{
 		"leveldb",
 		"snappy",
@@ -238,9 +238,9 @@ func setSyncbaseEnv(env *envvar.Vars, root string) error {
 			return err
 		}
 		dir = filepath.Join(dir, lib)
-		if _, err := os.Stat(dir); err != nil {
+		if _, err := ctx.Run().Stat(dir); err != nil {
 			if !os.IsNotExist(err) {
-				return fmt.Errorf("Stat(%v) failed: %v", dir, err)
+				return err
 			}
 			continue
 		}

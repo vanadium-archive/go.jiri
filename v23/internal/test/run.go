@@ -408,7 +408,7 @@ func checkTestReportFile(ctx *tool.Context, testName string) error {
 	}
 
 	xUnitReportFile := xunit.ReportPath(testName)
-	if _, err := os.Stat(xUnitReportFile); err != nil {
+	if _, err := ctx.Run().Stat(xUnitReportFile); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -463,16 +463,16 @@ func generateXUnitReportForError(ctx *tool.Context, testName string, err error, 
 	// Only create the report when the xUnit file doesn't exist, is
 	// invalid, or exist but doesn't have failed test cases.
 	createXUnitFile := false
-	if _, err := os.Stat(xUnitFilePath); err != nil {
+	if _, err := ctx.Run().Stat(xUnitFilePath); err != nil {
 		if os.IsNotExist(err) {
 			createXUnitFile = true
 		} else {
-			return nil, fmt.Errorf("Stat(%s) failed: %v", xUnitFilePath, err)
+			return nil, err
 		}
 	} else {
-		bytes, err := ioutil.ReadFile(xUnitFilePath)
+		bytes, err := ctx.Run().ReadFile(xUnitFilePath)
 		if err != nil {
-			return nil, fmt.Errorf("ReadFile(%s) failed: %v", xUnitFilePath, err)
+			return nil, err
 		}
 		var existingSuites xunit.TestSuites
 		if err := xml.Unmarshal(bytes, &existingSuites); err != nil {

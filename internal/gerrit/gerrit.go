@@ -466,10 +466,10 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 
 	// Look for the host credentials in the .netrc file.
 	netrcPath := filepath.Join(os.Getenv("HOME"), ".netrc")
-	file, err := os.Open(netrcPath)
+	file, err := run.Open(netrcPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("Open(%q) failed: %v", netrcPath, err)
+			return nil, err
 		}
 	} else {
 		defer collect.Error(func() error { return file.Close() }, &e)
@@ -491,10 +491,10 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 	opts.Stderr = &stderr
 	if err := run.CommandWithOpts(opts, "git", args...); err == nil {
 		cookieFilePath := strings.TrimSpace(stdout.String())
-		file, err := os.Open(cookieFilePath)
+		file, err := run.Open(cookieFilePath)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("Open(%q) failed: %v", cookieFilePath, err)
+				return nil, err
 			}
 		} else {
 			defer collect.Error(func() error { return file.Close() }, &e)

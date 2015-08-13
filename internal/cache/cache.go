@@ -5,7 +5,6 @@
 package cache
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,9 +18,9 @@ import (
 // file path.
 func StoreGoogleStorageFile(ctx *tool.Context, cacheRoot, bucketRoot, filename string) (_ string, e error) {
 	cachedFile := filepath.Join(cacheRoot, filename)
-	if _, err := os.Stat(cachedFile); err != nil {
+	if _, err := ctx.Run().Stat(cachedFile); err != nil {
 		if !os.IsNotExist(err) {
-			return "", fmt.Errorf("Stat() failed: %v", err)
+			return "", err
 		}
 		// To avoid interference between concurrent requests, download data to a
 		// tmp dir, and move it to the final location.

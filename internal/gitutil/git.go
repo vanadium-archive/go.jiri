@@ -409,7 +409,7 @@ func (g *Git) MergeInProgress() (bool, error) {
 		return false, err
 	}
 	mergeFile := filepath.Join(repoRoot, ".git", "MERGE_HEAD")
-	if _, err := os.Stat(mergeFile); err != nil {
+	if _, err := g.r.Stat(mergeFile); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}

@@ -118,7 +118,7 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 		for _, branch := range branches {
 			file := filepath.Join(state.project.Path, util.MetadataDirName(), branch, commitMessageFileName)
 			hasFile := true
-			if _, err := os.Stat(file); err != nil {
+			if _, err := ctx.Run().Stat(file); err != nil {
 				if !os.IsNotExist(err) {
 					ch <- err
 					return
