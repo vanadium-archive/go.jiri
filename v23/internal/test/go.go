@@ -398,7 +398,7 @@ type matchV23TestFunc struct{}
 
 func (t *matchV23TestFunc) match(fn *ast.FuncDecl) (bool, string) {
 	name := fn.Name.String()
-	if !strings.HasPrefix(name, "V23Test") {
+	if !strings.HasPrefix(name, "TestV23") {
 		return false, name
 	}
 	sig := fn.Type
@@ -415,7 +415,7 @@ func (t *matchV23TestFunc) match(fn *ast.FuncDecl) (bool, string) {
 	if !ok {
 		return false, name
 	}
-	return pkgIdent.Name == "v23tests" && sel.Sel.Name == "T", name
+	return pkgIdent.Name == "testing" && sel.Sel.Name == "T", name
 }
 
 func (t *matchV23TestFunc) goTestOpt() {}
@@ -492,7 +492,7 @@ func filterExcludedTests(pkg string, testNames []string, exclusions []exclusion)
 	}
 	if len(excluded) == 0 {
 		// Run all of the tests, none are to be skipped/excluded.
-		return true, nil, nil
+		return true, testNames, nil
 	}
 
 	remaining := []string{}
@@ -523,9 +523,8 @@ const defaultTestTimeout = "5m"
 
 type goTestTask struct {
 	pkg string
-	// specificTests enumerates the tests to run:
-	// if non-nil, pass to -run as a regex or'ing each item in the slice.
-	// if nil, invoke the test without -run.
+	// specificTests enumerates the tests to run.
+	// Tests are passed to -run as a regex or'ing each item in the slice.
 	specificTests []string
 	// excludedTests enumerates the tests that are to be excluded as a result
 	// of exclusion rules.
@@ -741,9 +740,27 @@ func testWorker(ctx *tool.Context, timeout string, args, nonTestArgs []string, t
 		// storage engine for the groups service. See v.io/i/632 for more
 		// details.
 		taskArgs := append([]string{"go", "test", "-tags=leveldb", "-timeout", timeout, "-v"}, args...)
-		if len(task.specificTests) != 0 {
-			taskArgs = append(taskArgs, "-run", fmt.Sprintf("%s", strings.Join(task.specificTests, "|")))
+
+		// Use the -run command-line flag to identify the specific tests to run.
+		// If this flag is already set, make sure to override it.
+		testsExpr := fmt.Sprintf("^(%s)$", strings.Join(task.specificTests, "|"))
+		found := false
+		for i, arg := range taskArgs {
+			switch {
+			case arg == "-run" || arg == "--run":
+				taskArgs[i+1] = testsExpr
+				found = true
+				break
+			case strings.HasPrefix(arg, "-run=") || strings.HasPrefix(arg, "--run="):
+				taskArgs[i] = fmt.Sprintf("-run=%s", testsExpr)
+				found = true
+				break
+			}
 		}
+		if !found {
+			taskArgs = append(taskArgs, "-run", testsExpr)
+		}
+
 		taskArgs = append(taskArgs, task.pkg)
 		taskArgs = append(taskArgs, nonTestArgs...)
 		var out bytes.Buffer
@@ -950,8 +967,9 @@ func newExclusion(pkg, name string, exclude bool) exclusion {
 }
 
 var (
-	goExclusions     []exclusion
-	goRaceExclusions []exclusion
+	goExclusions            []exclusion
+	goRaceExclusions        []exclusion
+	goIntegrationExclusions []exclusion
 )
 
 func init() {
@@ -1010,6 +1028,13 @@ func init() {
 		// This test takes too long in --race mode.
 		newExclusion("v.io/x/devtools/v23", "TestV23Generate", true),
 	}
+
+	// Tests excluded only when running integration tests (with --v23.tests flag).
+	goIntegrationExclusions = []exclusion{
+		// TODO(jingjin): re-enable this test when the following issue is resolved.
+		// https://github.com/vanadium/issues/issues/639
+		newExclusion("v.io/x/ref/services/device", "TestV23DeviceManagerMultiUser", isDarwin()),
+	}
 }
 
 // ExcludedTests returns the set of tests to be excluded from the
@@ -1022,6 +1047,12 @@ func ExcludedTests() []string {
 // the tests executed when testing the Vanadium project.
 func ExcludedRaceTests() []string {
 	return excludedTests(goRaceExclusions)
+}
+
+// ExcludedIntegrationTests returns the set of integration tests to be excluded
+// from the tests executed when testing the Vanadium project.
+func ExcludedIntegrationTests() []string {
+	return excludedTests(goIntegrationExclusions)
 }
 
 func excludedTests(exclusions []exclusion) []string {
@@ -1591,7 +1622,7 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_
 	env := ctx.Env()
 	env["V23_BIN_DIR"] = binDirPath()
 	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
-	return goTestAndReport(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, pkgs)
+	return goTestAndReport(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, exclusionsOpt(goIntegrationExclusions), pkgs)
 }
 
 // binOrder determines if the regression tests use

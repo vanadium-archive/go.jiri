@@ -155,13 +155,36 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23B",
+					},
 				},
-				Tests: 4,
-				Skip:  1,
+				Tests: 5,
+				Skip:  2,
 			},
 		},
 	}
 	wantV23Test = xunit.TestSuites{
+		Suites: []xunit.TestSuite{
+			xunit.TestSuite{
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
+				Cases: []xunit.TestCase{
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23",
+					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23B",
+					},
+				},
+				Tests: 2,
+				Skip:  0,
+			},
+		},
+	}
+	wantV23TestWithExcludedTests = xunit.TestSuites{
 		Suites: []xunit.TestSuite{
 			xunit.TestSuite{
 				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
@@ -197,9 +220,13 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23 [Suffix]",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23B [Suffix]",
+					},
 				},
-				Tests: 4,
-				Skip:  1,
+				Tests: 5,
+				Skip:  2,
 			},
 		},
 	}
@@ -216,9 +243,13 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23B",
+					},
 				},
-				Tests: 2,
-				Skip:  1,
+				Tests: 3,
+				Skip:  2,
 			},
 		},
 	}
@@ -381,7 +412,14 @@ func TestGoTestExcludedPackage(t *testing.T) {
 }
 
 func TestGoTestV23(t *testing.T) {
-	runGoTest(t, "", nil, wantV23Test, argsOpt{"--run=TestV23"}, nonTestArgsOpt([]string{"--v23.tests"}))
+	runGoTest(t, "", nil, wantV23Test, argsOpt{"--run=TestV23"}, funcMatcherOpt{&matchV23TestFunc{}}, nonTestArgsOpt([]string{"--v23.tests"}))
+}
+
+func TestGoTestV23WithExcludedTests(t *testing.T) {
+	exclusions := []exclusion{
+		newExclusion("v.io/x/devtools/v23/internal/test/testdata/foo", "TestV23B", true),
+	}
+	runGoTest(t, "", exclusions, wantV23TestWithExcludedTests, argsOpt{"--run=TestV23"}, funcMatcherOpt{&matchV23TestFunc{}}, nonTestArgsOpt([]string{"--v23.tests"}))
 }
 
 func runGoTest(t *testing.T, suffix string, exclusions []exclusion, expectedTestSuite xunit.TestSuites, testOpts ...goTestOpt) {

@@ -23,3 +23,7 @@ func TestMain(m *testing.M) {
 func TestV23(t *testing.T) {
 	v23tests.RunTest(t, V23Test)
 }
+
+func TestV23B(t *testing.T) {
+	v23tests.RunTest(t, V23TestB)
+}
