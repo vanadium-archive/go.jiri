@@ -37,6 +37,7 @@ const (
 
 var (
 	defaultReleaseTestTimeout = time.Minute * 5
+	manifestRE                = regexp.MustCompile(`.*<manifest label="(.*)">`)
 
 	serviceBinaries = []string{
 		"applicationd",
@@ -261,17 +262,17 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		return nil
 	}
 
-	// A helper function to check a single app's build time.
-	checkBuildTimeFn := func(appName string) error {
-		msg := fmt.Sprintf("Verify build time for %q\n", appName)
-		now := time.Now().UTC()
+	// A helper function to check a single app's manifest label.
+	expectedManifestLabel := os.Getenv(manifestEnvVar)
+	checkManifestLabelFn := func(appName string) error {
+		msg := fmt.Sprintf("Verify manifest label for %q\n", appName)
 		adminCredentialsArg := fmt.Sprintf("--v23.credentials=%s", adminCredDir)
 		args := []string{
 			adminCredentialsArg,
 			fmt.Sprintf("--v23.namespace.root=%s", localMountTable),
 			"stats",
 			"read",
-			fmt.Sprintf("%s/*/*/stats/system/metadata/build.Time", appName),
+			fmt.Sprintf("%s/*/*/stats/system/metadata/build.Manifest", appName),
 		}
 		var out bytes.Buffer
 		opts := ctx.Run().Opts()
@@ -280,16 +281,12 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			test.Fail(ctx, msg)
 			return err
 		}
-		// TODO(jingjin): check the build manifest label after changing the
-		// pre-release process to first cut the snapshot and then get the binaries
-		// for staging from the snapshot where we should be able to exactly match
-		// the build label.
-		expectedBuildTime := now.Format("2006-01-02")
-		buildTimeRE := regexp.MustCompile(fmt.Sprintf(`.*build\.Time:\s%sT.*`, expectedBuildTime))
 		statsOutput := out.String()
-		if !buildTimeRE.MatchString(statsOutput) {
+		matches := manifestRE.FindStringSubmatch(statsOutput)
+		if matches == nil || (matches[1] != expectedManifestLabel) {
 			test.Fail(ctx, msg)
-			return fmt.Errorf("Failed to verify build time.\nWant: %s\nGot: %s", expectedBuildTime, statsOutput)
+			return fmt.Errorf("failed to verify manifest label %q.\nCurrent manifest:\n%s",
+				expectedManifestLabel, statsOutput)
 		}
 		test.Pass(ctx, msg)
 		return nil
@@ -302,7 +299,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 			if err := updateAppFn(app); err != nil {
 				return err
 			}
-			if err := checkBuildTimeFn(app); err != nil {
+			if err := checkManifestLabelFn(app); err != nil {
 				return err
 			}
 		}
@@ -339,7 +336,7 @@ func updateServices(ctx *tool.Context, root, adminCredDir, publisherCredDir stri
 		if err := waitForMounttable(ctx, root, adminCredentialsArg, globalMountTable, `.+`); err != nil {
 			return err
 		}
-		if err := checkBuildTimeFn(mounttableName); err != nil {
+		if err := checkManifestLabelFn(mounttableName); err != nil {
 			return err
 		}
 	}
