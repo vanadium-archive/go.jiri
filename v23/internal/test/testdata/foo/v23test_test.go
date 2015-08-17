@@ -10,3 +10,5 @@ import (
 )
 
 func V23Test(i *v23tests.T) {}
+
+func V23TestB(i *v23tests.T) {}

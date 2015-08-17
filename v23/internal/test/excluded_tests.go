@@ -27,6 +27,7 @@ import (
 	"v.io/x/devtools/v23/internal/test"
 )
 
+var integrationFlag = flag.Bool("v23.tests", false, "Additionally display the tests excluded only when running integration tests.")
 var raceFlag = flag.Bool("race", false, "Additionally display the tests excluded only when running under the go race detector.")
 
 func main() {
@@ -46,6 +47,14 @@ func main() {
 		fmt.Println("Excluded race tests:")
 		raceExcluded := test.ExcludedRaceTests()
 		for _, t := range raceExcluded {
+			fmt.Printf("%#v\n", t)
+		}
+	}
+
+	if *integrationFlag {
+		fmt.Println("Excluded integration tests:")
+		integrationExcluded := test.ExcludedIntegrationTests()
+		for _, t := range integrationExcluded {
 			fmt.Printf("%#v\n", t)
 		}
 	}
