@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"path/filepath"
 	"time"
 
@@ -13,8 +12,6 @@ import (
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
-
-const sleepTime = 10 * time.Second
 
 var (
 	gcFlag       bool
@@ -103,19 +100,8 @@ func runUpdate(env *cmdline.Env, _ []string) error {
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
-	for i := 1; i <= attemptsFlag; i++ {
-		if i > 1 {
-			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, attemptsFlag)
-		}
-		if err = util.UpdateUniverse(ctx, gcFlag); err == nil {
-			break
-		} else {
-			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
-		}
-		if i < attemptsFlag {
-			fmt.Fprintf(ctx.Stdout(), "Wait for %v before next attempt...\n", sleepTime)
-			time.Sleep(sleepTime)
-		}
+	updateFn := func() error {
+		return util.UpdateUniverse(ctx, gcFlag)
 	}
-	return err
+	return util.Retry(ctx, updateFn, util.AttemptsOpt(attemptsFlag))
 }

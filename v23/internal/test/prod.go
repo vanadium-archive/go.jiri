@@ -201,13 +201,19 @@ func testAllProdServices(ctx *tool.Context, vroot, principalDir, namespaceRoot s
 // used by the machine, or mess up DNS entries.
 func testIdentityProviderHTTP(ctx *tool.Context, blessingRoot string) (suite *xunit.TestSuite, publickey string, blessingNames []string) {
 	url := fmt.Sprintf("https://%s/auth/blessing-root", blessingRoot)
-	start := time.Now()
 	var response struct {
 		Names     []string `json:"names"`
 		PublicKey string   `json:"publicKey"`
 	}
-	resp, err := http.Get(url)
-	if err == nil {
+	var resp *http.Response
+	var err error
+	var start time.Time
+	fn := func() error {
+		start = time.Now()
+		resp, err = http.Get(url)
+		return err
+	}
+	if err = util.Retry(ctx, fn); err == nil {
 		defer resp.Body.Close()
 		err = json.NewDecoder(resp.Body).Decode(&response)
 	}

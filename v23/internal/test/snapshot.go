@@ -5,11 +5,10 @@
 package test
 
 import (
-	"fmt"
-
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 )
 
 // vanadiumGoSnapshot create a snapshot of Vanadium Go code base.
@@ -22,16 +21,11 @@ func vanadiumGoSnapshot(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Create a new snapshot.
-	const numAttempts = 3
-	for i := 1; i <= numAttempts; i++ {
-		if i > 1 {
-			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, numAttempts)
-		}
-		if err = ctx.Run().Command("v23", "snapshot", "-remote", "create", "stable-go"); err == nil {
-			return &test.Result{Status: test.Passed}, nil
-		} else {
-			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
-		}
+	fn := func() error {
+		return ctx.Run().Command("v23", "snapshot", "-remote", "create", "stable-go")
 	}
-	return nil, internalTestError{err, "Snapshot"}
+	if err := util.Retry(ctx, fn); err != nil {
+		return nil, internalTestError{err, "Snapshot"}
+	}
+	return &test.Result{Status: test.Passed}, nil
 }

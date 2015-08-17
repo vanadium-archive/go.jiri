@@ -6,7 +6,6 @@ package test
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -16,11 +15,8 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
+	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
-)
-
-const (
-	numAttempts = 3
 )
 
 // vanadiumBootstrap runs a test of Vanadium bootstrapping.
@@ -57,15 +53,10 @@ func vanadiumBootstrap(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Re
 		return nil, internalTestError{err, "LookPath"}
 	}
 	opts.Env["PATH"] = strings.Replace(os.Getenv("PATH"), filepath.Dir(v23Path), "", -1)
-	for i := 1; i <= numAttempts; i++ {
-		if i > 1 {
-			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, numAttempts)
-		}
-		if err = ctx.Run().CommandWithOpts(opts, filepath.Join(oldRoot, "www", "public", "bootstrap")); err == nil {
-			break
-		}
+	fn := func() error {
+		return ctx.Run().CommandWithOpts(opts, filepath.Join(oldRoot, "www", "public", "bootstrap"))
 	}
-	if err != nil {
+	if err := util.Retry(ctx, fn); err != nil {
 		// Create xUnit report.
 		if err := xunit.CreateFailureReport(ctx, testName, "VanadiumGo", "bootstrap", "Vanadium bootstrapping failed", out.String()); err != nil {
 			return nil, err
