@@ -5,7 +5,6 @@
 package test
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -223,14 +222,14 @@ func goCoverage(ctx *tool.Context, testName string, opts ...goCoverageOpt) (_ *t
 		}
 	}
 
-	// Install dependencies.
-	if err := installGoTool(ctx, "cover"); err != nil {
+	// Install required tools.
+	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/cover"); err != nil {
 		return nil, internalTestError{err, "install-go-cover"}
 	}
-	if err := installGoCoverCobertura(ctx); err != nil {
+	if err := ctx.Run().Command("v23", "go", "install", "github.com/t-yuki/gocover-cobertura"); err != nil {
 		return nil, internalTestError{err, "install-gocover-cobertura"}
 	}
-	if err := installGo2XUnit(ctx); err != nil {
+	if err := ctx.Run().Command("v23", "go", "install", "bitbucket.org/tebeka/go2xunit"); err != nil {
 		return nil, internalTestError{err, "install-go2xunit"}
 	}
 
@@ -575,9 +574,9 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 		}
 	}
 
-	// Install dependencies.
-	if err := installGo2XUnit(ctx); err != nil {
-		return nil, nil, err
+	// Install required tools.
+	if err := ctx.Run().Command("v23", "go", "install", "bitbucket.org/tebeka/go2xunit"); err != nil {
+		return nil, nil, internalTestError{err, "install-go2xunit"}
 	}
 
 	// Build dependencies of test packages.
@@ -796,82 +795,6 @@ func buildTestDeps(ctx *tool.Context, pkgs []string) error {
 		return fmt.Errorf("%v\n%s", err, out.String())
 	}
 	fmt.Fprintf(ctx.Stdout(), "ok\n")
-	return nil
-}
-
-// installGoCover makes sure the "go cover" tool is installed.
-//
-// TODO(jsimsa): Unify the installation functions by moving the
-// gocover-cobertura and go2xunit tools into the third_party
-// project.
-func installGoTool(ctx *tool.Context, tool string) error {
-	// Check if the tool exists.
-	var out bytes.Buffer
-	cmd := exec.Command("go", "tool")
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	scanner := bufio.NewScanner(&out)
-	for scanner.Scan() {
-		if scanner.Text() == tool {
-			return nil
-		}
-	}
-	if scanner.Err() != nil {
-		return fmt.Errorf("Scan() failed: %v", scanner.Err())
-	}
-	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/"+tool); err != nil {
-		return err
-	}
-	return nil
-}
-
-// installGoCoverCobertura makes sure the "gocover-cobertura" tool is
-// installed.
-func installGoCoverCobertura(ctx *tool.Context) error {
-	root, err := util.V23Root()
-	if err != nil {
-		return err
-	}
-	// Check if the tool exists.
-	bin, err := util.ThirdPartyBinPath(root, "gocover-cobertura")
-	if err != nil {
-		return err
-	}
-	if _, err := ctx.Run().Stat(bin); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		opts := ctx.Run().Opts()
-		if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "install", "github.com/t-yuki/gocover-cobertura"); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// installGo2XUnit makes sure the "go2xunit" tool is installed.
-func installGo2XUnit(ctx *tool.Context) error {
-	root, err := util.V23Root()
-	if err != nil {
-		return err
-	}
-	// Check if the tool exists.
-	bin, err := util.ThirdPartyBinPath(root, "go2xunit")
-	if err != nil {
-		return err
-	}
-	if _, err := ctx.Run().Stat(bin); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		opts := ctx.Run().Opts()
-		if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "install", "bitbucket.org/tebeka/go2xunit"); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1531,8 +1454,8 @@ func vanadiumGoVet(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
 
-	// Build the govet tool in a temporary directory.
-	if err := installGoTool(ctx, "vet"); err != nil {
+	// Install the go vet tool.
+	if err := ctx.Run().Command("v23", "go", "install", "golang.org/x/tools/cmd/vet"); err != nil {
 		return nil, internalTestError{err, "install-go-vet"}
 	}
 
