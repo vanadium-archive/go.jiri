@@ -15,6 +15,7 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/gitutil"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
@@ -133,12 +134,12 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 	}
 
 	// Execute the above function in the snapshot directory.
-	project := util.Project{
+	p := project.Project{
 		Path:     snapshotDir,
 		Protocol: "git",
 		Revision: "HEAD",
 	}
-	if err := util.ApplyToLocalMaster(ctx, project, createFn); err != nil {
+	if err := project.ApplyToLocalMaster(ctx, p, createFn); err != nil {
 		return err
 	}
 	return nil
@@ -192,7 +193,7 @@ func checkSnapshotDir(ctx *tool.Context) (e error) {
 func createSnapshot(ctx *tool.Context, snapshotDir, snapshotFile, label string) error {
 	// Create a snapshot that encodes the current state of master
 	// branches for all local projects.
-	if err := util.CreateSnapshot(ctx, snapshotFile); err != nil {
+	if err := project.CreateSnapshot(ctx, snapshotFile); err != nil {
 		return err
 	}
 
@@ -222,13 +223,13 @@ func createSnapshot(ctx *tool.Context, snapshotDir, snapshotFile, label string) 
 // respecting the value of the "-remote" command-line flag.
 func getSnapshotDir() (string, error) {
 	if remoteFlag {
-		snapshotDir, err := util.RemoteSnapshotDir()
+		snapshotDir, err := project.RemoteSnapshotDir()
 		if err != nil {
 			return "", err
 		}
 		return snapshotDir, nil
 	}
-	snapshotDir, err := util.LocalSnapshotDir()
+	snapshotDir, err := project.LocalSnapshotDir()
 	if err != nil {
 		return "", err
 	}

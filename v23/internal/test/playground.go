@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 //
 // TODO(ivanpi): Port the namespace browser test logic from shell to Go. Add more tests.
 func vanadiumPlaygroundTest(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}

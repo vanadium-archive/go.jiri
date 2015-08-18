@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
 )
 
@@ -105,7 +105,7 @@ func vanadiumGitHubMirror(ctx *tool.Context, testName string, _ ...Opt) (_ *test
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
 
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "V23Root"}
 	}

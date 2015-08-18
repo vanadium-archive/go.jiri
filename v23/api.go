@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -100,7 +101,7 @@ func buildGotools(ctx *tool.Context) (string, func() error, error) {
 	}
 
 	// Determine the location of the gotools source.
-	projects, _, err := util.ReadManifest(ctx)
+	projects, _, err := project.ReadManifest(ctx)
 	if err != nil {
 		return "", nopCleanup, err
 	}
@@ -182,7 +183,7 @@ func packageName(path string) string {
 }
 
 func getPackageChanges(ctx *tool.Context, apiCheckProjects map[string]struct{}, args []string) (changes []packageChange, e error) {
-	projects, _, err := util.ReadManifest(ctx)
+	projects, _, err := project.ReadManifest(ctx)
 	if err != nil {
 		return nil, err
 	}

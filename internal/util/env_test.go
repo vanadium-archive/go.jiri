@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/lib/envvar"
 )
@@ -49,7 +50,7 @@ func TestV23RootSymlink(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
-	got, err := V23Root()
+	got, err := project.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -62,7 +63,7 @@ func testSetPathHelper(t *testing.T, name string) {
 	ctx := tool.NewDefaultContext()
 
 	// Setup a fake V23_ROOT.
-	root, err := NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -76,7 +77,7 @@ func testSetPathHelper(t *testing.T, name string) {
 	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.AddProject(ctx, Project{
+	if err := root.AddProject(ctx, project.Project{
 		Name:   "test",
 		Path:   "test",
 		Remote: root.Projects["test"],
@@ -94,14 +95,14 @@ func testSetPathHelper(t *testing.T, name string) {
 		config = NewConfig(VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
 	}
 
-	oldRoot, err := V23Root()
+	oldRoot, err := project.V23Root()
 	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
 
 	// Retrieve V23_ROOT through V23Root() to account for symlinks.
-	v23Root, err := V23Root()
+	v23Root, err := project.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package buildinfo implements encoding and decoding of build metadata injected
-// into binaries via the v23 tool.
+// Package buildinfo implements encoding and decoding of build
+// metadata injected into binaries via the v23 tool.
 package buildinfo
 
 import (
@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"v.io/x/devtools/internal/util"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/lib/metadata"
 )
 
@@ -20,7 +20,7 @@ import (
 type T struct {
 	// Manifest records the project manifest that identifies the state of Vanadium
 	// projects used for the build.
-	Manifest util.Manifest
+	Manifest project.Manifest
 	// Platform records the target platform of the build.
 	Platform string
 	// Pristine records whether the build was executed using pristine master

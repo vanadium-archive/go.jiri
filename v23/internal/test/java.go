@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/envvar"
 )
 
@@ -53,7 +53,7 @@ func vanadiumJavaTest(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 	}
 
 	// Run tests.
-	rootDir, err := util.V23Root()
+	rootDir, err := project.V23Root()
 	javaDir := filepath.Join(rootDir, "release", "java")
 	if err := ctx.Run().Chdir(javaDir); err != nil {
 		return nil, err

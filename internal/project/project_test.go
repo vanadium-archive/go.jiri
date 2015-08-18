@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package util
+// TODO(jsimsa): Switch this test to using FakeV23Root.
 
-// TODO(jsimsa): Switch this test to using lib/tool.FakeV23Root.
+package project
 
 import (
 	"bytes"

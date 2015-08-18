@@ -11,9 +11,9 @@ import (
 	"runtime"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 // vanadiumGoBinaries uploads Vanadium binaries to Google Storage.
@@ -39,7 +39,7 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 	}
 
 	// Compute the timestamp for the build snapshot.
-	labelFile, err := util.ManifestFile("snapshot/stable-go")
+	labelFile, err := project.ManifestFile("snapshot/stable-go")
 	if err != nil {
 		return nil, internalTestError{err, "ManifestFile"}
 	}
@@ -51,7 +51,7 @@ func vanadiumGoBinaries(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 
 	// Upload all v.io binaries to Google Storage.
 	bucket := fmt.Sprintf("gs://vanadium-binaries/%s_%s/", runtime.GOOS, runtime.GOARCH)
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "V23Root"}
 	}

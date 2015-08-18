@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 var (
@@ -32,7 +32,7 @@ func requireEnv(names []string) error {
 // vanadiumPresubmitPoll polls vanadium projects for new patchsets for
 // which to run presubmit tests.
 func vanadiumPresubmitPoll(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}

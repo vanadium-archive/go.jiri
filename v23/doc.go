@@ -137,6 +137,8 @@ The v23 cl mail flags are:
    Send a draft changelist.
  -edit=true
    Open an editor to edit the commit message.
+ -host=https://vanadium-review.googlesource.com/
+   Gerrit host to use.
  -presubmit=all
    The type of presubmit tests to run. Valid values: none,all.
  -r=

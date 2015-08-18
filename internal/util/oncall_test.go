@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 )
 
@@ -51,7 +52,7 @@ func createOncallFile(t *testing.T, ctx *tool.Context) {
 
 func TestOncall(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	root, err := NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -60,7 +61,7 @@ func TestOncall(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := V23Root()
+	oldRoot, err := project.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

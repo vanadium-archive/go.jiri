@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"v.io/x/devtools/internal/project"
+	"v.io/x/devtools/internal/retry"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -89,19 +90,19 @@ func runUpdate(env *cmdline.Env, _ []string) error {
 
 	// Create a snapshot of the current state of all projects and
 	// write it to the $V23_ROOT/.update_history folder.
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return err
 	}
 	snapshotFile := filepath.Join(root, ".update_history", time.Now().Format(time.RFC3339))
-	if err := util.CreateSnapshot(ctx, snapshotFile); err != nil {
+	if err := project.CreateSnapshot(ctx, snapshotFile); err != nil {
 		return err
 	}
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
 	updateFn := func() error {
-		return util.UpdateUniverse(ctx, gcFlag)
+		return project.UpdateUniverse(ctx, gcFlag)
 	}
-	return util.Retry(ctx, updateFn, util.AttemptsOpt(attemptsFlag))
+	return retry.Function(ctx, updateFn, retry.AttemptsOpt(attemptsFlag))
 }

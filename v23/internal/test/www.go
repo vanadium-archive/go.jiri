@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 // Runs specified make target in WWW Makefile as a test.
 func commonVanadiumWWW(ctx *tool.Context, testName, makeTarget string, timeout time.Duration, extraDeps []string) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func vanadiumWWWConfigDeployHelper(ctx *tool.Context, testName string, env strin
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Change dir to infrastructure/nginx.
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "V23Root"}
 	}

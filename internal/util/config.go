@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"v.io/x/devtools/internal/tool"
@@ -445,6 +446,9 @@ func saveConfig(ctx *tool.Context, config *Config, path string) error {
 	bytes, err := xml.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", data, err)
+	}
+	if err := ctx.Run().MkdirAll(filepath.Dir(path), os.FileMode(0755)); err != nil {
+		return err
 	}
 	if err := ctx.Run().WriteFile(path, bytes, os.FileMode(0644)); err != nil {
 		return err

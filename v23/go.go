@@ -18,6 +18,7 @@ import (
 
 	"v.io/x/devtools/internal/buildinfo"
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
@@ -132,7 +133,7 @@ func setBuildInfoFlags(ctx *tool.Context, args []string, env *envvar.Vars) ([]st
 	}
 	info.Platform = platform
 	// Compute the "manifest" value.
-	manifest, err := util.CurrentManifest(ctx)
+	manifest, err := project.CurrentManifest(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,7 @@ func reportOutdatedBranches(ctx *tool.Context) (e error) {
 		return err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	projects, err := util.LocalProjects(ctx)
+	projects, err := project.LocalProjects(ctx)
 	if err != nil {
 		return err
 	}
@@ -438,7 +439,7 @@ func runGoExtDistClean(cmdlineEnv *cmdline.Env, _ []string) error {
 		DryRun:  &dryRunFlag,
 		Verbose: &verboseFlag,
 	})
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return err
 	}

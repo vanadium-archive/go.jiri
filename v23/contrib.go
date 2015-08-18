@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -120,7 +121,7 @@ func runContributors(env *cmdline.Env, args []string) error {
 		Verbose: &verboseFlag,
 	})
 
-	projects, err := util.LocalProjects(ctx)
+	projects, err := project.LocalProjects(ctx)
 	if err != nil {
 		return err
 	}

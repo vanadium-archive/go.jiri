@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/v23/internal/test"
@@ -19,7 +20,7 @@ import (
 func TestTestProject(t *testing.T) {
 	// Setup a fake V23_ROOT.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -28,12 +29,6 @@ func TestTestProject(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-
-	// Setup a fake config.
-	config := util.NewConfig(util.ProjectTestsOpt(map[string][]string{"https://test-project": []string{"ignore-this"}}))
-	if err := root.WriteLocalToolsConfig(ctx, config); err != nil {
-		t.Fatalf("%v", err)
-	}
 
 	// Point the V23_ROOT and WORKSPACE environment variables to
 	// the fake.
@@ -47,6 +42,12 @@ func TestTestProject(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("WORKSPACE", oldWorkspace)
+
+	// Setup a fake config.
+	config := util.NewConfig(util.ProjectTestsOpt(map[string][]string{"https://test-project": []string{"ignore-this"}}))
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	// Check that running the tests for the test project generates
 	// the expected output.
@@ -68,7 +69,7 @@ ignore-this PASSED
 func TestTestRun(t *testing.T) {
 	// Setup a fake V23_ROOT.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -110,7 +111,7 @@ ignore-this PASSED
 func TestTestList(t *testing.T) {
 	// Setup a fake V23_ROOT.
 	ctx := tool.NewDefaultContext()
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

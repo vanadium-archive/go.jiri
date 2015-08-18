@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
+	"v.io/x/devtools/internal/retry"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
 )
 
@@ -84,7 +85,7 @@ func vanadiumProdServicesTest(ctx *tool.Context, testName string, opts ...Opt) (
 	}
 	defer collect.Error(func() error { return cleanup() }, &e)
 
-	vroot, err := util.V23Root()
+	vroot, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +214,7 @@ func testIdentityProviderHTTP(ctx *tool.Context, blessingRoot string) (suite *xu
 		resp, err = http.Get(url)
 		return err
 	}
-	if err = util.Retry(ctx, fn); err == nil {
+	if err = retry.Function(ctx, fn); err == nil {
 		defer resp.Body.Close()
 		err = json.NewDecoder(resp.Body).Decode(&response)
 	}

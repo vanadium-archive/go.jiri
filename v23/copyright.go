@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -143,11 +144,11 @@ func copyrightHelper(stdout, stderr io.Writer, args []string, fix bool) error {
 		Stdout:   stdout,
 		Stderr:   stderr,
 	})
-	projects, _, err := util.ReadManifest(ctx)
+	projects, _, err := project.ReadManifest(ctx)
 	if err != nil {
 		return err
 	}
-	dataDir, err := util.DataDirPath(ctx, "v23")
+	dataDir, err := project.DataDirPath(ctx, "v23")
 	if err != nil {
 		return err
 	}
@@ -226,7 +227,7 @@ func checkFile(ctx *tool.Context, path string, assets *copyrightAssets, fix bool
 // appropriate copyright header. If the fix option is set, the
 // function fixes up the project. Otherwise, the function reports
 // violations to standard error output.
-func checkProject(ctx *tool.Context, project util.Project, assets *copyrightAssets, fix bool) (e error) {
+func checkProject(ctx *tool.Context, project project.Project, assets *copyrightAssets, fix bool) (e error) {
 	check := func(fileMap map[string]string, isValid func([]byte, []byte) bool) error {
 		for file, want := range fileMap {
 			path := filepath.Join(project.Path, file)
@@ -388,7 +389,7 @@ func isIgnored(path string, expressions []*regexp.Regexp) bool {
 	return false
 }
 
-func readV23Ignore(ctx *tool.Context, project util.Project) ([]*regexp.Regexp, error) {
+func readV23Ignore(ctx *tool.Context, project project.Project) ([]*regexp.Regexp, error) {
 	// Grab the .v23ignore in from project.Path. Ignore file not found errors, not
 	// all projects will have one of these ignore files.
 	path := filepath.Join(project.Path, v23Ignore)

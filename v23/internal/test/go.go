@@ -28,6 +28,7 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/goutil"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
@@ -1116,7 +1117,7 @@ func thirdPartyGoRace(ctx *tool.Context, testName string, opts ...Opt) (_ *test.
 // thirdPartyPkgs returns a list of Go expressions that describe all
 // third-party packages.
 func thirdPartyPkgs() ([]string, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -1328,7 +1329,7 @@ func vanadiumGoGenerate(ctx *tool.Context, testName string, opts ...Opt) (_ *tes
 	// Stash any uncommitted changes and defer functions that undo any
 	// changes created by this function and then unstash the original
 	// uncommitted changes.
-	projects, err := util.LocalProjects(ctx)
+	projects, err := project.LocalProjects(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1673,7 +1674,7 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 	if err := ctx.Run().Command("v23", "go", "install", "-tags=leveldb", "v.io/..."); err != nil {
 		return nil, internalTestError{err, "Install"}
 	}
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}

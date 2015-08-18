@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -61,7 +62,7 @@ func TestList(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
 	// Setup a fake V23_ROOT.
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -70,17 +71,17 @@ func TestList(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := util.V23Root()
+	oldRoot, err := project.V23Root()
 	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
 
-	remoteSnapshotDir, err := util.RemoteSnapshotDir()
+	remoteSnapshotDir, err := project.RemoteSnapshotDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	localSnapshotDir, err := util.LocalSnapshotDir()
+	localSnapshotDir, err := project.LocalSnapshotDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -198,7 +199,7 @@ func TestCreate(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
 	// Setup a fake V23_ROOT instance.
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -214,7 +215,7 @@ func TestCreate(t *testing.T) {
 		if err := root.CreateRemoteProject(ctx, remoteProjectName(i)); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if err := root.AddProject(ctx, util.Project{
+		if err := root.AddProject(ctx, project.Project{
 			Name:   remoteProjectName(i),
 			Path:   localProjectName(i),
 			Remote: root.Projects[remoteProjectName(i)],
@@ -223,22 +224,25 @@ func TestCreate(t *testing.T) {
 		}
 	}
 
-	// Create a fake configuration file.
-	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"test-remote": []string{}}))
-	root.WriteLocalToolsConfig(ctx, config)
-
-	oldRoot, err := util.V23Root()
+	// Point the V23_ROOT environment variable to the fake.
+	oldRoot, err := project.V23Root()
 	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
+
+	// Create a fake configuration file.
+	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"test-remote": []string{}}))
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
 	for i := 0; i < numProjects; i++ {
 		writeReadme(t, ctx, root.Projects[remoteProjectName(i)], "revision 1")
 	}
-	if err := util.UpdateUniverse(ctx, true); err != nil {
+	if err := project.UpdateUniverse(ctx, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -260,7 +264,7 @@ func TestCreate(t *testing.T) {
 
 	// Check that invoking the UpdateUniverse() with the local
 	// snapshot restores the local repositories.
-	snapshotDir, err := util.LocalSnapshotDir()
+	snapshotDir, err := project.LocalSnapshotDir()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -268,7 +272,7 @@ func TestCreate(t *testing.T) {
 	localCtx := ctx.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,
 	})
-	if err := util.UpdateUniverse(localCtx, true); err != nil {
+	if err := project.UpdateUniverse(localCtx, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
@@ -296,7 +300,7 @@ func TestCreate(t *testing.T) {
 	remoteCtx := ctx.Clone(tool.ContextOpts{
 		Manifest: &manifest,
 	})
-	if err := util.UpdateUniverse(remoteCtx, true); err != nil {
+	if err := project.UpdateUniverse(remoteCtx, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {

@@ -13,8 +13,8 @@ import (
 	"regexp"
 	"testing"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 func TestCopyright(t *testing.T) {
@@ -24,7 +24,7 @@ func TestCopyright(t *testing.T) {
 	})
 
 	// Load assets.
-	dataDir, err := util.DataDirPath(ctx, "v23")
+	dataDir, err := project.DataDirPath(ctx, "v23")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -34,7 +34,7 @@ func TestCopyright(t *testing.T) {
 	}
 
 	// Setup a fake V23_ROOT.
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -46,7 +46,7 @@ func TestCopyright(t *testing.T) {
 	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.AddProject(ctx, util.Project{
+	if err := root.AddProject(ctx, project.Project{
 		Name:   "test",
 		Path:   "test",
 		Remote: root.Projects["test"],
@@ -57,7 +57,7 @@ func TestCopyright(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	oldRoot, err := util.V23Root()
+	oldRoot, err := project.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -77,7 +77,7 @@ func TestCopyright(t *testing.T) {
 	// Write out test licensing files and sample source code files to a
 	// project and verify that the project checks out.
 	projectPath := filepath.Join(root.Dir, "test")
-	project := util.Project{Path: projectPath}
+	project := project.Project{Path: projectPath}
 	for _, lang := range languages {
 		file := "test" + lang.FileExtension
 		if err := ctx.Run().WriteFile(filepath.Join(projectPath, file), nil, os.FileMode(0600)); err != nil {

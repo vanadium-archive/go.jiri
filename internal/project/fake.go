@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package util
+package project
 
 import (
 	"encoding/xml"
@@ -21,12 +21,11 @@ type FakeV23Root struct {
 }
 
 const (
-	defaultDataDir    = "data"
-	defaultConfigFile = "config.v1.xml"
-	defaultManifest   = "default"
-	manifestProject   = ".manifest"
-	manifestVersion   = "v2"
-	toolsProject      = "tools"
+	defaultDataDir  = "data"
+	defaultManifest = "default"
+	manifestProject = ".manifest"
+	manifestVersion = "v2"
+	toolsProject    = "tools"
 )
 
 // NewFakeV23Root is the FakeV23Root factory.
@@ -45,16 +44,6 @@ func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
 		return nil, err
 	}
 	if err := root.CreateRemoteProject(ctx, toolsProject); err != nil {
-		return nil, err
-	}
-
-	// Create a fake configuration file.
-	toolsConfigPath := filepath.Join(remoteDir, toolsProject, defaultDataDir)
-	if err := ctx.Run().MkdirAll(toolsConfigPath, os.FileMode(0700)); err != nil {
-		return nil, err
-	}
-	var config Config
-	if err := root.WriteRemoteToolsConfig(ctx, &config); err != nil {
 		return nil, err
 	}
 
@@ -191,24 +180,6 @@ func getManifest(ctx *tool.Context) string {
 	return defaultManifest
 }
 
-// ReadLocalToolsConfig reads a tools configuration from the local
-// tools project.
-func (root FakeV23Root) ReadLocalToolsConfig(ctx *tool.Context) (*Config, error) {
-	path := filepath.Join(root.Dir, toolsProject, defaultDataDir, defaultConfigFile)
-	return root.readToolsConfig(ctx, path)
-}
-
-// ReadLocalToolsConfig reads a tools configuration from the remote
-// tools project.
-func (root FakeV23Root) ReadRemoteToolsConfig(ctx *tool.Context) (*Config, error) {
-	path := filepath.Join(root.remote, toolsProject, defaultDataDir, defaultConfigFile)
-	return root.readToolsConfig(ctx, path)
-}
-
-func (root FakeV23Root) readToolsConfig(ctx *tool.Context, path string) (*Config, error) {
-	return loadConfig(ctx, path)
-}
-
 // ReadLocalManifest read a manifest from the local manifest project.
 func (root FakeV23Root) ReadLocalManifest(ctx *tool.Context) (*Manifest, error) {
 	path := filepath.Join(root.Dir, manifestProject, manifestVersion, getManifest(ctx))
@@ -242,35 +213,6 @@ func (root FakeV23Root) UpdateUniverse(ctx *tool.Context, gc bool) error {
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
 	if err := UpdateUniverse(ctx, gc); err != nil {
-		return err
-	}
-	return nil
-}
-
-// WriteLocalToolsConfig writes the given tools configuration to the
-// local tools project.
-func (root FakeV23Root) WriteLocalToolsConfig(ctx *tool.Context, config *Config) error {
-	dir := filepath.Join(root.Dir, toolsProject)
-	path := filepath.Join(dir, defaultDataDir, defaultConfigFile)
-	return root.writeToolsConfig(ctx, config, dir, path)
-}
-
-// WriteRemoteToolsConfig writes the given tools configuration to the
-// remote tools project.
-func (root FakeV23Root) WriteRemoteToolsConfig(ctx *tool.Context, config *Config) error {
-	dir := filepath.Join(root.remote, toolsProject)
-	path := filepath.Join(dir, defaultDataDir, defaultConfigFile)
-	return root.writeToolsConfig(ctx, config, dir, path)
-}
-
-func (root FakeV23Root) writeToolsConfig(ctx *tool.Context, config *Config, dir, path string) error {
-	if err := saveConfig(ctx, config, path); err != nil {
-		return err
-	}
-	if err := ctx.Git(tool.RootDirOpt(dir)).Add(path); err != nil {
-		return err
-	}
-	if err := ctx.Git(tool.RootDirOpt(dir)).Commit(); err != nil {
 		return err
 	}
 	return nil

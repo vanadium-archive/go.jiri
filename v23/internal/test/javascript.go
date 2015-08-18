@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
 )
 
@@ -66,7 +66,7 @@ func runJSTest(ctx *tool.Context, testName, testDir, target string, cleanFn func
 
 // vanadiumJSBuildExtension tests the vanadium javascript build extension.
 func vanadiumJSBuildExtension(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func vanadiumJSBuildExtension(ctx *tool.Context, testName string, _ ...Opt) (*te
 // vanadiumJSDoc (re)generates the content of the vanadium javascript
 // documentation server.
 func vanadiumJSDoc(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func vanadiumJSDoc(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 
 // vanadiumJSBrowserIntegration runs the vanadium javascript integration test in a browser environment using nacl plugin.
 func vanadiumJSBrowserIntegration(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func vanadiumJSBrowserIntegration(ctx *tool.Context, testName string, _ ...Opt) 
 
 // vanadiumJSNodeIntegration runs the vanadium javascript integration test in NodeJS environment using wspr.
 func vanadiumJSNodeIntegration(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func vanadiumJSNodeIntegration(ctx *tool.Context, testName string, _ ...Opt) (*t
 
 // vanadiumJSUnit runs the vanadium javascript unit test.
 func vanadiumJSUnit(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func vanadiumJSUnit(ctx *tool.Context, testName string, _ ...Opt) (*test.Result,
 
 // vanadiumJSVdl runs the vanadium javascript vdl test.
 func vanadiumJSVdl(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func vanadiumJSVdl(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 
 // vanadiumJSVDLAudit checks that all VDL-based JS source files are up-to-date.
 func vanadiumJSVdlAudit(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func vanadiumJSVdlAudit(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 
 // vanadiumJSVom runs the vanadium javascript vom test.
 func vanadiumJSVom(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func vanadiumJSVom(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, 
 
 // vanadiumJSSyncbaseBrowser runs the vanadium javascript syncbase test in a browser.
 func vanadiumJSSyncbaseBrowser(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func vanadiumJSSyncbaseBrowser(ctx *tool.Context, testName string, _ ...Opt) (*t
 
 // vanadiumJSSyncbaseNode runs the vanadium javascript syncbase test in nodejs.
 func vanadiumJSSyncbaseNode(ctx *tool.Context, testName string, _ ...Opt) (*test.Result, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
