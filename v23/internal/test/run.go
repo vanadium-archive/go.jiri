@@ -124,6 +124,7 @@ var testFunctions = map[string]func(*tool.Context, string, ...Opt) (*test.Result
 	"vanadium-signup-github-new":          vanadiumSignupGithubNew,
 	"vanadium-signup-group":               vanadiumSignupGroup,
 	"vanadium-signup-group-new":           vanadiumSignupGroupNew,
+	"vanadium-signup-discuss-new":         vanadiumSignupDiscussNew,
 	"vanadium-signup-proxy":               vanadiumSignupProxy,
 	"vanadium-signup-proxy-new":           vanadiumSignupProxyNew,
 	"vanadium-signup-welcome-1-new":       vanadiumSignupWelcomeStepOneNew,
