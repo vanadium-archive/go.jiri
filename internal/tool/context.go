@@ -133,8 +133,8 @@ func (ctx Context) Env() map[string]string {
 }
 
 // Gerrit returns the Gerrit instance of the context.
-func (ctx Context) Gerrit(host, username, password string) *gerrit.Gerrit {
-	return gerrit.New(host, username, password)
+func (ctx Context) Gerrit(host string) *gerrit.Gerrit {
+	return gerrit.New(ctx.run, host)
 }
 
 type gitOpt interface {

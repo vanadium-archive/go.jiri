@@ -385,24 +385,20 @@ type funcMatcher interface {
 	match(*ast.FuncDecl) (bool, string)
 }
 
-type matchGoTestFunc struct {
-	testNameRE *regexp.Regexp
-}
+type matchGoTestFunc struct{}
 
 func (t *matchGoTestFunc) match(fn *ast.FuncDecl) (bool, string) {
 	name := fn.Name.String()
 	// TODO(cnicolaou): match on signature, not just name.
-	return t.testNameRE.MatchString(name), name
+	return strings.HasPrefix(name, "Test"), name
 }
 func (t *matchGoTestFunc) goTestOpt() {}
 
-type matchV23TestFunc struct {
-	testNameRE *regexp.Regexp
-}
+type matchV23TestFunc struct{}
 
 func (t *matchV23TestFunc) match(fn *ast.FuncDecl) (bool, string) {
 	name := fn.Name.String()
-	if !t.testNameRE.MatchString(name) {
+	if !strings.HasPrefix(name, "TestV23") {
 		return false, name
 	}
 	sig := fn.Type
@@ -423,12 +419,6 @@ func (t *matchV23TestFunc) match(fn *ast.FuncDecl) (bool, string) {
 }
 
 func (t *matchV23TestFunc) goTestOpt() {}
-
-var (
-	goTestNameRE          = regexp.MustCompile("^Test.*")
-	goBenchNameRE         = regexp.MustCompile("^Benchmark.*")
-	integrationTestNameRE = regexp.MustCompile("^TestV23.*")
-)
 
 // goListPackagesAndFuncs is a helper function for listing Go
 // packages and obtaining lists of function names that are matched
@@ -556,7 +546,7 @@ func goTest(ctx *tool.Context, testName string, opts ...goTestOpt) (_ *test.Resu
 	timeout := defaultTestTimeout
 	args, suffix, exclusions, pkgs := []string{}, "", []exclusion{}, []string{}
 	var matcher funcMatcher
-	matcher = &matchGoTestFunc{testNameRE: goTestNameRE}
+	matcher = &matchGoTestFunc{}
 	numWorkers := runtime.NumCPU()
 	var nonTestArgs nonTestArgsOpt
 	for _, opt := range opts {
@@ -1218,9 +1208,8 @@ func vanadiumGoBench(ctx *tool.Context, testName string, opts ...Opt) (_ *test.R
 	if err != nil {
 		return nil, err
 	}
-	args := argsOpt([]string{"-bench", "."})
-	matcher := funcMatcherOpt{&matchGoTestFunc{testNameRE: goBenchNameRE}}
-	return goTestAndReport(ctx, testName, args, matcher, pkgs)
+	args := argsOpt([]string{"-bench", ".", "-run", "XXX"})
+	return goTestAndReport(ctx, testName, args, pkgs)
 }
 
 // vanadiumGoBuild runs Go build for the vanadium projects.
@@ -1551,12 +1540,13 @@ func vanadiumIntegrationTest(ctx *tool.Context, testName string, opts ...Opt) (_
 		return nil, err
 	}
 	suffix := suffixOpt(genTestNameSuffix("V23Test"))
+	args := argsOpt([]string{"-run", "^TestV23"})
 	nonTestArgs := nonTestArgsOpt([]string{"-v23.tests"})
-	matcher := funcMatcherOpt{&matchV23TestFunc{testNameRE: integrationTestNameRE}}
+	matcher := funcMatcherOpt{&matchV23TestFunc{}}
 	env := ctx.Env()
 	env["V23_BIN_DIR"] = binDirPath()
 	newCtx := ctx.Clone(tool.ContextOpts{Env: env})
-	return goTestAndReport(newCtx, testName, suffix, getNumWorkersOpt(opts), nonTestArgs, matcher, exclusionsOpt(goIntegrationExclusions), pkgs)
+	return goTestAndReport(newCtx, testName, suffix, args, getNumWorkersOpt(opts), nonTestArgs, matcher, exclusionsOpt(goIntegrationExclusions), pkgs)
 }
 
 // binOrder determines if the regression tests use
@@ -1669,9 +1659,10 @@ func vanadiumRegressionTest(ctx *tool.Context, testName string, opts ...Opt) (_ 
 		return nil, err
 	}
 	globalOpts := []goTestOpt{
+		argsOpt([]string{"-run", config.Tests}),
 		getNumWorkersOpt(opts),
 		nonTestArgsOpt([]string{"-v23.tests"}),
-		funcMatcherOpt{&matchV23TestFunc{testNameRE: regexp.MustCompile(config.Tests)}},
+		funcMatcherOpt{&matchV23TestFunc{}},
 		pkgs,
 	}
 

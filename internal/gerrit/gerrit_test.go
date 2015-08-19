@@ -216,18 +216,18 @@ vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.c
 .googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=12321
 	`
 	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContent))
-	expected := map[string]*Credential{
-		"vanadium.googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "12345",
+	expected := map[string]*credentials{
+		"vanadium.googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "12345",
 		},
-		"vanadium-review.googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "54321",
+		"vanadium-review.googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "54321",
 		},
-		".googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "12321",
+		".googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "12321",
 		},
 	}
 	if err != nil {
@@ -247,10 +247,10 @@ vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=1234
 vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o
 	`
 	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContentWithInvalidEntries))
-	expected := map[string]*Credential{
-		"vanadium.googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "12345",
+	expected := map[string]*credentials{
+		"vanadium.googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "12345",
 		},
 	}
 	if err != nil {
@@ -268,14 +268,14 @@ machine vanadium.googlesource.com login git-johndoe.example.com password 12345
 machine vanadium-review.googlesource.com login git-johndoe.example.com password 54321
 	`
 	got, err := parseNetrcFile(strings.NewReader(netrcFileContent))
-	expected := map[string]*Credential{
-		"vanadium.googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "12345",
+	expected := map[string]*credentials{
+		"vanadium.googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "12345",
 		},
-		"vanadium-review.googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "54321",
+		"vanadium-review.googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "54321",
 		},
 	}
 	if err != nil {
@@ -296,10 +296,10 @@ machine vanadium4.googlesource.com login git-johndoe.example.com password_blah 1
 machine vanadium-review.googlesource.com login git-johndoe.example.com password 54321
 	`
 	got, err := parseNetrcFile(strings.NewReader(netRcFileContentWithInvalidEntries))
-	expected := map[string]*Credential{
-		"vanadium-review.googlesource.com": &Credential{
-			Username: "git-johndoe.example.com",
-			Password: "54321",
+	expected := map[string]*credentials{
+		"vanadium-review.googlesource.com": &credentials{
+			username: "git-johndoe.example.com",
+			password: "54321",
 		},
 	}
 	if err != nil {
@@ -310,5 +310,5 @@ machine vanadium-review.googlesource.com login git-johndoe.example.com password 
 	}
 }
 
-// TODO(jsimsa): Add a test for the HostCredential function that
-// exercises the logic that read the .netrc and git cookie file.
+// TODO(jsimsa): Add a test for the hostCredentials function that
+// exercises the logic that reads the .netrc and git cookie files.

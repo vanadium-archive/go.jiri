@@ -27,7 +27,3 @@ func TestV23(t *testing.T) {
 func TestV23B(t *testing.T) {
 	v23tests.RunTest(t, V23TestB)
 }
-
-func TestV23Hello(t *testing.T) {
-	v23tests.RunTest(t, V23TestHello)
-}
