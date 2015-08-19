@@ -667,13 +667,13 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 
 	// Install dependencies.
 	var pkgs []string
-	switch target.OS {
+	switch runtime.GOOS {
 	case "linux":
 		pkgs = []string{"ant", "autoconf", "bzip2", "default-jdk", "gawk", "lib32z1", "lib32stdc++6"}
 	case "darwin":
 		pkgs = []string{"ant", "autoconf", "gawk"}
 	default:
-		return fmt.Errorf("unsupported OS: %s", target.OS)
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
@@ -681,13 +681,13 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 
 	androidRoot := filepath.Join(root, "third_party", "android")
 	var sdkRoot string
-	switch target.OS {
+	switch runtime.GOOS {
 	case "linux":
 		sdkRoot = filepath.Join(androidRoot, "android-sdk-linux")
 	case "darwin":
 		sdkRoot = filepath.Join(androidRoot, "android-sdk-macosx")
 	default:
-		return fmt.Errorf("unsupported OS: %s", target.OS)
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 
 	// Download Android SDK.
@@ -701,19 +701,19 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 		var filename string
-		switch target.OS {
+		switch runtime.GOOS {
 		case "linux":
 			filename = "android-sdk_r23-linux.tgz"
 		case "darwin":
 			filename = "android-sdk_r23-macosx.zip"
 		default:
-			return fmt.Errorf("unsupported OS: %s", target.OS)
+			return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 		}
 		remote, local := "https://dl.google.com/android/"+filename, filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
 		}
-		switch target.OS {
+		switch runtime.GOOS {
 		case "linux":
 			if err := run(ctx, "tar", []string{"-C", androidRoot, "-xzf", local}, nil); err != nil {
 				return err
@@ -723,7 +723,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 				return err
 			}
 		default:
-			return fmt.Errorf("unsupported OS: %s", target.OS)
+			return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 		}
 		return nil
 	}
@@ -758,7 +758,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 			return fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		filename := "android-ndk-r9d-" + target.OS + "-x86_64.tar.bz2"
+		filename := "android-ndk-r9d-" + runtime.GOOS + "-x86_64.tar.bz2"
 		remote := "https://dl.google.com/android/ndk/" + filename
 		local := filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
@@ -998,25 +998,11 @@ func installNaclCommon(ctx *tool.Context, target profileTarget) error {
 
 // installSyncbaseDarwin installs the syncbase profile for darwin.
 func installSyncbaseDarwin(ctx *tool.Context, target profileTarget) error {
-	// Install dependencies.
-	pkgs := []string{
-		"autoconf", "automake", "libtool", "pkg-config",
-	}
-	if err := installDeps(ctx, pkgs); err != nil {
-		return err
-	}
 	return installSyncbaseCommon(ctx, target)
 }
 
 // installSyncbaseLinux installs the syncbase profile for linux.
 func installSyncbaseLinux(ctx *tool.Context, target profileTarget) error {
-	// Install dependencies.
-	pkgs := []string{
-		"autoconf", "automake", "g++", "g++-multilib", "gcc-multilib", "libtool", "pkg-config",
-	}
-	if err := installDeps(ctx, pkgs); err != nil {
-		return err
-	}
 	return installSyncbaseCommon(ctx, target)
 }
 
@@ -1026,6 +1012,21 @@ func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 	if err != nil {
 		return err
 	}
+
+	// Install dependencies.
+	var pkgs []string
+	switch runtime.GOOS {
+	case "linux":
+		pkgs = []string{"autoconf", "automake", "g++", "g++-multilib", "gcc-multilib", "libtool", "pkg-config"}
+	case "darwin":
+		pkgs = []string{"autoconf", "automake", "libtool", "pkg-config"}
+	default:
+		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+	}
+	if err := installDeps(ctx, pkgs); err != nil {
+		return err
+	}
+
 	outPrefix, err := util.ThirdPartyCCodePath(target.OS, target.Arch)
 	if err != nil {
 		return err
