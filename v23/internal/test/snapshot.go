@@ -6,9 +6,9 @@ package test
 
 import (
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/retry"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 // vanadiumGoSnapshot create a snapshot of Vanadium Go code base.
@@ -24,7 +24,7 @@ func vanadiumGoSnapshot(ctx *tool.Context, testName string, _ ...Opt) (_ *test.R
 	fn := func() error {
 		return ctx.Run().Command("v23", "snapshot", "-remote", "create", "stable-go")
 	}
-	if err := util.Retry(ctx, fn); err != nil {
+	if err := retry.Function(ctx, fn); err != nil {
 		return nil, internalTestError{err, "Snapshot"}
 	}
 	return &test.Result{Status: test.Passed}, nil

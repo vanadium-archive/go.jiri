@@ -13,9 +13,9 @@ import (
 
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/gitutil"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 func vanadiumSignupProxy(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
@@ -27,7 +27,7 @@ func vanadiumSignupProxyNew(ctx *tool.Context, testName string, _ ...Opt) (_ *te
 }
 
 func vanadiumSignupProxyHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
@@ -90,7 +90,7 @@ func vanadiumSignupProxyHelper(ctx *tool.Context, schema, testName string) (_ *t
 }
 
 func vanadiumSignupWelcomeStepOneNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
@@ -176,7 +176,7 @@ func vanadiumSignupWelcomeStepOneNew(ctx *tool.Context, testName string, _ ...Op
 }
 
 func vanadiumSignupWelcomeStepTwoNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
@@ -198,7 +198,7 @@ func vanadiumSignupGithubNew(ctx *tool.Context, testName string, _ ...Opt) (_ *t
 }
 
 func vanadiumSignupGithubHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
@@ -232,7 +232,7 @@ func vanadiumSignupGroupNew(ctx *tool.Context, testName string, _ ...Opt) (_ *te
 }
 
 func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}
@@ -260,7 +260,7 @@ func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string) (_ *t
 }
 
 func fetchFieldValues(ctx *tool.Context, credentials, field, schema, sheetID string) ([]byte, error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
 	}

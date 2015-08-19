@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
@@ -64,7 +65,7 @@ var (
 
 // vanadiumReleaseCandidate updates binaries of staging cloud services and run tests for them.
 func vanadiumReleaseCandidate(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +479,7 @@ func updateLatestFile(ctx *tool.Context, rcLabel string) error {
 // in the form of "<manifestEnvVar>=<symlinkTarget>" to
 // "V23_ROOT/<snapshotManifestFile>".
 func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts ...Opt) (_ *test.Result, e error) {
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +504,7 @@ func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts .
 	}
 
 	// Get the symlink target of the newly created snapshot manifest.
-	snapshotDir, err := util.RemoteSnapshotDir()
+	snapshotDir, err := project.RemoteSnapshotDir()
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +515,7 @@ func vanadiumReleaseCandidateSnapshot(ctx *tool.Context, testName string, opts .
 	}
 
 	// Get manifest file's relative path to the root manifest dir.
-	manifestDir, err := util.ManifestDir()
+	manifestDir, err := project.ManifestDir()
 	if err != nil {
 		return nil, err
 	}

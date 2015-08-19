@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/lib/envvar"
 )
@@ -35,7 +36,7 @@ const (
 // variable can override existing environment.
 func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	env := envvar.VarsFromOS()
-	root, err := V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +171,7 @@ func setVdlPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config
 // variables for different types of workspaces.
 func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, workspaces []string, suffix string) error {
 	path := env.GetTokens(name, ":")
-	projects, _, err := readManifest(ctx, false)
+	projects, _, err := project.ReadManifest(ctx)
 	if err != nil {
 		return err
 	}

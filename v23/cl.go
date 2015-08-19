@@ -14,8 +14,8 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/gerrit"
 	"v.io/x/devtools/internal/gitutil"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -29,6 +29,7 @@ var (
 	ccsFlag          string
 	draftFlag        bool
 	editFlag         bool
+	hostFlag         string
 	forceFlag        bool
 	presubmitFlag    string
 	remoteBranchFlag string
@@ -59,6 +60,7 @@ func init() {
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
+	cmdCLMail.Flags.StringVar(&hostFlag, "host", project.VanadiumGerritHost(), "Gerrit host to use.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
@@ -74,7 +76,7 @@ func getCommitMessageFileName(ctx *tool.Context, branch string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(topLevel, util.MetadataDirName(), branch, commitMessageFileName), nil
+	return filepath.Join(topLevel, project.MetadataDirName(), branch, commitMessageFileName), nil
 }
 
 func getDependencyPathFileName(ctx *tool.Context, branch string) (string, error) {
@@ -82,7 +84,7 @@ func getDependencyPathFileName(ctx *tool.Context, branch string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(topLevel, util.MetadataDirName(), branch, dependencyPathFileName), nil
+	return filepath.Join(topLevel, project.MetadataDirName(), branch, dependencyPathFileName), nil
 }
 
 func getDependentCLs(ctx *tool.Context, branch string) ([]string, error) {
@@ -202,7 +204,7 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 	if err != nil {
 		return err
 	}
-	metadataDir := filepath.Join(topLevel, util.MetadataDirName())
+	metadataDir := filepath.Join(topLevel, project.MetadataDirName())
 	if err := ctx.Run().RemoveAll(filepath.Join(metadataDir, branch)); err != nil {
 		return err
 	}
@@ -359,14 +361,16 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 	}
 
 	// Create and run the review.
+
 	review, err := newReview(ctx, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
-		Ccs:          ccsFlag,
+		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
 		Edit:         editFlag,
+		Host:         hostFlag,
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
-		Reviewers:    reviewersFlag,
+		Reviewers:    parseEmails(reviewersFlag),
 	})
 	if err != nil {
 		return err
@@ -377,6 +381,25 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		return nil
 	}
 	return review.run()
+}
+
+// parseEmails input a list of comma separated tokens and outputs a
+// list of email addresses. The tokens can either be email addresses
+// or Google LDAPs in which case the suffix @google.com is appended to
+// them to turn them into email addresses.
+func parseEmails(value string) []string {
+	var emails []string
+	tokens := strings.Split(value, ",")
+	for _, token := range tokens {
+		if token == "" {
+			continue
+		}
+		if !strings.Contains(token, "@") {
+			token += "@google.com"
+		}
+		emails = append(emails, token)
+	}
+	return emails
 }
 
 // checkDependents makes sure that all CLs in the sequence of
@@ -834,7 +857,7 @@ func (review *review) setTopic() error {
 	if changeID == nil || len(changeID) < 2 {
 		return fmt.Errorf("could not find Change-Id in:\n%s", bytes)
 	}
-	host := util.VanadiumGerritHost()
+	host := project.VanadiumGerritHost()
 	cred, err := gerrit.HostCredential(review.ctx.Run(), host)
 	if err != nil {
 		return err
@@ -873,7 +896,7 @@ func (review *review) updateReviewMessage(file string) error {
 	if err != nil {
 		return err
 	}
-	newMetadataDir := filepath.Join(topLevel, util.MetadataDirName(), review.CLOpts.Branch)
+	newMetadataDir := filepath.Join(topLevel, project.MetadataDirName(), review.CLOpts.Branch)
 	if err := review.ctx.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
@@ -895,7 +918,7 @@ branch and records the relationship between the current branch and the
 new branch in the %v metadata directory. The information recorded in
 the %v metadata directory tracks dependencies between CLs and is used
 by the "v23 cl sync" and "v23 cl mail" commands.
-`, util.MetadataDirName(), util.MetadataDirName()),
+`, project.MetadataDirName(), project.MetadataDirName()),
 	ArgsName: "<name>",
 	ArgsLong: "<name> is the changelist name.",
 }
@@ -945,7 +968,7 @@ func newCL(ctx *tool.Context, args []string) error {
 		return err
 	}
 	branches = append(branches, originalBranch)
-	newMetadataDir := filepath.Join(topLevel, util.MetadataDirName(), newBranch)
+	newMetadataDir := filepath.Join(topLevel, project.MetadataDirName(), newBranch)
 	if err := ctx.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
@@ -980,7 +1003,7 @@ NOTE: It is possible that the command cannot automatically merge
 changes in an ancestor into its dependent. When that occurs, the
 command is aborted and prints instructions that need to be followed
 before the command can be retried.
-`, util.MetadataDirName()),
+`, project.MetadataDirName()),
 }
 
 func runCLSync(env *cmdline.Env, _ []string) error {

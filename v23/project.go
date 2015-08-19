@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -61,11 +62,11 @@ func runProjectClean(env *cmdline.Env, args []string) (e error) {
 		Manifest: &manifestFlag,
 		Verbose:  &verboseFlag,
 	})
-	localProjects, err := util.LocalProjects(ctx)
+	localProjects, err := project.LocalProjects(ctx)
 	if err != nil {
 		return err
 	}
-	projects := map[string]util.Project{}
+	projects := map[string]project.Project{}
 	if len(args) > 0 {
 		for _, arg := range args {
 			if p, ok := localProjects[arg]; ok {
@@ -77,7 +78,7 @@ func runProjectClean(env *cmdline.Env, args []string) (e error) {
 	} else {
 		projects = localProjects
 	}
-	if err := util.CleanupProjects(ctx, projects, cleanupBranchesFlag); err != nil {
+	if err := project.CleanupProjects(ctx, projects, cleanupBranchesFlag); err != nil {
 		return err
 	}
 	return nil
@@ -97,7 +98,7 @@ type branchState struct {
 }
 
 type projectState struct {
-	project        util.Project
+	project        project.Project
 	branches       []branchState
 	currentBranch  string
 	hasUncommitted bool
@@ -116,7 +117,7 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 			return
 		}
 		for _, branch := range branches {
-			file := filepath.Join(state.project.Path, util.MetadataDirName(), branch, commitMessageFileName)
+			file := filepath.Join(state.project.Path, project.MetadataDirName(), branch, commitMessageFileName)
 			hasFile := true
 			if _, err := ctx.Run().Stat(file); err != nil {
 				if !os.IsNotExist(err) {
@@ -143,14 +144,14 @@ func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch
 			}
 		}
 	default:
-		ch <- util.UnsupportedProtocolErr(state.project.Protocol)
+		ch <- project.UnsupportedProtocolErr(state.project.Protocol)
 		return
 	}
 	ch <- nil
 }
 
 func getProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*projectState, error) {
-	projects, err := util.LocalProjects(ctx)
+	projects, err := project.LocalProjects(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +252,7 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 	sort.Strings(names)
 
 	// Get the name of the current project.
-	currentProjectName, err := util.CurrentProjectName(ctx)
+	currentProjectName, err := project.CurrentProjectName(ctx)
 	if err != nil {
 		return err
 	}
@@ -334,7 +335,7 @@ func runProjectPoll(env *cmdline.Env, args []string) error {
 			set.String.Union(projectSet, set.String.FromSlice(projects))
 		}
 	}
-	update, err := util.PollProjects(ctx, manifestFlag, projectSet)
+	update, err := project.PollProjects(ctx, manifestFlag, projectSet)
 	if err != nil {
 		return err
 	}

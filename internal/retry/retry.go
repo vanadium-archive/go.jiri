@@ -1,4 +1,6 @@
-package util
+// Package retry provides a facility for retrying function
+// invocations.
+package retry
 
 import (
 	"fmt"
@@ -24,9 +26,9 @@ const (
 	defaultInterval = 10 * time.Second
 )
 
-// Retry retries the given function for the given number of attempts at the
-// given interval.
-func Retry(ctx *tool.Context, fn func() error, opts ...RetryOpt) error {
+// Function retries the given function for the given number of
+// attempts at the given interval.
+func Function(ctx *tool.Context, fn func() error, opts ...RetryOpt) error {
 	attempts, interval := defaultAttempts, defaultInterval
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
@@ -24,7 +25,7 @@ func writeFileOrDie(t *testing.T, ctx *tool.Context, path, contents string) {
 
 type testEnv struct {
 	oldRoot        string
-	fakeRoot       *util.FakeV23Root
+	fakeRoot       *project.FakeV23Root
 	ctx            *tool.Context
 	gotoolsPath    string
 	gotoolsCleanup func() error
@@ -33,14 +34,14 @@ type testEnv struct {
 // setupAPITest sets up the test environment and returns a testEnv
 // representing the environment that was created.
 func setupAPITest(t *testing.T, ctx *tool.Context) testEnv {
-	root, err := util.NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.AddProject(ctx, util.Project{
+	if err := root.AddProject(ctx, project.Project{
 		Name:   "test",
 		Path:   "test",
 		Remote: root.Projects["test"],
@@ -52,7 +53,7 @@ func setupAPITest(t *testing.T, ctx *tool.Context) testEnv {
 	}
 	// The code under test wants to build visualfc/gotools, but this won't
 	// exist in our fake environment unless we copy it in there.
-	oldRoot, err := util.V23Root()
+	oldRoot, err := project.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -90,7 +91,9 @@ func TestPublicAPICheckError(t *testing.T) {
 	defer teardownAPITest(t, env)
 
 	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -129,7 +132,9 @@ func TestPublicAPICheckOk(t *testing.T) {
 	defer teardownAPITest(t, env)
 
 	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -168,7 +173,9 @@ func TestPublicAPIMissingAPIFile(t *testing.T) {
 	defer teardownAPITest(t, env)
 
 	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -204,7 +211,9 @@ func TestPublicAPIMissingAPIFileNoPublicAPI(t *testing.T) {
 	defer teardownAPITest(t, env)
 
 	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -239,7 +248,9 @@ func TestPublicAPIMissingAPIFileNotRequired(t *testing.T) {
 	defer teardownAPITest(t, env)
 
 	config := util.NewConfig(util.APICheckProjectsOpt(map[string]struct{}{"test": struct{}{}}))
-	env.fakeRoot.WriteLocalToolsConfig(ctx, config)
+	if err := util.SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -276,6 +287,9 @@ func TestPublicAPIUpdate(t *testing.T) {
 	env := setupAPITest(t, ctx)
 	defer teardownAPITest(t, env)
 
+	if err := util.SaveConfig(ctx, util.NewConfig()); err != nil {
+		t.Fatalf("%v", err)
+	}
 	branch := "my-branch"
 	projectPath := filepath.Join(env.fakeRoot.Dir, "test")
 	if err := ctx.Git(tool.RootDirOpt(projectPath)).CreateAndCheckoutBranch(branch); err != nil {
@@ -301,7 +315,7 @@ func TestFunction1() {
 	var out bytes.Buffer
 	cmdlineEnv := &cmdline.Env{Stdout: &out, Stderr: &out}
 	if err := runAPIFix(cmdlineEnv, []string{"test"}); err != nil {
-		t.Fatalf("should have succeeded but did not: %v", err)
+		t.Fatalf("should have succeeded but did not: %v\n%v", err, out.String())
 	}
 
 	contents, err := readAPIFileContents(ctx, filepath.Join(projectPath, ".api"))

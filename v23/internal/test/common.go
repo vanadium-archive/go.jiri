@@ -6,13 +6,12 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 var (
@@ -141,7 +140,7 @@ func initTest(ctx *tool.Context, testName string, profiles []string) (func() err
 // findTestResultFiles returns a slice of paths to test result related files.
 func findTestResultFiles(ctx *tool.Context, testName string) ([]string, error) {
 	result := []string{}
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +169,9 @@ func findTestResultFiles(ctx *tool.Context, testName string) ([]string, error) {
 	if workspaceDir == "" {
 		workspaceDir = filepath.Join(os.Getenv("HOME"), "tmp", testName)
 	}
-	fileInfoList, err := ioutil.ReadDir(workspaceDir)
+	fileInfoList, err := ctx.Run().ReadDir(workspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("ReadDir(%v) failed: %v", workspaceDir, err)
+		return nil, err
 	}
 	for _, fileInfo := range fileInfoList {
 		fileName := fileInfo.Name()

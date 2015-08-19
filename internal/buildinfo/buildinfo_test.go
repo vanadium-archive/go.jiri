@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"v.io/x/devtools/internal/util"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/lib/metadata"
 )
 
@@ -20,7 +20,7 @@ var (
 	}{
 		{
 			BuildInfo: T{
-				Manifest: util.Manifest{Label: "foo"},
+				Manifest: project.Manifest{Label: "foo"},
 				Platform: "platform",
 				Pristine: true,
 				Time:     time.Date(2015, time.May, 3, 3, 15, 0, 0, time.UTC),
@@ -40,7 +40,7 @@ var (
 		},
 		{
 			BuildInfo: T{
-				Manifest: util.Manifest{Label: "bar"},
+				Manifest: project.Manifest{Label: "bar"},
 				Platform: "amd64unknown-linux-unknown",
 				Pristine: false,
 				Time:     time.Unix(0, 0).UTC(),

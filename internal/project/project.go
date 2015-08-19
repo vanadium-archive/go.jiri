@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package util
+package project
 
 import (
 	"bytes"
@@ -406,10 +406,24 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 	if err := ctx.Run().Chdir(toolsProject.Path); err != nil {
 		return err
 	}
-
-	env, err := VanadiumEnvironment(ctx)
-	if err != nil {
-		return err
+	// Identify the Go workspace the tool is in. To this end we use a
+	// heuristic that identifies the maximal suffix of the project path
+	// that corresponds to a prefix of the package name.
+	workspace, path := "", toolsProject.Path
+	for i := 0; i < len(path); i++ {
+		if path[i] == filepath.Separator {
+			if strings.HasPrefix("src/"+pkg, filepath.ToSlash(path[i+1:])) {
+				workspace = path[:i]
+				break
+			}
+		}
+	}
+	if workspace == "" {
+		return fmt.Errorf("could not identify go workspace for %v", pkg)
+	}
+	workspaces := []string{workspace}
+	if envGoPath := os.Getenv("GOPATH"); envGoPath != "" {
+		workspaces = append(workspaces, strings.Split(envGoPath, string(filepath.ListSeparator))...)
 	}
 	output := filepath.Join(outputDir, name)
 	count := 0
@@ -427,7 +441,9 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 	args := []string{"build", "-ldflags", ldflags, "-o", output, pkg}
 	var stderr bytes.Buffer
 	opts := ctx.Run().Opts()
-	opts.Env = env.ToMap()
+	opts.Env = map[string]string{
+		"GOPATH": strings.Join(workspaces, string(filepath.ListSeparator)),
+	}
 	opts.Stdout = ioutil.Discard
 	opts.Stderr = &stderr
 	if err := ctx.Run().CommandWithOpts(opts, "go", args...); err != nil {

@@ -54,21 +54,23 @@ type CLOpts struct {
 	Autosubmit bool
 	// Branch identifies the local branch that contains the CL.
 	Branch string
-	// Ccs records the comma-separted list of users to cc on the CL.
-	Ccs string
+	// Ccs records a list of email addresses to cc on the CL.
+	Ccs []string
 	// Draft determines if this CL is a draft.
 	Draft bool
 	// Edit determines if the user should be prompted to edit the commit
 	// message when the CL is exported to Gerrit.
 	Edit bool
+	// Host identifies the Gerrit host.
+	Host string
 	// Presubmit determines what presubmit tests to run.
 	Presubmit PresubmitTestType
 	// Remote identifies the remote that the CL pertains to.
 	Remote string
 	// RemoteBranch identifies the remote branch the CL pertains to.
 	RemoteBranch string
-	// Reviewers records the comma-separated list of CL reviewers.
-	Reviewers string
+	// Reviewers records a list of email addresses of CL reviewers.
+	Reviewers []string
 	// Topic records the CL topic.
 	Topic string
 }
@@ -367,22 +369,12 @@ func (g *Gerrit) Submit(changeID string) (e error) {
 }
 
 // formatParams formats parameters of a change list.
-func formatParams(params, key string, email bool) []string {
-	if len(params) == 0 {
-		return []string{}
+func formatParams(params []string, key string) []string {
+	var keyedParams []string
+	for _, param := range params {
+		keyedParams = append(keyedParams, key+"="+param)
 	}
-	paramsSlice := strings.Split(params, ",")
-	formattedParamsSlice := make([]string, len(paramsSlice))
-	for i, param := range paramsSlice {
-		value := strings.TrimSpace(param)
-		if !strings.Contains(value, "@") && email {
-			// Param is only an ldap and we need an email;
-			// append @google.com to it.
-			value = value + "@google.com"
-		}
-		formattedParamsSlice[i] = key + "=" + value
-	}
-	return formattedParamsSlice
+	return keyedParams
 }
 
 // Reference inputs CL options and returns a matching string
@@ -394,20 +386,18 @@ func Reference(opts CLOpts) string {
 	} else {
 		ref = "refs/for/" + opts.RemoteBranch
 	}
-
-	params := formatParams(opts.Reviewers, "r", true)
-	params = append(params, formatParams(opts.Ccs, "cc", true)...)
-
+	var params []string
+	params = append(params, formatParams(opts.Reviewers, "r")...)
+	params = append(params, formatParams(opts.Ccs, "cc")...)
 	if len(params) > 0 {
 		ref = ref + "%" + strings.Join(params, ",")
 	}
-
 	return ref
 }
 
 // getRemoteURL returns the URL of the vanadium Gerrit project with
 // respect to the project identified by the current working directory.
-func getRemoteURL(run *runutil.Run) (string, error) {
+func getRemoteURL(run *runutil.Run, clOpts CLOpts) (string, error) {
 	args := []string{"config", "--get", "remote.origin.url"}
 	var stdout, stderr bytes.Buffer
 	opts := run.Opts()
@@ -416,7 +406,7 @@ func getRemoteURL(run *runutil.Run) (string, error) {
 	if err := run.CommandWithOpts(opts, "git", args...); err != nil {
 		return "", gitutil.Error(stdout.String(), stderr.String(), args...)
 	}
-	return "https://vanadium-review.googlesource.com/" + filepath.Base(strings.TrimSpace(stdout.String())), nil
+	return clOpts.Host + filepath.Base(strings.TrimSpace(stdout.String())), nil
 }
 
 // Push pushes the current branch to Gerrit.
@@ -424,7 +414,7 @@ func Push(run *runutil.Run, clOpts CLOpts) error {
 	remote := clOpts.Remote
 	if remote == "" {
 		var err error
-		remote, err = getRemoteURL(run)
+		remote, err = getRemoteURL(run, clOpts)
 		if err != nil {
 			return err
 		}

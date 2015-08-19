@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"v.io/x/devtools/internal/collect"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/devtools/internal/xunit"
 )
 
@@ -30,7 +30,7 @@ func runProjectTest(ctx *tool.Context, testName, projectName, target string, env
 	defer collect.Error(func() error { return cleanup() }, &e)
 
 	// Navigate to project directory.
-	root, err := util.V23Root()
+	root, err := project.V23Root()
 	if err != nil {
 		return nil, err
 	}

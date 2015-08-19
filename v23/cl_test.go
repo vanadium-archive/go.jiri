@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"v.io/x/devtools/internal/gerrit"
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 )
 
 // assertCommitCount asserts that the commit count between two
@@ -129,7 +129,7 @@ func createRepo(t *testing.T, ctx *tool.Context, workingDir, prefix string) stri
 	if err := ctx.Git().Init(repoPath); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := ctx.Run().MkdirAll(filepath.Join(repoPath, util.MetadataDirName()), os.FileMode(0755)); err != nil {
+	if err := ctx.Run().MkdirAll(filepath.Join(repoPath, project.MetadataDirName()), os.FileMode(0755)); err != nil {
 		t.Fatalf("%v", err)
 	}
 	return repoPath
@@ -192,8 +192,8 @@ func createTestRepos(t *testing.T, ctx *tool.Context, workingDir string) (string
 }
 
 // setup creates a set up for testing the review tool.
-func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*util.FakeV23Root, string, string, string) {
-	root, err := util.NewFakeV23Root(ctx)
+func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*project.FakeV23Root, string, string, string) {
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -210,7 +210,7 @@ func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*util.FakeV23
 }
 
 // teardownTest cleans up the set up for testing the review tool.
-func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *util.FakeV23Root) {
+func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *project.FakeV23Root) {
 	if err := ctx.Run().Chdir(oldWorkDir); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -393,7 +393,7 @@ func TestSendReview(t *testing.T) {
 		// Test with draft = false, reviewers, and no ccs.
 		review, err := newReview(ctx, gerrit.CLOpts{
 			Remote:    gerritPath,
-			Reviewers: "reviewer1,reviewer2@example.org",
+			Reviewers: parseEmails("reviewer1,reviewer2@example.org"),
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -407,10 +407,10 @@ func TestSendReview(t *testing.T) {
 	{
 		// Test with draft = true, reviewers, and ccs.
 		review, err := newReview(ctx, gerrit.CLOpts{
-			Ccs:       "cc1@example.org,cc2",
+			Ccs:       parseEmails("cc1@example.org,cc2"),
 			Draft:     true,
 			Remote:    gerritPath,
-			Reviewers: "reviewer3@example.org,reviewer4",
+			Reviewers: parseEmails("reviewer3@example.org,reviewer4"),
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -513,7 +513,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 		Autosubmit: true,
 		Presubmit:  gerrit.PresubmitTestTypeNone,
 		Remote:     gerritPath,
-		Reviewers:  "run1",
+		Reviewers:  parseEmails("run1"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -555,7 +555,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	review, err = newReview(ctx, gerrit.CLOpts{
 		Autosubmit: true,
 		Remote:     gerritPath,
-		Reviewers:  "run2",
+		Reviewers:  parseEmails("run2"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -583,7 +583,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	// Test setting autosubmit=false.
 	review, err = newReview(ctx, gerrit.CLOpts{
 		Remote:    gerritPath,
-		Reviewers: "run3",
+		Reviewers: parseEmails("run3"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)

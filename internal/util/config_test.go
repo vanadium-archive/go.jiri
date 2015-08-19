@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 )
 
@@ -123,7 +124,7 @@ func TestConfigAPI(t *testing.T) {
 func TestConfigSerialization(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	root, err := NewFakeV23Root(ctx)
+	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -132,7 +133,7 @@ func TestConfigSerialization(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := V23Root()
+	oldRoot, err := project.V23Root()
 	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -151,11 +152,13 @@ func TestConfigSerialization(t *testing.T) {
 		VDLWorkspacesOpt(vdlWorkspaces),
 	)
 
-	root.WriteLocalToolsConfig(ctx, config)
-	config2, err := root.ReadLocalToolsConfig(ctx)
+	if err := SaveConfig(ctx, config); err != nil {
+		t.Fatalf("%v", err)
+	}
+	gotConfig, err := LoadConfig(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	testConfigAPI(t, config2)
+	testConfigAPI(t, gotConfig)
 }

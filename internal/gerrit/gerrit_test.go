@@ -20,8 +20,8 @@ func TestParseQueryResults(t *testing.T) {
 			"project": "vanadium",
 			"owner": {
 				"_account_id": 1234,
-				"name": "Veyron Jenkins",
-				"email": "vj@google.com"
+				"name": "John Doe",
+				"email": "john.doe@example.com"
 			},
 			"revisions": {
 				"3654e38b2f80a5410ea94f1d7321477d89cac391": {
@@ -43,8 +43,8 @@ func TestParseQueryResults(t *testing.T) {
 			"project": "vanadium",
 			"owner": {
 				"_account_id": 1234,
-				"name": "Veyron Jenkins",
-				"email": "vj@google.com"
+				"name": "John Doe",
+				"email": "john.doe@example.com"
 			},
 			"topic": "test",
 			"revisions": {
@@ -66,8 +66,8 @@ func TestParseQueryResults(t *testing.T) {
 			"project": "tools",
 			"owner": {
 				"_account_id": 1234,
-				"name": "Veyron Jenkins",
-				"email": "vj@google.com"
+				"name": "John Doe",
+				"email": "john.doe@example.com"
 			},
 			"revisions": {
 				"b60413712472f1b576c7be951c4de309c6edaa53": {
@@ -94,14 +94,14 @@ func TestParseQueryResults(t *testing.T) {
 		{
 			ref:           "refs/changes/40/4440/1",
 			project:       "vanadium",
-			ownerEmail:    "vj@google.com",
+			ownerEmail:    "john.doe@example.com",
 			multiPart:     nil,
 			presubmitType: PresubmitTestTypeAll,
 		},
 		{
 			ref:        "refs/changes/40/4440/1",
 			project:    "vanadium",
-			ownerEmail: "vj@google.com",
+			ownerEmail: "john.doe@example.com",
 			multiPart: &MultiPartCLInfo{
 				Topic: "test",
 				Index: 1,
@@ -112,7 +112,7 @@ func TestParseQueryResults(t *testing.T) {
 		{
 			ref:           "refs/changes/43/4443/1",
 			project:       "tools",
-			ownerEmail:    "vj@google.com",
+			ownerEmail:    "john.doe@example.com",
 			multiPart:     nil,
 			presubmitType: PresubmitTestTypeNone,
 		},
@@ -211,22 +211,22 @@ func TestParseMultiPartMatch(t *testing.T) {
 func TestParseValidGitCookieFile(t *testing.T) {
 	// Valid content.
 	gitCookieFileContent := `
-vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12345
-vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=54321
-.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12321
+vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=12345
+vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=54321
+.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=12321
 	`
 	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContent))
 	expected := map[string]*Credential{
 		"vanadium.googlesource.com": &Credential{
-			Username: "git-jsimsa.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "12345",
 		},
 		"vanadium-review.googlesource.com": &Credential{
-			Username: "git-jsimsa.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "54321",
 		},
 		".googlesource.com": &Credential{
-			Username: "git-jsimsa.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "12321",
 		},
 	}
@@ -241,15 +241,15 @@ vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com
 func TestParseInvalidGitCookieFile(t *testing.T) {
 	// Content with invalid entries which should be skipped.
 	gitCookieFileContentWithInvalidEntries := `
-vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com
-vanadium-review.googlesource.com FALSE / TRUE 2147483647 o git-jsimsa.google.com=54321
-vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-jsimsa.google.com=12345
+vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com
+vanadium-review.googlesource.com FALSE / TRUE 2147483647 o git-johndoe.example.com=54321
+vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=12345
 vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o
 	`
 	got, err := parseGitCookieFile(strings.NewReader(gitCookieFileContentWithInvalidEntries))
 	expected := map[string]*Credential{
 		"vanadium.googlesource.com": &Credential{
-			Username: "git-jsimsa.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "12345",
 		},
 	}
@@ -264,17 +264,17 @@ vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o
 func TestParseValidNetRcFile(t *testing.T) {
 	// Valid content.
 	netrcFileContent := `
-machine vanadium.googlesource.com login git-jingjin.google.com password 12345
-machine vanadium-review.googlesource.com login git-jingjin.google.com password 54321
+machine vanadium.googlesource.com login git-johndoe.example.com password 12345
+machine vanadium-review.googlesource.com login git-johndoe.example.com password 54321
 	`
 	got, err := parseNetrcFile(strings.NewReader(netrcFileContent))
 	expected := map[string]*Credential{
 		"vanadium.googlesource.com": &Credential{
-			Username: "git-jingjin.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "12345",
 		},
 		"vanadium-review.googlesource.com": &Credential{
-			Username: "git-jingjin.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "54321",
 		},
 	}
@@ -289,16 +289,16 @@ machine vanadium-review.googlesource.com login git-jingjin.google.com password 5
 func TestParseInvalidNetRcFile(t *testing.T) {
 	// Content with invalid entries which should be skipped.
 	netRcFileContentWithInvalidEntries := `
-machine vanadium.googlesource.com login git-jingjin.google.com password
-machine_blah vanadium3.googlesource.com login git-jingjin.google.com password 12345
-machine vanadium2.googlesource.com login_blah git-jingjin.google.com password 12345
-machine vanadium4.googlesource.com login git-jingjin.google.com password_blah 12345
-machine vanadium-review.googlesource.com login git-jingjin.google.com password 54321
+machine vanadium.googlesource.com login git-johndoe.example.com password
+machine_blah vanadium3.googlesource.com login git-johndoe.example.com password 12345
+machine vanadium2.googlesource.com login_blah git-johndoe.example.com password 12345
+machine vanadium4.googlesource.com login git-johndoe.example.com password_blah 12345
+machine vanadium-review.googlesource.com login git-johndoe.example.com password 54321
 	`
 	got, err := parseNetrcFile(strings.NewReader(netRcFileContentWithInvalidEntries))
 	expected := map[string]*Credential{
 		"vanadium-review.googlesource.com": &Credential{
-			Username: "git-jingjin.google.com",
+			Username: "git-johndoe.example.com",
 			Password: "54321",
 		},
 	}

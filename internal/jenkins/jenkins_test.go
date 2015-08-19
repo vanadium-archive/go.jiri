@@ -15,11 +15,11 @@ var buildInfo = BuildInfo{
 			Parameters: []BuildInfoParameter{
 				BuildInfoParameter{
 					Name:  "TESTS",
-					Value: "vanadium-chat-shell-test vanadium-chat-web-test",
+					Value: "example-test another-example-test",
 				},
 				BuildInfoParameter{
 					Name:  "PROJECTS",
-					Value: "release.go.core",
+					Value: "test-project",
 				},
 				BuildInfoParameter{
 					Name:  "REFS",
@@ -70,22 +70,22 @@ func TestQueuedBuilds(t *testing.T) {
 	"items" : [
 		{
 			"id": 10,
-			"params": "\nPROJECTS=release.js.core release.go.core\nREFS=refs/changes/78/4778/1:refs/changes/50/4750/2",
+			"params": "\nPROJECTS=test-project test-project\nREFS=refs/changes/78/4778/1:refs/changes/50/4750/2",
 			"task" : {
-				"name": "vanadium-presubmit-test"
+				"name": "example-test"
 			}
 		},
 		{
 			"id": 20,
-			"params": "\nPROJECTS=release.js.core\nREFS=refs/changes/99/4799/2",
+			"params": "\nPROJECTS=test-project\nREFS=refs/changes/99/4799/2",
 			"task" : {
-				"name": "vanadium-presubmit-test"
+				"name": "example-test"
 			}
 		},
 		{
 			"id": 30,
 			"task" : {
-				"name": "vanadium-go-test"
+				"name": "another-example-test"
 			}
 		}
 	]
@@ -93,23 +93,23 @@ func TestQueuedBuilds(t *testing.T) {
 	`
 	jenkins := NewForTesting()
 	jenkins.MockAPI("queue/api/json", response)
-	got, err := jenkins.QueuedBuilds("vanadium-presubmit-test")
+	got, err := jenkins.QueuedBuilds("example-test")
 	if err != nil {
 		t.Fatalf("want no errors, got: %v", err)
 	}
 	want := []QueuedBuild{
 		QueuedBuild{
 			Id:     10,
-			Params: "\nPROJECTS=release.js.core release.go.core\nREFS=refs/changes/78/4778/1:refs/changes/50/4750/2",
+			Params: "\nPROJECTS=test-project test-project\nREFS=refs/changes/78/4778/1:refs/changes/50/4750/2",
 			Task: QueuedBuildTask{
-				Name: "vanadium-presubmit-test",
+				Name: "example-test",
 			},
 		},
 		QueuedBuild{
 			Id:     20,
-			Params: "\nPROJECTS=release.js.core\nREFS=refs/changes/99/4799/2",
+			Params: "\nPROJECTS=test-project\nREFS=refs/changes/99/4799/2",
 			Task: QueuedBuildTask{
-				Name: "vanadium-presubmit-test",
+				Name: "example-test",
 			},
 		},
 	}
@@ -131,12 +131,12 @@ func TestOngoingBuilds(t *testing.T) {
 			"executors": [
 				{
 					"currentExecutable": {
-						"url": "https://dev.v.io/jenkins/job/vanadium-presubmit-poll/13415/"
+						"url": "https://example.com/jenkins/job/presubmit-poll/13415/"
 					}
 				},
 				{
 					"currentExecutable": {
-						"url": "https://dev.v.io/jenkins/job/vanadium-presubmit-test/OS=linux,TEST=vanadium-go-race/1234/"
+						"url": "https://example.com/jenkins/job/example-test/OS=linux,TEST=presubmit-test/1234/"
 					}
 				}
 			],
@@ -147,7 +147,7 @@ func TestOngoingBuilds(t *testing.T) {
 			"oneOffExecutors": [
 				{
 					"currentExecutable": {
-						"url": "https://dev.v.io/jenkins/job/vanadium-presubmit-test/1234/"
+						"url": "https://example.com/jenkins/job/presubmit-test/1234/"
 					}
 				}
 			]
@@ -160,11 +160,11 @@ func TestOngoingBuilds(t *testing.T) {
 			"parameters": [
 			  {
 					"name": "TESTS",
-					"value": "vanadium-chat-shell-test vanadium-chat-web-test"
+					"value": "example-test another-example-test"
 				},
 				{
 					"name": "PROJECTS",
-					"value": "release.go.core"
+					"value": "test-project"
 				},
 				{
 					"name": "REFS",
@@ -179,8 +179,8 @@ func TestOngoingBuilds(t *testing.T) {
 }`
 	jenkins := NewForTesting()
 	jenkins.MockAPI("computer/api/json", ongoingBuildsResponse)
-	jenkins.MockAPI("job/vanadium-presubmit-test/1234/api/json", buildInfoResponse)
-	got, err := jenkins.OngoingBuilds("vanadium-presubmit-test")
+	jenkins.MockAPI("job/presubmit-test/1234/api/json", buildInfoResponse)
+	got, err := jenkins.OngoingBuilds("presubmit-test")
 	if err != nil {
 		t.Fatalf("want no errors, got: %v", err)
 	}
@@ -219,8 +219,8 @@ func TestFailedTestCasesForBuildSpec(t *testing.T) {
 }`
 
 	jenkins := NewForTesting()
-	jenkins.MockAPI("job/vanadium-presubmit-test/1234/testReport/api/json", response)
-	got, err := jenkins.FailedTestCasesForBuildSpec("vanadium-presubmit-test/1234")
+	jenkins.MockAPI("job/example-test/1234/testReport/api/json", response)
+	got, err := jenkins.FailedTestCasesForBuildSpec("example-test/1234")
 	if err != nil {
 		t.Fatalf("want no errors, got: %v", err)
 	}

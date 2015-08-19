@@ -7,14 +7,14 @@ package main
 import (
 	"fmt"
 
+	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/set"
 )
 
 // parseProjectNames identifies the set of projects that a v23 command
 // should be applied to.
-func parseProjectNames(ctx *tool.Context, args []string, projects map[string]util.Project, defaultProjects map[string]struct{}) []string {
+func parseProjectNames(ctx *tool.Context, args []string, projects map[string]project.Project, defaultProjects map[string]struct{}) []string {
 	names := []string{}
 	if len(args) == 0 {
 		// Use the default set of projects.
