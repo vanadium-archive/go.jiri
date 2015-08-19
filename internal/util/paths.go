@@ -15,15 +15,6 @@ import (
 	"v.io/x/lib/host"
 )
 
-// AliasesFilePath returns the path to the aliases file.
-func AliasesFilePath(ctx *tool.Context) (string, error) {
-	dataDir, err := project.DataDirPath(ctx, tool.Name)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dataDir, "aliases.v1.xml"), nil
-}
-
 // ConfigFilePath returns the path to the tools configuration file.
 func ConfigFilePath(ctx *tool.Context) (string, error) {
 	dataDir, err := project.DataDirPath(ctx, tool.Name)

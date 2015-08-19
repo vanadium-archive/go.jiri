@@ -110,8 +110,8 @@ func getDependentCLs(ctx *tool.Context, branch string) ([]string, error) {
 // cmdCL represents the "v23 cl" command.
 var cmdCL = &cmdline.Command{
 	Name:     "cl",
-	Short:    "Manage vanadium changelists",
-	Long:     "Manage vanadium changelists.",
+	Short:    "Manage project changelists",
+	Long:     "Manage project changelists.",
 	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync},
 }
 
@@ -857,12 +857,7 @@ func (review *review) setTopic() error {
 	if changeID == nil || len(changeID) < 2 {
 		return fmt.Errorf("could not find Change-Id in:\n%s", bytes)
 	}
-	host := project.VanadiumGerritHost()
-	cred, err := gerrit.HostCredential(review.ctx.Run(), host)
-	if err != nil {
-		return err
-	}
-	if err := review.ctx.Gerrit(host, cred.Username, cred.Password).SetTopic(string(changeID[1]), review.CLOpts); err != nil {
+	if err := review.ctx.Gerrit(review.CLOpts.Host).SetTopic(string(changeID[1]), review.CLOpts); err != nil {
 		return err
 	}
 	return nil
