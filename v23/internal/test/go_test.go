@@ -159,9 +159,13 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23B",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23Hello",
+					},
 				},
-				Tests: 5,
-				Skip:  2,
+				Tests: 6,
+				Skip:  3,
 			},
 		},
 	}
@@ -178,8 +182,12 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23B",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23Hello",
+					},
 				},
-				Tests: 2,
+				Tests: 3,
 				Skip:  0,
 			},
 		},
@@ -192,6 +200,25 @@ var (
 					xunit.TestCase{
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23",
+					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23Hello",
+					},
+				},
+				Tests: 2,
+				Skip:  0,
+			},
+		},
+	}
+	wantRegressionTest = xunit.TestSuites{
+		Suites: []xunit.TestSuite{
+			xunit.TestSuite{
+				Name: "v.io/x/devtools/v23/internal/test/testdata/foo",
+				Cases: []xunit.TestCase{
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23Hello",
 					},
 				},
 				Tests: 1,
@@ -224,9 +251,13 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23B [Suffix]",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23Hello [Suffix]",
+					},
 				},
-				Tests: 5,
-				Skip:  2,
+				Tests: 6,
+				Skip:  3,
 			},
 		},
 	}
@@ -247,9 +278,13 @@ var (
 						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
 						Name:      "TestV23B",
 					},
+					xunit.TestCase{
+						Classname: "v.io/x/devtools/v23/internal/test/testdata/foo",
+						Name:      "TestV23Hello",
+					},
 				},
-				Tests: 3,
-				Skip:  2,
+				Tests: 4,
+				Skip:  3,
 			},
 		},
 	}
@@ -412,14 +447,19 @@ func TestGoTestExcludedPackage(t *testing.T) {
 }
 
 func TestGoTestV23(t *testing.T) {
-	runGoTest(t, "", nil, wantV23Test, argsOpt{"--run=TestV23"}, funcMatcherOpt{&matchV23TestFunc{}}, nonTestArgsOpt([]string{"--v23.tests"}))
+	runGoTest(t, "", nil, wantV23Test, funcMatcherOpt{&matchV23TestFunc{testNameRE: integrationTestNameRE}}, nonTestArgsOpt([]string{"--v23.tests"}))
 }
 
 func TestGoTestV23WithExcludedTests(t *testing.T) {
 	exclusions := []exclusion{
 		newExclusion("v.io/x/devtools/v23/internal/test/testdata/foo", "TestV23B", true),
 	}
-	runGoTest(t, "", exclusions, wantV23TestWithExcludedTests, argsOpt{"--run=TestV23"}, funcMatcherOpt{&matchV23TestFunc{}}, nonTestArgsOpt([]string{"--v23.tests"}))
+	runGoTest(t, "", exclusions, wantV23TestWithExcludedTests, funcMatcherOpt{&matchV23TestFunc{testNameRE: integrationTestNameRE}}, nonTestArgsOpt([]string{"--v23.tests"}))
+}
+
+func TestRegressionTest(t *testing.T) {
+	config := defaultRegressionConfig()
+	runGoTest(t, "", nil, wantRegressionTest, funcMatcherOpt{&matchV23TestFunc{testNameRE: regexp.MustCompile(config.Tests)}}, nonTestArgsOpt([]string{"--v23.tests"}))
 }
 
 func runGoTest(t *testing.T, suffix string, exclusions []exclusion, expectedTestSuite xunit.TestSuites, testOpts ...goTestOpt) {

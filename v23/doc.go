@@ -12,8 +12,8 @@ Usage:
    v23 [flags] <command>
 
 The v23 commands are:
-   cl           Manage project changelists
-   contributors List project contributors
+   cl           Manage vanadium changelists
+   contributors List vanadium project contributors
    copyright    Manage vanadium copyright
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
@@ -48,9 +48,9 @@ The global flags are:
  -metadata=<just specify -metadata to activate>
    Displays metadata for the program and exits.
 
-V23 cl - Manage project changelists
+V23 cl - Manage vanadium changelists
 
-Manage project changelists.
+Manage vanadium changelists.
 
 Usage:
    v23 cl <command>
@@ -150,11 +150,11 @@ The v23 cl sync flags are:
  -remote-branch=master
    Name of the remote branch the CL pertains to.
 
-V23 contributors - List project contributors
+V23 contributors - List vanadium project contributors
 
-Lists project contributors. Projects to consider can be specified as an
-argument. If no projects are specified, all projects in the current manifest are
-considered by default.
+Lists vanadium project contributors. Vanadium projects to consider can be
+specified as an argument. If no projects are specified, all vanadium projects
+are considered by default.
 
 Usage:
    v23 contributors [flags] <projects>
@@ -162,8 +162,6 @@ Usage:
 <projects> is a list of projects to consider.
 
 The v23 contributors flags are:
- -aliases=
-   Path to the aliases file.
  -n=false
    Show number of contributions.
 
