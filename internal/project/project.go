@@ -19,6 +19,7 @@ import (
 	"v.io/x/devtools/internal/runutil"
 	"v.io/x/devtools/internal/tool"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/set"
 )
 
 var DevToolsProject = "release.go.x.devtools"
@@ -1297,5 +1298,29 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) (operati
 		}
 	}
 	sort.Sort(result)
+	return result, nil
+}
+
+// ParseNames identifies the set of projects that a v23 command should
+// be applied to.
+func ParseNames(ctx *tool.Context, args []string, defaultProjects map[string]struct{}) (map[string]Project, error) {
+	projects, _, err := ReadManifest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]Project{}
+	if len(args) == 0 {
+		// Use the default set of projects.
+		args = set.String.ToSlice(defaultProjects)
+	}
+	for _, name := range args {
+		if project, ok := projects[name]; ok {
+			result[name] = project
+		} else {
+			// Issue a warning if the target project does not exist in the
+			// project manifest.
+			fmt.Fprintf(ctx.Stderr(), "WARNING: project %q does not exist in the project manifest and will be skipped\n", name)
+		}
+	}
 	return result, nil
 }

@@ -12,7 +12,6 @@ Usage:
    v23 [flags] <command>
 
 The v23 commands are:
-   api          Work with Vanadium's public API
    cl           Manage vanadium changelists
    contributors List vanadium project contributors
    copyright    Manage vanadium copyright
@@ -28,6 +27,14 @@ The v23 commands are:
    update       Update all vanadium tools and projects
    version      Print version
    help         Display help for commands or topics
+   api          Work with Vanadium's public API
+   copyright
+   env
+   go
+   goext
+   oncall
+   run
+   test
 
 The v23 flags are:
  -color=true
@@ -40,48 +47,6 @@ The v23 flags are:
 The global flags are:
  -metadata=<just specify -metadata to activate>
    Displays metadata for the program and exits.
-
-V23 api - Work with Vanadium's public API
-
-Use this command to ensure that no unintended changes are made to Vanadium's
-public API.
-
-Usage:
-   v23 api [flags] <command>
-
-The v23 api commands are:
-   check       Check if any changes have been made to the public API
-   fix         Update .api files to reflect changes to the public API
-
-The v23 api flags are:
- -gotools-bin=
-   The path to the gotools binary to use. If empty, gotools will be built if
-   necessary.
-
-V23 api check - Check if any changes have been made to the public API
-
-Check if any changes have been made to the public API.
-
-Usage:
-   v23 api check [flags] <projects>
-
-<projects> is a list of Vanadium projects to check. If none are specified, all
-projects that require a public API check upon presubmit are checked.
-
-The v23 api check flags are:
- -detailed=true
-   If true, shows each API change in an expanded form. Otherwise, only a summary
-   is shown.
-
-V23 api fix
-
-Update .api files to reflect changes to the public API.
-
-Usage:
-   v23 api fix <projects>
-
-<projects> is a list of Vanadium projects to update. If none are specified, all
-project APIs are updated.
 
 V23 cl - Manage vanadium changelists
 
@@ -714,6 +679,56 @@ Print version of the v23 tool.
 
 Usage:
    v23 version
+
+V23 api - Work with Vanadium's public API
+
+Use this command to ensure that no unintended changes are made to Vanadium's
+public API.
+
+Usage:
+   v23 api [flags] <command>
+
+The v23 api commands are:
+   check       Check if any changes have been made to the public API
+   fix         Update .api files to reflect changes to the public API
+
+The v23 api flags are:
+ -color=true
+   Use color to format output.
+ -gotools-bin=
+   The path to the gotools binary to use. If empty, gotools will be built if
+   necessary.
+ -manifest=
+   Name of the project manifest.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+V23 api check - Check if any changes have been made to the public API
+
+Check if any changes have been made to the public API.
+
+Usage:
+   v23 api check [flags] <projects>
+
+<projects> is a list of Vanadium projects to check. If none are specified, all
+projects that require a public API check upon presubmit are checked.
+
+The v23 api check flags are:
+ -detailed=true
+   If true, shows each API change in an expanded form. Otherwise, only a summary
+   is shown.
+
+V23 api fix
+
+Update .api files to reflect changes to the public API.
+
+Usage:
+   v23 api fix <projects>
+
+<projects> is a list of Vanadium projects to update. If none are specified, all
+project APIs are updated.
 
 V23 help - Display help for commands or topics
 

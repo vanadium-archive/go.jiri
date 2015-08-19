@@ -144,10 +144,6 @@ func copyrightHelper(stdout, stderr io.Writer, args []string, fix bool) error {
 		Stdout:   stdout,
 		Stderr:   stderr,
 	})
-	projects, _, err := project.ReadManifest(ctx)
-	if err != nil {
-		return err
-	}
 	dataDir, err := project.DataDirPath(ctx, "v23")
 	if err != nil {
 		return err
@@ -160,8 +156,12 @@ func copyrightHelper(stdout, stderr io.Writer, args []string, fix bool) error {
 	if err != nil {
 		return err
 	}
-	for _, name := range parseProjectNames(ctx, args, projects, config.CopyrightCheckProjects()) {
-		if err := checkProject(ctx, projects[name], assets, fix); err != nil {
+	projects, err := project.ParseNames(ctx, args, config.CopyrightCheckProjects())
+	if err != nil {
+		return err
+	}
+	for _, project := range projects {
+		if err := checkProject(ctx, project, assets, fix); err != nil {
 			return err
 		}
 	}
