@@ -75,25 +75,27 @@ type CLOpts struct {
 	Topic string
 }
 
-// Gerrit records a hostname of a Gerrit instance and credentials that
-// can be used to access it.
+// Gerrit records a hostname of a Gerrit instance.
 type Gerrit struct {
-	host     string
-	password string
-	username string
+	host string
+	r    *runutil.Run
 }
 
 // New is the Gerrit factory.
-func New(host, username, password string) *Gerrit {
+func New(r *runutil.Run, host string) *Gerrit {
 	return &Gerrit{
-		host:     host,
-		password: password,
-		username: username,
+		host: host,
+		r:    r,
 	}
 }
 
 // PostReview posts a review to the given Gerrit reference.
 func (g *Gerrit) PostReview(ref string, message string, labels map[string]string) (e error) {
+	cred, err := hostCredentials(g.r, g.host)
+	if err != nil {
+		return err
+	}
+
 	review := Review{
 		Message: message,
 		Labels:  labels,
@@ -121,7 +123,7 @@ func (g *Gerrit) PostReview(ref string, message string, labels map[string]string
 		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
 	}
 	req.Header.Add("Content-Type", "application/json;charset=UTF-8")
-	req.SetBasicAuth(g.username, g.password)
+	req.SetBasicAuth(cred.username, cred.password)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Do(%v) failed: %v", req, err)
@@ -137,6 +139,11 @@ type Topic struct {
 
 // SetTopic sets the topic of the given Gerrit reference.
 func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
+	cred, err := hostCredentials(g.r, g.host)
+	if err != nil {
+		return err
+	}
+
 	topic := Topic{opts.Topic}
 	data, err := json.Marshal(topic)
 	if err != nil {
@@ -150,7 +157,7 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
 	}
 	req.Header.Add("Content-Type", "application/json;charset=UTF-8")
-	req.SetBasicAuth(g.username, g.password)
+	req.SetBasicAuth(cred.username, cred.password)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Do(%v) failed: %v", req, err)
@@ -303,6 +310,11 @@ func parsePresubmitTestType(match string) PresubmitTestType {
 // - https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#list-changes
 // - https://gerrit-review.googlesource.com/Documentation/user-search.html
 func (g *Gerrit) Query(query string) (_ []Change, e error) {
+	cred, err := hostCredentials(g.r, g.host)
+	if err != nil {
+		return nil, err
+	}
+
 	url := fmt.Sprintf("%s/a/changes/?o=CURRENT_REVISION&o=CURRENT_COMMIT&o=LABELS&o=DETAILED_ACCOUNTS&q=%s", g.host, url.QueryEscape(query))
 	var body io.Reader
 	method, body := "GET", nil
@@ -311,7 +323,7 @@ func (g *Gerrit) Query(query string) (_ []Change, e error) {
 		return nil, fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
 	}
 	req.Header.Add("Accept", "application/json")
-	req.SetBasicAuth(g.username, g.password)
+	req.SetBasicAuth(cred.username, cred.password)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -323,6 +335,11 @@ func (g *Gerrit) Query(query string) (_ []Change, e error) {
 
 // Submit submits the given changelist through Gerrit.
 func (g *Gerrit) Submit(changeID string) (e error) {
+	cred, err := hostCredentials(g.r, g.host)
+	if err != nil {
+		return err
+	}
+
 	// Encode data needed for Submit.
 	data := struct {
 		WaitForMerge bool `json:"wait_for_merge"`
@@ -344,7 +361,7 @@ func (g *Gerrit) Submit(changeID string) (e error) {
 		return fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
 	}
 	req.Header.Add("Content-Type", "application/json;charset=UTF-8")
-	req.SetBasicAuth(g.username, g.password)
+	req.SetBasicAuth(cred.username, cred.password)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -436,15 +453,15 @@ func Push(run *runutil.Run, clOpts CLOpts) error {
 	return nil
 }
 
-type Credential struct {
-	Username string
-	Password string
+type credentials struct {
+	username string
+	password string
 }
 
-// HostCredential returns credentials for the given Gerrit host. The
+// hostCredentials returns credentials for the given Gerrit host. The
 // function uses best effort to scan common locations where the
 // credentials could exist.
-func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
+func hostCredentials(run *runutil.Run, host string) (_ *credentials, e error) {
 	// Check the host URL is valid.
 	url, err := url.Parse(host)
 	if err != nil {
@@ -463,13 +480,13 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 		}
 	} else {
 		defer collect.Error(func() error { return file.Close() }, &e)
-		creds, err := parseNetrcFile(file)
+		credsMap, err := parseNetrcFile(file)
 		if err != nil {
 			return nil, err
 		}
-		cred, ok := creds[url.Host]
+		creds, ok := credsMap[url.Host]
 		if ok {
-			return cred, nil
+			return creds, nil
 		}
 	}
 
@@ -488,20 +505,20 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 			}
 		} else {
 			defer collect.Error(func() error { return file.Close() }, &e)
-			creds, err := parseGitCookieFile(file)
+			credsMap, err := parseGitCookieFile(file)
 			if err != nil {
 				return nil, err
 			}
-			cred, ok := creds[url.Host]
+			creds, ok := credsMap[url.Host]
 			if ok {
-				return cred, nil
+				return creds, nil
 			}
 			// Account for site-wide credentials. Namely, the git cookie
 			// file can contain credentials of the form ".<name>", which
 			// should match any host "*.<name>".
-			for host, cred := range creds {
+			for host, creds := range credsMap {
 				if strings.HasPrefix(host, ".") && strings.HasSuffix(url.Host, host) {
-					return cred, nil
+					return creds, nil
 				}
 			}
 		}
@@ -512,8 +529,8 @@ func HostCredential(run *runutil.Run, host string) (_ *Credential, e error) {
 
 // parseGitCookieFile parses the content of the given git cookie file
 // and returns credentials stored in the file indexed by hosts.
-func parseGitCookieFile(reader io.Reader) (map[string]*Credential, error) {
-	creds := map[string]*Credential{}
+func parseGitCookieFile(reader io.Reader) (map[string]*credentials, error) {
+	credsMap := map[string]*credentials{}
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -525,21 +542,21 @@ func parseGitCookieFile(reader io.Reader) (map[string]*Credential, error) {
 		if len(tokens) != 2 {
 			continue
 		}
-		creds[parts[0]] = &Credential{
-			Username: tokens[0],
-			Password: tokens[1],
+		credsMap[parts[0]] = &credentials{
+			username: tokens[0],
+			password: tokens[1],
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("Scan() failed: %v", err)
 	}
-	return creds, nil
+	return credsMap, nil
 }
 
 // parseNetrcFile parses the content of the given netrc file and
 // returns credentials stored in the file indexed by hosts.
-func parseNetrcFile(reader io.Reader) (map[string]*Credential, error) {
-	creds := map[string]*Credential{}
+func parseNetrcFile(reader io.Reader) (map[string]*credentials, error) {
+	credsMap := map[string]*credentials{}
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -547,13 +564,13 @@ func parseNetrcFile(reader io.Reader) (map[string]*Credential, error) {
 		if len(parts) != 6 || parts[0] != "machine" || parts[2] != "login" || parts[4] != "password" {
 			continue
 		}
-		creds[parts[1]] = &Credential{
-			Username: parts[3],
-			Password: parts[5],
+		credsMap[parts[1]] = &credentials{
+			username: parts[3],
+			password: parts[5],
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("Scan() failed: %v", err)
 	}
-	return creds, nil
+	return credsMap, nil
 }

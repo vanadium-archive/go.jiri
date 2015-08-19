@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -15,28 +16,33 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/set"
 )
 
+const (
+	aliasesFileName = "aliases.v1.xml"
+)
+
 var (
-	countFlag bool
+	countFlag   bool
+	aliasesFlag string
 )
 
 func init() {
 	cmdContributors.Flags.BoolVar(&countFlag, "n", false, "Show number of contributions.")
+	cmdContributors.Flags.StringVar(&aliasesFlag, "aliases", "", "Path to the aliases file.")
 }
 
 // cmdContributors represents the "v23 contributors" command.
 var cmdContributors = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runContributors),
 	Name:   "contributors",
-	Short:  "List vanadium project contributors",
+	Short:  "List project contributors",
 	Long: `
-Lists vanadium project contributors. Vanadium projects to consider can
-be specified as an argument. If no projects are specified, all
-vanadium projects are considered by default.
+Lists project contributors. Projects to consider can be specified as
+an argument. If no projects are specified, all projects in the current
+manifest are considered by default.
 `,
 	ArgsName: "<projects>",
 	ArgsLong: "<projects> is a list of projects to consider.",
@@ -85,9 +91,13 @@ func canonicalize(aliases *aliasMaps, email, name string) (string, string) {
 }
 
 func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
-	aliasesFile, err := util.AliasesFilePath(ctx)
-	if err != nil {
-		return nil, err
+	aliasesFile := aliasesFlag
+	if aliasesFile == "" {
+		dataDir, err := project.DataDirPath(ctx, tool.Name)
+		if err != nil {
+			return nil, err
+		}
+		aliasesFile = filepath.Join(dataDir, aliasesFileName)
 	}
 	bytes, err := ctx.Run().ReadFile(aliasesFile)
 	if err != nil {
