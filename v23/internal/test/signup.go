@@ -36,7 +36,7 @@ func vanadiumSignupProxyHelper(ctx *tool.Context, schema, testName string) (_ *t
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "email", schema, sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "email", schema, sheetID, false)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -98,7 +98,7 @@ func vanadiumSignupWelcomeStepOneNew(ctx *tool.Context, testName string, _ ...Op
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "email", "new_schema.go", sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "email", "new_schema.go", sheetID, false)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -206,7 +206,7 @@ func vanadiumSignupGithubHelper(ctx *tool.Context, schema, testName string) (_ *
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "github", schema, sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "github", schema, sheetID, false)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -224,14 +224,18 @@ func vanadiumSignupGithubHelper(ctx *tool.Context, schema, testName string) (_ *
 }
 
 func vanadiumSignupGroup(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	return vanadiumSignupGroupHelper(ctx, "old_schema.go", testName)
+	return vanadiumSignupGroupHelper(ctx, "old_schema.go", testName, false)
 }
 
 func vanadiumSignupGroupNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
-	return vanadiumSignupGroupHelper(ctx, "new_schema.go", testName)
+	return vanadiumSignupGroupHelper(ctx, "new_schema.go", testName, false)
 }
 
-func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string) (_ *test.Result, e error) {
+func vanadiumSignupDiscussNew(ctx *tool.Context, testName string, _ ...Opt) (_ *test.Result, e error) {
+	return vanadiumSignupGroupHelper(ctx, "new_schema.go", testName, true)
+}
+
+func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string, discussOnly bool) (_ *test.Result, e error) {
 	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -241,7 +245,7 @@ func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string) (_ *t
 	credentials := os.Getenv("CREDENTIALS")
 	sheetID := os.Getenv("SHEET_ID")
 
-	data, err := fetchFieldValues(ctx, credentials, "email", schema, sheetID)
+	data, err := fetchFieldValues(ctx, credentials, "email", schema, sheetID, discussOnly)
 	if err != nil {
 		return nil, internalTestError{err, "fetch"}
 	}
@@ -249,17 +253,18 @@ func vanadiumSignupGroupHelper(ctx *tool.Context, schema, testName string) (_ *t
 	// Add them to Google Group.
 	keyFile := os.Getenv("KEYFILE")
 	serviceAccount := os.Getenv("SERVICE_ACCOUNT")
+	groupEmail := os.Getenv("GROUP_EMAIL")
 	opts := ctx.Run().Opts()
 	opts.Stdin = bytes.NewReader(data)
 	groupSrc := filepath.Join(root, "infrastructure", "signup", "group.go")
-	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", groupSrc, "-keyFile="+keyFile, "-account="+serviceAccount); err != nil {
+	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", groupSrc, "-keyFile="+keyFile, "-account="+serviceAccount, "-groupEmail="+groupEmail); err != nil {
 		return nil, internalTestError{err, "group"}
 	}
 
 	return &test.Result{Status: test.Passed}, nil
 }
 
-func fetchFieldValues(ctx *tool.Context, credentials, field, schema, sheetID string) ([]byte, error) {
+func fetchFieldValues(ctx *tool.Context, credentials, field, schema, sheetID string, discussOnly bool) ([]byte, error) {
 	root, err := project.V23Root()
 	if err != nil {
 		return nil, internalTestError{err, "VanadiumRoot"}
@@ -271,7 +276,11 @@ func fetchFieldValues(ctx *tool.Context, credentials, field, schema, sheetID str
 	schemaSrc := filepath.Join(root, "infrastructure", "signup", schema)
 	opts := ctx.Run().Opts()
 	opts.Stdout = &buffer
-	if err := ctx.Run().CommandWithOpts(opts, "v23", "go", "run", fetchSrc, schemaSrc, "-credentials="+credentials, "-field="+field, "-sheet-id="+sheetID); err != nil {
+	args := []string{"go", "run", fetchSrc, schemaSrc, "-credentials="+credentials, "-field="+field, "-sheet-id="+sheetID}
+	if discussOnly {
+	  args = append(args, "-discuss-only")
+	}
+	if err := ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
