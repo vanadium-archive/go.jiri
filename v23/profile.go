@@ -349,6 +349,13 @@ func install(ctx *tool.Context, target profileTarget, profile string) error {
 		default:
 			reportNotImplemented(ctx, profile, target)
 		}
+	case "android":
+		switch profile {
+		case "syncbase":
+			return installSyncbaseAndroid(ctx, target)
+		default:
+			reportNotImplemented(ctx, profile, target)
+		}
 	default:
 		reportNotImplemented(ctx, profile, target)
 	}
@@ -992,6 +999,26 @@ func installNaclCommon(ctx *tool.Context, target profileTarget) error {
 	return nil
 }
 
+// installSyncbaseAndroid installs the syncbase profile for android.
+func installSyncbaseAndroid(ctx *tool.Context, target profileTarget) error {
+	root, err := project.V23Root()
+	if err != nil {
+		return err
+	}
+
+	if target.Arch != "arm" {
+		return fmt.Errorf("Architecture %q is not supported when compiling for Android.  Please use GOARCH=arm.", target.Arch)
+	}
+
+	// Make sure android profile is installed.
+	androidRoot := filepath.Join(root, "third_party", "android")
+	if !directoryExists(ctx, androidRoot) {
+		return fmt.Errorf("Android profile is required.  Please run 'v23 profile install android'.")
+	}
+
+	return installSyncbaseCommon(ctx, target)
+}
+
 // installSyncbaseDarwin installs the syncbase profile for darwin.
 func installSyncbaseDarwin(ctx *tool.Context, target profileTarget) error {
 	// Install dependencies.
@@ -1048,6 +1075,15 @@ func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 		if target.Arch == "386" {
 			env["CC"] = "gcc -m32"
 			env["CXX"] = "g++ -m32"
+		} else if target.Arch == "arm" && target.OS == "android" {
+			args = append(args,
+				"--host=arm-linux-androidabi",
+				"--target=arm-linux-androidabi",
+			)
+
+			ndkRoot := filepath.Join(root, "third_party", "android", "ndk-toolchain")
+			env["CC"] = filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-gcc")
+			env["CXX"] = filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-g++")
 		}
 		if err := run(ctx, "./configure", args, env); err != nil {
 			return err
@@ -1094,6 +1130,11 @@ func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 		if target.Arch == "386" {
 			env["CC"] = "gcc -m32"
 			env["CXX"] = "g++ -m32"
+		} else if target.Arch == "arm" && target.OS == "android" {
+			ndkRoot := filepath.Join(root, "third_party", "android", "ndk-toolchain")
+			env["CC"] = filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-gcc")
+			env["CXX"] = filepath.Join(ndkRoot, "bin", "arm-linux-androideabi-g++")
+			env["TARGET_OS"] = "OS_ANDROID_CROSSCOMPILE"
 		}
 		if err := run(ctx, "make", []string{"clean"}, env); err != nil {
 			return err
@@ -1345,6 +1386,13 @@ func uninstall(ctx *tool.Context, target profileTarget, profile string, version 
 		default:
 			reportNotImplemented(ctx, profile, target)
 		}
+	case "android":
+		switch profile {
+		case "syncbase":
+			return uninstallSyncbaseAndroid(ctx, target, version)
+		default:
+			reportNotImplemented(ctx, profile, target)
+		}
 	default:
 		reportNotImplemented(ctx, profile, target)
 	}
@@ -1455,6 +1503,11 @@ func uninstallNodeJSCommon(ctx *tool.Context, target profileTarget, version int)
 		return err
 	}
 	return nil
+}
+
+// uninstallSyncbaseAndroid uninstalls the syncbase profile for android.
+func uninstallSyncbaseAndroid(ctx *tool.Context, target profileTarget, version int) error {
+	return uninstallSyncbaseCommon(ctx, target, version)
 }
 
 // uninstallSyncbaseDarwin uninstalls the syncbase profile for darwin.
