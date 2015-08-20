@@ -36,23 +36,17 @@ type ContextOpts struct {
 	Verbose  *bool
 }
 
-var (
-	e = ""
-	f = false
-	t = true
-)
-
 // newContextOpts is the ContextOpts factory.
 func newContextOpts() *ContextOpts {
 	return &ContextOpts{
-		Color:    &f,
-		DryRun:   &f,
+		Color:    &ColorFlag,
+		DryRun:   &DryRunFlag,
 		Env:      map[string]string{},
-		Manifest: &e,
+		Manifest: &ManifestFlag,
 		Stdin:    os.Stdin,
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
-		Verbose:  &t,
+		Verbose:  &VerboseFlag,
 	}
 }
 
@@ -96,10 +90,12 @@ func NewContext(opts ContextOpts) *Context {
 	}
 }
 
-// NewContextFromEnv returns a new context instance based on the given cmdline
-// environment.
-func NewContextFromEnv(env *cmdline.Env, opts ContextOpts) *Context {
+// NewContextFromEnv returns a new context instance based on the given
+// cmdline environment.
+func NewContextFromEnv(env *cmdline.Env) *Context {
+	opts := ContextOpts{}
 	initOpts(newContextOpts(), &opts)
+	opts.Stdin = env.Stdin
 	opts.Stdout = env.Stdout
 	opts.Stderr = env.Stderr
 	return NewContext(opts)

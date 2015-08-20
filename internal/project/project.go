@@ -240,7 +240,7 @@ func LocalProjects(ctx *tool.Context) (Projects, error) {
 // PollProjects returns the set of changelists that exist remotely but
 // not locally. Changes are grouped by vanadium projects and contain
 // author identification and a description of their content.
-func PollProjects(ctx *tool.Context, manifest string, projectSet map[string]struct{}) (_ Update, e error) {
+func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, e error) {
 	update := Update{}
 	cwd, err := os.Getwd()
 	if err != nil {

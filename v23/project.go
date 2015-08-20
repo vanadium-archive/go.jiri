@@ -30,11 +30,13 @@ var (
 
 func init() {
 	cmdProjectClean.Flags.BoolVar(&cleanupBranchesFlag, "branches", false, "Delete all non-master branches.")
-	cmdProjectPoll.Flags.StringVar(&manifestFlag, "manifest", "", "Name of the project manifest.")
 	cmdProjectList.Flags.BoolVar(&branchesFlag, "branches", false, "Show project branches.")
 	cmdProjectList.Flags.BoolVar(&noPristineFlag, "nopristine", false, "If true, omit pristine projects, i.e. projects with a clean master branch and no other branches.")
 	cmdProjectShellPrompt.Flags.BoolVar(&checkDirtyFlag, "check-dirty", true, "If false, don't check for uncommitted changes or untracked files. Setting this option to false is dangerous: dirty master branches will not appear in the output.")
 	cmdProjectShellPrompt.Flags.BoolVar(&showNameFlag, "show-name", false, "Show the name of the current repo.")
+
+	tool.InitializeProjectFlags(&cmdProjectPoll.Flags)
+
 }
 
 // cmdProject represents the "v23 project" command.
@@ -56,12 +58,7 @@ var cmdProjectClean = &cmdline.Command{
 }
 
 func runProjectClean(env *cmdline.Env, args []string) (e error) {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:    &colorFlag,
-		DryRun:   &dryRunFlag,
-		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	localProjects, err := project.LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -177,13 +174,7 @@ func getProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*projectSt
 
 // runProjectList generates a listing of local projects.
 func runProjectList(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:    &colorFlag,
-		DryRun:   &dryRunFlag,
-		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag,
-	})
-
+	ctx := tool.NewContextFromEnv(env)
 	states, err := getProjectStates(ctx, noPristineFlag)
 	if err != nil {
 		return err
@@ -234,12 +225,7 @@ indication of each project's status:
 }
 
 func runProjectShellPrompt(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:    &colorFlag,
-		DryRun:   &dryRunFlag,
-		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 
 	states, err := getProjectStates(ctx, checkDirtyFlag)
 	if err != nil {
@@ -307,12 +293,7 @@ tests are specified, all projects are polled by default.
 // runProjectPoll generates a description of changes that exist
 // remotely but do not exist locally.
 func runProjectPoll(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:    &colorFlag,
-		DryRun:   &dryRunFlag,
-		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	projectSet := map[string]struct{}{}
 	if len(args) > 0 {
 		config, err := util.LoadConfig(ctx)
@@ -335,7 +316,7 @@ func runProjectPoll(env *cmdline.Env, args []string) error {
 			set.String.Union(projectSet, set.String.FromSlice(projects))
 		}
 	}
-	update, err := project.PollProjects(ctx, manifestFlag, projectSet)
+	update, err := project.PollProjects(ctx, projectSet)
 	if err != nil {
 		return err
 	}

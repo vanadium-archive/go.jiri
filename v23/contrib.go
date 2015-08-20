@@ -125,11 +125,7 @@ func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
 }
 
 func runContributors(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 
 	projects, err := project.LocalProjects(ctx)
 	if err != nil {

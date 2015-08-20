@@ -102,9 +102,9 @@ var (
 )
 
 const (
-	// Number of retries for profile installation.
-	numRetries              = 3
 	actionCompletedFileName = ".vanadium_action_completed"
+	defaultFileMode         = os.FileMode(0644)
+	numRetries              = 3 // Number of retries for profile installation
 )
 
 // cmdProfile represents the "v23 profile" command.
@@ -267,11 +267,7 @@ func runProfileInstall(env *cmdline.Env, args []string) error {
 	}
 
 	// Create contexts.
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	t := true
 	verboseCtx := ctx.Clone(tool.ContextOpts{Verbose: &t})
 
@@ -450,7 +446,7 @@ func installAndroidPkg(ctx *tool.Context, sdkRoot string, pkg androidPkg) error 
 		opts.Stdout = &stdout
 		opts.Stderr = &stdout
 		err := ctx.Run().CommandWithOpts(opts, androidBin, androidArgs...)
-		if err != nil || verboseFlag {
+		if err != nil || tool.VerboseFlag {
 			fmt.Fprintf(ctx.Stdout(), out.String())
 		}
 		return err
@@ -502,7 +498,7 @@ func run(ctx *tool.Context, bin string, args []string, env map[string]string) er
 	opts.Stderr = &out
 	opts.Env = env
 	err := ctx.Run().CommandWithOpts(opts, bin, args...)
-	if err != nil || verboseFlag {
+	if err != nil || tool.VerboseFlag {
 		fmt.Fprintf(ctx.Stdout(), out.String())
 	}
 	return err
@@ -667,13 +663,13 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 
 	// Install dependencies.
 	var pkgs []string
-	switch runtime.GOOS {
+	switch target.OS {
 	case "linux":
 		pkgs = []string{"ant", "autoconf", "bzip2", "default-jdk", "gawk", "lib32z1", "lib32stdc++6"}
 	case "darwin":
 		pkgs = []string{"ant", "autoconf", "gawk"}
 	default:
-		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+		return fmt.Errorf("unsupported OS: %s", target.OS)
 	}
 	if err := installDeps(ctx, pkgs); err != nil {
 		return err
@@ -681,13 +677,13 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 
 	androidRoot := filepath.Join(root, "third_party", "android")
 	var sdkRoot string
-	switch runtime.GOOS {
+	switch target.OS {
 	case "linux":
 		sdkRoot = filepath.Join(androidRoot, "android-sdk-linux")
 	case "darwin":
 		sdkRoot = filepath.Join(androidRoot, "android-sdk-macosx")
 	default:
-		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+		return fmt.Errorf("unsupported OS: %s", target.OS)
 	}
 
 	// Download Android SDK.
@@ -701,19 +697,19 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 		var filename string
-		switch runtime.GOOS {
+		switch target.OS {
 		case "linux":
 			filename = "android-sdk_r23-linux.tgz"
 		case "darwin":
 			filename = "android-sdk_r23-macosx.zip"
 		default:
-			return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+			return fmt.Errorf("unsupported OS: %s", target.OS)
 		}
 		remote, local := "https://dl.google.com/android/"+filename, filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
 			return err
 		}
-		switch runtime.GOOS {
+		switch target.OS {
 		case "linux":
 			if err := run(ctx, "tar", []string{"-C", androidRoot, "-xzf", local}, nil); err != nil {
 				return err
@@ -723,7 +719,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 				return err
 			}
 		default:
-			return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+			return fmt.Errorf("unsupported OS: %s", target.OS)
 		}
 		return nil
 	}
@@ -758,7 +754,7 @@ func installAndroidCommon(ctx *tool.Context, target profileTarget) (e error) {
 			return fmt.Errorf("TempDir() failed: %v", err)
 		}
 		defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-		filename := "android-ndk-r9d-" + runtime.GOOS + "-x86_64.tar.bz2"
+		filename := "android-ndk-r9d-" + target.OS + "-x86_64.tar.bz2"
 		remote := "https://dl.google.com/android/ndk/" + filename
 		local := filepath.Join(tmpDir, filename)
 		if err := run(ctx, "curl", []string{"-Lo", local, remote}, nil); err != nil {
@@ -998,11 +994,25 @@ func installNaclCommon(ctx *tool.Context, target profileTarget) error {
 
 // installSyncbaseDarwin installs the syncbase profile for darwin.
 func installSyncbaseDarwin(ctx *tool.Context, target profileTarget) error {
+	// Install dependencies.
+	pkgs := []string{
+		"autoconf", "automake", "libtool", "pkg-config",
+	}
+	if err := installDeps(ctx, pkgs); err != nil {
+		return err
+	}
 	return installSyncbaseCommon(ctx, target)
 }
 
 // installSyncbaseLinux installs the syncbase profile for linux.
 func installSyncbaseLinux(ctx *tool.Context, target profileTarget) error {
+	// Install dependencies.
+	pkgs := []string{
+		"autoconf", "automake", "g++", "g++-multilib", "gcc-multilib", "libtool", "pkg-config",
+	}
+	if err := installDeps(ctx, pkgs); err != nil {
+		return err
+	}
 	return installSyncbaseCommon(ctx, target)
 }
 
@@ -1012,21 +1022,6 @@ func installSyncbaseCommon(ctx *tool.Context, target profileTarget) (e error) {
 	if err != nil {
 		return err
 	}
-
-	// Install dependencies.
-	var pkgs []string
-	switch runtime.GOOS {
-	case "linux":
-		pkgs = []string{"autoconf", "automake", "g++", "g++-multilib", "gcc-multilib", "libtool", "pkg-config"}
-	case "darwin":
-		pkgs = []string{"autoconf", "automake", "libtool", "pkg-config"}
-	default:
-		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
-	}
-	if err := installDeps(ctx, pkgs); err != nil {
-		return err
-	}
-
 	outPrefix, err := util.ThirdPartyCCodePath(target.OS, target.Arch)
 	if err != nil {
 		return err
@@ -1280,11 +1275,7 @@ func runProfileUninstall(env *cmdline.Env, args []string) error {
 	}
 
 	// Create contexts.
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	t := true
 	verboseCtx := ctx.Clone(tool.ContextOpts{Verbose: &t})
 
@@ -1512,11 +1503,7 @@ func runProfileUpdate(env *cmdline.Env, args []string) error {
 	}
 
 	// Create contexts.
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	t := true
 	verboseCtx := ctx.Clone(tool.ContextOpts{Verbose: &t})
 

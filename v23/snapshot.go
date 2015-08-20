@@ -94,11 +94,7 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 		return env.UsageErrorf("unexpected number of arguments")
 	}
 	label := args[0]
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	if err := checkSnapshotDir(ctx); err != nil {
 		return err
 	}
@@ -313,11 +309,7 @@ command lists snapshots for all known labels.
 }
 
 func runSnapshotList(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	if err := checkSnapshotDir(ctx); err != nil {
 		return err
 	}

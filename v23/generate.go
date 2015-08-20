@@ -86,11 +86,7 @@ func configureBuilder(ctx *tool.Context) (cleanup func(), err error) {
 }
 
 func runTestGenerate(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	// Delete all files we're going to generate, to start with a clean slate.  We
 	// do this first to avoid any issues where packages in the cache might include
 	// the generated files.

@@ -246,11 +246,7 @@ func runCLCleanup(env *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		return env.UsageErrorf("cleanup requires at least one argument")
 	}
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	return cleanupCL(ctx, args)
 }
 
@@ -332,11 +328,7 @@ var defaultMessageHeader = `
 
 // runCLMail is a wrapper that sets up and runs a review instance.
 func runCLMail(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 
 	// Sanity checks for the <presubmitFlag> flag.
 	if !checkPresubmitFlag() {
@@ -922,11 +914,7 @@ func runCLNew(env *cmdline.Env, args []string) error {
 	if got, want := len(args), 1; got != want {
 		return env.UsageErrorf("unexpected number of arguments: got %v, want %v", got, want)
 	}
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	return newCL(ctx, args)
 }
 
@@ -1002,11 +990,7 @@ before the command can be retried.
 }
 
 func runCLSync(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	return syncCL(ctx)
 }
 

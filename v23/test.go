@@ -67,11 +67,7 @@ func runTestProject(env *cmdline.Env, args []string) error {
 	if len(args) != 1 {
 		return env.UsageErrorf("unexpected number of arguments")
 	}
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	project := args[0]
 	results, err := v23test.RunProjectTests(ctx, nil, []string{project}, optsFromFlags()...)
 	if err != nil {
@@ -100,11 +96,7 @@ func runTestRun(env *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		return env.UsageErrorf("unexpected number of arguments")
 	}
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	results, err := v23test.RunTests(ctx, nil, args, optsFromFlags()...)
 	if err != nil {
 		return err
@@ -168,12 +160,7 @@ var cmdTestList = &cmdline.Command{
 }
 
 func runTestList(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:    &colorFlag,
-		DryRun:   &dryRunFlag,
-		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	testList, err := v23test.ListTests()
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr(), "%v\n", err)

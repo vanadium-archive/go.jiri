@@ -34,11 +34,7 @@ var cmdOncallList = &cmdline.Command{
 }
 
 func runOncall(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	shift, err := util.Oncall(ctx, time.Now())
 	if err != nil {
 		return err
@@ -48,11 +44,7 @@ func runOncall(env *cmdline.Env, _ []string) error {
 }
 
 func runOncallList(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 	rotation, err := util.LoadOncallRotation(ctx)
 	if err != nil {
 		return err

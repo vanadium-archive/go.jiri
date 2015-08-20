@@ -52,11 +52,7 @@ func runGo(cmdlineEnv *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		return cmdlineEnv.UsageErrorf("not enough arguments")
 	}
-	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(cmdlineEnv)
 
 	env, err := util.VanadiumEnvironment(ctx)
 	if err != nil {
@@ -434,11 +430,7 @@ packages that no longer exist in the source tree.
 }
 
 func runGoExtDistClean(cmdlineEnv *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(cmdlineEnv, tool.ContextOpts{
-		Color:   &colorFlag,
-		DryRun:  &dryRunFlag,
-		Verbose: &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(cmdlineEnv)
 	root, err := project.V23Root()
 	if err != nil {
 		return err

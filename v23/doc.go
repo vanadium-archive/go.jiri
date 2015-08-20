@@ -14,7 +14,6 @@ Usage:
 The v23 commands are:
    cl           Manage project changelists
    contributors List project contributors
-   copyright    Manage vanadium copyright
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
@@ -27,8 +26,8 @@ The v23 commands are:
    update       Update all vanadium tools and projects
    version      Print version
    help         Display help for commands or topics
-   api          Work with Vanadium's public API
-   copyright
+   api          Manage vanadium public API
+   copyright    Manage vanadium copyright
    env
    go
    goext
@@ -166,47 +165,6 @@ The v23 contributors flags are:
    Path to the aliases file.
  -n=false
    Show number of contributions.
-
-V23 copyright - Manage vanadium copyright
-
-This command can be used to check if all source code files of Vanadium projects
-contain the appropriate copyright header and also if all projects contains the
-appropriate licensing files. Optionally, the command can be used to fix the
-appropriate copyright headers and licensing files.
-
-In order to ignore checked in third-party assets which have their own copyright
-and licensing headers a ".v23ignore" file can be added to a project. The
-".v23ignore" file is expected to contain a single regular expression pattern per
-line.
-
-Usage:
-   v23 copyright [flags] <command>
-
-The v23 copyright commands are:
-   check       Check copyright headers and licensing files
-   fix         Fix copyright headers and licensing files
-
-The v23 copyright flags are:
- -manifest=
-   Name of the project manifest.
-
-V23 copyright check - Check copyright headers and licensing files
-
-Check copyright headers and licensing files.
-
-Usage:
-   v23 copyright check <projects>
-
-<projects> is a list of projects to check.
-
-V23 copyright fix - Fix copyright headers and licensing files
-
-Fix copyright headers and licensing files.
-
-Usage:
-   v23 copyright fix <projects>
-
-<projects> is a list of projects to fix.
 
 V23 env - Print vanadium environment variables
 
@@ -682,9 +640,9 @@ Print version of the v23 tool.
 Usage:
    v23 version
 
-V23 api - Work with Vanadium's public API
+V23 api - Manage vanadium public API
 
-Use this command to ensure that no unintended changes are made to Vanadium's
+Use this command to ensure that no unintended changes are made to the vanadium
 public API.
 
 Usage:
@@ -714,7 +672,7 @@ Check if any changes have been made to the public API.
 Usage:
    v23 api check [flags] <projects>
 
-<projects> is a list of Vanadium projects to check. If none are specified, all
+<projects> is a list of vanadium projects to check. If none are specified, all
 projects that require a public API check upon presubmit are checked.
 
 The v23 api check flags are:
@@ -729,8 +687,55 @@ Update .api files to reflect changes to the public API.
 Usage:
    v23 api fix <projects>
 
-<projects> is a list of Vanadium projects to update. If none are specified, all
+<projects> is a list of vanadium projects to update. If none are specified, all
 project APIs are updated.
+
+V23 copyright - Manage vanadium copyright
+
+This command can be used to check if all source code files of Vanadium projects
+contain the appropriate copyright header and also if all projects contains the
+appropriate licensing files. Optionally, the command can be used to fix the
+appropriate copyright headers and licensing files.
+
+In order to ignore checked in third-party assets which have their own copyright
+and licensing headers a ".v23ignore" file can be added to a project. The
+".v23ignore" file is expected to contain a single regular expression pattern per
+line.
+
+Usage:
+   v23 copyright [flags] <command>
+
+The v23 copyright commands are:
+   check       Check copyright headers and licensing files
+   fix         Fix copyright headers and licensing files
+
+The v23 copyright flags are:
+ -color=true
+   Use color to format output.
+ -manifest=
+   Name of the project manifest.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+V23 copyright check - Check copyright headers and licensing files
+
+Check copyright headers and licensing files.
+
+Usage:
+   v23 copyright check <projects>
+
+<projects> is a list of projects to check.
+
+V23 copyright fix - Fix copyright headers and licensing files
+
+Fix copyright headers and licensing files.
+
+Usage:
+   v23 copyright fix <projects>
+
+<projects> is a list of projects to fix.
 
 V23 help - Display help for commands or topics
 

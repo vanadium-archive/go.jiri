@@ -20,8 +20,9 @@ var (
 )
 
 func init() {
+	tool.InitializeProjectFlags(&cmdUpdate.Flags)
+
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
-	cmdUpdate.Flags.StringVar(&manifestFlag, "manifest", "", "Name of the project manifest.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 }
 
@@ -81,12 +82,7 @@ is not an API. It is an implementation and can change without notice.
 }
 
 func runUpdate(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env, tool.ContextOpts{
-		Color:    &colorFlag,
-		DryRun:   &dryRunFlag,
-		Manifest: &manifestFlag,
-		Verbose:  &verboseFlag,
-	})
+	ctx := tool.NewContextFromEnv(env)
 
 	// Create a snapshot of the current state of all projects and
 	// write it to the $V23_ROOT/.update_history folder.

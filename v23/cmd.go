@@ -15,19 +15,10 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-var (
-	verboseFlag  bool
-	dryRunFlag   bool
-	colorFlag    bool
-	manifestFlag string
-)
-
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	cmdRoot.Flags.BoolVar(&verboseFlag, "v", false, "Print verbose output.")
-	cmdRoot.Flags.BoolVar(&dryRunFlag, "n", false, "Show what commands will run but do not execute them.")
-	cmdRoot.Flags.BoolVar(&colorFlag, "color", true, "Use color to format output.")
+	tool.InitializeRunFlags(&cmdRoot.Flags)
 }
 
 func main() {
@@ -45,7 +36,6 @@ Command v23 is a multi-purpose tool for Vanadium development.
 	Children: []*cmdline.Command{
 		cmdCL,
 		cmdContributors,
-		cmdCopyright,
 		cmdEnv,
 		cmdGo,
 		cmdGoExt,
