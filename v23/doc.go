@@ -29,6 +29,7 @@ The v23 commands are:
    go
    goext
    oncall
+   profile
    run          Run an executable using the vanadium environment
    test         Manage vanadium tests
 
