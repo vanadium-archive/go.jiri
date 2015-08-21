@@ -14,8 +14,6 @@ Usage:
 The v23 commands are:
    cl           Manage project changelists
    contributors List project contributors
-   go           Execute the go tool using the vanadium environment
-   goext        Vanadium extensions of the go tool
    oncall       Manage vanadium oncall schedule
    profile      Manage vanadium profiles
    project      Manage the vanadium projects
@@ -26,8 +24,8 @@ The v23 commands are:
    api          Manage vanadium public API
    copyright    Manage vanadium copyright
    env          Print vanadium environment variables
-   go
-   goext
+   go           Execute the go tool using the vanadium environment
+   goext        Vanadium extensions of the go tool
    oncall
    run          Run an executable using the vanadium environment
    test         Manage vanadium tests
@@ -162,44 +160,6 @@ The v23 contributors flags are:
    Path to the aliases file.
  -n=false
    Show number of contributions.
-
-V23 go - Execute the go tool using the vanadium environment
-
-Wrapper around the 'go' tool that can be used for compilation of vanadium Go
-sources. It takes care of vanadium-specific setup, such as setting up the Go
-specific environment variables or making sure that VDL generated files are
-regenerated before compilation.
-
-In particular, the tool invokes the following command before invoking any go
-tool commands that compile vanadium Go code:
-
-vdl generate -lang=go all
-
-Usage:
-   v23 go <arg ...>
-
-<arg ...> is a list of arguments for the go tool.
-
-V23 goext - Vanadium extensions of the go tool
-
-Vanadium extension of the go tool.
-
-Usage:
-   v23 goext <command>
-
-The v23 goext commands are:
-   distclean   Restore the vanadium Go workspaces to their pristine state
-
-V23 goext distclean - Restore the vanadium Go workspaces to their pristine state
-
-Unlike the 'go clean' command, which only removes object files for packages in
-the source tree, the 'goext disclean' command removes all object files from
-vanadium Go workspaces. This functionality is needed to avoid accidental use of
-stale object files that correspond to packages that no longer exist in the
-source tree.
-
-Usage:
-   v23 goext distclean
 
 V23 oncall - Manage vanadium oncall schedule
 
@@ -627,6 +587,60 @@ The v23 env flags are:
    Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
+
+V23 go - Execute the go tool using the vanadium environment
+
+Wrapper around the 'go' tool that can be used for compilation of vanadium Go
+sources. It takes care of vanadium-specific setup, such as setting up the Go
+specific environment variables or making sure that VDL generated files are
+regenerated before compilation.
+
+In particular, the tool invokes the following command before invoking any go
+tool commands that compile vanadium Go code:
+
+vdl generate -lang=go all
+
+Usage:
+   v23 go [flags] <arg ...>
+
+<arg ...> is a list of arguments for the go tool.
+
+The v23 go flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+V23 goext - Vanadium extensions of the go tool
+
+Vanadium extension of the go tool.
+
+Usage:
+   v23 goext [flags] <command>
+
+The v23 goext commands are:
+   distclean   Restore the vanadium Go workspaces to their pristine state
+
+The v23 goext flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+V23 goext distclean - Restore the vanadium Go workspaces to their pristine state
+
+Unlike the 'go clean' command, which only removes object files for packages in
+the source tree, the 'goext disclean' command removes all object files from
+vanadium Go workspaces. This functionality is needed to avoid accidental use of
+stale object files that correspond to packages that no longer exist in the
+source tree.
+
+Usage:
+   v23 goext distclean
 
 V23 run - Run an executable using the vanadium environment
 
