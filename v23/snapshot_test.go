@@ -13,7 +13,6 @@ import (
 
 	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
 	"v.io/x/lib/cmdline"
 )
 
@@ -231,12 +230,6 @@ func TestCreate(t *testing.T) {
 	}
 	defer os.Setenv("V23_ROOT", oldRoot)
 
-	// Create a fake configuration file.
-	config := util.NewConfig(util.SnapshotLabelTestsOpt(map[string][]string{"test-remote": []string{}}))
-	if err := util.SaveConfig(ctx, config); err != nil {
-		t.Fatalf("%v", err)
-	}
-
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
 	for i := 0; i < numProjects; i++ {
@@ -295,7 +288,8 @@ func TestCreate(t *testing.T) {
 		}
 	}
 
-	// Check that invoking the UpdateUniverse() with the remote snapshot.
+	// Check that invoking the UpdateUniverse() with the remote snapshot
+	// restores the local repositories.
 	manifest := "snapshot/test-remote"
 	remoteCtx := ctx.Clone(tool.ContextOpts{
 		Manifest: &manifest,
