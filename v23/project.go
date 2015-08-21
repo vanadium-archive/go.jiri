@@ -7,7 +7,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -89,93 +88,10 @@ var cmdProjectList = &cmdline.Command{
 	Long:   "Inspect the local filesystem and list the existing projects and branches.",
 }
 
-type branchState struct {
-	name             string
-	hasGerritMessage bool
-}
-
-type projectState struct {
-	project        project.Project
-	branches       []branchState
-	currentBranch  string
-	hasUncommitted bool
-	hasUntracked   bool
-}
-
-func setProjectState(ctx *tool.Context, state *projectState, checkDirty bool, ch chan<- error) {
-	var err error
-	switch state.project.Protocol {
-	case "git":
-		scm := ctx.Git(tool.RootDirOpt(state.project.Path))
-		var branches []string
-		branches, state.currentBranch, err = scm.GetBranches()
-		if err != nil {
-			ch <- err
-			return
-		}
-		for _, branch := range branches {
-			file := filepath.Join(state.project.Path, project.MetadataDirName(), branch, commitMessageFileName)
-			hasFile := true
-			if _, err := ctx.Run().Stat(file); err != nil {
-				if !os.IsNotExist(err) {
-					ch <- err
-					return
-				}
-				hasFile = false
-			}
-			state.branches = append(state.branches, branchState{
-				name:             branch,
-				hasGerritMessage: hasFile,
-			})
-		}
-		if checkDirty {
-			state.hasUncommitted, err = scm.HasUncommittedChanges()
-			if err != nil {
-				ch <- err
-				return
-			}
-			state.hasUntracked, err = scm.HasUntrackedFiles()
-			if err != nil {
-				ch <- err
-				return
-			}
-		}
-	default:
-		ch <- project.UnsupportedProtocolErr(state.project.Protocol)
-		return
-	}
-	ch <- nil
-}
-
-func getProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*projectState, error) {
-	projects, err := project.LocalProjects(ctx)
-	if err != nil {
-		return nil, err
-	}
-	states := make(map[string]*projectState, len(projects))
-	sem := make(chan error, len(projects))
-	for name, project := range projects {
-		state := &projectState{
-			project: project,
-		}
-		states[name] = state
-		// ctx is not threadsafe, so we make a clone for each
-		// goroutine.
-		go setProjectState(ctx.Clone(tool.ContextOpts{}), state, checkDirty, sem)
-	}
-	for _ = range projects {
-		err := <-sem
-		if err != nil {
-			return nil, err
-		}
-	}
-	return states, nil
-}
-
 // runProjectList generates a listing of local projects.
 func runProjectList(env *cmdline.Env, _ []string) error {
 	ctx := tool.NewContextFromEnv(env)
-	states, err := getProjectStates(ctx, noPristineFlag)
+	states, err := project.GetProjectStates(ctx, noPristineFlag)
 	if err != nil {
 		return err
 	}
@@ -188,20 +104,20 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 	for _, name := range names {
 		state := states[name]
 		if noPristineFlag {
-			pristine := len(state.branches) == 1 && state.currentBranch == "master" && !state.hasUncommitted && !state.hasUntracked
+			pristine := len(state.Branches) == 1 && state.CurrentBranch == "master" && !state.HasUncommitted && !state.HasUntracked
 			if pristine {
 				continue
 			}
 		}
-		fmt.Fprintf(ctx.Stdout(), "project=%q path=%q\n", path.Base(name), state.project.Path)
+		fmt.Fprintf(ctx.Stdout(), "project=%q path=%q\n", path.Base(name), state.Project.Path)
 		if branchesFlag {
-			for _, branch := range state.branches {
+			for _, branch := range state.Branches {
 				s := "  "
-				if branch.name == state.currentBranch {
+				if branch.Name == state.CurrentBranch {
 					s += "* "
 				}
-				s += branch.name
-				if branch.hasGerritMessage {
+				s += branch.Name
+				if branch.HasGerritMessage {
 					s += " (exported to gerrit)"
 				}
 				fmt.Fprintf(ctx.Stdout(), "%v\n", s)
@@ -227,7 +143,7 @@ indication of each project's status:
 func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env)
 
-	states, err := getProjectStates(ctx, checkDirtyFlag)
+	states, err := project.GetProjectStates(ctx, checkDirtyFlag)
 	if err != nil {
 		return err
 	}
@@ -247,14 +163,14 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 		state := states[name]
 		status := ""
 		if checkDirtyFlag {
-			if state.hasUncommitted {
+			if state.HasUncommitted {
 				status += "*"
 			}
-			if state.hasUntracked {
+			if state.HasUntracked {
 				status += "%"
 			}
 		}
-		short := state.currentBranch + status
+		short := state.CurrentBranch + status
 		long := filepath.Base(name) + ":" + short
 		if name == currentProjectName {
 			if showNameFlag {
@@ -263,9 +179,9 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 				statuses = append([]string{short}, statuses...)
 			}
 		} else {
-			pristine := state.currentBranch == "master"
+			pristine := state.CurrentBranch == "master"
 			if checkDirtyFlag {
-				pristine = pristine && !state.hasUncommitted && !state.hasUntracked
+				pristine = pristine && !state.HasUncommitted && !state.HasUntracked
 			}
 			if !pristine {
 				statuses = append(statuses, long)
