@@ -43,9 +43,6 @@ var (
 		"test-project":  []string{"test-test-A", "test-test-group"},
 		"test-project2": []string{"test-test-D"},
 	}
-	snapshotLabelTests = map[string][]string{
-		"test-snapshot-label": []string{"test-test-A", "test-test-group"},
-	}
 	testDependencies = map[string][]string{
 		"test-test-A": []string{"test-test-B"},
 		"test-test-B": []string{"test-test-C"},
@@ -84,12 +81,6 @@ func testConfigAPI(t *testing.T, c *Config) {
 	if got, want := c.ProjectTests([]string{"test-project", "test-project2"}), []string{"test-test-A", "test-test-B", "test-test-C", "test-test-D"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
-	if got, want := c.SnapshotLabels(), []string{"test-snapshot-label"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("unexpected result: got %v, want %v", got, want)
-	}
-	if got, want := c.SnapshotLabelTests("test-snapshot-label"), []string{"test-test-A", "test-test-B", "test-test-C"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("unexpected result: got %v, want %v", got, want)
-	}
 	if got, want := c.TestDependencies("test-test-A"), []string{"test-test-B"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected result: got %v, want %v", got, want)
 	}
@@ -111,7 +102,6 @@ func TestConfigAPI(t *testing.T) {
 		GoWorkspacesOpt(goWorkspaces),
 		JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
 		ProjectTestsOpt(projectTests),
-		SnapshotLabelTestsOpt(snapshotLabelTests),
 		TestDependenciesOpt(testDependencies),
 		TestGroupsOpt(testGroups),
 		TestPartsOpt(testParts),
@@ -145,7 +135,6 @@ func TestConfigSerialization(t *testing.T) {
 		GoWorkspacesOpt(goWorkspaces),
 		JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
 		ProjectTestsOpt(projectTests),
-		SnapshotLabelTestsOpt(snapshotLabelTests),
 		TestDependenciesOpt(testDependencies),
 		TestGroupsOpt(testGroups),
 		TestPartsOpt(testParts),

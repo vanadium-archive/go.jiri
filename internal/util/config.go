@@ -32,9 +32,6 @@ type Config struct {
 	// projectTests maps vanadium projects to sets of tests that should be
 	// executed to test changes in the given project.
 	projectTests map[string][]string
-	// snapshotLabelTests maps snapshot labels to sets of tests that
-	// determine whether a snapshot for the given label can be created.
-	snapshotLabelTests map[string][]string
 	// testDependencies maps tests to sets of tests that the given test
 	// depends on.
 	testDependencies map[string][]string
@@ -86,12 +83,6 @@ type ProjectTestsOpt map[string][]string
 
 func (ProjectTestsOpt) configOpt() {}
 
-// SnapshotLabelTestsOpt is the type that can be used to pass the
-// Config factory a snapshot label tests option.
-type SnapshotLabelTestsOpt map[string][]string
-
-func (SnapshotLabelTestsOpt) configOpt() {}
-
 // TestDependenciesOpt is the type that can be used to pass the Config
 // factory a test dependencies option.
 type TestDependenciesOpt map[string][]string
@@ -131,8 +122,6 @@ func NewConfig(opts ...ConfigOpt) *Config {
 			c.jenkinsMatrixJobs = map[string]JenkinsMatrixJobInfo(typedOpt)
 		case ProjectTestsOpt:
 			c.projectTests = map[string][]string(typedOpt)
-		case SnapshotLabelTestsOpt:
-			c.snapshotLabelTests = map[string][]string(typedOpt)
 		case TestDependenciesOpt:
 			c.testDependencies = map[string][]string(typedOpt)
 		case TestGroupsOpt:
@@ -212,32 +201,6 @@ func (c Config) ProjectTests(projects []string) []string {
 	return tests
 }
 
-// SnapshotLabels returns a list of snapshot labels included in the
-// config.
-func (c Config) SnapshotLabels() []string {
-	var labels []string
-	for label, _ := range c.snapshotLabelTests {
-		labels = append(labels, label)
-	}
-	return labels
-}
-
-// SnapshotLabelTests returns a list of tests for the given label.
-func (c Config) SnapshotLabelTests(label string) []string {
-	testSet := map[string]struct{}{}
-	testGroups := c.testGroups
-	for _, test := range c.snapshotLabelTests[label] {
-		if testGroup, ok := testGroups[test]; ok {
-			set.String.Union(testSet, set.String.FromSlice(testGroup))
-		} else {
-			testSet[test] = struct{}{}
-		}
-	}
-	tests := set.String.ToSlice(testSet)
-	sort.Strings(tests)
-	return tests
-}
-
 // TestDependencies returns a list of dependencies for the given test.
 func (c Config) TestDependencies(test string) []string {
 	return c.testDependencies[test]
@@ -259,7 +222,6 @@ type configSchema struct {
 	GoWorkspaces           []string                `xml:"goWorkspaces>workspace"`
 	JenkinsMatrixJobs      jenkinsMatrixJobsSchema `xml:"jenkinsMatrixJobs>job"`
 	ProjectTests           testGroupSchemas        `xml:"projectTests>project"`
-	SnapshotLabelTests     testGroupSchemas        `xml:"snapshotLabelTests>snapshot"`
 	TestDependencies       dependencyGroupSchemas  `xml:"testDependencies>test"`
 	TestGroups             testGroupSchemas        `xml:"testGroups>group"`
 	TestParts              partGroupSchemas        `xml:"testParts>test"`
@@ -343,7 +305,6 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 		goWorkspaces:           []string{},
 		jenkinsMatrixJobs:      map[string]JenkinsMatrixJobInfo{},
 		projectTests:           map[string][]string{},
-		snapshotLabelTests:     map[string][]string{},
 		testDependencies:       map[string][]string{},
 		testGroups:             map[string][]string{},
 		testParts:              map[string][]string{},
@@ -360,9 +321,6 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 	}
 	for _, project := range data.ProjectTests {
 		config.projectTests[project.Name] = project.Tests
-	}
-	for _, snapshot := range data.SnapshotLabelTests {
-		config.snapshotLabelTests[snapshot.Name] = snapshot.Tests
 	}
 	for _, test := range data.TestDependencies {
 		config.testDependencies[test.Name] = test.Dependencies
@@ -411,13 +369,6 @@ func saveConfig(ctx *tool.Context, config *Config, path string) error {
 		})
 	}
 	sort.Sort(data.ProjectTests)
-	for name, tests := range config.snapshotLabelTests {
-		data.SnapshotLabelTests = append(data.SnapshotLabelTests, testGroupSchema{
-			Name:  name,
-			Tests: tests,
-		})
-	}
-	sort.Sort(data.SnapshotLabelTests)
 	for name, dependencies := range config.testDependencies {
 		data.TestDependencies = append(data.TestDependencies, dependencyGroupSchema{
 			Name:         name,

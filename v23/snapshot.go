@@ -16,10 +16,7 @@ import (
 	"v.io/x/devtools/internal/collect"
 	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/project"
-	"v.io/x/devtools/internal/test"
 	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
-	v23test "v.io/x/devtools/v23/internal/test"
 	"v.io/x/lib/cmdline"
 )
 
@@ -98,15 +95,6 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 	if err := checkSnapshotDir(ctx); err != nil {
 		return err
 	}
-
-	// Run the tests associated with the given label. The creation
-	// of "remote" snapshots requires that the label exists in the
-	// vanadium project  configuration, while creationg "local"
-	// snapshots does not have that requirement.
-	if err := runTests(ctx, label); err != nil {
-		return err
-	}
-
 	snapshotDir, err := getSnapshotDir()
 	if err != nil {
 		return err
@@ -258,37 +246,6 @@ func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string)
 	if remoteFlag {
 		if err := ctx.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-// runTests runs the tests associated with the given snapshot label.
-func runTests(ctx *tool.Context, label string) error {
-	config, err := util.LoadConfig(ctx)
-	if err != nil {
-		return err
-	}
-	found := false
-	for _, l := range config.SnapshotLabels() {
-		if label == l {
-			found = true
-			break
-		}
-	}
-	if !found {
-		if remoteFlag {
-			return fmt.Errorf("no configuration for label %v found", label)
-		}
-		return nil
-	}
-	for _, t := range config.SnapshotLabelTests(label) {
-		result, err := v23test.RunTests(ctx, nil, []string{t})
-		if err != nil {
-			return err
-		}
-		if result[t].Status != test.Passed {
-			return fmt.Errorf("%v failed", t)
 		}
 	}
 	return nil
