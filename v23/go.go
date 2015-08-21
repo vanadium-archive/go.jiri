@@ -91,7 +91,7 @@ func runGo(cmdlineEnv *cmdline.Env, args []string) error {
 	}
 	opts := ctx.Run().Opts()
 	opts.Env = env.ToMap()
-	return translateExitCode(ctx.Run().CommandWithOpts(opts, goBin, args...))
+	return util.TranslateExitCode(ctx.Run().CommandWithOpts(opts, goBin, args...))
 }
 
 // getPlatform identifies the target platform by querying the go tool

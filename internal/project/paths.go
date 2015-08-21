@@ -31,7 +31,7 @@ func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
 	}
 	tool, ok := tools[toolName]
 	if !ok {
-		return "", fmt.Errorf("tool %q not found in the manifest", tool.Name)
+		return "", fmt.Errorf("tool %q not found in the manifest", toolName)
 	}
 	projectName := tool.Project
 	project, ok := projects[projectName]

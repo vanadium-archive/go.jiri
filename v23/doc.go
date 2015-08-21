@@ -14,13 +14,11 @@ Usage:
 The v23 commands are:
    cl           Manage project changelists
    contributors List project contributors
-   env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
    oncall       Manage vanadium oncall schedule
    profile      Manage vanadium profiles
    project      Manage the vanadium projects
-   run          Run an executable using the vanadium environment
    snapshot     Manage snapshots of the vanadium project
    test         Manage vanadium tests
    update       Update all vanadium tools and projects
@@ -28,11 +26,11 @@ The v23 commands are:
    help         Display help for commands or topics
    api          Manage vanadium public API
    copyright    Manage vanadium copyright
-   env
+   env          Print vanadium environment variables
    go
    goext
    oncall
-   run
+   run          Run an executable using the vanadium environment
    test
 
 The v23 flags are:
@@ -165,23 +163,6 @@ The v23 contributors flags are:
    Path to the aliases file.
  -n=false
    Show number of contributions.
-
-V23 env - Print vanadium environment variables
-
-Print vanadium environment variables.
-
-If no arguments are given, prints all variables in NAME="VALUE" format, each on
-a separate line ordered by name.  This format makes it easy to set all vars by
-running the following bash command (or similar for other shells):
-   eval $(v23 env)
-
-If arguments are given, prints only the value of each named variable, each on a
-separate line in the same order as the arguments.
-
-Usage:
-   v23 env [name ...]
-
-[name ...] is an optional list of variable names.
 
 V23 go - Execute the go tool using the vanadium environment
 
@@ -387,16 +368,6 @@ Usage:
 The v23 project poll flags are:
  -manifest=
    Name of the project manifest.
-
-V23 run - Run an executable using the vanadium environment
-
-Run an executable using the vanadium environment.
-
-Usage:
-   v23 run <executable> [arg ...]
-
-<executable> [arg ...] is the executable to run and any arguments to pass
-verbatim to the executable.
 
 V23 snapshot - Manage snapshots of the vanadium project
 
@@ -736,6 +707,49 @@ Usage:
    v23 copyright fix <projects>
 
 <projects> is a list of projects to fix.
+
+V23 env - Print vanadium environment variables
+
+Print vanadium environment variables.
+
+If no arguments are given, prints all variables in NAME="VALUE" format, each on
+a separate line ordered by name.  This format makes it easy to set all vars by
+running the following bash command (or similar for other shells):
+   eval $(v23 env)
+
+If arguments are given, prints only the value of each named variable, each on a
+separate line in the same order as the arguments.
+
+Usage:
+   v23 env [flags] [name ...]
+
+[name ...] is an optional list of variable names.
+
+The v23 env flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+V23 run - Run an executable using the vanadium environment
+
+Run an executable using the vanadium environment.
+
+Usage:
+   v23 run [flags] <executable> [arg ...]
+
+<executable> [arg ...] is the executable to run and any arguments to pass
+verbatim to the executable.
+
+The v23 run flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 V23 help - Display help for commands or topics
 

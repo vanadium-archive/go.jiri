@@ -36,13 +36,11 @@ Command v23 is a multi-purpose tool for Vanadium development.
 	Children: []*cmdline.Command{
 		cmdCL,
 		cmdContributors,
-		cmdEnv,
 		cmdGo,
 		cmdGoExt,
 		cmdOncall,
 		cmdProfile,
 		cmdProject,
-		cmdRun,
 		cmdSnapshot,
 		cmdTest,
 		cmdUpdate,
