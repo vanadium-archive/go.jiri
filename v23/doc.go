@@ -467,19 +467,19 @@ Print version of the v23 tool.
 Usage:
    v23 version
 
-V23 api - Manage vanadium public API
+Api - Manage vanadium public API
 
 Use this command to ensure that no unintended changes are made to the vanadium
 public API.
 
 Usage:
-   v23 api [flags] <command>
+   api [flags] <command>
 
-The v23 api commands are:
+The api commands are:
    check       Check if any changes have been made to the public API
    fix         Update .api files to reflect changes to the public API
 
-The v23 api flags are:
+The api flags are:
  -color=true
    Use color to format output.
  -gotools-bin=
@@ -492,32 +492,32 @@ The v23 api flags are:
  -v=false
    Print verbose output.
 
-V23 api check - Check if any changes have been made to the public API
+Api check - Check if any changes have been made to the public API
 
 Check if any changes have been made to the public API.
 
 Usage:
-   v23 api check [flags] <projects>
+   api check [flags] <projects>
 
 <projects> is a list of vanadium projects to check. If none are specified, all
 projects that require a public API check upon presubmit are checked.
 
-The v23 api check flags are:
+The api check flags are:
  -detailed=true
    If true, shows each API change in an expanded form. Otherwise, only a summary
    is shown.
 
-V23 api fix
+Api fix
 
 Update .api files to reflect changes to the public API.
 
 Usage:
-   v23 api fix <projects>
+   api fix <projects>
 
 <projects> is a list of vanadium projects to update. If none are specified, all
 project APIs are updated.
 
-V23 copyright - Manage vanadium copyright
+Copyright - Manage vanadium copyright
 
 This command can be used to check if all source code files of Vanadium projects
 contain the appropriate copyright header and also if all projects contains the
@@ -530,13 +530,13 @@ and licensing headers a ".v23ignore" file can be added to a project. The
 line.
 
 Usage:
-   v23 copyright [flags] <command>
+   copyright [flags] <command>
 
-The v23 copyright commands are:
+The copyright commands are:
    check       Check copyright headers and licensing files
    fix         Fix copyright headers and licensing files
 
-The v23 copyright flags are:
+The copyright flags are:
  -color=true
    Use color to format output.
  -manifest=
@@ -546,25 +546,25 @@ The v23 copyright flags are:
  -v=false
    Print verbose output.
 
-V23 copyright check - Check copyright headers and licensing files
+Copyright check - Check copyright headers and licensing files
 
 Check copyright headers and licensing files.
 
 Usage:
-   v23 copyright check <projects>
+   copyright check <projects>
 
 <projects> is a list of projects to check.
 
-V23 copyright fix - Fix copyright headers and licensing files
+Copyright fix - Fix copyright headers and licensing files
 
 Fix copyright headers and licensing files.
 
 Usage:
-   v23 copyright fix <projects>
+   copyright fix <projects>
 
 <projects> is a list of projects to fix.
 
-V23 env - Print vanadium environment variables
+Env - Print vanadium environment variables
 
 Print vanadium environment variables.
 
@@ -577,11 +577,11 @@ If arguments are given, prints only the value of each named variable, each on a
 separate line in the same order as the arguments.
 
 Usage:
-   v23 env [flags] [name ...]
+   env [flags] [name ...]
 
 [name ...] is an optional list of variable names.
 
-The v23 env flags are:
+The env flags are:
  -color=true
    Use color to format output.
  -n=false
@@ -589,7 +589,7 @@ The v23 env flags are:
  -v=false
    Print verbose output.
 
-V23 go - Execute the go tool using the vanadium environment
+Go - Execute the go tool using the vanadium environment
 
 Wrapper around the 'go' tool that can be used for compilation of vanadium Go
 sources. It takes care of vanadium-specific setup, such as setting up the Go
@@ -602,11 +602,11 @@ tool commands that compile vanadium Go code:
 vdl generate -lang=go all
 
 Usage:
-   v23 go [flags] <arg ...>
+   go [flags] <arg ...>
 
 <arg ...> is a list of arguments for the go tool.
 
-The v23 go flags are:
+The go flags are:
  -color=true
    Use color to format output.
  -n=false
@@ -614,17 +614,17 @@ The v23 go flags are:
  -v=false
    Print verbose output.
 
-V23 goext - Vanadium extensions of the go tool
+Goext - Vanadium extensions of the go tool
 
 Vanadium extension of the go tool.
 
 Usage:
-   v23 goext [flags] <command>
+   goext [flags] <command>
 
-The v23 goext commands are:
+The goext commands are:
    distclean   Restore the vanadium Go workspaces to their pristine state
 
-The v23 goext flags are:
+The goext flags are:
  -color=true
    Use color to format output.
  -n=false
@@ -632,7 +632,7 @@ The v23 goext flags are:
  -v=false
    Print verbose output.
 
-V23 goext distclean - Restore the vanadium Go workspaces to their pristine state
+Goext distclean - Restore the vanadium Go workspaces to their pristine state
 
 Unlike the 'go clean' command, which only removes object files for packages in
 the source tree, the 'goext disclean' command removes all object files from
@@ -641,19 +641,19 @@ stale object files that correspond to packages that no longer exist in the
 source tree.
 
 Usage:
-   v23 goext distclean
+   goext distclean
 
-V23 run - Run an executable using the vanadium environment
+Run - Run an executable using the vanadium environment
 
 Run an executable using the vanadium environment.
 
 Usage:
-   v23 run [flags] <executable> [arg ...]
+   run [flags] <executable> [arg ...]
 
 <executable> [arg ...] is the executable to run and any arguments to pass
 verbatim to the executable.
 
-The v23 run flags are:
+The run flags are:
  -color=true
    Use color to format output.
  -n=false
@@ -661,20 +661,20 @@ The v23 run flags are:
  -v=false
    Print verbose output.
 
-V23 test - Manage vanadium tests
+Test - Manage vanadium tests
 
 Manage vanadium tests.
 
 Usage:
-   v23 test [flags] <command>
+   test [flags] <command>
 
-The v23 test commands are:
+The test commands are:
    generate    Generate supporting code for v23 integration tests
    project     Run tests for a vanadium project
    run         Run vanadium tests
    list        List vanadium tests
 
-The v23 test flags are:
+The test flags are:
  -color=true
    Use color to format output.
  -n=false
@@ -682,7 +682,7 @@ The v23 test flags are:
  -v=false
    Print verbose output.
 
-V23 test generate - Generate supporting code for v23 integration tests
+Test generate - Generate supporting code for v23 integration tests
 
 The generate command supports the vanadium integration test framework and unit
 tests by generating go files that contain supporting code.  v23 test generate is
@@ -709,11 +709,11 @@ The generated TestMain performs common initialization, and also performs child
 process dispatching for tests that use "v.io/veyron/test/modules".
 
 Usage:
-   v23 test generate [flags] [packages]
+   test generate [flags] [packages]
 
 list of go packages
 
-The v23 test generate flags are:
+The test generate flags are:
  -prefix=v23
    Specifies the prefix to use for generated files. Up to two files may
    generated, the defaults are v23_test.go and v23_internal_test.go, or
@@ -721,7 +721,7 @@ The v23 test generate flags are:
  -progress=false
    Print verbose progress information.
 
-V23 test project - Run tests for a vanadium project
+Test project - Run tests for a vanadium project
 
 Runs tests for a vanadium project that is by the remote URL specified as the
 command-line argument. Projects hosted on googlesource.com, can be specified
@@ -729,20 +729,20 @@ using the basename of the URL (e.g. "vanadium.go.core" implies
 "https://vanadium.googlesource.com/vanadium.go.core").
 
 Usage:
-   v23 test project <project>
+   test project <project>
 
 <project> identifies the project for which to run tests.
 
-V23 test run - Run vanadium tests
+Test run - Run vanadium tests
 
 Run vanadium tests.
 
 Usage:
-   v23 test run [flags] <name...>
+   test run [flags] <name...>
 
 <name...> is a list names identifying the tests to run.
 
-The v23 test run flags are:
+The test run flags are:
  -blessings-root=dev.v.io
    The blessings root.
  -clean-go=true
@@ -766,12 +766,12 @@ The v23 test run flags are:
  -v23.namespace.root=/ns.dev.v.io:8101
    The namespace root.
 
-V23 test list - List vanadium tests
+Test list - List vanadium tests
 
 List vanadium tests.
 
 Usage:
-   v23 test list
+   test list
 
 V23 help - Display help for commands or topics
 
