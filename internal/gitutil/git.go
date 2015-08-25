@@ -376,13 +376,13 @@ func (g *Git) Log(branch, base, format string) ([][]string, error) {
 func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	args := []string{"merge"}
 	squash := false
-	strategy := ""
+	strategyOption := ""
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case SquashOpt:
 			squash = bool(typedOpt)
 		case StrategyOpt:
-			strategy = string(typedOpt)
+			strategyOption = string(typedOpt)
 		}
 	}
 	if squash {
@@ -390,8 +390,8 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	} else {
 		args = append(args, "--no-squash")
 	}
-	if strategy != "" {
-		args = append(args, fmt.Sprintf("--strategy=%v", strategy))
+	if strategyOption != "" {
+		args = append(args, fmt.Sprintf("--strategy-option=%v", strategyOption))
 	}
 	args = append(args, branch)
 	if out, err := g.runOutput(args...); err != nil {
