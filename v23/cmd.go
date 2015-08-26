@@ -37,7 +37,6 @@ Command v23 is a multi-purpose tool for Vanadium development.
 		cmdCL,
 		cmdContributors,
 		cmdOncall,
-		cmdProfile,
 		cmdProject,
 		cmdSnapshot,
 		cmdUpdate,

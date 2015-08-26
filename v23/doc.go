@@ -15,7 +15,6 @@ The v23 commands are:
    cl           Manage project changelists
    contributors List project contributors
    oncall       Manage vanadium oncall schedule
-   profile      Manage vanadium profiles
    project      Manage the vanadium projects
    snapshot     Manage snapshots of the vanadium project
    update       Update all vanadium tools and projects
@@ -27,7 +26,7 @@ The v23 commands are:
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
    oncall
-   profile
+   profile      Manage vanadium profiles
    run          Run an executable using the vanadium environment
    test         Manage vanadium tests
 
@@ -180,80 +179,6 @@ List available oncall schedule.
 
 Usage:
    v23 oncall list
-
-V23 profile - Manage vanadium profiles
-
-To facilitate development across different host platforms, vanadium defines
-platform-independent "profiles" that map different platforms to a set of
-libraries and tools that can be used for a facet of vanadium development.
-
-Each profile can be in one of three states: absent, up-to-date, or out-of-date.
-The subcommands of the profile command realize the following transitions:
-
-  install:   absent => up-to-date
-  update:    out-of-date => up-to-date
-  uninstall: up-to-date or out-of-date => absent
-
-In addition, a profile can transition from being up-to-date to out-of-date by
-the virtue of a new version of the profile being released.
-
-To enable cross-compilation, a profile can be installed for multiple targets. If
-a profile supports multiple targets the above state transitions are applied on a
-profile + target basis.
-
-Usage:
-   v23 profile <command>
-
-The v23 profile commands are:
-   install     Install the given vanadium profiles
-   list        List known vanadium profiles
-   setup       Set up the given vanadium profiles
-   uninstall   Uninstall the given vanadium profiles
-   update      Update the given vanadium profiles
-
-V23 profile install - Install the given vanadium profiles
-
-Install the given vanadium profiles.
-
-Usage:
-   v23 profile install <profiles>
-
-<profiles> is a list of profiles to install.
-
-V23 profile list - List known vanadium profiles
-
-List known vanadium profiles.
-
-Usage:
-   v23 profile list
-
-V23 profile setup - Set up the given vanadium profiles
-
-Set up the given vanadium profiles. This command is identical to 'install' and
-is provided for backwards compatibility.
-
-Usage:
-   v23 profile setup <profiles>
-
-<profiles> is a list of profiles to set up.
-
-V23 profile uninstall - Uninstall the given vanadium profiles
-
-Uninstall the given vanadium profiles.
-
-Usage:
-   v23 profile uninstall <profiles>
-
-<profiles> is a list of profiles to uninstall.
-
-V23 profile update - Update the given vanadium profiles
-
-Update the given vanadium profiles.
-
-Usage:
-   v23 profile update <profiles>
-
-<profiles> is a list of profiles to update.
 
 V23 project - Manage the vanadium projects
 
@@ -642,6 +567,88 @@ source tree.
 
 Usage:
    goext distclean
+
+Profile - Manage vanadium profiles
+
+To facilitate development across different host platforms, vanadium defines
+platform-independent "profiles" that map different platforms to a set of
+libraries and tools that can be used for a facet of vanadium development.
+
+Each profile can be in one of three states: absent, up-to-date, or out-of-date.
+The subcommands of the profile command realize the following transitions:
+
+  install:   absent => up-to-date
+  update:    out-of-date => up-to-date
+  uninstall: up-to-date or out-of-date => absent
+
+In addition, a profile can transition from being up-to-date to out-of-date by
+the virtue of a new version of the profile being released.
+
+To enable cross-compilation, a profile can be installed for multiple targets. If
+a profile supports multiple targets the above state transitions are applied on a
+profile + target basis.
+
+Usage:
+   profile [flags] <command>
+
+The profile commands are:
+   install     Install the given vanadium profiles
+   list        List known vanadium profiles
+   setup       Set up the given vanadium profiles
+   uninstall   Uninstall the given vanadium profiles
+   update      Update the given vanadium profiles
+
+The profile flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Profile install - Install the given vanadium profiles
+
+Install the given vanadium profiles.
+
+Usage:
+   profile install <profiles>
+
+<profiles> is a list of profiles to install.
+
+Profile list - List known vanadium profiles
+
+List known vanadium profiles.
+
+Usage:
+   profile list
+
+Profile setup - Set up the given vanadium profiles
+
+Set up the given vanadium profiles. This command is identical to 'install' and
+is provided for backwards compatibility.
+
+Usage:
+   profile setup <profiles>
+
+<profiles> is a list of profiles to set up.
+
+Profile uninstall - Uninstall the given vanadium profiles
+
+Uninstall the given vanadium profiles.
+
+Usage:
+   profile uninstall <profiles>
+
+<profiles> is a list of profiles to uninstall.
+
+Profile update - Update the given vanadium profiles
+
+Update the given vanadium profiles.
+
+Usage:
+   profile update <profiles>
+
+<profiles> is a list of profiles to update.
 
 Run - Run an executable using the vanadium environment
 
