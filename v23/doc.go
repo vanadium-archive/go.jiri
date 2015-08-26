@@ -25,7 +25,6 @@ The v23 commands are:
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
-   oncall
    profile      Manage vanadium profiles
    run          Run an executable using the vanadium environment
    test         Manage vanadium tests
