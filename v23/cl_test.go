@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -77,17 +78,13 @@ func assertFilesNotCommitted(t *testing.T, ctx *tool.Context, files []string) {
 // assertFilesPushedToRef asserts that the given files have been
 // pushed to the given remote repository reference.
 func assertFilesPushedToRef(t *testing.T, ctx *tool.Context, repoPath, gerritPath, pushedRef string, files []string) {
-	if err := ctx.Run().Chdir(gerritPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", gerritPath, err)
-	}
+	chdir(t, ctx, gerritPath)
 	assertCommitCount(t, ctx, pushedRef, "master", 1)
 	if err := ctx.Git().CheckoutBranch(pushedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertFilesCommitted(t, ctx, files)
-	if err := ctx.Run().Chdir(repoPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", repoPath, err)
-	}
+	chdir(t, ctx, repoPath)
 }
 
 // assertStashSize asserts that the stash size matches the expected
@@ -150,48 +147,63 @@ func installCommitMsgHook(t *testing.T, ctx *tool.Context, repoPath string) {
 	}
 }
 
+// chdir changes the runtime working directory and traps any errors.
+func chdir(t *testing.T, ctx *tool.Context, path string) {
+	if err := ctx.Run().Chdir(path); err != nil {
+		_, file, line, _ := runtime.Caller(1)
+		t.Fatalf("%s: %d: Chdir(%v) failed: %v", file, line, path, err)
+	}
+}
+
+// createRepoFromOrigin creates a Git repo tracking origin/master.
+func createRepoFromOrigin(t *testing.T, ctx *tool.Context, workingDir string, subpath string, originPath string) string {
+	repoPath := createRepo(t, ctx, workingDir, subpath)
+	chdir(t, ctx, repoPath)
+	if err := ctx.Git().AddRemote("origin", originPath); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().Pull("origin", "master"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	return repoPath
+}
+
 // createTestRepos sets up three local repositories: origin, gerrit,
 // and the main test repository which pulls from origin and can push
 // to gerrit.
 func createTestRepos(t *testing.T, ctx *tool.Context, workingDir string) (string, string, string) {
 	// Create origin.
 	originPath := createRepo(t, ctx, workingDir, "origin")
-	if err := ctx.Run().Chdir(originPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", originPath, err)
-	}
+	chdir(t, ctx, originPath)
 	if err := ctx.Git().CommitWithMessage("initial commit"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	// Create test repo.
-	repoPath := createRepo(t, ctx, workingDir, "test")
-	if err := ctx.Run().Chdir(repoPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", repoPath, err)
-	}
-	if err := ctx.Git().AddRemote("origin", originPath); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().Pull("origin", "master"); err != nil {
-		t.Fatalf("%v", err)
-	}
+	repoPath := createRepoFromOrigin(t, ctx, workingDir, "test", originPath)
 	// Add Gerrit remote.
-	gerritPath := createRepo(t, ctx, workingDir, "gerrit")
-	if err := ctx.Run().Chdir(gerritPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", gerritPath, err)
-	}
-	if err := ctx.Git().AddRemote("origin", originPath); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := ctx.Git().Pull("origin", "master"); err != nil {
-		t.Fatalf("%v", err)
-	}
+	gerritPath := createRepoFromOrigin(t, ctx, workingDir, "gerrit", originPath)
 	// Switch back to test repo.
-	if err := ctx.Run().Chdir(repoPath); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", repoPath, err)
-	}
+	chdir(t, ctx, repoPath)
 	return repoPath, originPath, gerritPath
 }
 
-// setup creates a set up for testing the review tool.
+// submit mocks a Gerrit review submit by pushing the Gerrit remote to origin.
+// Actually origin pulls from Gerrit since origin isn't actually a bare git repo.
+// Some of our tests actually rely on accessing .git in origin, so it must be non-bare.
+func submit(t *testing.T, ctx *tool.Context, originPath string, gerritPath string, review *review) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	chdir(t, ctx, originPath)
+	expectedRef := gerrit.Reference(review.CLOpts)
+	if err := ctx.Git().Pull(gerritPath, expectedRef); err != nil {
+		t.Fatalf("Pull gerrit to origin failed: %v", err)
+	}
+	chdir(t, ctx, cwd)
+}
+
+// setupTest creates a setup for testing the review tool.
 func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*project.FakeV23Root, string, string, string) {
 	root, err := project.NewFakeV23Root(ctx)
 	if err != nil {
@@ -203,20 +215,23 @@ func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*project.Fake
 			installCommitMsgHook(t, ctx, path)
 		}
 	}
-	if err := ctx.Run().Chdir(repoPath); err != nil {
-		t.Fatalf("%v", err)
-	}
+	chdir(t, ctx, repoPath)
 	return root, repoPath, originPath, gerritPath
 }
 
-// teardownTest cleans up the set up for testing the review tool.
+// teardownTest cleans up the setup for testing the review tool.
 func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *project.FakeV23Root) {
-	if err := ctx.Run().Chdir(oldWorkDir); err != nil {
-		t.Fatalf("%v", err)
-	}
+	chdir(t, ctx, oldWorkDir)
 	if err := root.Cleanup(ctx); err != nil {
 		t.Fatalf("%v", err)
 	}
+}
+
+func createCLWithFile(t *testing.T, ctx *tool.Context, branch string, file string) {
+	if err := newCL(ctx, []string{branch}); err != nil {
+		t.Fatalf("%v", err)
+	}
+	commitFiles(t, ctx, []string{file})
 }
 
 // TestCleanupClean checks that cleanup succeeds if the branch to be
@@ -237,13 +252,9 @@ func TestCleanupClean(t *testing.T) {
 	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := ctx.Run().Chdir(originPath); err != nil {
-		t.Fatalf("%v", err)
-	}
+	chdir(t, ctx, originPath)
 	commitFiles(t, ctx, []string{"file1", "file2"})
-	if err := ctx.Run().Chdir(repoPath); err != nil {
-		t.Fatalf("%v", err)
-	}
+	chdir(t, ctx, repoPath)
 	if err := cleanupCL(ctx, []string{branch}); err != nil {
 		t.Fatalf("cleanup() failed: %v", err)
 	}
@@ -697,9 +708,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	}
 	files := []string{path.Join(subdir, "file1")}
 	commitFiles(t, ctx, files)
-	if err := ctx.Run().Chdir(subdir); err != nil {
-		t.Fatalf("Chdir(%v) failed: %v", subdir, err)
-	}
+	chdir(t, ctx, subdir)
 	review, err := newReview(ctx, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -860,6 +869,68 @@ func TestCLNew(t *testing.T) {
 		if bytes.Compare(data, testCase.data) != 0 {
 			t.Fatalf("unexpected data:\ngot\n%v\nwant\n%v", string(data), string(testCase.data))
 		}
+	}
+}
+
+// TestParallelDev checks "v23 cl mail" behavior when parallel development has
+// been submitted upstream.
+func TestParallelDev(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	root, repoPath, originPath, gerritAPath := setupTest(t, ctx, true)
+	gerritBPath := createRepoFromOrigin(t, ctx, root.Dir, "gerritB", originPath)
+	chdir(t, ctx, repoPath)
+	defer teardownTest(t, ctx, cwd, root)
+
+	// Create parallel branches with independent changes.
+	createCLWithFile(t, ctx, "feature1-A", "A")
+
+	if err := ctx.Git().CheckoutBranch("master"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	createCLWithFile(t, ctx, "feature1-B", "B")
+
+	reviewB, err := newReview(ctx, gerrit.CLOpts{Remote: gerritBPath})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	setTopicFlag = false
+	if err := reviewB.run(); err != nil {
+		t.Fatalf("run() failed: %v", err)
+	}
+
+	// Submit one and verify the other doesn't revert it.
+	submit(t, ctx, originPath, gerritBPath, reviewB)
+
+	chdir(t, ctx, originPath)
+	if _, err := ctx.Run().Stat("B"); err != nil {
+		t.Fatalf("file B not pushed to origin: %v", err)
+	}
+
+	chdir(t, ctx, repoPath)
+
+	if err := ctx.Git().CheckoutBranch("feature1-A"); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	reviewA, err := newReview(ctx, gerrit.CLOpts{Remote: gerritAPath})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := reviewA.run(); err != nil {
+		t.Fatalf("run() failed: %v", err)
+	}
+
+	chdir(t, ctx, gerritAPath)
+	expectedRef := gerrit.Reference(reviewA.CLOpts)
+	if err := ctx.Git().CheckoutBranch(expectedRef); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if _, err := ctx.Run().Stat("B"); err != nil {
+		t.Fatalf("file B was not present in Gerrit: %v", err)
 	}
 }
 

@@ -822,23 +822,31 @@ func (review *review) send() error {
 	return nil
 }
 
-// setTopic sets the topic for the CL corresponding to the branch the
-// review was created for.
-func (review *review) setTopic() error {
-	// Read the commit message and extract the Change-Id.
+// getChangeID reads the commit message and extracts the change-Id.
+func (review *review) getChangeID() (string, error) {
 	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
 	if err != nil {
-		return err
+		return "", err
 	}
 	bytes, err := review.ctx.Run().ReadFile(file)
 	if err != nil {
-		return err
+		return "", err
 	}
 	changeID := changeIDRE.FindSubmatch(bytes)
 	if changeID == nil || len(changeID) < 2 {
-		return fmt.Errorf("could not find Change-Id in:\n%s", bytes)
+		return "", fmt.Errorf("could not find Change-Id in:\n%s", bytes)
 	}
-	if err := review.ctx.Gerrit(review.CLOpts.Host).SetTopic(string(changeID[1]), review.CLOpts); err != nil {
+	return string(changeID[1]), nil
+}
+
+// setTopic sets the topic for the CL corresponding to the branch the
+// review was created for.
+func (review *review) setTopic() error {
+	changeID, err := review.getChangeID()
+	if err != nil {
+		return err
+	}
+	if err := review.ctx.Gerrit(review.CLOpts.Host).SetTopic(changeID, review.CLOpts); err != nil {
 		return err
 	}
 	return nil
