@@ -32,11 +32,11 @@ func init() {
 
 var cmdSnapshot = &cmdline.Command{
 	Name:  "snapshot",
-	Short: "Manage snapshots of the vanadium project",
+	Short: "Manage project snapshots",
 	Long: `
-The "v23 snapshot" command can be used to manage snapshots of the
-vanadium project. In particular, it can be used to create new snapshots
-and to list existing snapshots.
+The "v23 snapshot" command can be used to manage project snapshots.
+In particular, it can be used to create new snapshots and to list
+existing snapshots.
 
 The command-line flag "-remote" determines whether the command
 pertains to "local" snapshots that are only stored locally or "remote"
@@ -49,17 +49,14 @@ snapshots the are revisioned in the manifest repository.
 var cmdSnapshotCreate = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runSnapshotCreate),
 	Name:   "create",
-	Short:  "Create a new snapshot of the vanadium project",
+	Short:  "Create a new project snapshot",
 	Long: `
-The "v23 snapshot create <label>" command first checks whether the
-vanadium project configuration associates the given label with any
-tests. If so, the command checks that all of these tests pass.
-
-Next, the command captures the current state of the vanadium project as a
-manifest and, depending on the value of the -remote flag, the command
-either stores the manifest in the local $V23_ROOT/.snapshots
-directory, or in the manifest repository, pushing the change to the
-remote repository and thus making it available globally.
+The "v23 snapshot create <label>" command captures the current project
+state in a manifest and, depending on the value of the -remote flag,
+the command either stores the manifest in the local
+$V23_ROOT/.snapshots directory, or in the manifest repository, pushing
+the change to the remote repository and thus making it available
+globally.
 
 Internally, snapshots are organized as follows:
 
@@ -100,9 +97,9 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 		return err
 	}
 	snapshotFile := filepath.Join(snapshotDir, "labels", label, time.Now().Format(timeFormatFlag))
-	// Either atomically create a new snapshot that captures the
-	// state of the vanadium project and push the changes to the
-	// remote repository (if applicable), or fail with no effect.
+	// Either atomically create a new snapshot that captures the project
+	// state and push the changes to the remote repository (if
+	// applicable), or fail with no effect.
 	createFn := func() error {
 		revision, err := ctx.Git().CurrentRevision()
 		if err != nil {
@@ -255,7 +252,7 @@ func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string)
 var cmdSnapshotList = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runSnapshotList),
 	Name:   "list",
-	Short:  "List existing snapshots of vanadium projects",
+	Short:  "List existing project snapshots",
 	Long: `
 The "snapshot list" command lists existing snapshots of the labels
 specified as command-line arguments. If no arguments are provided, the

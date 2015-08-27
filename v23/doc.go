@@ -14,9 +14,8 @@ Usage:
 The v23 commands are:
    cl           Manage project changelists
    contributors List project contributors
-   oncall       Manage vanadium oncall schedule
    project      Manage the vanadium projects
-   snapshot     Manage snapshots of the vanadium project
+   snapshot     Manage project snapshots
    update       Update all vanadium tools and projects
    version      Print version
    api          Manage vanadium public API
@@ -24,6 +23,7 @@ The v23 commands are:
    env          Print vanadium environment variables
    go           Execute the go tool using the vanadium environment
    goext        Vanadium extensions of the go tool
+   oncall       Manage vanadium oncall schedule
    profile      Manage vanadium profiles
    run          Run an executable using the vanadium environment
    test         Manage vanadium tests
@@ -160,25 +160,6 @@ The v23 contributors flags are:
  -n=false
    Show number of contributions.
 
-V23 oncall - Manage vanadium oncall schedule
-
-Manage vanadium oncall schedule. If no subcommand is given, it shows the LDAP of
-the current oncall.
-
-Usage:
-   v23 oncall
-   v23 oncall <command>
-
-The v23 oncall commands are:
-   list        List available oncall schedule
-
-V23 oncall list - List available oncall schedule
-
-List available oncall schedule.
-
-Usage:
-   v23 oncall list
-
 V23 project - Manage the vanadium projects
 
 Manage the vanadium projects.
@@ -253,11 +234,11 @@ The v23 project poll flags are:
  -manifest=
    Name of the project manifest.
 
-V23 snapshot - Manage snapshots of the vanadium project
+V23 snapshot - Manage project snapshots
 
-The "v23 snapshot" command can be used to manage snapshots of the vanadium
-project. In particular, it can be used to create new snapshots and to list
-existing snapshots.
+The "v23 snapshot" command can be used to manage project snapshots. In
+particular, it can be used to create new snapshots and to list existing
+snapshots.
 
 The command-line flag "-remote" determines whether the command pertains to
 "local" snapshots that are only stored locally or "remote" snapshots the are
@@ -267,21 +248,17 @@ Usage:
    v23 snapshot [flags] <command>
 
 The v23 snapshot commands are:
-   create      Create a new snapshot of the vanadium project
-   list        List existing snapshots of vanadium projects
+   create      Create a new project snapshot
+   list        List existing project snapshots
 
 The v23 snapshot flags are:
  -remote=false
    Manage remote snapshots.
 
-V23 snapshot create - Create a new snapshot of the vanadium project
+V23 snapshot create - Create a new project snapshot
 
-The "v23 snapshot create <label>" command first checks whether the vanadium
-project configuration associates the given label with any tests. If so, the
-command checks that all of these tests pass.
-
-Next, the command captures the current state of the vanadium project as a
-manifest and, depending on the value of the -remote flag, the command either
+The "v23 snapshot create <label>" command captures the current project state in
+a manifest and, depending on the value of the -remote flag, the command either
 stores the manifest in the local $V23_ROOT/.snapshots directory, or in the
 manifest repository, pushing the change to the remote repository and thus making
 it available globally.
@@ -316,7 +293,7 @@ The v23 snapshot create flags are:
  -time-format=2006-01-02T15:04:05Z07:00
    Time format for snapshot file name.
 
-V23 snapshot list - List existing snapshots of vanadium projects
+V23 snapshot list - List existing project snapshots
 
 The "snapshot list" command lists existing snapshots of the labels specified as
 command-line arguments. If no arguments are provided, the command lists
@@ -566,6 +543,33 @@ source tree.
 
 Usage:
    v23 goext distclean
+
+V23 oncall - Manage vanadium oncall schedule
+
+Manage vanadium oncall schedule. If no subcommand is given, it shows the LDAP of
+the current oncall.
+
+Usage:
+   v23 oncall [flags]
+   v23 oncall [flags] <command>
+
+The v23 oncall commands are:
+   list        List available oncall schedule
+
+The v23 oncall flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+V23 oncall list - List available oncall schedule
+
+List available oncall schedule.
+
+Usage:
+   v23 oncall list
 
 V23 profile - Manage vanadium profiles
 
