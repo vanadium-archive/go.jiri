@@ -6,7 +6,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"testing"
 
 	"v.io/x/devtools/internal/gerrit"
+	"v.io/x/devtools/internal/gitutil"
 	"v.io/x/devtools/internal/project"
 	"v.io/x/devtools/internal/tool"
 )
@@ -43,9 +43,8 @@ func assertFileContent(t *testing.T, ctx *tool.Context, file, want string) {
 	}
 }
 
-// assertFilesCommitted asserts that the files exist and are committed
-// in the current branch.
-func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
+// assertFilesExist asserts that the files exist.
+func assertFilesExist(t *testing.T, ctx *tool.Context, files []string) {
 	for _, file := range files {
 		if _, err := ctx.Run().Stat(file); err != nil {
 			if os.IsNotExist(err) {
@@ -53,6 +52,25 @@ func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
 			}
 			t.Fatalf("%v", err)
 		}
+	}
+}
+
+// assertFilesDoNotExist asserts that the files do not exist.
+func assertFilesDoNotExist(t *testing.T, ctx *tool.Context, files []string) {
+	for _, file := range files {
+		if _, err := ctx.Run().Stat(file); err != nil && !os.IsNotExist(err) {
+			t.Fatalf("%v", err)
+		} else if err == nil {
+			t.Fatalf("expected file %v to not exist but it did", file)
+		}
+	}
+}
+
+// assertFilesCommitted asserts that the files exist and are committed
+// in the current branch.
+func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
+	assertFilesExist(t, ctx, files)
+	for _, file := range files {
 		if !ctx.Git().IsFileCommitted(file) {
 			t.Fatalf("expected file %v to be committed but it is not", file)
 		}
@@ -62,13 +80,8 @@ func assertFilesCommitted(t *testing.T, ctx *tool.Context, files []string) {
 // assertFilesNotCommitted asserts that the files exist and are *not*
 // committed in the current branch.
 func assertFilesNotCommitted(t *testing.T, ctx *tool.Context, files []string) {
+	assertFilesExist(t, ctx, files)
 	for _, file := range files {
-		if _, err := ctx.Run().Stat(file); err != nil {
-			if os.IsNotExist(err) {
-				t.Fatalf("expected file %v to exist but it did not", file)
-			}
-			t.Fatalf("%v", err)
-		}
 		if ctx.Git().IsFileCommitted(file) {
 			t.Fatalf("expected file %v not to be committed but it is", file)
 		}
@@ -99,18 +112,23 @@ func assertStashSize(t *testing.T, ctx *tool.Context, want int) {
 	}
 }
 
+// commitFile commits a file with the specified content into a branch
+func commitFile(t *testing.T, ctx *tool.Context, filename string, content string) {
+	if err := ctx.Run().WriteFile(filename, []byte(content), 0644); err != nil {
+		t.Fatalf("%v", err)
+	}
+	commitMessage := "Commit " + filename
+	if err := ctx.Git().CommitFile(filename, commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
 // commitFiles commits the given files into to current branch.
-func commitFiles(t *testing.T, ctx *tool.Context, fileNames []string) {
+func commitFiles(t *testing.T, ctx *tool.Context, filenames []string) {
 	// Create and commit the files one at a time.
-	for _, fileName := range fileNames {
-		fileContent := "This is file " + fileName
-		if err := ctx.Run().WriteFile(fileName, []byte(fileContent), 0644); err != nil {
-			t.Fatalf("%v", err)
-		}
-		commitMessage := "Commit " + fileName
-		if err := ctx.Git().CommitFile(fileName, commitMessage); err != nil {
-			t.Fatalf("%v", err)
-		}
+	for _, filename := range filenames {
+		content := "This is file " + filename
+		commitFile(t, ctx, filename, content)
 	}
 }
 
@@ -204,19 +222,24 @@ func submit(t *testing.T, ctx *tool.Context, originPath string, gerritPath strin
 }
 
 // setupTest creates a setup for testing the review tool.
-func setupTest(t *testing.T, ctx *tool.Context, installHook bool) (*project.FakeV23Root, string, string, string) {
-	root, err := project.NewFakeV23Root(ctx)
+func setupTest(t *testing.T, installHook bool) (ctx *tool.Context, cwd string, root *project.FakeV23Root, repoPath, originPath, gerritPath string) {
+	ctx = tool.NewDefaultContext()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() failed: %v", err)
+	}
+	root, err = project.NewFakeV23Root(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	repoPath, originPath, gerritPath := createTestRepos(t, ctx, root.Dir)
+	repoPath, originPath, gerritPath = createTestRepos(t, ctx, root.Dir)
 	if installHook == true {
 		for _, path := range []string{repoPath, originPath, gerritPath} {
 			installCommitMsgHook(t, ctx, path)
 		}
 	}
 	chdir(t, ctx, repoPath)
-	return root, repoPath, originPath, gerritPath
+	return
 }
 
 // teardownTest cleans up the setup for testing the review tool.
@@ -237,12 +260,7 @@ func createCLWithFile(t *testing.T, ctx *tool.Context, branch string, file strin
 // TestCleanupClean checks that cleanup succeeds if the branch to be
 // cleaned up has been merged with the master.
 func TestCleanupClean(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, originPath, _ := setupTest(t, ctx, true)
+	ctx, cwd, root, repoPath, originPath, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -266,12 +284,7 @@ func TestCleanupClean(t *testing.T) {
 // TestCleanupDirty checks that cleanup is a no-op if the branch to be
 // cleaned up has unmerged changes.
 func TestCleanupDirty(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, _ := setupTest(t, ctx, true)
+	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -294,12 +307,7 @@ func TestCleanupDirty(t *testing.T) {
 // TestCreateReviewBranch checks that the temporary review branch is
 // created correctly.
 func TestCreateReviewBranch(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, _ := setupTest(t, ctx, true)
+	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -333,12 +341,7 @@ func TestCreateReviewBranch(t *testing.T) {
 // createReviewBranch() on a branch with no changes will result in an
 // EmptyChangeError.
 func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, _ := setupTest(t, ctx, true)
+	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -360,12 +363,7 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 
 // TestSendReview checks the various options for sending a review.
 func TestSendReview(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	ctx, cwd, root, repoPath, _, gerritPath := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -437,13 +435,8 @@ func TestSendReview(t *testing.T) {
 // TestSendReviewNoChangeID checks that review.send() correctly errors when
 // not run with a commit hook that adds a Change-Id.
 func TestSendReviewNoChangeID(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
 	// Pass 'false' to setup so it doesn't install the commit-msg hook.
-	root, _, _, gerritPath := setupTest(t, ctx, false)
+	ctx, cwd, root, _, _, gerritPath := setupTest(t, false)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -465,12 +458,7 @@ func TestSendReviewNoChangeID(t *testing.T) {
 
 // TestEndToEnd checks the end-to-end functionality of the review tool.
 func TestEndToEnd(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	ctx, cwd, root, repoPath, _, gerritPath := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -505,12 +493,7 @@ func TestEndToEnd(t *testing.T) {
 // fact that the reference name is a function of the reviewers and
 // uses different reviewers for different review runs.
 func TestLabelsInCommitMessage(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	ctx, cwd, root, repoPath, _, gerritPath := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -619,12 +602,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 // TestDirtyBranch checks that the tool correctly handles unstaged and
 // untracked changes in a working branch with stashed changes.
 func TestDirtyBranch(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, gerritPath := setupTest(t, ctx, true)
+	ctx, cwd, root, _, _, gerritPath := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -690,12 +668,7 @@ func TestDirtyBranch(t *testing.T) {
 // within a subdirectory of a branch that does not exist on master branch, and
 // will return the user to the subdirectory after completion.
 func TestRunInSubdirectory(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, _, gerritPath := setupTest(t, ctx, true)
+	ctx, cwd, root, repoPath, _, gerritPath := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 	branch := "my-branch"
 	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -734,12 +707,13 @@ func TestRunInSubdirectory(t *testing.T) {
 		t.Fatalf("unexpected working directory: got %v, want %v", got, want)
 	}
 	expectedRef := gerrit.Reference(review.CLOpts)
-	fmt.Printf("%v\n", expectedRef)
 	assertFilesPushedToRef(t, ctx, repoPath, gerritPath, expectedRef, files)
 }
 
 // TestProcessLabels checks that the processLabels function works as expected.
 func TestProcessLabels(t *testing.T) {
+	ctx, cwd, root, _, _, _ := setupTest(t, true)
+	defer teardownTest(t, ctx, cwd, root)
 	testCases := []struct {
 		autosubmit      bool
 		presubmitType   gerrit.PresubmitTestType
@@ -810,7 +784,6 @@ Change-Id: I0000000000000000000000000000000000000000`,
 Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
-	ctx := tool.NewDefaultContext()
 	for _, test := range testCases {
 		review, err := newReview(ctx, gerrit.CLOpts{
 			Autosubmit: test.autosubmit,
@@ -827,12 +800,7 @@ Change-Id: I0000000000000000000000000000000000000000`,
 
 // TestCLNew checks the operation of the "v23 cl new" command.
 func TestCLNew(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, _ := setupTest(t, ctx, true)
+	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 
 	// Create some dependent CLs.
@@ -875,23 +843,21 @@ func TestCLNew(t *testing.T) {
 // TestParallelDev checks "v23 cl mail" behavior when parallel development has
 // been submitted upstream.
 func TestParallelDev(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, repoPath, originPath, gerritAPath := setupTest(t, ctx, true)
+	ctx, cwd, root, repoPath, originPath, gerritAPath := setupTest(t, true)
 	gerritBPath := createRepoFromOrigin(t, ctx, root.Dir, "gerritB", originPath)
 	chdir(t, ctx, repoPath)
 	defer teardownTest(t, ctx, cwd, root)
 
-	// Create parallel branches with independent changes.
+	// Create parallel branches with:
+	// * non-conflicting changes in different files
+	// * conflicting changes in a file
 	createCLWithFile(t, ctx, "feature1-A", "A")
 
 	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	createCLWithFile(t, ctx, "feature1-B", "B")
+	commitFile(t, ctx, "A", "Don't tread on me.")
 
 	reviewB, err := newReview(ctx, gerrit.CLOpts{Remote: gerritBPath})
 	if err != nil {
@@ -902,14 +868,12 @@ func TestParallelDev(t *testing.T) {
 		t.Fatalf("run() failed: %v", err)
 	}
 
-	// Submit one and verify the other doesn't revert it.
+	// Submit B and verify A doesn't revert it.
 	submit(t, ctx, originPath, gerritBPath, reviewB)
 
+	// Assert files pushed to origin.
 	chdir(t, ctx, originPath)
-	if _, err := ctx.Run().Stat("B"); err != nil {
-		t.Fatalf("file B not pushed to origin: %v", err)
-	}
-
+	assertFilesExist(t, ctx, []string{"A", "B"})
 	chdir(t, ctx, repoPath)
 
 	if err := ctx.Git().CheckoutBranch("feature1-A"); err != nil {
@@ -917,9 +881,40 @@ func TestParallelDev(t *testing.T) {
 	}
 
 	reviewA, err := newReview(ctx, gerrit.CLOpts{Remote: gerritAPath})
-	if err != nil {
+	if err == nil {
+		t.Fatalf("creating a review did not fail when it should")
+	}
+	// Assert state restored after failed review.
+	assertFileContent(t, ctx, "A", "This is file A")
+	assertFilesDoNotExist(t, ctx, []string{"B"})
+
+	// Manual conflict resolution.
+	if err := ctx.Git().Merge("master", gitutil.ResetOnFailureOpt(false)); err == nil {
+		t.Fatalf("merge applied cleanly when it shouldn't")
+	}
+	assertFilesNotCommitted(t, ctx, []string{"A", "B"})
+	assertFileContent(t, ctx, "B", "This is file B")
+
+	if err := ctx.Run().WriteFile("A", []byte("This is file A. Don't tread on me."), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
+
+	if err := ctx.Git().Add("A"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().Add("B"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().CommitWithMessage("Conflict resolution"); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Retry review.
+	reviewA, err = newReview(ctx, gerrit.CLOpts{Remote: gerritAPath})
+	if err != nil {
+		t.Fatalf("review failed: %v", err)
+	}
+
 	if err := reviewA.run(); err != nil {
 		t.Fatalf("run() failed: %v", err)
 	}
@@ -936,12 +931,7 @@ func TestParallelDev(t *testing.T) {
 
 // TestCLSync checks the operation of the "v23 cl sync" command.
 func TestCLSync(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() failed: %v", err)
-	}
-	root, _, _, _ := setupTest(t, ctx, true)
+	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
 
 	// Create some dependent CLs.

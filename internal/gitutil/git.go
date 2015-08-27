@@ -377,12 +377,15 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	args := []string{"merge"}
 	squash := false
 	strategyOption := ""
+	resetOnFailure := true
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case SquashOpt:
 			squash = bool(typedOpt)
 		case StrategyOpt:
 			strategyOption = string(typedOpt)
+		case ResetOnFailureOpt:
+			resetOnFailure = bool(typedOpt)
 		}
 	}
 	if squash {
@@ -395,7 +398,11 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	}
 	args = append(args, branch)
 	if out, err := g.runOutput(args...); err != nil {
-		g.run("reset", "--merge")
+		if resetOnFailure {
+			if err2 := g.run("reset", "--merge"); err2 != nil {
+				return fmt.Errorf("%v\nCould not git reset while recovering from error: %v", err, err2)
+			}
+		}
 		return fmt.Errorf("%v\n%v", err, strings.Join(out, "\n"))
 	}
 	return nil

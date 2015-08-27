@@ -336,22 +336,6 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
 
-	// Sync all CLs in the sequence of dependent CLs ending in the
-	// current branch.
-	if err := syncCL(ctx); err != nil {
-		return err
-	}
-
-	// Make sure that all CLs in the above sequence (possibly except for
-	// the current branch) have been exported to Gerrit. This is needed
-	// to make sure we have commit messages for all but the last CL.
-	//
-	// NOTE: The alternative here is to prompt the user for multiple
-	// commit messages, which seems less user friendly.
-	if err := checkDependents(ctx); err != nil {
-		return err
-	}
-
 	// Create and run the review.
 
 	review, err := newReview(ctx, gerrit.CLOpts{
@@ -435,6 +419,22 @@ type review struct {
 }
 
 func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
+	// Sync all CLs in the sequence of dependent CLs ending in the
+	// current branch.
+	if err := syncCL(ctx); err != nil {
+		return nil, err
+	}
+
+	// Make sure that all CLs in the above sequence (possibly except for
+	// the current branch) have been exported to Gerrit. This is needed
+	// to make sure we have commit messages for all but the last CL.
+	//
+	// NOTE: The alternative here is to prompt the user for multiple
+	// commit messages, which seems less user friendly.
+	if err := checkDependents(ctx); err != nil {
+		return nil, err
+	}
+
 	branch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return nil, err
@@ -1001,16 +1001,32 @@ func syncCL(ctx *tool.Context) (e error) {
 	}
 
 	// Register a cleanup handler in case of subsequent errors.
-	cleanup := true
+	forceOriginalBranch := true
 	originalBranch, err := ctx.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
+	originalWd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
 	defer func() {
-		if cleanup {
+		if forceOriginalBranch {
 			ctx.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
 		}
+		ctx.Run().Chdir(originalWd)
 	}()
+
+	// Switch to an existing directory in master so we can run commands.
+	// TODO(rosswang): This may be a little invasive; I'm noticing it actually mucking with the v23 repo during tests.
+	topLevel, err := ctx.Git().TopLevel()
+	if err != nil {
+		return err
+	}
+	if err := ctx.Run().Chdir(topLevel); err != nil {
+		return err
+	}
 
 	// Identify the dependents CLs leading to (and including) the
 	// current branch.
@@ -1019,6 +1035,14 @@ func syncCL(ctx *tool.Context) (e error) {
 		return err
 	}
 	branches = append(branches, originalBranch)
+
+	// Sync from upstream.
+	if err := ctx.Git().CheckoutBranch(branches[0]); err != nil {
+		return err
+	}
+	if err := ctx.Git().Pull("origin", branches[0]); err != nil {
+		return err
+	}
 
 	// Bring all CLs in the sequence of dependent CLs leading to the
 	// current branch up to date with the <remoteBranchFlag> branch.
@@ -1039,6 +1063,6 @@ $ git checkout %v
 		}
 	}
 
-	cleanup = false
+	forceOriginalBranch = false
 	return nil
 }

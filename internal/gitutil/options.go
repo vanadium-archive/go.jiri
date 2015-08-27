@@ -37,6 +37,10 @@ type ModeOpt string
 
 func (ModeOpt) resetOpt() {}
 
+type ResetOnFailureOpt bool
+
+func (ResetOnFailureOpt) mergeOpt() {}
+
 type SquashOpt bool
 
 func (SquashOpt) mergeOpt() {}
