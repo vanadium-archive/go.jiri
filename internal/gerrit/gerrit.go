@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/gitutil"
-	"v.io/x/devtools/internal/runutil"
+	"v.io/jiri/internal/collect"
+	"v.io/jiri/internal/gitutil"
+	"v.io/jiri/internal/runutil"
 )
 
 var (

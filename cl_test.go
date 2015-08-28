@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/x/devtools/internal/gerrit"
-	"v.io/x/devtools/internal/gitutil"
-	"v.io/x/devtools/internal/project"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/gerrit"
+	"v.io/jiri/internal/gitutil"
+	"v.io/jiri/internal/project"
+	"v.io/jiri/internal/tool"
 )
 
 // assertCommitCount asserts that the commit count between two

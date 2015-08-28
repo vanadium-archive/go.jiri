@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/project"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/collect"
+	"v.io/jiri/internal/project"
+	"v.io/jiri/internal/tool"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/set"
 )

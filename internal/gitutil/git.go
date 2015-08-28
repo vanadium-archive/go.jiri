@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/x/devtools/internal/runutil"
+	"v.io/jiri/internal/runutil"
 )
 
 type GitError struct {

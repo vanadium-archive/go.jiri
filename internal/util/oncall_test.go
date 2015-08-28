@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"v.io/x/devtools/internal/project"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/project"
+	"v.io/jiri/internal/tool"
 )
 
 func createOncallFile(t *testing.T, ctx *tool.Context) {

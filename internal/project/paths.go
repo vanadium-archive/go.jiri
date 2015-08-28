@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/tool"
 )
 
 const (

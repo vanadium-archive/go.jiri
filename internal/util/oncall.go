@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/tool"
 )
 
 type OncallRotation struct {

@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/collect"
+	"v.io/jiri/internal/tool"
 )
 
 type FakeV23Root struct {

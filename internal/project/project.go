@@ -14,10 +14,10 @@ import (
 	"sort"
 	"strings"
 
-	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/gitutil"
-	"v.io/x/devtools/internal/runutil"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/collect"
+	"v.io/jiri/internal/gitutil"
+	"v.io/jiri/internal/runutil"
+	"v.io/jiri/internal/tool"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/set"
 )
@@ -135,7 +135,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 		manifest.Tools = append(manifest.Tools, Tool{
 			Data:    "data",
 			Name:    "v23",
-			Package: "v.io/x/devtools/v23",
+			Package: "v.io/jiri/v23",
 			Project: DevToolsProject,
 		})
 	}
@@ -438,7 +438,7 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 	default:
 		return UnsupportedProtocolErr(toolsProject.Protocol)
 	}
-	ldflags := fmt.Sprintf("-X v.io/x/devtools/internal/tool.Name %s -X v.io/x/devtools/internal/tool.Version %d", name, count)
+	ldflags := fmt.Sprintf("-X v.io/jiri/internal/tool.Name %s -X v.io/jiri/internal/tool.Version %d", name, count)
 	args := []string{"build", "-ldflags", ldflags, "-o", output, pkg}
 	var stderr bytes.Buffer
 	opts := ctx.Run().Opts()

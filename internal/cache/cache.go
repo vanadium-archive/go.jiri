@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"v.io/x/devtools/internal/collect"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/collect"
+	"v.io/jiri/internal/tool"
 )
 
 // StoreGoogleStorageFile reads the given file from the given Google Storage

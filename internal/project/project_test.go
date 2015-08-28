@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/tool"
 )
 
 func addRemote(t *testing.T, ctx *tool.Context, localProject, name, remoteProject string) {

@@ -330,7 +330,7 @@ schema:
      ...
    </projects>
    <tools>
-     <tool name="v23" package="v.io/x/devtools/v23"/>
+     <tool name="v23" package="v.io/jiri/v23"/>
      ...
    </tools>
  </manifest>

@@ -6,7 +6,7 @@
        and v.io/x/lib, to reduce the exposure to breakage.  Technically this
        isn't necessary since v.io/x/devtools/.godepcop already provides the same
        guarantee, but it's better to be safe than sorry.  -->
-  <pkg allow="v.io/x/devtools/..."/>
+  <pkg allow="v.io/jiri/..."/>
   <pkg allow="v.io/x/lib/..."/>
   <pkg deny="..."/>
 </godepcop>

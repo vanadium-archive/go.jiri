@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"v.io/x/devtools/internal/tool"
-	"v.io/x/devtools/internal/util"
+	"v.io/jiri/internal/tool"
+	"v.io/jiri/internal/util"
 )
 
 type TestSuites struct {

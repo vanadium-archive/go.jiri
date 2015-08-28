@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/tool"
 	"v.io/x/lib/cmdline"
 )
 

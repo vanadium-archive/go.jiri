@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"v.io/x/devtools/internal/project"
+	"v.io/jiri/internal/project"
 	"v.io/x/lib/metadata"
 )
 

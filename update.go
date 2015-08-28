@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"v.io/x/devtools/internal/project"
-	"v.io/x/devtools/internal/retry"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/project"
+	"v.io/jiri/internal/retry"
+	"v.io/jiri/internal/tool"
 	"v.io/x/lib/cmdline"
 )
 
@@ -57,7 +57,7 @@ manifest uses the following XML schema:
      ...
    </projects>
    <tools>
-     <tool name="v23" package="v.io/x/devtools/v23"/>
+     <tool name="v23" package="v.io/jiri/v23"/>
      ...
    </tools>
  </manifest>

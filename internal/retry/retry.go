@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/tool"
 )
 
 type RetryOpt interface {

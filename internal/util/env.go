@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"v.io/x/devtools/internal/project"
-	"v.io/x/devtools/internal/tool"
+	"v.io/jiri/internal/project"
+	"v.io/jiri/internal/tool"
 	"v.io/x/lib/envvar"
 )
 

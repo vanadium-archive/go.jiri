@@ -8,10 +8,10 @@ import (
 	"io"
 	"os"
 
-	"v.io/x/devtools/internal/gerrit"
-	"v.io/x/devtools/internal/gitutil"
-	"v.io/x/devtools/internal/jenkins"
-	"v.io/x/devtools/internal/runutil"
+	"v.io/jiri/internal/gerrit"
+	"v.io/jiri/internal/gitutil"
+	"v.io/jiri/internal/jenkins"
+	"v.io/jiri/internal/runutil"
 	"v.io/x/lib/cmdline"
 )
 
