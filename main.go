@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	fmt.Printf("Coming soon...")
+	fmt.Println("Coming soon...")
 }
