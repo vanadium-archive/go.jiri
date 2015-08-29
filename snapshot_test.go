@@ -115,7 +115,7 @@ func TestList(t *testing.T) {
 			createLabelDir(t, ctx, test.dir, label.name, label.snapshots)
 		}
 
-		// Check that running "v23 snapshot list" with no arguments
+		// Check that running "jiri snapshot list" with no arguments
 		// returns the expected output.
 		var stdout bytes.Buffer
 		env := &cmdline.Env{Stdout: &stdout}
@@ -130,7 +130,7 @@ func TestList(t *testing.T) {
 			t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v\n", got, want)
 		}
 
-		// Check that running "v23 snapshot list" with one argument
+		// Check that running "jiri snapshot list" with one argument
 		// returns the expected output.
 		stdout.Reset()
 		if err := runSnapshotList(env, []string{"stable"}); err != nil {
@@ -141,7 +141,7 @@ func TestList(t *testing.T) {
 			t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v\n", got, want)
 		}
 
-		// Check that running "v23 snapshot list" with
+		// Check that running "jiri snapshot list" with
 		// multiple arguments returns the expected output.
 		stdout.Reset()
 		if err := runSnapshotList(env, []string{"beta", "stable"}); err != nil {

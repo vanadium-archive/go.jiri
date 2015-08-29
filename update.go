@@ -26,7 +26,7 @@ func init() {
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 }
 
-// cmdUpdate represents the "v23 update" command.
+// cmdUpdate represents the "jiri update" command.
 var cmdUpdate = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runUpdate),
 	Name:   "update",
@@ -49,15 +49,15 @@ manifest uses the following XML schema:
      ...
    </imports>
    <projects>
-     <project name="release.go.v23"
-              path="release/go/src/v.io/v23"
+     <project name="release.go.jiri"
+              path="release/go/src/v.io/jiri"
               protocol="git"
-              name="https://vanadium.googlesource.com/release.go.v23"
+              name="https://vanadium.googlesource.com/release.go.jiri"
               revision="HEAD"/>
      ...
    </projects>
    <tools>
-     <tool name="v23" package="v.io/jiri/v23"/>
+     <tool name="jiri" package="v.io/jiri"/>
      ...
    </tools>
  </manifest>
@@ -76,7 +76,7 @@ used. Otherwise, the $V23_ROOT/.manifest/v2/<manifest>.xml file is
 used, which <manifest> is the value of the -manifest command-line
 flag, which defaults to "default".
 
-NOTE: Unlike the v23 tool commands, the above manifest file format
+NOTE: Unlike the jiri tool commands, the above manifest file format
 is not an API. It is an implementation and can change without notice.
 `,
 }

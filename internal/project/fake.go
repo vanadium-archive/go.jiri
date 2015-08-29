@@ -66,9 +66,9 @@ func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
 		return nil, err
 	}
 
-	// Add the "tools" project and a fake "v23" tool to the
+	// Add the "tools" project and a fake "jiri" tool to the
 	// manifests. This is necessary to make sure that the commonly
-	// invoked DataDirPath() function, which uses the "v23" tool
+	// invoked DataDirPath() function, which uses the "jiri" tool
 	// configuration for its default, works.
 	if err := root.AddProject(ctx, Project{
 		Name:   toolsProject,
@@ -78,7 +78,7 @@ func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
 		return nil, err
 	}
 	if err := root.AddTool(ctx, Tool{
-		Name:    "v23",
+		Name:    "jiri",
 		Data:    defaultDataDir,
 		Project: toolsProject,
 	}); err != nil {

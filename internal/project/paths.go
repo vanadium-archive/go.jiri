@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	rootEnv          = "V23_ROOT"
+	// TODO(nlacasse): Change this to "JIRI_ROOT".
+	rootEnv = "V23_ROOT"
+	// TODO(nlacasse): Change this to ".jiri".
 	metadataDirName  = ".v23"
 	metadataFileName = "metadata.v2"
 )
@@ -25,9 +27,9 @@ func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
 		return "", err
 	}
 	if toolName == "" {
-		// If the tool name is not set, use "v23" as the default. As a
-		// consequence, any manifest is assumed to specify a "v23" tool.
-		toolName = "v23"
+		// If the tool name is not set, use "jiri" as the default. As a
+		// consequence, any manifest is assumed to specify a "jiri" tool.
+		toolName = "jiri"
 	}
 	tool, ok := tools[toolName]
 	if !ok {
@@ -78,7 +80,7 @@ func ManifestFile(name string) (string, error) {
 	return filepath.Join(dir, name), nil
 }
 
-// MetadataDir returns the name of the directory in which v23 stores
+// MetadataDir returns the name of the directory in which jiri stores
 // project specific metadata.
 func MetadataDirName() string {
 	return metadataDirName
@@ -115,6 +117,9 @@ func ResolveManifestPath(name string) (string, error) {
 	return path, nil
 }
 
+// TODO(nlacasse): Move VanadiumGerritHost and VanadiumGitHost and make these
+// configurable.
+
 // VanadiumGerritHost returns the URL that hosts Vanadium Gerrit code
 // review system.
 func VanadiumGerritHost() string {
@@ -127,12 +132,13 @@ func VanadiumGitHost() string {
 	return "https://vanadium.googlesource.com/"
 }
 
-// V23ProfilesFile returns the path to the v23 profiles file.
+// V23ProfilesFile returns the path to the jiri profiles file.
 func V23ProfilesFile() (string, error) {
 	root, err := V23Root()
 	if err != nil {
 		return "", err
 	}
+	// TODO(nlacasse): Rename this to ".jiri_profiles".
 	return filepath.Join(root, ".v23_profiles"), nil
 }
 

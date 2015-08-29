@@ -34,7 +34,7 @@ func init() {
 	cmdContributors.Flags.StringVar(&aliasesFlag, "aliases", "", "Path to the aliases file.")
 }
 
-// cmdContributors represents the "v23 contributors" command.
+// cmdContributors represents the "jiri contributors" command.
 var cmdContributors = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runContributors),
 	Name:   "contributors",

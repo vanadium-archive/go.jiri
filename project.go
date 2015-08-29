@@ -38,7 +38,7 @@ func init() {
 
 }
 
-// cmdProject represents the "v23 project" command.
+// cmdProject represents the "jiri project" command.
 var cmdProject = &cmdline.Command{
 	Name:     "project",
 	Short:    "Manage the vanadium projects",
@@ -46,7 +46,7 @@ var cmdProject = &cmdline.Command{
 	Children: []*cmdline.Command{cmdProjectClean, cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
 }
 
-// cmdProjectClean represents the "v23 project clean" command.
+// cmdProjectClean represents the "jiri project clean" command.
 var cmdProjectClean = &cmdline.Command{
 	Runner:   cmdline.RunnerFunc(runProjectClean),
 	Name:     "clean",
@@ -80,7 +80,7 @@ func runProjectClean(env *cmdline.Env, args []string) (e error) {
 	return nil
 }
 
-// cmdProjectList represents the "v23 project list" command.
+// cmdProjectList represents the "jiri project list" command.
 var cmdProjectList = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runProjectList),
 	Name:   "list",
@@ -127,7 +127,7 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 	return nil
 }
 
-// cmdProjectShellPrompt represents the "v23 project shell-prompt" command.
+// cmdProjectShellPrompt represents the "jiri project shell-prompt" command.
 var cmdProjectShellPrompt = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runProjectShellPrompt),
 	Name:   "shell-prompt",
@@ -192,7 +192,7 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 	return nil
 }
 
-// cmdProjectPoll represents the "v23 project poll" command.
+// cmdProjectPoll represents the "jiri project poll" command.
 var cmdProjectPoll = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runProjectPoll),
 	Name:   "poll",

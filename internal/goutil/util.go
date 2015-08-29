@@ -35,7 +35,7 @@ func list(ctx *tool.Context, format string, pkgs ...string) ([]string, error) {
 	opts := ctx.Run().Opts()
 	opts.Stdout = &out
 	opts.Stderr = &out
-	if err := ctx.Run().CommandWithOpts(opts, "v23", args...); err != nil {
+	if err := ctx.Run().CommandWithOpts(opts, "jiri", args...); err != nil {
 		fmt.Fprintln(ctx.Stderr(), out.String())
 		return nil, err
 	}

@@ -25,12 +25,12 @@ func main() {
 	cmdline.Main(cmdRoot)
 }
 
-// cmdRoot represents the root of the v23 tool.
+// cmdRoot represents the root of the jiri tool.
 var cmdRoot = &cmdline.Command{
-	Name:  "v23",
+	Name:  "jiri",
 	Short: "Multi-purpose tool for Vanadium development",
 	Long: `
-Command v23 is a multi-purpose tool for Vanadium development.
+Command jiri is a multi-purpose tool for Vanadium development.
 `,
 	LookPath: true,
 	Children: []*cmdline.Command{
@@ -43,15 +43,15 @@ Command v23 is a multi-purpose tool for Vanadium development.
 	},
 }
 
-// cmdVersion represents the "v23 version" command.
+// cmdVersion represents the "jiri version" command.
 var cmdVersion = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runVersion),
 	Name:   "version",
 	Short:  "Print version",
-	Long:   "Print version of the v23 tool.",
+	Long:   "Print version of the jiri tool.",
 }
 
 func runVersion(env *cmdline.Env, _ []string) error {
-	fmt.Fprintf(env.Stdout, "v23 tool version %v\n", tool.Version)
+	fmt.Fprintf(env.Stdout, "jiri tool version %v\n", tool.Version)
 	return nil
 }

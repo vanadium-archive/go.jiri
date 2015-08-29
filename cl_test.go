@@ -798,7 +798,7 @@ Change-Id: I0000000000000000000000000000000000000000`,
 	}
 }
 
-// TestCLNew checks the operation of the "v23 cl new" command.
+// TestCLNew checks the operation of the "jiri cl new" command.
 func TestCLNew(t *testing.T) {
 	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)
@@ -840,7 +840,7 @@ func TestCLNew(t *testing.T) {
 	}
 }
 
-// TestParallelDev checks "v23 cl mail" behavior when parallel development has
+// TestParallelDev checks "jiri cl mail" behavior when parallel development has
 // been submitted upstream.
 func TestParallelDev(t *testing.T) {
 	ctx, cwd, root, repoPath, originPath, gerritAPath := setupTest(t, true)
@@ -929,7 +929,7 @@ func TestParallelDev(t *testing.T) {
 	}
 }
 
-// TestCLSync checks the operation of the "v23 cl sync" command.
+// TestCLSync checks the operation of the "jiri cl sync" command.
 func TestCLSync(t *testing.T) {
 	ctx, cwd, root, _, _, _ := setupTest(t, true)
 	defer teardownTest(t, ctx, cwd, root)

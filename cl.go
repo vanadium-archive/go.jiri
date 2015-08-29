@@ -107,7 +107,7 @@ func getDependentCLs(ctx *tool.Context, branch string) ([]string, error) {
 	return branches, nil
 }
 
-// cmdCL represents the "v23 cl" command.
+// cmdCL represents the "jiri cl" command.
 var cmdCL = &cmdline.Command{
 	Name:     "cl",
 	Short:    "Manage project changelists",
@@ -115,7 +115,7 @@ var cmdCL = &cmdline.Command{
 	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync},
 }
 
-// cmdCLCleanup represents the "v23 cl cleanup" command.
+// cmdCLCleanup represents the "jiri cl cleanup" command.
 //
 // TODO(jsimsa): Replace this with a "submit" command that talks to
 // Gerrit to submit the CL and then (optionally) removes it locally.
@@ -250,7 +250,7 @@ func runCLCleanup(env *cmdline.Env, args []string) error {
 	return cleanupCL(ctx, args)
 }
 
-// cmdCLMail represents the "v23 cl mail" command.
+// cmdCLMail represents the "jiri cl mail" command.
 var cmdCLMail = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runCLMail),
 	Name:   "mail",
@@ -402,7 +402,7 @@ func checkDependents(ctx *tool.Context) (e error) {
 			return fmt.Errorf(`Failed to export the branch %q to Gerrit because its ancestor %q has not been exported to Gerrit yet.
 The following steps are needed before the operation can be retried:
 $ git checkout %v
-$ v23 cl mail
+$ jiri cl mail
 $ git checkout %v
 # retry the original command
 `, originalBranch, branches[i], branches[i], originalBranch)
@@ -630,7 +630,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		// it to create the squashed commit. This is needed to make sure
 		// that the commit hash of the squashed commit stays the same as
 		// long as the squashed sequence of commits does not change. If
-		// this was not the case, consecutive invocations of "v23 cl mail"
+		// this was not the case, consecutive invocations of "jiri cl mail"
 		// could fail if some, but not all, of the dependent CLs submitted
 		// to Gerrit have changed.
 		output, err := review.ctx.Git().Log(branches[i], branches[i]+"^", "%ad%n%cd")
@@ -890,7 +890,7 @@ func (review *review) updateReviewMessage(file string) error {
 	return nil
 }
 
-// cmdCLNew represents the "v23 cl new" command.
+// cmdCLNew represents the "jiri cl new" command.
 var cmdCLNew = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runCLNew),
 	Name:   "new",
@@ -901,7 +901,7 @@ particular, it forks a new branch with the given name from the current
 branch and records the relationship between the current branch and the
 new branch in the %v metadata directory. The information recorded in
 the %v metadata directory tracks dependencies between CLs and is used
-by the "v23 cl sync" and "v23 cl mail" commands.
+by the "jiri cl sync" and "jiri cl mail" commands.
 `, project.MetadataDirName(), project.MetadataDirName()),
 	ArgsName: "<name>",
 	ArgsLong: "<name> is the changelist name.",
@@ -964,7 +964,7 @@ func newCL(ctx *tool.Context, args []string) error {
 	return nil
 }
 
-// cmdCLSync represents the "v23 cl sync" command.
+// cmdCLSync represents the "jiri cl sync" command.
 var cmdCLSync = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runCLSync),
 	Name:   "sync",
@@ -1019,7 +1019,7 @@ func syncCL(ctx *tool.Context) (e error) {
 	}()
 
 	// Switch to an existing directory in master so we can run commands.
-	// TODO(rosswang): This may be a little invasive; I'm noticing it actually mucking with the v23 repo during tests.
+	// TODO(rosswang): This may be a little invasive; I'm noticing it actually mucking with the jiri repo during tests.
 	topLevel, err := ctx.Git().TopLevel()
 	if err != nil {
 		return err

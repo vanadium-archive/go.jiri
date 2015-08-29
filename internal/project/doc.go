@@ -2,6 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package project contains library functions for working with v23
+// Package project contains library functions for working with jiri
 // projects.
 package project

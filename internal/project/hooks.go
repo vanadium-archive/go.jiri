@@ -222,7 +222,7 @@ if [[ "${REMOTE}" == "origin" && "${BRANCH}" == "master" ]]
 then
   echo "======================================================================"
   echo "Vanadium code cannot be pushed to master using the 'git push' command."
-  echo "Use the 'v23 cl mail' command to follow the code review workflow."
+  echo "Use the 'jiri cl mail' command to follow the code review workflow."
   echo "======================================================================"
   exit 1
 fi

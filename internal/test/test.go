@@ -16,7 +16,7 @@ import (
 // run before being forcefully terminated.
 var DefaultTimeout = 10 * time.Minute
 
-// FailedExitCode is the error code that "v23 test" exits with if any
+// FailedExitCode is the error code that "jiri test" exits with if any
 // of the tests it runs fails.
 const FailedExitCode = 3
 

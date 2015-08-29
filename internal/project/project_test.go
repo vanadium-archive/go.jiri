@@ -230,6 +230,7 @@ func setupNewProject(t *testing.T, ctx *tool.Context, dir, name string, ignore b
 	}
 	if ignore {
 		ignoreFile := filepath.Join(projectDir, ".gitignore")
+		// TODO(nlacasse): Rename the string below to "/.jiri".
 		if err := ctx.Run().WriteFile(ignoreFile, []byte("/.v23"), os.FileMode(0644)); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -279,7 +280,7 @@ func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 	}
 }
 
-// TestUpdateUniverse is a comprehensive test of the "v23 update"
+// TestUpdateUniverse is a comprehensive test of the "jiri update"
 // logic that handles projects.
 //
 // TODO(jsimsa): Add tests for the logic that updates tools.

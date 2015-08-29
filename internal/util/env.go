@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	v23ProfileEnv = "V23_PROFILE"
+	jiriProfileEnv = "V23_PROFILE"
 	javaEnv       = "JAVA_HOME"
 )
 
@@ -25,7 +25,7 @@ const (
 // the Vanadium project. The util package captures the original state
 // of the relevant environment variables when the tool is initialized
 // and every invocation of this function updates this original state
-// according to the v23 tool configuration.
+// according to the jiri tool configuration.
 //
 // By default, the Vanadium Go and VDL workspaces are added to the
 // GOPATH and VDLPATH environment variables respectively. In addition,
@@ -54,7 +54,7 @@ func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	if err := setSyncbaseEnv(ctx, env, root); err != nil {
 		return nil, err
 	}
-	if profile := os.Getenv(v23ProfileEnv); profile != "" {
+	if profile := os.Getenv(jiriProfileEnv); profile != "" {
 		fmt.Fprintf(ctx.Stdout(), `NOTE: Enabling environment variable setting for %q.
 This can override values of existing environment variables.
 `, profile)
@@ -95,7 +95,7 @@ func setJavaEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 		return nil
 	}
 
-	// Compile using Java Go 1.5 (installed via 'v23 profile install java').
+	// Compile using Java Go 1.5 (installed via 'jiri profile install java').
 	javaGoDir := filepath.Join(root, "third_party", "java", "go")
 
 	// Set Go-specific environment variables.
@@ -106,7 +106,7 @@ func setJavaEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 
 	// Update PATH.
 	if _, err := ctx.Run().Stat(javaGoDir); err != nil {
-		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"v23 profile install java\"?", javaGoDir)
+		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"jiri profile install java\"?", javaGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{filepath.Join(javaGoDir, "bin")}, path...)
@@ -118,7 +118,7 @@ func setJavaEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 // cross-compilation.
 func setAndroidEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	// Compile using Android Go 1.5 (installed via
-	// 'v23 profile install android').
+	// 'jiri profile install android').
 	androidGoDir := filepath.Join(root, "third_party", "android", "go")
 
 	// Set Go-specific environment variables.
@@ -129,7 +129,7 @@ func setAndroidEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 
 	// Update PATH.
 	if _, err := ctx.Run().Stat(androidGoDir); err != nil {
-		return fmt.Errorf("Couldn't find android Go installation directory %s: did you run \"v23 profile install android\"?", androidGoDir)
+		return fmt.Errorf("Couldn't find android Go installation directory %s: did you run \"jiri profile install android\"?", androidGoDir)
 	}
 	path := env.GetTokens("PATH", ":")
 	path = append([]string{filepath.Join(androidGoDir, "bin")}, path...)
@@ -178,14 +178,14 @@ func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, works
 	for _, workspace := range workspaces {
 		absWorkspace := filepath.Join(root, workspace, suffix)
 		// Only append an entry to the path if the workspace is rooted
-		// under a v23 project that exists locally or vice versa.
+		// under a jiri project that exists locally or vice versa.
 		for _, project := range projects {
 			// We check if <project.Path> is a prefix of <absWorkspace> to
-			// account for Go workspaces nested under a single v23 project,
+			// account for Go workspaces nested under a single jiri project,
 			// such as: $V23_ROOT/release/projects/chat/go.
 			//
 			// We check if <absWorkspace> is a prefix of <project.Path> to
-			// account for Go workspaces that span multiple v23 projects,
+			// account for Go workspaces that span multiple jiri projects,
 			// such as: $V23_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
 				if _, err := ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {

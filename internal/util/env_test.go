@@ -102,7 +102,7 @@ func testSetPathHelper(t *testing.T, name string) {
 	defer os.Setenv("V23_ROOT", oldRoot)
 
 	// Retrieve V23_ROOT through V23Root() to account for symlinks.
-	v23Root, err := project.V23Root()
+	jiriRoot, err := project.V23Root()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -110,17 +110,17 @@ func testSetPathHelper(t *testing.T, name string) {
 	var want string
 	switch name {
 	case "GOPATH":
-		want = filepath.Join(v23Root, "test")
-		if err := setGoPath(ctx, env, v23Root, config); err != nil {
+		want = filepath.Join(jiriRoot, "test")
+		if err := setGoPath(ctx, env, jiriRoot, config); err != nil {
 			t.Fatalf("%v", err)
 		}
 	case "VDLPATH":
 		// Make a fake src directory.
-		want = filepath.Join(v23Root, "test", "src")
+		want = filepath.Join(jiriRoot, "test", "src")
 		if err := ctx.Run().MkdirAll(want, 0755); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if err := setVdlPath(ctx, env, v23Root, config); err != nil {
+		if err := setVdlPath(ctx, env, jiriRoot, config); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}

@@ -75,7 +75,7 @@ type Project struct {
 	// Remote is the project remote.
 	Remote string `xml:"remote,attr"`
 	// Revision is the revision the project should be advanced to
-	// during "v23 update". If not set, "HEAD" is used as the
+	// during "jiri update". If not set, "HEAD" is used as the
 	// default.
 	Revision string `xml:"revision,attr"`
 }
@@ -124,18 +124,18 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	// If the $V23_ROOT/devtools/bin/v23 binary exists, add the "v23"
+	// If the $V23_ROOT/devtools/bin/jiri binary exists, add the "jiri"
 	// tool to the manifest. The binary might not exist if we are
 	// dealing with a fake Vanadium root used for testing.
 	root, err := V23Root()
 	if err != nil {
 		return err
 	}
-	if _, err := ctx.Run().Stat(filepath.Join(root, devtoolsBinDir, "v23")); err == nil {
+	if _, err := ctx.Run().Stat(filepath.Join(root, devtoolsBinDir, "jiri")); err == nil {
 		manifest.Tools = append(manifest.Tools, Tool{
 			Data:    "data",
-			Name:    "v23",
-			Package: "v.io/jiri/v23",
+			Name:    "jiri",
+			Package: "v.io/jiri",
 			Project: DevToolsProject,
 		})
 	}
@@ -157,7 +157,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 const currentManifestFileName = ".current_manifest"
 
 // CurrentManifest returns a manifest that identifies the result of
-// the most recent "v23 update" invocation.
+// the most recent "jiri update" invocation.
 func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
 	root, err := V23Root()
 	if err != nil {
@@ -168,8 +168,8 @@ func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Fprintf(ctx.Stderr(), `WARNING: Could not find %s.
-The contents of this file are stored as metadata in binaries the v23
-tool builds. To fix this problem, please run "v23 update".
+The contents of this file are stored as metadata in binaries the jiri
+tool builds. To fix this problem, please run "jiri update".
 `, currentManifestFile)
 			return &Manifest{}, nil
 		}
@@ -183,7 +183,7 @@ tool builds. To fix this problem, please run "v23 update".
 }
 
 // writeCurrentManifest writes the given manifest to a file that
-// stores the result of the most recent "v23 update" invocation.
+// stores the result of the most recent "jiri update" invocation.
 func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
 	root, err := V23Root()
 	if err != nil {
@@ -200,7 +200,7 @@ func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
 }
 
 // CurrentProjectName gets the name of the current project from the
-// current directory by reading the v23 project metadata located in a
+// current directory by reading the jiri project metadata located in a
 // directory at the root of the current repository.
 func CurrentProjectName(ctx *tool.Context) (string, error) {
 	topLevel, err := ctx.Git().TopLevel()
@@ -472,7 +472,7 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 		tool := remoteTools[name]
 		// Skip tools with no package specified. Besides increasing
 		// robustness, this step also allows us to create Vanadium root
-		// fakes without having to provide an implementation for the "v23"
+		// fakes without having to provide an implementation for the "jiri"
 		// tool, which every manifest needs to specify.
 		if tool.Package == "" {
 			continue
@@ -776,7 +776,7 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 			return err
 		}
 		if current != "master" {
-			line1 := fmt.Sprintf(`NOTE: "v23 update" only updates the "master" branch and the current branch is %q`, current)
+			line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch is %q`, current)
 			line2 := fmt.Sprintf(`to update the %q branch once the master branch is updated, run "git merge master"`, current)
 			opts := runutil.Opts{Verbose: true}
 			ctx.Run().OutputWithOpts(opts, []string{line1, line2})
@@ -1072,7 +1072,7 @@ func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 		if op.project.Name == DevToolsProject {
 			lines := []string{
 				fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
-				"however this project is required for correct operation of the v23",
+				"however this project is required for correct operation of the jiri",
 				"development tools and will thus not be deleted",
 			}
 			opts := runutil.Opts{Verbose: true}
@@ -1110,7 +1110,7 @@ func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 		fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
 		"it was not automatically removed to avoid deleting uncommitted work",
 		fmt.Sprintf(`if you no longer need it, invoke "rm -rf %v"`, op.source),
-		`or invoke "v23 update -gc" to remove all such local projects`,
+		`or invoke "jiri update -gc" to remove all such local projects`,
 	}
 	opts := runutil.Opts{Verbose: true}
 	ctx.Run().OutputWithOpts(opts, lines)
@@ -1301,7 +1301,7 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) (operati
 	return result, nil
 }
 
-// ParseNames identifies the set of projects that a v23 command should
+// ParseNames identifies the set of projects that a jiri command should
 // be applied to.
 func ParseNames(ctx *tool.Context, args []string, defaultProjects map[string]struct{}) (map[string]Project, error) {
 	projects, _, err := ReadManifest(ctx)

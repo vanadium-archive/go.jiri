@@ -34,7 +34,7 @@ var cmdSnapshot = &cmdline.Command{
 	Name:  "snapshot",
 	Short: "Manage project snapshots",
 	Long: `
-The "v23 snapshot" command can be used to manage project snapshots.
+The "jiri snapshot" command can be used to manage project snapshots.
 In particular, it can be used to create new snapshots and to list
 existing snapshots.
 
@@ -45,13 +45,13 @@ snapshots the are revisioned in the manifest repository.
 	Children: []*cmdline.Command{cmdSnapshotCreate, cmdSnapshotList},
 }
 
-// cmdSnapshotCreate represents the "v23 snapshot create" command.
+// cmdSnapshotCreate represents the "jiri snapshot create" command.
 var cmdSnapshotCreate = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runSnapshotCreate),
 	Name:   "create",
 	Short:  "Create a new project snapshot",
 	Long: `
-The "v23 snapshot create <label>" command captures the current project
+The "jiri snapshot create <label>" command captures the current project
 state in a manifest and, depending on the value of the -remote flag,
 the command either stores the manifest in the local
 $V23_ROOT/.snapshots directory, or in the manifest repository, pushing
@@ -76,7 +76,7 @@ Internally, snapshots are organized as follows:
    <label2> # a symlink to the latest <label2-snapshot*>
    ...
 
-NOTE: Unlike the v23 tool commands, the above internal organization
+NOTE: Unlike the jiri tool commands, the above internal organization
 is not an API. It is an implementation and can change without notice.
 `,
 	ArgsName: "<label>",
@@ -248,7 +248,7 @@ func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string)
 	return nil
 }
 
-// cmdSnapshotList represents the "v23 snapshot list" command.
+// cmdSnapshotList represents the "jiri snapshot list" command.
 var cmdSnapshotList = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runSnapshotList),
 	Name:   "list",

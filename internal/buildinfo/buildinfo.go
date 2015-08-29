@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package buildinfo implements encoding and decoding of build
-// metadata injected into binaries via the v23 tool.
+// metadata injected into binaries via the jiri tool.
 package buildinfo
 
 import (
