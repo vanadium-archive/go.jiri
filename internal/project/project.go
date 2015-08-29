@@ -138,6 +138,16 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 			Package: "v.io/x/devtools/v23",
 			Project: DevToolsProject,
 		})
+		otherTools := []string{"api", "copyright", "env", "go", "goext", "oncall", "profile", "run", "test"}
+		for _, t := range otherTools {
+			toolName := fmt.Sprintf("v23-%s", t)
+			manifest.Tools = append(manifest.Tools, Tool{
+				Data:    "data",
+				Name:    toolName,
+				Package: fmt.Sprintf("v.io/x/devtools/%s", toolName),
+				Project: DevToolsProject,
+			})
+		}
 	}
 	perm := os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(filepath.Dir(path), perm); err != nil {
