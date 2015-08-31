@@ -29,6 +29,7 @@ func TestStartCommandOK(t *testing.T) {
 	if _, err := start.Command(bin); err != nil {
 		t.Fatalf(`Command("go run ./testdata/slow_hello2.go") failed: %v`, err)
 	}
+	time.Sleep(time.Second * 3)
 	// Note that the output shouldn't have "hello" because start.Command won't
 	// wait for the command to finish.
 	if got, want := removeTimestamps(t, &out), fmt.Sprintf(">> %s\n>> OK\n", bin); got != want {
