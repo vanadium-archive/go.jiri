@@ -34,7 +34,7 @@ type CL struct {
 	Description string
 }
 
-// Manifest represents a setting used for updating the vanadium universe.
+// Manifest represents a setting used for updating the universe.
 type Manifest struct {
 	Imports  []Import  `xml:"imports>import"`
 	Label    string    `xml:"label,attr"`
@@ -53,10 +53,10 @@ type Import struct {
 	Name string `xml:"name,attr"`
 }
 
-// Projects maps vanadium project names to their detailed description.
+// Projects maps project names to their detailed description.
 type Projects map[string]Project
 
-// Project represents a vanadium project.
+// Project represents a jiri project.
 type Project struct {
 	// Exclude is flag used to exclude previously included projects.
 	Exclude bool `xml:"exclude,attr"`
@@ -80,10 +80,10 @@ type Project struct {
 	Revision string `xml:"revision,attr"`
 }
 
-// Tools maps vanadium tool names, to their detailed description.
+// Tools maps jiri tool names, to their detailed description.
 type Tools map[string]Tool
 
-// Tool represents a vanadium tool.
+// Tool represents a jiri tool.
 type Tool struct {
 	// Exclude is flag used to exclude previously included projects.
 	Exclude bool `xml:"exclude,attr"`
@@ -109,7 +109,7 @@ func (e UnsupportedProtocolErr) Error() string {
 	return fmt.Sprintf("unsupported protocol %v", e)
 }
 
-// Update represents an update of vanadium projects as a map from
+// Update represents an update of projects as a map from
 // project names to a collections of commits.
 type Update map[string][]CL
 
@@ -126,7 +126,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	}
 	// If the $V23_ROOT/devtools/bin/jiri binary exists, add the "jiri"
 	// tool to the manifest. The binary might not exist if we are
-	// dealing with a fake Vanadium root used for testing.
+	// dealing with a fake jiri root used for testing.
 	root, err := V23Root()
 	if err != nil {
 		return err
@@ -237,9 +237,9 @@ func LocalProjects(ctx *tool.Context) (Projects, error) {
 	return projects, nil
 }
 
-// PollProjects returns the set of changelists that exist remotely but
-// not locally. Changes are grouped by vanadium projects and contain
-// author identification and a description of their content.
+// PollProjects returns the set of changelists that exist remotely but not
+// locally. Changes are grouped by projects and contain author identification
+// and a description of their content.
 func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, e error) {
 	update := Update{}
 	cwd, err := os.Getwd()
@@ -300,7 +300,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 }
 
 // ReadManifest retrieves and parses the manifest that determines what
-// projects and tools are part of the vanadium universe.
+// projects and tools are part of the jiri universe.
 func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
 	return readManifest(ctx, false)
 }
@@ -348,7 +348,7 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 		return err
 	}
 	// 2. Build all tools in a temporary directory.
-	tmpDir, err := ctx.Run().TempDir("", "tmp-vanadium-tools-build")
+	tmpDir, err := ctx.Run().TempDir("", "tmp-jiri-tools-build")
 	if err != nil {
 		return fmt.Errorf("TempDir() failed: %v", err)
 	}
@@ -453,10 +453,9 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 	return nil
 }
 
-// buildTools builds and installs all vanadium tools using the version
-// available in the local master branch of the tools
-// repository. Notably, this function does not perform any version
-// control operation on the master branch.
+// buildTools builds and installs all jiri tools using the version available in
+// the local master branch of the tools repository. Notably, this function does
+// not perform any version control operation on the master branch.
 func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
@@ -471,7 +470,7 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 	for _, name := range names {
 		tool := remoteTools[name]
 		// Skip tools with no package specified. Besides increasing
-		// robustness, this step also allows us to create Vanadium root
+		// robustness, this step also allows us to create jiri root
 		// fakes without having to provide an implementation for the "jiri"
 		// tool, which every manifest needs to specify.
 		if tool.Package == "" {
@@ -500,9 +499,9 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 	return nil
 }
 
-// CleanupProjects restores the given vanadium projects back to their master
-// branches and gets rid of all the local changes. If "cleanupBranches" is true,
-// it will also delete all the non-master branches.
+// CleanupProjects restores the given jiri projects back to their master
+// branches and gets rid of all the local changes. If "cleanupBranches" is
+// true, it will also delete all the non-master branches.
 func CleanupProjects(ctx *tool.Context, projects Projects, cleanupBranches bool) (e error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -631,7 +630,7 @@ func installTools(ctx *tool.Context, dir string) error {
 	failed := false
 	// TODO(jsimsa): Make sure the "$V23_ROOT/devtools/bin" directory
 	// exists. This is for backwards compatibility for instances of
-	// Vanadium root that have been created before go/vcl/9511.
+	// jiri root that have been created before go/vcl/9511.
 	binDir := filepath.Join(root, devtoolsBinDir)
 	if err := ctx.Run().MkdirAll(binDir, os.FileMode(0755)); err != nil {
 		return err
@@ -656,7 +655,7 @@ func installTools(ctx *tool.Context, dir string) error {
 	}
 	// TODO(jsimsa): Make sure the "$V23_ROOT/bin" directory is removed,
 	// forcing people to update their PATH. Remove this once all
-	// instances of Vanadium root has been updated past go/vcl/9511.
+	// instances of jiri root has been updated past go/vcl/9511.
 	oldBinDir := filepath.Join(root, "bin")
 	if err := ctx.Run().RemoveAll(oldBinDir); err != nil {
 		return err
@@ -824,7 +823,7 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 	return &manifest, nil
 }
 
-// updateProjects updates all vanadium projects.
+// updateProjects updates all jiri projects.
 func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
@@ -902,7 +901,7 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 
 // addProjectToManifest records the information about the given
 // project in the given manifest. The function is used to create a
-// manifest that records the current state of Vanadium projects, which
+// manifest that records the current state of jiri projects, which
 // can be used to restore this state at some later point.
 //
 // NOTE: The function assumes that the the given project is on a

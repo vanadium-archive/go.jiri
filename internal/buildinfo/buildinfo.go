@@ -18,13 +18,13 @@ import (
 
 // T describes build related metadata.
 type T struct {
-	// Manifest records the project manifest that identifies the state of Vanadium
+	// Manifest records the project manifest that identifies the state of
 	// projects used for the build.
 	Manifest project.Manifest
 	// Platform records the target platform of the build.
 	Platform string
 	// Pristine records whether the build was executed using pristine master
-	// branches of Vanadium projects (or not).
+	// branches of projects (or not).
 	Pristine bool
 	// Time records the time of the build.
 	Time time.Time

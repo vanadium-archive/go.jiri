@@ -132,6 +132,8 @@ func VanadiumGitHost() string {
 	return "https://vanadium.googlesource.com/"
 }
 
+// TODO(nlacasse): Rename V23ProfilesFile and V23Root.
+
 // V23ProfilesFile returns the path to the jiri profiles file.
 func V23ProfilesFile() (string, error) {
 	root, err := V23Root()
@@ -142,7 +144,7 @@ func V23ProfilesFile() (string, error) {
 	return filepath.Join(root, ".v23_profiles"), nil
 }
 
-// V23Root returns the root of the Vanadium universe.
+// V23Root returns the root of the jiri universe.
 func V23Root() (string, error) {
 	root := os.Getenv(rootEnv)
 	if root == "" {

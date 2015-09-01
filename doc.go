@@ -6,7 +6,7 @@
 // DO NOT UPDATE MANUALLY
 
 /*
-Command jiri is a multi-purpose tool for Vanadium development.
+Command jiri is a multi-purpose tool for multi-repo development.
 
 Usage:
    jiri [flags] <command>
@@ -14,9 +14,9 @@ Usage:
 The jiri commands are:
    cl           Manage project changelists
    contributors List project contributors
-   project      Manage the vanadium projects
+   project      Manage the jiri projects
    snapshot     Manage project snapshots
-   update       Update all vanadium tools and projects
+   update       Update all jiri tools and projects
    version      Print version
    help         Display help for commands or topics
 
@@ -151,23 +151,23 @@ The jiri contributors flags are:
  -n=false
    Show number of contributions.
 
-Jiri project - Manage the vanadium projects
+Jiri project - Manage the jiri projects
 
-Manage the vanadium projects.
+Manage the jiri projects.
 
 Usage:
    jiri project <command>
 
 The jiri project commands are:
-   clean        Restore vanadium projects to their pristine state
-   list         List existing vanadium projects and branches
+   clean        Restore jiri projects to their pristine state
+   list         List existing jiri projects and branches
    shell-prompt Print a succinct status of projects, suitable for shell prompts
-   poll         Poll existing vanadium projects
+   poll         Poll existing jiri projects
 
-Jiri project clean - Restore vanadium projects to their pristine state
+Jiri project clean - Restore jiri projects to their pristine state
 
-Restore vanadium projects back to their master branches and get rid of all the
-local branches and changes.
+Restore jiri projects back to their master branches and get rid of all the local
+branches and changes.
 
 Usage:
    jiri project clean [flags] <project ...>
@@ -178,7 +178,7 @@ The jiri project clean flags are:
  -branches=false
    Delete all non-master branches.
 
-Jiri project list - List existing vanadium projects and branches
+Jiri project list - List existing jiri projects and branches
 
 Inspect the local filesystem and list the existing projects and branches.
 
@@ -194,7 +194,7 @@ The jiri project list flags are:
 
 Jiri project shell-prompt
 
-Reports current branches of vanadium projects (repositories) as well as an
+Reports current branches of jiri projects (repositories) as well as an
 indication of each project's status:
   *  indicates that a repository contains uncommitted changes
   %  indicates that a repository contains untracked files
@@ -210,9 +210,9 @@ The jiri project shell-prompt flags are:
  -show-name=false
    Show the name of the current repo.
 
-Jiri project poll - Poll existing vanadium projects
+Jiri project poll - Poll existing jiri projects
 
-Poll vanadium projects that can affect the outcome of the given tests and report
+Poll jiri projects that can affect the outcome of the given tests and report
 whether any new changes in these projects exist. If no tests are specified, all
 projects are polled by default.
 
@@ -295,17 +295,16 @@ Usage:
 
 <label ...> is a list of snapshot labels.
 
-Jiri update - Update all vanadium tools and projects
+Jiri update - Update all jiri tools and projects
 
-Updates all vanadium projects, builds the latest version of vanadium tools, and
-installs the resulting binaries into $V23_ROOT/devtools/bin. The sequence in
-which the individual updates happen guarantees that we end up with a consistent
-set of tools and source code.
+Updates all jiri projects, builds the latest version of jiri tools, and installs
+the resulting binaries into $V23_ROOT/devtools/bin. The sequence in which the
+individual updates happen guarantees that we end up with a consistent set of
+tools and source code.
 
-The set of project and tools to update is describe by a manifest. Vanadium
-manifests are revisioned and stored in a "manifest" repository, that is
-available locally in $V23_ROOT/.manifest. The manifest uses the following XML
-schema:
+The set of project and tools to update is describe by a manifest. Jiri manifests
+are revisioned and stored in a "manifest" repository, that is available locally
+in $V23_ROOT/.manifest. The manifest uses the following XML schema:
 
  <manifest>
    <imports>

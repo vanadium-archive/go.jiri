@@ -17,23 +17,24 @@ import (
 )
 
 const (
+	// TODO(nlacasse): Rename to JIRI_PROFILE.
 	jiriProfileEnv = "V23_PROFILE"
-	javaEnv       = "JAVA_HOME"
+	javaEnv        = "JAVA_HOME"
 )
 
-// VanadiumEnvironment returns the environment variables setting for
-// the Vanadium project. The util package captures the original state
-// of the relevant environment variables when the tool is initialized
-// and every invocation of this function updates this original state
-// according to the jiri tool configuration.
+// TODO(nlacasse): Rename this.
+// VanadiumEnvironment returns the environment variables setting for the
+// project. The util package captures the original state of the relevant
+// environment variables when the tool is initialized and every invocation of
+// this function updates this original state according to the jiri tool
+// configuration.
 //
-// By default, the Vanadium Go and VDL workspaces are added to the
-// GOPATH and VDLPATH environment variables respectively. In addition,
-// the V23_PROFILE environment variable can be used to activate an
-// environment variable setting for various development profiles of
-// the Vanadium project (e.g. arm, android, java, or nacl). Unlike the
-// default setting, the setting enabled by the V23_PROFILE environment
-// variable can override existing environment.
+// By default, the Go and VDL workspaces are added to the GOPATH and VDLPATH
+// environment variables respectively. In addition, the V23_PROFILE environment
+// variable can be used to activate an environment variable setting for various
+// development profiles of the project (e.g. arm, android, java, or nacl).
+// Unlike the default setting, the setting enabled by the V23_PROFILE
+// environment variable can override existing environment.
 func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	env := envvar.VarsFromOS()
 	root, err := project.V23Root()
@@ -155,14 +156,12 @@ func setArmEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	return nil
 }
 
-// setGoPath adds the paths to Vanadium Go workspaces to the GOPATH
-// variable.
+// setGoPath adds the paths of Go workspaces to the GOPATH variable.
 func setGoPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config) error {
 	return setPathHelper(ctx, env, "GOPATH", root, config.GoWorkspaces(), "")
 }
 
-// setVdlPath adds the paths to Vanadium VDL workspaces to the VDLPATH
-// variable.
+// setVdlPath adds the paths of VDL workspaces to the VDLPATH variable.
 func setVdlPath(ctx *tool.Context, env *envvar.Vars, root string, config *Config) error {
 	return setPathHelper(ctx, env, "VDLPATH", root, config.VDLWorkspaces(), "src")
 }
@@ -198,6 +197,9 @@ func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, works
 	env.SetTokens(name, path, ":")
 	return nil
 }
+
+// TODO(nlacasse): Move setNaclEnv and setSyncbaseEnv out of jiri since they
+// are not general-purpose.
 
 // setNaclEnv sets the environment variables used for nacl
 // cross-compilation.

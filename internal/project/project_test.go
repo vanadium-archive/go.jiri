@@ -230,8 +230,7 @@ func setupNewProject(t *testing.T, ctx *tool.Context, dir, name string, ignore b
 	}
 	if ignore {
 		ignoreFile := filepath.Join(projectDir, ".gitignore")
-		// TODO(nlacasse): Rename the string below to "/.jiri".
-		if err := ctx.Run().WriteFile(ignoreFile, []byte("/.v23"), os.FileMode(0644)); err != nil {
+		if err := ctx.Run().WriteFile(ignoreFile, []byte(metadataDirName), os.FileMode(0644)); err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := ctx.Git().Add(ignoreFile); err != nil {
@@ -285,10 +284,9 @@ func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 //
 // TODO(jsimsa): Add tests for the logic that updates tools.
 func TestUpdateUniverse(t *testing.T) {
-	// Setup an instance of vanadium universe, creating the remote
-	// repositories for the manifest and projects under the
-	// "remote" directory, which is ignored from the consideration
-	// of LocalProjects().
+	// Setup an instance of jiri universe, creating the remote repositories for
+	// the manifest and projects under the "remote" directory, which is ignored
+	// from the consideration of LocalProjects().
 	ctx := tool.NewDefaultContext()
 	rootDir, err := ctx.Run().TempDir("", "")
 	if err != nil {

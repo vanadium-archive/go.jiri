@@ -30,16 +30,16 @@ func init() {
 var cmdUpdate = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runUpdate),
 	Name:   "update",
-	Short:  "Update all vanadium tools and projects",
+	Short:  "Update all jiri tools and projects",
 	Long: `
-Updates all vanadium projects, builds the latest version of vanadium
+Updates all jiri projects, builds the latest version of jiri
 tools, and installs the resulting binaries into
 $V23_ROOT/devtools/bin. The sequence in which the individual updates
 happen guarantees that we end up with a consistent set of tools and
 source code.
 
 The set of project and tools to update is describe by a
-manifest. Vanadium manifests are revisioned and stored in a "manifest"
+manifest. Jiri manifests are revisioned and stored in a "manifest"
 repository, that is available locally in $V23_ROOT/.manifest. The
 manifest uses the following XML schema:
 

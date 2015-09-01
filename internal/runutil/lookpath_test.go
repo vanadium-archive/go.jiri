@@ -39,7 +39,7 @@ func TestLookPathCommandOK(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	cmd := "vanadium-unlikely-binary-name"
+	cmd := "jiri-unlikely-binary-name"
 	absPath := filepath.Join(tmpDir, cmd)
 
 	tmpFile, err := os.OpenFile(absPath, os.O_CREATE, os.FileMode(0755))
@@ -74,7 +74,7 @@ func TestLookPathCommandFail(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	absPath := filepath.Join(tmpDir, "vanadium-unlikely-binary-name")
+	absPath := filepath.Join(tmpDir, "jiri-unlikely-binary-name")
 	env := map[string]string{"PATH": tmpDir}
 	if _, err := LookPath(filepath.Base(absPath), env); err == nil {
 		t.Fatalf("LookPath(%v) did not fail when it should", filepath.Base(absPath))
@@ -97,7 +97,7 @@ func TestLookPathAbsoluteOK(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	absPath := filepath.Join(tmpDir, "vanadium-unlikely-binary-name")
+	absPath := filepath.Join(tmpDir, "jiri-unlikely-binary-name")
 	tmpFile, err := os.OpenFile(absPath, os.O_CREATE, os.FileMode(0755))
 	if err != nil {
 		t.Fatalf("OpenFile(%v) failed: %v", absPath, err)
@@ -129,7 +129,7 @@ func TestLookPathAbsoluteFail(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	absPath := filepath.Join(tmpDir, "vanadium-unlikely-binary-name")
+	absPath := filepath.Join(tmpDir, "jiri-unlikely-binary-name")
 	env := map[string]string{"PATH": tmpDir}
 	if _, err := LookPath(absPath, env); err == nil {
 		t.Fatalf("LookPath(%v) did not fail when it should", absPath)
@@ -152,7 +152,7 @@ func TestLookPathAbsoluteExecFail(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	absPath := filepath.Join(tmpDir, "vanadium-unlikely-binary-name")
+	absPath := filepath.Join(tmpDir, "jiri-unlikely-binary-name")
 	tmpFile, err := os.OpenFile(absPath, os.O_CREATE, os.FileMode(0644))
 	if err != nil {
 		t.Fatalf("OpenFile(%v) failed: %v", absPath, err)
@@ -180,7 +180,7 @@ func TestLookPathRelativeOK(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	cmd := "vanadium-unlikely-binary-name"
+	cmd := "jiri-unlikely-binary-name"
 	absPath := filepath.Join(tmpDir, cmd)
 	tmpFile, err := os.OpenFile(absPath, os.O_CREATE, os.FileMode(0755))
 	if err != nil {
@@ -214,7 +214,7 @@ func TestLookPathRelativeFail(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	absPath := filepath.Join(tmpDir, "vanadium-unlikely-binary-name")
+	absPath := filepath.Join(tmpDir, "jiri-unlikely-binary-name")
 	relPath := "." + string(os.PathSeparator) + filepath.Base(absPath)
 	env := map[string]string{"PATH": tmpDir}
 	if _, err := LookPath(relPath, env); err == nil {
@@ -238,7 +238,7 @@ func TestLookPathRelativeExecFail(t *testing.T) {
 		t.Fatalf("Chdir(%v) failed: %v", tmpDir, err)
 	}
 	defer os.Chdir(cwd)
-	absPath := filepath.Join(tmpDir, "vanadium-unlikely-binary-name")
+	absPath := filepath.Join(tmpDir, "jiri-unlikely-binary-name")
 	tmpFile, err := os.OpenFile(absPath, os.O_CREATE, os.FileMode(0644))
 	if err != nil {
 		t.Fatalf("OpenFile(%v) failed: %v", absPath, err)

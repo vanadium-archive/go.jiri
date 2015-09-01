@@ -15,7 +15,7 @@ import (
 	"v.io/x/lib/set"
 )
 
-// Config holds configuration common to vanadium tools.
+// Config holds configuration common to jiri tools.
 type Config struct {
 	// apiCheckProjects identifies the set of project names for which
 	// the API check is required.
@@ -29,7 +29,7 @@ type Config struct {
 	// jenkinsMatrixJobs identifies the set of matrix (multi-configutation) jobs
 	// in Jenkins.
 	jenkinsMatrixJobs map[string]JenkinsMatrixJobInfo
-	// projectTests maps vanadium projects to sets of tests that should be
+	// projectTests maps jiri projects to sets of tests that should be
 	// executed to test changes in the given project.
 	projectTests map[string][]string
 	// testDependencies maps tests to sets of tests that the given test
@@ -245,7 +245,7 @@ type JenkinsMatrixJobInfo struct {
 	HasOS    bool `xml:"OS,attr"`
 	HasParts bool `xml:"parts,attr"`
 	// ShowOS determines whether to show OS label in job summary.
-	// It is possible that a job (e.g. vanadium-go-race) has an OS axis but
+	// It is possible that a job (e.g. jiri-go-race) has an OS axis but
 	// the axis only has a single value in order to constrain where its
 	// sub-builds run. In such cases, we do not want to show the OS label.
 	ShowOS bool   `xml:"showOS,attr"`

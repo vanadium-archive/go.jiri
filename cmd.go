@@ -28,9 +28,9 @@ func main() {
 // cmdRoot represents the root of the jiri tool.
 var cmdRoot = &cmdline.Command{
 	Name:  "jiri",
-	Short: "Multi-purpose tool for Vanadium development",
+	Short: "Multi-purpose tool for multi-repo development",
 	Long: `
-Command jiri is a multi-purpose tool for Vanadium development.
+Command jiri is a multi-purpose tool for multi-repo development.
 `,
 	LookPath: true,
 	Children: []*cmdline.Command{

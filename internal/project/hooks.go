@@ -200,7 +200,7 @@ readonly BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [[ "${BRANCH}" == "master" ]]
 then
   echo "==========================================================================="
-  echo "Vanadium code cannot be committed to master using the 'git commit' command."
+  echo "Code cannot be committed to master using the 'git commit' command."
   echo "Please create a local non-master branch and commit your code there."
   echo "==========================================================================="
   exit 1
@@ -221,7 +221,7 @@ readonly BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [[ "${REMOTE}" == "origin" && "${BRANCH}" == "master" ]]
 then
   echo "======================================================================"
-  echo "Vanadium code cannot be pushed to master using the 'git push' command."
+  echo "Code cannot be pushed to master using the 'git push' command."
   echo "Use the 'jiri cl mail' command to follow the code review workflow."
   echo "======================================================================"
   exit 1

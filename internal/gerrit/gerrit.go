@@ -412,8 +412,8 @@ func Reference(opts CLOpts) string {
 	return ref
 }
 
-// getRemoteURL returns the URL of the vanadium Gerrit project with
-// respect to the project identified by the current working directory.
+// getRemoteURL returns the URL of the Gerrit project with respect to the
+// project identified by the current working directory.
 func getRemoteURL(run *runutil.Run, clOpts CLOpts) (string, error) {
 	args := []string{"config", "--get", "remote.origin.url"}
 	var stdout, stderr bytes.Buffer

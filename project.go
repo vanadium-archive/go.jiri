@@ -41,8 +41,8 @@ func init() {
 // cmdProject represents the "jiri project" command.
 var cmdProject = &cmdline.Command{
 	Name:     "project",
-	Short:    "Manage the vanadium projects",
-	Long:     "Manage the vanadium projects.",
+	Short:    "Manage the jiri projects",
+	Long:     "Manage the jiri projects.",
 	Children: []*cmdline.Command{cmdProjectClean, cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
 }
 
@@ -50,8 +50,8 @@ var cmdProject = &cmdline.Command{
 var cmdProjectClean = &cmdline.Command{
 	Runner:   cmdline.RunnerFunc(runProjectClean),
 	Name:     "clean",
-	Short:    "Restore vanadium projects to their pristine state",
-	Long:     "Restore vanadium projects back to their master branches and get rid of all the local branches and changes.",
+	Short:    "Restore jiri projects to their pristine state",
+	Long:     "Restore jiri projects back to their master branches and get rid of all the local branches and changes.",
 	ArgsName: "<project ...>",
 	ArgsLong: "<project ...> is a list of projects to clean up.",
 }
@@ -84,7 +84,7 @@ func runProjectClean(env *cmdline.Env, args []string) (e error) {
 var cmdProjectList = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runProjectList),
 	Name:   "list",
-	Short:  "List existing vanadium projects and branches",
+	Short:  "List existing jiri projects and branches",
 	Long:   "Inspect the local filesystem and list the existing projects and branches.",
 }
 
@@ -133,7 +133,7 @@ var cmdProjectShellPrompt = &cmdline.Command{
 	Name:   "shell-prompt",
 	Short:  "Print a succinct status of projects, suitable for shell prompts",
 	Long: `
-Reports current branches of vanadium projects (repositories) as well as an
+Reports current branches of jiri projects (repositories) as well as an
 indication of each project's status:
   *  indicates that a repository contains uncommitted changes
   %  indicates that a repository contains untracked files
@@ -196,9 +196,9 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 var cmdProjectPoll = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runProjectPoll),
 	Name:   "poll",
-	Short:  "Poll existing vanadium projects",
+	Short:  "Poll existing jiri projects",
 	Long: `
-Poll vanadium projects that can affect the outcome of the given tests
+Poll jiri projects that can affect the outcome of the given tests
 and report whether any new changes in these projects exist. If no
 tests are specified, all projects are polled by default.
 `,
