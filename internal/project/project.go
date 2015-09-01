@@ -140,7 +140,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 		})
 		otherTools := []string{"api", "copyright", "env", "go", "goext", "oncall", "profile", "run", "test"}
 		for _, t := range otherTools {
-			toolName := fmt.Sprintf("v23-%s", t)
+			toolName := fmt.Sprintf("jiri-%s", t)
 			manifest.Tools = append(manifest.Tools, Tool{
 				Data:    "data",
 				Name:    toolName,
