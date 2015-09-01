@@ -6,10 +6,10 @@ package runutil
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,24 +29,11 @@ func TestStartCommandOK(t *testing.T) {
 	if _, err := start.Command(bin); err != nil {
 		t.Fatalf(`Command("go run ./testdata/slow_hello2.go") failed: %v`, err)
 	}
-	time.Sleep(time.Second * 3)
-	// Note that the output shouldn't have "hello" because start.Command won't
+	// Note that the output shouldn't have "hello!!" because start.Command won't
 	// wait for the command to finish.
-	if got, want := removeTimestamps(t, &out), fmt.Sprintf(">> %s\n>> OK\n", bin); got != want {
-		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
-	}
-}
-
-// TestStartCommandWithNonZeroExitCodeOK tests that start.Command() succeeds
-// even if the command it started failed.
-func TestStartCommandWithNonZeroExitCodeOK(t *testing.T) {
-	var out bytes.Buffer
-	start := NewStart(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
-	if _, err := start.Command("go", "run", "./testdata/fail_hello.go"); err != nil {
-		t.Fatalf(`Command("go run ./testdata/fail_hello.go") failed: %v`, err)
-	}
-	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\n>> OK\n"; got != want {
-		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
+	output := removeTimestamps(t, &out)
+	if strings.Index(output, "hello!!") != -1 {
+		t.Fatalf("output shouldn't contain 'hello!!':\n%v", output)
 	}
 }
 
