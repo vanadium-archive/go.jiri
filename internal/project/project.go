@@ -670,6 +670,28 @@ func installTools(ctx *tool.Context, dir string) error {
 	if err := ctx.Run().RemoveAll(oldBinDir); err != nil {
 		return err
 	}
+	// TODO(nlacasse): Remove old "v23-" subcommands.  Remove this once the
+	// transition from v23->jiri is complete.
+	// TODO(nlacasse): Once transition is complete, remove the "v23" tool
+	// itself from devtoolsBinDir.
+	v23SubCmds := []string{
+		"v23-api",
+		"v23-copyright",
+		"v23-env",
+		"v23-go",
+		"v23-goext",
+		"v23-oncall",
+		"v23-profile",
+		"v23-run",
+		"v23-test",
+	}
+	for _, subCmd := range v23SubCmds {
+		subCmdPath := filepath.Join(binDir, subCmd)
+		if err := ctx.Run().RemoveAll(subCmdPath); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
