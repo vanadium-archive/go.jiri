@@ -32,7 +32,8 @@ var cmdRoot = &cmdline.Command{
 	Long: `
 Command jiri is a multi-purpose tool for multi-repo development.
 `,
-	LookPath: true,
+	LookPath:         true,
+	LookPathPrefixes: []string{"jiri"},
 	Children: []*cmdline.Command{
 		cmdCL,
 		cmdContributors,
