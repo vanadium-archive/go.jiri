@@ -22,7 +22,7 @@ const (
 
 // DataDirPath returns the path to the data directory of the given tool.
 func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
-	projects, tools, err := readManifest(ctx, false)
+	projects, tools, _, err := readManifest(ctx, false)
 	if err != nil {
 		return "", err
 	}

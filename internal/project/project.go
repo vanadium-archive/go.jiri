@@ -36,11 +36,36 @@ type CL struct {
 
 // Manifest represents a setting used for updating the universe.
 type Manifest struct {
+	Hooks    []Hook    `xml:"hooks>hook"`
 	Imports  []Import  `xml:"imports>import"`
 	Label    string    `xml:"label,attr"`
 	Projects []Project `xml:"projects>project"`
 	Tools    []Tool    `xml:"tools>tool"`
 	XMLName  struct{}  `xml:"manifest"`
+}
+
+// Hooks maps hook names to their detailed description.
+type Hooks map[string]Hook
+
+// Hook represents a post-update project hook.
+type Hook struct {
+	// Exclude is flag used to exclude previously included hooks.
+	Exclude bool `xml:"exclude,attr"`
+	// Name is the hook name.
+	Name string `xml:"name,attr"`
+	// Project is the name of the project the hook is associated with.
+	Project string `xml:"project,attr"`
+	// Path is the path of the hook relative to its project's root.
+	Path string `xml:"path,attr"`
+	// Interpreter is an optional program used to interpret the hook (i.e. python). Unlike Path,
+	// Interpreter is relative to the environment's PATH and not the project's root.
+	Interpreter string `xml:"interpreter,attr"`
+	// Arguments for the hook.
+	Args []HookArg `xml:"arg"`
+}
+
+type HookArg struct {
+	Arg string `xml:",chardata"`
 }
 
 // Imports maps manifest import names to their detailed description.
@@ -261,7 +286,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 	if err != nil {
 		return nil, err
 	}
-	remoteProjects, _, err := readManifest(ctx, false)
+	remoteProjects, _, _, err := readManifest(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -312,17 +337,18 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 // ReadManifest retrieves and parses the manifest that determines what
 // projects and tools are part of the jiri universe.
 func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
-	return readManifest(ctx, false)
+	p, t, _, e := readManifest(ctx, false)
+	return p, t, e
 }
 
 // readManifest implements the ReadManifest logic and provides an
 // optional flag that can be used to fetch the latest manifest updates
 // from the manifest repository.
-func readManifest(ctx *tool.Context, update bool) (Projects, Tools, error) {
+func readManifest(ctx *tool.Context, update bool) (Projects, Tools, Hooks, error) {
 	if update {
 		root, err := V23Root()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		project := Project{
 			Path:     filepath.Join(root, ".manifest"),
@@ -330,18 +356,18 @@ func readManifest(ctx *tool.Context, update bool) (Projects, Tools, error) {
 			Revision: "HEAD",
 		}
 		if err := pullProject(ctx, project); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 	path, err := ResolveManifestPath(ctx.Manifest())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	projects, tools, stack := Projects{}, Tools{}, map[string]struct{}{}
-	if err := loadManifest(ctx, path, projects, tools, stack); err != nil {
-		return nil, nil, err
+	projects, tools, hooks, stack := Projects{}, Tools{}, Hooks{}, map[string]struct{}{}
+	if err := loadManifest(ctx, path, projects, tools, hooks, stack); err != nil {
+		return nil, nil, nil, err
 	}
-	return projects, tools, nil
+	return projects, tools, hooks, nil
 }
 
 // UpdateUniverse updates all local projects and tools to match the
@@ -349,7 +375,7 @@ func readManifest(ctx *tool.Context, update bool) (Projects, Tools, error) {
 // the 'gc' flag can be used to indicate that local projects that no
 // longer exist remotely should be removed.
 func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
-	remoteProjects, remoteTools, err := readManifest(ctx, true)
+	remoteProjects, remoteTools, remoteHooks, err := readManifest(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -367,7 +393,11 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 		return err
 	}
 	// 3. Install the tools into $V23_ROOT/devtools/bin.
-	return installTools(ctx, tmpDir)
+	if err := installTools(ctx, tmpDir); err != nil {
+		return err
+	}
+	// 4. Run all specified hooks
+	return runHooks(ctx, remoteHooks)
 }
 
 // ApplyToLocalMaster applies an operation expressed as the given
@@ -695,6 +725,25 @@ func installTools(ctx *tool.Context, dir string) error {
 	return nil
 }
 
+// runHooks runs the specified hooks
+func runHooks(ctx *tool.Context, hooks Hooks) error {
+	for _, hook := range hooks {
+		command := hook.Path
+		args := []string{}
+		if hook.Interpreter != "" {
+			command = hook.Interpreter
+			args = append(args, hook.Path)
+		}
+		for _, arg := range hook.Args {
+			args = append(args, arg.Arg)
+		}
+		if err := ctx.Run().Command(command, args...); err != nil {
+			return fmt.Errorf("Hook %v failed: %v", hook.Name, err)
+		}
+	}
+	return nil
+}
+
 // pullProject advances the local master branch of the given
 // project, which is expected to exist locally at project.Path.
 func pullProject(ctx *tool.Context, project Project) error {
@@ -714,7 +763,7 @@ func pullProject(ctx *tool.Context, project Project) error {
 
 // loadManifest loads the given manifest, processing all of its
 // imports, projects and tools settings.
-func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools, stack map[string]struct{}) error {
+func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools, hooks Hooks, stack map[string]struct{}) error {
 	data, err := ctx.Run().ReadFile(path)
 	if err != nil {
 		return err
@@ -733,7 +782,7 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 			return err
 		}
 		stack[manifest.Name] = struct{}{}
-		if err := loadManifest(ctx, path, projects, tools, stack); err != nil {
+		if err := loadManifest(ctx, path, projects, tools, hooks, stack); err != nil {
 			return err
 		}
 		delete(stack, manifest.Name)
@@ -785,6 +834,23 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 			tool.Data = "data"
 		}
 		tools[tool.Name] = tool
+	}
+	// Process all hooks.
+	for _, hook := range m.Hooks {
+		if hook.Exclude {
+			// Exclude the hook in case it was previously
+			// included.
+			delete(hooks, hook.Name)
+			continue
+		}
+		project, found := projects[hook.Project]
+		if !found {
+			return fmt.Errorf("hook %v specified project %v which was not found",
+				hook.Name, hook.Project)
+		}
+		// Replace project-relative path with absolute path.
+		hook.Path = filepath.Join(project.Path, hook.Path)
+		hooks[hook.Name] = hook
 	}
 	return nil
 }
