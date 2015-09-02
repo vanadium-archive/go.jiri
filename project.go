@@ -12,9 +12,9 @@ import (
 	"sort"
 	"strings"
 
-	"v.io/jiri/internal/project"
-	"v.io/jiri/internal/tool"
-	"v.io/jiri/internal/util"
+	"v.io/jiri/lib/project"
+	"v.io/jiri/lib/tool"
+	"v.io/jiri/lib/util"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/set"
 )

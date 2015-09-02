@@ -1,5 +1,0 @@
-<godepcop>
-  <pkg allow="code.google.com/p/goauth2/..."/>
-  <pkg allow="golang.org/x/net/..."/>
-  <pkg allow="google.golang.org/api/..."/>
-</godepcop>

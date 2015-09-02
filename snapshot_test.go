@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/jiri/internal/project"
-	"v.io/jiri/internal/tool"
+	"v.io/jiri/lib/project"
+	"v.io/jiri/lib/tool"
 	"v.io/x/lib/cmdline"
 )
 
