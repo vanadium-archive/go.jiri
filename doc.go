@@ -18,6 +18,15 @@ The jiri commands are:
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
    version      Print version
+   api          Manage vanadium public API
+   copyright    Manage vanadium copyright
+   env          Print vanadium environment variables
+   go           Execute the go tool using the vanadium environment
+   goext        Vanadium extensions of the go tool
+   oncall       Manage vanadium oncall schedule
+   profile      Manage vanadium profiles
+   run          Run an executable using the vanadium environment
+   test         Manage vanadium tests
    help         Display help for commands or topics
 
 The jiri flags are:
@@ -357,6 +366,422 @@ Print version of the jiri tool.
 
 Usage:
    jiri version
+
+Jiri api - Manage vanadium public API
+
+Use this command to ensure that no unintended changes are made to the vanadium
+public API.
+
+Usage:
+   jiri api [flags] <command>
+
+The jiri api commands are:
+   check       Check if any changes have been made to the public API
+   fix         Update .api files to reflect changes to the public API
+
+The jiri api flags are:
+ -color=true
+   Use color to format output.
+ -gotools-bin=
+   The path to the gotools binary to use. If empty, gotools will be built if
+   necessary.
+ -manifest=
+   Name of the project manifest.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri api check - Check if any changes have been made to the public API
+
+Check if any changes have been made to the public API.
+
+Usage:
+   jiri api check [flags] <projects>
+
+<projects> is a list of vanadium projects to check. If none are specified, all
+projects that require a public API check upon presubmit are checked.
+
+The jiri api check flags are:
+ -detailed=true
+   If true, shows each API change in an expanded form. Otherwise, only a summary
+   is shown.
+
+Jiri api fix
+
+Update .api files to reflect changes to the public API.
+
+Usage:
+   jiri api fix <projects>
+
+<projects> is a list of vanadium projects to update. If none are specified, all
+project APIs are updated.
+
+Jiri copyright - Manage vanadium copyright
+
+This command can be used to check if all source code files of Vanadium projects
+contain the appropriate copyright header and also if all projects contains the
+appropriate licensing files. Optionally, the command can be used to fix the
+appropriate copyright headers and licensing files.
+
+In order to ignore checked in third-party assets which have their own copyright
+and licensing headers a ".v23ignore" file can be added to a project. The
+".v23ignore" file is expected to contain a single regular expression pattern per
+line.
+
+Usage:
+   jiri copyright [flags] <command>
+
+The jiri copyright commands are:
+   check       Check copyright headers and licensing files
+   fix         Fix copyright headers and licensing files
+
+The jiri copyright flags are:
+ -color=true
+   Use color to format output.
+ -manifest=
+   Name of the project manifest.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri copyright check - Check copyright headers and licensing files
+
+Check copyright headers and licensing files.
+
+Usage:
+   jiri copyright check <projects>
+
+<projects> is a list of projects to check.
+
+Jiri copyright fix - Fix copyright headers and licensing files
+
+Fix copyright headers and licensing files.
+
+Usage:
+   jiri copyright fix <projects>
+
+<projects> is a list of projects to fix.
+
+Jiri env - Print vanadium environment variables
+
+Print vanadium environment variables.
+
+If no arguments are given, prints all variables in NAME="VALUE" format, each on
+a separate line ordered by name.  This format makes it easy to set all vars by
+running the following bash command (or similar for other shells):
+   eval $(v23 env)
+
+If arguments are given, prints only the value of each named variable, each on a
+separate line in the same order as the arguments.
+
+Usage:
+   jiri env [flags] [name ...]
+
+[name ...] is an optional list of variable names.
+
+The jiri env flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri go - Execute the go tool using the vanadium environment
+
+Wrapper around the 'go' tool that can be used for compilation of vanadium Go
+sources. It takes care of vanadium-specific setup, such as setting up the Go
+specific environment variables or making sure that VDL generated files are
+regenerated before compilation.
+
+In particular, the tool invokes the following command before invoking any go
+tool commands that compile vanadium Go code:
+
+vdl generate -lang=go all
+
+Usage:
+   jiri go [flags] <arg ...>
+
+<arg ...> is a list of arguments for the go tool.
+
+The jiri go flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri goext - Vanadium extensions of the go tool
+
+Vanadium extension of the go tool.
+
+Usage:
+   jiri goext [flags] <command>
+
+The jiri goext commands are:
+   distclean   Restore the vanadium Go workspaces to their pristine state
+
+The jiri goext flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri goext distclean - Restore the vanadium Go workspaces to their pristine
+state
+
+Unlike the 'go clean' command, which only removes object files for packages in
+the source tree, the 'goext disclean' command removes all object files from
+vanadium Go workspaces. This functionality is needed to avoid accidental use of
+stale object files that correspond to packages that no longer exist in the
+source tree.
+
+Usage:
+   jiri goext distclean
+
+Jiri oncall - Manage vanadium oncall schedule
+
+Manage vanadium oncall schedule. If no subcommand is given, it shows the LDAP of
+the current oncall.
+
+Usage:
+   jiri oncall [flags]
+   jiri oncall [flags] <command>
+
+The jiri oncall commands are:
+   list        List available oncall schedule
+
+The jiri oncall flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri oncall list - List available oncall schedule
+
+List available oncall schedule.
+
+Usage:
+   jiri oncall list
+
+Jiri profile - Manage vanadium profiles
+
+To facilitate development across different host platforms, vanadium defines
+platform-independent "profiles" that map different platforms to a set of
+libraries and tools that can be used for a facet of vanadium development.
+
+Each profile can be in one of three states: absent, up-to-date, or out-of-date.
+The subcommands of the profile command realize the following transitions:
+
+  install:   absent => up-to-date
+  update:    out-of-date => up-to-date
+  uninstall: up-to-date or out-of-date => absent
+
+In addition, a profile can transition from being up-to-date to out-of-date by
+the virtue of a new version of the profile being released.
+
+To enable cross-compilation, a profile can be installed for multiple targets. If
+a profile supports multiple targets the above state transitions are applied on a
+profile + target basis.
+
+Usage:
+   jiri profile [flags] <command>
+
+The jiri profile commands are:
+   install     Install the given vanadium profiles
+   list        List known vanadium profiles
+   setup       Set up the given vanadium profiles
+   uninstall   Uninstall the given vanadium profiles
+   update      Update the given vanadium profiles
+
+The jiri profile flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri profile install - Install the given vanadium profiles
+
+Install the given vanadium profiles.
+
+Usage:
+   jiri profile install <profiles>
+
+<profiles> is a list of profiles to install.
+
+Jiri profile list - List known vanadium profiles
+
+List known vanadium profiles.
+
+Usage:
+   jiri profile list
+
+Jiri profile setup - Set up the given vanadium profiles
+
+Set up the given vanadium profiles. This command is identical to 'install' and
+is provided for backwards compatibility.
+
+Usage:
+   jiri profile setup <profiles>
+
+<profiles> is a list of profiles to set up.
+
+Jiri profile uninstall - Uninstall the given vanadium profiles
+
+Uninstall the given vanadium profiles.
+
+Usage:
+   jiri profile uninstall <profiles>
+
+<profiles> is a list of profiles to uninstall.
+
+Jiri profile update - Update the given vanadium profiles
+
+Update the given vanadium profiles.
+
+Usage:
+   jiri profile update <profiles>
+
+<profiles> is a list of profiles to update.
+
+Jiri run - Run an executable using the vanadium environment
+
+Run an executable using the vanadium environment.
+
+Usage:
+   jiri run [flags] <executable> [arg ...]
+
+<executable> [arg ...] is the executable to run and any arguments to pass
+verbatim to the executable.
+
+The jiri run flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri test - Manage vanadium tests
+
+Manage vanadium tests.
+
+Usage:
+   jiri test [flags] <command>
+
+The jiri test commands are:
+   generate    Generate supporting code for v23 integration tests
+   project     Run tests for a vanadium project
+   run         Run vanadium tests
+   list        List vanadium tests
+
+The jiri test flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri test generate - Generate supporting code for v23 integration tests
+
+The generate command supports the vanadium integration test framework and unit
+tests by generating go files that contain supporting code.  v23 test generate is
+intended to be invoked via the 'go generate' mechanism and the resulting files
+are to be checked in.
+
+Integration tests are functions of the following form:
+
+    func V23Test<x>(i *v23tests.T)
+
+These functions are typically defined in 'external' *_test packages, to ensure
+better isolation.  But they may also be defined directly in the 'internal' *
+package.  The following helper functions will be generated:
+
+    func TestV23<x>(t *testing.T) {
+      v23tests.RunTest(t, V23Test<x>)
+    }
+
+In addition a TestMain function is generated, if it doesn't already exist.  Note
+that Go requires that at most one TestMain function is defined across both the
+internal and external test packages.
+
+The generated TestMain performs common initialization, and also performs child
+process dispatching for tests that use "v.io/veyron/test/modules".
+
+Usage:
+   jiri test generate [flags] [packages]
+
+list of go packages
+
+The jiri test generate flags are:
+ -prefix=v23
+   Specifies the prefix to use for generated files. Up to two files may
+   generated, the defaults are v23_test.go and v23_internal_test.go, or
+   <prefix>_test.go and <prefix>_internal_test.go.
+ -progress=false
+   Print verbose progress information.
+
+Jiri test project - Run tests for a vanadium project
+
+Runs tests for a vanadium project that is by the remote URL specified as the
+command-line argument. Projects hosted on googlesource.com, can be specified
+using the basename of the URL (e.g. "vanadium.go.core" implies
+"https://vanadium.googlesource.com/vanadium.go.core").
+
+Usage:
+   jiri test project <project>
+
+<project> identifies the project for which to run tests.
+
+Jiri test run - Run vanadium tests
+
+Run vanadium tests.
+
+Usage:
+   jiri test run [flags] <name...>
+
+<name...> is a list names identifying the tests to run.
+
+The jiri test run flags are:
+ -blessings-root=dev.v.io
+   The blessings root.
+ -clean-go=true
+   Specify whether to remove Go object files and binaries before running the
+   tests. Setting this flag to 'false' may lead to faster Go builds, but it may
+   also result in some source code changes not being reflected in the tests
+   (e.g., if the change was made in a different Go workspace).
+ -num-test-workers=<runtime.NumCPU()>
+   Set the number of test workers to use; use 1 to serialize all tests.
+ -output-dir=
+   Directory to output test results into.
+ -part=-1
+   Specify which part of the test to run.
+ -pkgs=
+   Comma-separated list of Go package expressions that identify a subset of
+   tests to run; only relevant for Go-based tests
+ -v23.credentials.admin=
+   Directory for vanadium credentials.
+ -v23.credentials.publisher=
+   Directory for vanadium credentials for publishing new binaries.
+ -v23.namespace.root=/ns.dev.v.io:8101
+   The namespace root.
+
+Jiri test list - List vanadium tests
+
+List vanadium tests.
+
+Usage:
+   jiri test list
 
 Jiri help - Display help for commands or topics
 
