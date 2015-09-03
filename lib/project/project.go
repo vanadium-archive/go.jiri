@@ -23,6 +23,7 @@ import (
 )
 
 var DevToolsProject = "release.go.x.devtools"
+var JiriProject = "release.go.jiri"
 
 // CL represents a changelist.
 type CL struct {
@@ -158,10 +159,10 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	}
 	if _, err := ctx.Run().Stat(filepath.Join(root, devtoolsBinDir, "jiri")); err == nil {
 		manifest.Tools = append(manifest.Tools, Tool{
-			Data:    "data",
+			Data:    "../x/devtools/data",
 			Name:    "jiri",
 			Package: "v.io/jiri",
-			Project: DevToolsProject,
+			Project: JiriProject,
 		})
 		otherTools := []string{"api", "copyright", "env", "go", "goext", "oncall", "profile", "run", "test"}
 		for _, t := range otherTools {
