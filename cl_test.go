@@ -250,11 +250,11 @@ func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *proj
 	}
 }
 
-func createCLWithFile(t *testing.T, ctx *tool.Context, branch string, file string) {
+func createCLWithFiles(t *testing.T, ctx *tool.Context, branch string, files ...string) {
 	if err := newCL(ctx, []string{branch}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	commitFiles(t, ctx, []string{file})
+	commitFiles(t, ctx, files)
 }
 
 // TestCleanupClean checks that cleanup succeeds if the branch to be
@@ -840,6 +840,72 @@ func TestCLNew(t *testing.T) {
 	}
 }
 
+// TestDependentClsWithEditDelete exercises a previously observed failure case
+// where if a CL edits a file and a dependent CL deletes it, jiri cl mail after
+// the deletion failed with unrecoverable merge errors.
+func TestDependentClsWithEditDelete(t *testing.T) {
+	ctx, cwd, root, repoPath, originPath, gerritPath := setupTest(t, true)
+	defer teardownTest(t, ctx, cwd, root)
+	chdir(t, ctx, originPath)
+	commitFiles(t, ctx, []string{"A", "B"})
+
+	chdir(t, ctx, repoPath)
+	if err := syncCL(ctx); err != nil {
+		t.Fatalf("%v", err)
+	}
+	assertFilesExist(t, ctx, []string{"A", "B"})
+
+	createCLWithFiles(t, ctx, "editme", "C")
+	if err := ctx.Run().WriteFile("B", []byte("Will I dream?"), 0644); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().Add("B"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().CommitWithMessage("editing stuff"); err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+	review, err := newReview(ctx, gerrit.CLOpts{
+		Remote:    gerritPath,
+		Reviewers: parseEmails("run1"), // See hack note about TestLabelsInCommitMessage
+	})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	setTopicFlag = false
+	if err := review.run(); err != nil {
+		t.Fatalf("run() failed: %v", err)
+	}
+
+	if err := newCL(ctx, []string{"deleteme"}); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().Remove("B", "C"); err != nil {
+		t.Fatalf("git rm B C failed: %v", err)
+	}
+	if err := ctx.Git().CommitWithMessage("deleting stuff"); err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+	review, err = newReview(ctx, gerrit.CLOpts{
+		Remote:    gerritPath,
+		Reviewers: parseEmails("run2"),
+	})
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := review.run(); err != nil {
+		t.Fatalf("run() failed: %v", err)
+	}
+
+	chdir(t, ctx, gerritPath)
+	expectedRef := gerrit.Reference(review.CLOpts)
+	if err := ctx.Git().CheckoutBranch(expectedRef); err != nil {
+		t.Fatalf("%v", err)
+	}
+	assertFilesExist(t, ctx, []string{"A"})
+	assertFilesDoNotExist(t, ctx, []string{"B", "C"})
+}
+
 // TestParallelDev checks "jiri cl mail" behavior when parallel development has
 // been submitted upstream.
 func TestParallelDev(t *testing.T) {
@@ -851,12 +917,12 @@ func TestParallelDev(t *testing.T) {
 	// Create parallel branches with:
 	// * non-conflicting changes in different files
 	// * conflicting changes in a file
-	createCLWithFile(t, ctx, "feature1-A", "A")
+	createCLWithFiles(t, ctx, "feature1-A", "A")
 
 	if err := ctx.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	createCLWithFile(t, ctx, "feature1-B", "B")
+	createCLWithFiles(t, ctx, "feature1-B", "B")
 	commitFile(t, ctx, "A", "Don't tread on me.")
 
 	reviewB, err := newReview(ctx, gerrit.CLOpts{Remote: gerritBPath})
@@ -924,9 +990,7 @@ func TestParallelDev(t *testing.T) {
 	if err := ctx.Git().CheckoutBranch(expectedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if _, err := ctx.Run().Stat("B"); err != nil {
-		t.Fatalf("file B was not present in Gerrit: %v", err)
-	}
+	assertFilesExist(t, ctx, []string{"B"})
 }
 
 // TestCLSync checks the operation of the "jiri cl sync" command.
@@ -961,8 +1025,6 @@ func TestCLSync(t *testing.T) {
 		if err := ctx.Git().CheckoutBranch(branch); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if _, err := ctx.Run().Stat("test"); err != nil {
-			t.Fatalf("%v", err)
-		}
+		assertFilesExist(t, ctx, []string{"test"})
 	}
 }

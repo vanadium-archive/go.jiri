@@ -376,14 +376,14 @@ func (g *Git) Log(branch, base, format string) ([][]string, error) {
 func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	args := []string{"merge"}
 	squash := false
-	strategyOption := ""
+	strategy := ""
 	resetOnFailure := true
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case SquashOpt:
 			squash = bool(typedOpt)
 		case StrategyOpt:
-			strategyOption = string(typedOpt)
+			strategy = string(typedOpt)
 		case ResetOnFailureOpt:
 			resetOnFailure = bool(typedOpt)
 		}
@@ -393,8 +393,8 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	} else {
 		args = append(args, "--no-squash")
 	}
-	if strategyOption != "" {
-		args = append(args, fmt.Sprintf("--strategy-option=%v", strategyOption))
+	if strategy != "" {
+		args = append(args, fmt.Sprintf("--strategy=%v", strategy))
 	}
 	args = append(args, branch)
 	if out, err := g.runOutput(args...); err != nil {
@@ -483,9 +483,11 @@ func (g *Git) RebaseAbort() error {
 	return g.run("rebase", "--abort")
 }
 
-// Remove removes the given file.
-func (g *Git) Remove(fileName string) error {
-	return g.run("rm", fileName)
+// Remove removes the given files.
+func (g *Git) Remove(fileNames ...string) error {
+	args := []string{"rm"}
+	args = append(args, fileNames...)
+	return g.run(args...)
 }
 
 // RemoveUntrackedFiles removes untracked files and directories.

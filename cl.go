@@ -608,18 +608,13 @@ func (review *review) createReviewBranch(message string) (e error) {
 func (review *review) squashBranches(branches []string, message string) (e error) {
 	for i := 1; i < len(branches); i++ {
 		// We want to merge the <branches[i]> branch on top of the review
-		// branch. Eventually, we will want this to be a rebase of the
-		// <branches[i]> patches onto the review branch, and we will want
-		// to base the review branch on the latest pull from Gerrit. For
-		// now though, just use a "theirs" merge strategy to merge
-		// <branches[i]>. This is not perfect, as it does not correctly
-		// handle file deletions.
+		// branch, forcing all conflicts to be reviewed in favor of the
+		// <branches[i]> branch. Unfortunately, git merge does not offer a
+		// strategy that would do that for us. The solution implemented
+		// here is based on:
 		//
-		// This was also tried:
 		// http://stackoverflow.com/questions/173919/is-there-a-theirs-version-of-git-merge-s-ours
-		// but since it is based on content rather than patches, in the case
-		// where master is out of date, it can introduce spurious reverts.
-		if err := review.ctx.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("theirs")); err != nil {
+		if err := review.ctx.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("ours")); err != nil {
 			return changeConflictError{
 				localBranch:  branches[i],
 				remoteBranch: review.CLOpts.RemoteBranch,
@@ -659,6 +654,22 @@ func (review *review) squashBranches(branches []string, message string) (e error
 			if err := committer.Commit(message); err != nil {
 				return err
 			}
+		}
+		tmpBranch := review.reviewBranch + "-" + branches[i] + "-TMP"
+		if err := review.ctx.Git().CreateBranch(tmpBranch); err != nil {
+			return err
+		}
+		defer collect.Error(func() error {
+			return review.ctx.Git().DeleteBranch(tmpBranch, gitutil.ForceOpt(true))
+		}, &e)
+		if err := review.ctx.Git().Reset(branches[i]); err != nil {
+			return err
+		}
+		if err := review.ctx.Git().Reset(tmpBranch, gitutil.ModeOpt("soft")); err != nil {
+			return err
+		}
+		if err := review.ctx.Git(authorDate, committerDate).CommitAmend(); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1019,7 +1030,6 @@ func syncCL(ctx *tool.Context) (e error) {
 	}()
 
 	// Switch to an existing directory in master so we can run commands.
-	// TODO(rosswang): This may be a little invasive; I'm noticing it actually mucking with the jiri repo during tests.
 	topLevel, err := ctx.Git().TopLevel()
 	if err != nil {
 		return err
