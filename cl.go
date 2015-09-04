@@ -793,6 +793,7 @@ func (review *review) run() (e error) {
 	} else {
 		message = string(data)
 	}
+
 	// Add/remove labels to/from the commit message before asking users
 	// to edit it. We do this only when this is not the initial commit
 	// where the message is empty.

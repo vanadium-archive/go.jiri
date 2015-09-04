@@ -128,6 +128,9 @@ func (g *Gerrit) PostReview(ref string, message string, labels map[string]string
 	if err != nil {
 		return fmt.Errorf("Do(%v) failed: %v", req, err)
 	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("PostReview:Do(%v) failed: %v", req, res.StatusCode)
+	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
 
 	return nil
@@ -143,7 +146,6 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 	if err != nil {
 		return err
 	}
-
 	topic := Topic{opts.Topic}
 	data, err := json.Marshal(topic)
 	if err != nil {
@@ -161,6 +163,9 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Do(%v) failed: %v", req, err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("SetTopic:Do(%v) failed: %v", req, res.StatusCode)
 	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
 
@@ -329,6 +334,9 @@ func (g *Gerrit) Query(query string) (_ []Change, e error) {
 	if err != nil {
 		return nil, fmt.Errorf("Do(%v) failed: %v", req, err)
 	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Query:Do(%v) failed: %v", req, res.StatusCode)
+	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
 	return parseQueryResults(res.Body)
 }
@@ -366,6 +374,9 @@ func (g *Gerrit) Submit(changeID string) (e error) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Do(%v) failed: %v", req, err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Submit:Do(%v) failed: %v", req, res.StatusCode)
 	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
 
@@ -564,7 +575,11 @@ func parseNetrcFile(reader io.Reader) (map[string]*credentials, error) {
 		if len(parts) != 6 || parts[0] != "machine" || parts[2] != "login" || parts[4] != "password" {
 			continue
 		}
-		credsMap[parts[1]] = &credentials{
+		host := parts[1]
+		if _, present := credsMap[host]; present {
+			return nil, fmt.Errorf("multiple logins exist for %q, please ensure there is only one", host)
+		}
+		credsMap[host] = &credentials{
 			username: parts[3],
 			password: parts[5],
 		}
