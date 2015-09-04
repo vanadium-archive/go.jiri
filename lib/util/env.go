@@ -52,9 +52,6 @@ func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	if err := setVdlPath(ctx, env, root, config); err != nil {
 		return nil, err
 	}
-	if err := setSyncbaseEnv(ctx, env, root); err != nil {
-		return nil, err
-	}
 	if profile := os.Getenv(jiriProfileEnv); profile != "" {
 		fmt.Fprintf(ctx.Stdout(), `NOTE: Enabling environment variable setting for %q.
 This can override values of existing environment variables.
@@ -83,6 +80,9 @@ This can override values of existing environment variables.
 		default:
 			fmt.Fprintf(ctx.Stderr(), "Unknown environment profile %q", profile)
 		}
+	}
+	if err := setSyncbaseEnv(ctx, env, root); err != nil {
+		return nil, err
 	}
 	return env, nil
 }
@@ -225,7 +225,7 @@ func setSyncbaseEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 		"snappy",
 	}
 	// TODO(rogulenko): get these vars from a config file.
-	goos, goarch := os.Getenv("GOOS"), os.Getenv("GOARCH")
+	goos, goarch := env.Get("GOOS"), env.Get("GOARCH")
 	if goos == "" {
 		goos = runtime.GOOS
 	}
