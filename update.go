@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"v.io/jiri/lib/project"
-	"v.io/jiri/lib/retry"
-	"v.io/jiri/lib/tool"
+	"v.io/jiri/project"
+	"v.io/jiri/retry"
+	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 )
 

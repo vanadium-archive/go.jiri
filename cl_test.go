@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri/lib/gerrit"
-	"v.io/jiri/lib/gitutil"
-	"v.io/jiri/lib/project"
-	"v.io/jiri/lib/tool"
+	"v.io/jiri/gerrit"
+	"v.io/jiri/gitutil"
+	"v.io/jiri/project"
+	"v.io/jiri/tool"
 )
 
 // assertCommitCount asserts that the commit count between two
