@@ -1,0 +1,17 @@
+<profiles>
+  <profile name="java">
+    <target arch="amd64" os="darwin" version="1"></target>
+  </profile>
+  <profile name="nacl">
+    <target arch="amd64" os="darwin" version="1"></target>
+  </profile>
+  <profile name="nodejs">
+    <target arch="amd64" os="darwin" version="1"></target>
+  </profile>
+  <profile name="syncbase">
+    <target arch="amd64" os="darwin" version="1"></target>
+  </profile>
+  <profile name="web">
+    <target arch="amd64" os="darwin" version="1"></target>
+  </profile>
+</profiles>

@@ -1,0 +1,30 @@
+<profiles>
+  <profile name="a" root="">
+    <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="">
+      <envvars>
+        <var>A=B</var>
+        <var>C=D</var>
+      </envvars>
+    </target>
+    <target tag="t2" arch="cpu2" os="os2" installation-directory="bar" version="bar">
+      <envvars>
+        <var>A=B</var>
+        <var>C=D</var>
+      </envvars>
+    </target>
+  </profile>
+  <profile name="b" root="">
+    <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="">
+      <envvars>
+        <var>A=B</var>
+        <var>C=D</var>
+      </envvars>
+    </target>
+    <target tag="t2" arch="cpu2" os="os2" installation-directory="bar" version="bar">
+      <envvars>
+        <var>A=B</var>
+        <var>C=D</var>
+      </envvars>
+    </target>
+  </profile>
+</profiles>

@@ -13,16 +13,32 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 )
 
 // helper executes the given Go standard library function,
 // encapsulated as a closure, respecting the "dry run" option.
 func (r *Run) helper(fn func() error, format string, args ...interface{}) error {
-	opts := r.opts
-	if opts.DryRun {
+	if opts := r.opts; opts.DryRun {
 		opts.Verbose = true
 		return r.FunctionWithOpts(opts, func() error { return nil }, format, args...)
+	}
+	return r.Function(fn, format, args...)
+}
+
+// dryRun executes the given Go standard library function, encapsulated as a
+// closure, but translating "dry run" into "verbose" for this particular
+// command so that the command can execute and thus allow subsequent
+// commands to complete. It is generally used for testing/making files/directories
+// that affect subsequent behaviour.
+func (r *Run) dryRun(fn func() error, format string, args ...interface{}) error {
+	if opts := r.opts; opts.DryRun {
+		// Disable the dry run option as this function has no effect and
+		// doing so results in more informative "dry run" output.
+		opts.DryRun = false
+		opts.Verbose = true
+		return r.FunctionWithOpts(opts, fn, format, args...)
 	}
 	return r.Function(fn, format, args...)
 }
@@ -30,14 +46,9 @@ func (r *Run) helper(fn func() error, format string, args ...interface{}) error 
 // Chdir is a wrapper around os.Chdir that handles options such as
 // "verbose" or "dry run".
 func (r *Run) Chdir(dir string) error {
-	opts := r.opts
-	if opts.DryRun {
-		// Disable the dry run option as this function has no effect and
-		// doing so results in more informative "dry run" output.
-		opts.DryRun = false
-		opts.Verbose = true
-	}
-	return r.FunctionWithOpts(opts, func() error { return os.Chdir(dir) }, fmt.Sprintf("cd %q", dir))
+	return r.dryRun(func() error {
+		return os.Chdir(dir)
+	}, fmt.Sprintf("cd %q", dir))
 }
 
 // Chmod is a wrapper around os.Chmod that handles options such as
@@ -69,7 +80,7 @@ func (r *Run) Open(name string) (*os.File, error) {
 func (r *Run) ReadDir(dirname string) ([]os.FileInfo, error) {
 	var fileInfos []os.FileInfo
 	var err error
-	r.helper(func() error {
+	r.dryRun(func() error {
 		fileInfos, err = ioutil.ReadDir(dirname)
 		return err
 	}, fmt.Sprintf("ls %q", dirname))
@@ -81,7 +92,7 @@ func (r *Run) ReadDir(dirname string) ([]os.FileInfo, error) {
 func (r *Run) ReadFile(filename string) ([]byte, error) {
 	var bytes []byte
 	var err error
-	r.helper(func() error {
+	r.dryRun(func() error {
 		bytes, err = ioutil.ReadFile(filename)
 		return err
 	}, fmt.Sprintf("read %q", filename))
@@ -92,6 +103,12 @@ func (r *Run) ReadFile(filename string) ([]byte, error) {
 // such as "verbose" or "dry run".
 func (r *Run) RemoveAll(dir string) error {
 	return r.helper(func() error { return os.RemoveAll(dir) }, fmt.Sprintf("rm -rf %q", dir))
+}
+
+// Remove is a wrapper around os.Remove that handles options
+// such as "verbose" or "dry run".
+func (r *Run) Remove(file string) error {
+	return r.helper(func() error { return os.Remove(file) }, fmt.Sprintf("rm %q", file))
 }
 
 // Rename is a wrapper around os.Rename that handles options such as
@@ -123,18 +140,26 @@ func (r *Run) Rename(src, dst string) error {
 func (r *Run) Stat(name string) (os.FileInfo, error) {
 	var fileInfo os.FileInfo
 	var err error
-	opts := r.opts
-	if opts.DryRun {
-		// Disable the dry run option as this function has no effect and
-		// doing so results in more informative "dry run" output.
-		opts.DryRun = false
-		opts.Verbose = true
-	}
-	r.FunctionWithOpts(opts, func() error {
+	r.dryRun(func() error {
 		fileInfo, err = os.Stat(name)
 		return err
 	}, fmt.Sprintf("stat %q", name))
 	return fileInfo, err
+}
+
+// IsDir is a wrapper around os.Stat that handles options such as
+// "verbose" or "dry run".
+func (r *Run) IsDir(name string) (bool, error) {
+	var fileInfo os.FileInfo
+	var err error
+	r.dryRun(func() error {
+		fileInfo, err = os.Stat(name)
+		return err
+	}, fmt.Sprintf("isdir %q", name))
+	if err != nil {
+		return false, err
+	}
+	return fileInfo.IsDir(), err
 }
 
 // Symlink is a wrapper around os.Symlink that handles options such as
@@ -146,11 +171,12 @@ func (r *Run) Symlink(src, dst string) error {
 // TempDir is a wrapper around ioutil.TempDir that handles options
 // such as "verbose" or "dry run".
 func (r *Run) TempDir(dir, prefix string) (string, error) {
-	tmpDir := fmt.Sprintf("%v%c%vXXXXXX", dir, os.PathSeparator, prefix)
 	var err error
 	if dir == "" {
 		dir = os.Getenv("TMPDIR")
 	}
+	tmpDir := fmt.Sprintf("%v%c%vXXXXXX", dir, os.PathSeparator, prefix)
+	tmpDir = filepath.Clean(tmpDir)
 	r.helper(func() error {
 		tmpDir, err = ioutil.TempDir(dir, prefix)
 		return err
