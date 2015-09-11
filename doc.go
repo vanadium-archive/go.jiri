@@ -471,7 +471,7 @@ Print vanadium environment variables.
 If no arguments are given, prints all variables in NAME="VALUE" format, each on
 a separate line ordered by name.  This format makes it easy to set all vars by
 running the following bash command (or similar for other shells):
-   eval $(v23 env)
+   eval $(jiri env)
 
 If arguments are given, prints only the value of each named variable, each on a
 separate line in the same order as the arguments.
@@ -695,9 +695,9 @@ The jiri test flags are:
 Jiri test generate - Generate supporting code for v23 integration tests
 
 The generate command supports the vanadium integration test framework and unit
-tests by generating go files that contain supporting code.  v23 test generate is
-intended to be invoked via the 'go generate' mechanism and the resulting files
-are to be checked in.
+tests by generating go files that contain supporting code.  jiri test generate
+is intended to be invoked via the 'go generate' mechanism and the resulting
+files are to be checked in.
 
 Integration tests are functions of the following form:
 
