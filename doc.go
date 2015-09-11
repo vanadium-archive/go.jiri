@@ -425,9 +425,9 @@ appropriate licensing files. Optionally, the command can be used to fix the
 appropriate copyright headers and licensing files.
 
 In order to ignore checked in third-party assets which have their own copyright
-and licensing headers a ".v23ignore" file can be added to a project. The
-".v23ignore" file is expected to contain a single regular expression pattern per
-line.
+and licensing headers a ".jiriignore" file can be added to a project. The
+".jiriignore" file is expected to contain a single regular expression pattern
+per line.
 
 Usage:
    jiri copyright [flags] <command>
