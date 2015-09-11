@@ -94,9 +94,11 @@ The jiri cl mail flags are:
  -d=false
    Send a draft changelist.
  -edit=true
-   Open an editor to edit the commit message.
+   Open an editor to edit the CL description.
  -host=https://vanadium-review.googlesource.com/
    Gerrit host to use.
+ -m=
+   CL description.
  -presubmit=all
    The type of presubmit tests to run. Valid values: none,all.
  -r=

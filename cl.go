@@ -29,8 +29,9 @@ var (
 	ccsFlag          string
 	draftFlag        bool
 	editFlag         bool
-	hostFlag         string
 	forceFlag        bool
+	hostFlag         string
+	messageFlag      string
 	presubmitFlag    string
 	remoteBranchFlag string
 	reviewersFlag    string
@@ -59,8 +60,9 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
-	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the commit message.")
+	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the CL description.")
 	cmdCLMail.Flags.StringVar(&hostFlag, "host", project.VanadiumGerritHost(), "Gerrit host to use.")
+	cmdCLMail.Flags.StringVar(&messageFlag, "m", "", "CL description.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
@@ -761,21 +763,13 @@ func (review *review) run() (e error) {
 		return err
 	}
 	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
-	message := ""
 	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
 	if err != nil {
 		return err
 	}
-	data, err := review.ctx.Run().ReadFile(file)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-		// CLs exported to Gerrit prior to v.io/c/13993 might have the
-		// commit message file stored in a different location. Check if
-		// the file exists there, and if so, read it into memory and then
-		// get rid of it.
-		file := filepath.Join(topLevel, commitMessageFileName)
+	message := messageFlag
+	if message == "" {
+		// Message was not passed in flag.  Attempt to read it from file.
 		data, err := review.ctx.Run().ReadFile(file)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -783,15 +777,7 @@ func (review *review) run() (e error) {
 			}
 		} else {
 			message = string(data)
-			if err := review.ctx.Git().Remove(file); err != nil {
-				return err
-			}
-			if err := review.ctx.Git().CommitWithMessage("removing outdated commit message file"); err != nil {
-				return err
-			}
 		}
-	} else {
-		message = string(data)
 	}
 
 	// Add/remove labels to/from the commit message before asking users
