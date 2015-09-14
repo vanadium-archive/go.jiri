@@ -15,6 +15,7 @@ The jiri commands are:
    cl           Manage project changelists
    contributors List project contributors
    project      Manage the jiri projects
+   rebuild      Rebuild the jiri command line tool
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
    version      Print version
@@ -235,6 +236,13 @@ Usage:
 The jiri project poll flags are:
  -manifest=
    Name of the project manifest.
+
+Jiri rebuild - Rebuild the jiri command line tool
+
+Rebuild the jiri command line tool.
+
+Usage:
+   jiri rebuild
 
 Jiri snapshot - Manage project snapshots
 

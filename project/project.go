@@ -24,6 +24,8 @@ import (
 
 var DevToolsProject = "release.go.x.devtools"
 var JiriProject = "release.go.jiri"
+var JiriName = "jiri"
+var JiriPackage = "v.io/jiri"
 
 // CL represents a changelist.
 type CL struct {
@@ -160,8 +162,8 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	if _, err := ctx.Run().Stat(filepath.Join(root, devtoolsBinDir, "jiri")); err == nil {
 		manifest.Tools = append(manifest.Tools, Tool{
 			Data:    "../x/devtools/data",
-			Name:    "jiri",
-			Package: "v.io/jiri",
+			Name:    JiriName,
+			Package: JiriPackage,
 			Project: JiriProject,
 		})
 		otherTools := []string{"api", "copyright", "env", "go", "goext", "oncall", "profile", "run", "test"}
@@ -259,8 +261,7 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 	return "", nil
 }
 
-// LocalProjects scans the local filesystem to identify existing
-// projects.
+// LocalProjects scans the local filesystem to identify existing projects.
 func LocalProjects(ctx *tool.Context) (Projects, error) {
 	root, err := JiriRoot()
 	if err != nil {
@@ -394,7 +395,7 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 		return err
 	}
 	// 3. Install the tools into $JIRI_ROOT/devtools/bin.
-	if err := installTools(ctx, tmpDir); err != nil {
+	if err := InstallTools(ctx, tmpDir); err != nil {
 		return err
 	}
 	// 4. Run all specified hooks
@@ -653,9 +654,9 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 	return nil
 }
 
-// installTools installs the tools from the given directory into
+// InstallTools installs the tools from the given directory into
 // $JIRI_ROOT/devtools/bin.
-func installTools(ctx *tool.Context, dir string) error {
+func InstallTools(ctx *tool.Context, dir string) error {
 	if ctx.DryRun() {
 		// In "dry run" mode, no binaries are built.
 		return nil
