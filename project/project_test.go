@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// TODO(jsimsa): Switch this test to using FakeV23Root.
+// TODO(jsimsa): Switch this test to using FakeJiriRoot.
 
 package project
 
@@ -305,11 +305,11 @@ func TestUpdateUniverse(t *testing.T) {
 		remoteProjects = append(remoteProjects, remoteProject)
 	}
 	createRemoteManifest(t, ctx, remoteManifest, remoteProjects)
-	oldRoot := os.Getenv("V23_ROOT")
-	if err := os.Setenv("V23_ROOT", localDir); err != nil {
+	oldRoot := os.Getenv("JIRI_ROOT")
+	if err := os.Setenv("JIRI_ROOT", localDir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	// Check that calling UpdateUniverse() creates local copies of
 	// the remote repositories, advancing projects to HEAD or to

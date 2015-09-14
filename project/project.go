@@ -89,11 +89,11 @@ type Project struct {
 	// Name is the project name.
 	Name string `xml:"name,attr"`
 	// Path is the path used to store the project locally. Project
-	// manifest uses paths that are relative to the $V23_ROOT
+	// manifest uses paths that are relative to the $JIRI_ROOT
 	// environment variable. When a manifest is parsed (e.g. in
 	// RemoteProjects), the program logic converts the relative
 	// paths to an absolute paths, using the current value of the
-	// $V23_ROOT environment variable as a prefix.
+	// $JIRI_ROOT environment variable as a prefix.
 	Path string `xml:"path,attr"`
 	// Protocol is the version control protocol used by the
 	// project. If not set, "git" is used as the default.
@@ -150,10 +150,10 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	// If the $V23_ROOT/devtools/bin/jiri binary exists, add the "jiri"
+	// If the $JIRI_ROOT/devtools/bin/jiri binary exists, add the "jiri"
 	// tool to the manifest. The binary might not exist if we are
 	// dealing with a fake jiri root used for testing.
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ const currentManifestFileName = ".current_manifest"
 // CurrentManifest returns a manifest that identifies the result of
 // the most recent "jiri update" invocation.
 func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ tool builds. To fix this problem, please run "jiri update".
 // writeCurrentManifest writes the given manifest to a file that
 // stores the result of the most recent "jiri update" invocation.
 func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 // LocalProjects scans the local filesystem to identify existing
 // projects.
 func LocalProjects(ctx *tool.Context) (Projects, error) {
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
 // from the manifest repository.
 func readManifest(ctx *tool.Context, update bool) (Projects, Tools, Hooks, error) {
 	if update {
-		root, err := V23Root()
+		root, err := JiriRoot()
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -393,7 +393,7 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 	if err := buildTools(ctx, remoteTools, tmpDir); err != nil {
 		return err
 	}
-	// 3. Install the tools into $V23_ROOT/devtools/bin.
+	// 3. Install the tools into $JIRI_ROOT/devtools/bin.
 	if err := installTools(ctx, tmpDir); err != nil {
 		return err
 	}
@@ -612,7 +612,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 	if err := ctx.Run().Chdir(path); err != nil {
 		return err
 	}
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -630,7 +630,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 		if p, ok := projects[project.Name]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
-		// Root relative paths in the $V23_ROOT directory.
+		// Root relative paths in the $JIRI_ROOT directory.
 		if !filepath.IsAbs(project.Path) {
 			project.Path = filepath.Join(root, project.Path)
 		}
@@ -654,13 +654,13 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 }
 
 // installTools installs the tools from the given directory into
-// $V23_ROOT/devtools/bin.
+// $JIRI_ROOT/devtools/bin.
 func installTools(ctx *tool.Context, dir string) error {
 	if ctx.DryRun() {
 		// In "dry run" mode, no binaries are built.
 		return nil
 	}
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -669,7 +669,7 @@ func installTools(ctx *tool.Context, dir string) error {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
 	}
 	failed := false
-	// TODO(jsimsa): Make sure the "$V23_ROOT/devtools/bin" directory
+	// TODO(jsimsa): Make sure the "$JIRI_ROOT/devtools/bin" directory
 	// exists. This is for backwards compatibility for instances of
 	// jiri root that have been created before go/vcl/9511.
 	binDir := filepath.Join(root, devtoolsBinDir)
@@ -694,7 +694,7 @@ func installTools(ctx *tool.Context, dir string) error {
 	if failed {
 		return cmdline.ErrExitCode(2)
 	}
-	// TODO(jsimsa): Make sure the "$V23_ROOT/bin" directory is removed,
+	// TODO(jsimsa): Make sure the "$JIRI_ROOT/bin" directory is removed,
 	// forcing people to update their PATH. Remove this once all
 	// instances of jiri root has been updated past go/vcl/9511.
 	oldBinDir := filepath.Join(root, "bin")
@@ -789,7 +789,7 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 		delete(stack, manifest.Name)
 	}
 	// Process all projects.
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -892,7 +892,7 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -974,8 +974,8 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 		return err
 	}
 	// Replace absolute project paths with relative paths to make it
-	// possible to move the $V23_ROOT directory locally.
-	root, err := V23Root()
+	// possible to move the $JIRI_ROOT directory locally.
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -1020,7 +1020,7 @@ func addProjectToManifest(ctx *tool.Context, manifest *Manifest, project Project
 		return UnsupportedProtocolErr(project.Protocol)
 	}
 	// Replace absolute path with a relative one.
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
@@ -1080,7 +1080,7 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 	}
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
-	// $V23_ROOT directory in an inconsistent state.
+	// $JIRI_ROOT directory in an inconsistent state.
 	tmpDir, err := ctx.Run().TempDir(path, "")
 	if err != nil {
 		return err

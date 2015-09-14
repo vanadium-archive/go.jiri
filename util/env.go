@@ -37,7 +37,7 @@ const (
 // environment variable can override existing environment.
 func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	env := envvar.VarsFromOS()
-	root, err := project.V23Root()
+	root, err := project.JiriRoot()
 	if err != nil {
 		return nil, err
 	}
@@ -181,11 +181,11 @@ func setPathHelper(ctx *tool.Context, env *envvar.Vars, name, root string, works
 		for _, project := range projects {
 			// We check if <project.Path> is a prefix of <absWorkspace> to
 			// account for Go workspaces nested under a single jiri project,
-			// such as: $V23_ROOT/release/projects/chat/go.
+			// such as: $JIRI_ROOT/release/projects/chat/go.
 			//
 			// We check if <absWorkspace> is a prefix of <project.Path> to
 			// account for Go workspaces that span multiple jiri projects,
-			// such as: $V23_ROOT/release/go.
+			// such as: $JIRI_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
 				if _, err := ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
 					path = append(path, absWorkspace)

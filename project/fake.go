@@ -14,7 +14,7 @@ import (
 	"v.io/jiri/tool"
 )
 
-type FakeV23Root struct {
+type FakeJiriRoot struct {
 	Dir      string
 	Projects map[string]string
 	remote   string
@@ -28,9 +28,9 @@ const (
 	toolsProject    = "tools"
 )
 
-// NewFakeV23Root is the FakeV23Root factory.
-func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
-	root := &FakeV23Root{
+// NewFakeJiriRoot is the FakeJiriRoot factory.
+func NewFakeJiriRoot(ctx *tool.Context) (*FakeJiriRoot, error) {
+	root := &FakeJiriRoot{
 		Projects: map[string]string{},
 	}
 
@@ -56,7 +56,7 @@ func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
 		return nil, err
 	}
 
-	// Create a fake V23_ROOT.
+	// Create a fake JIRI_ROOT.
 	rootDir, err := ctx.Run().TempDir("", "")
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
 		return nil, err
 	}
 
-	// Update the contents of the fake V23_ROOT instance based on
+	// Update the contents of the fake JIRI_ROOT instance based on
 	// the information recorded in the remote manifest.
 	if err := root.UpdateUniverse(ctx, false); err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func NewFakeV23Root(ctx *tool.Context) (*FakeV23Root, error) {
 }
 
 // Cleanup cleans up the given Vanadium root fake.
-func (root FakeV23Root) Cleanup(ctx *tool.Context) error {
+func (root FakeJiriRoot) Cleanup(ctx *tool.Context) error {
 	var errs []error
 	collect.Errors(func() error { return ctx.Run().RemoveAll(root.Dir) }, &errs)
 	collect.Errors(func() error { return ctx.Run().RemoveAll(root.remote) }, &errs)
@@ -106,7 +106,7 @@ func (root FakeV23Root) Cleanup(ctx *tool.Context) error {
 }
 
 // AddProject adds the given project to a remote manifest.
-func (root FakeV23Root) AddProject(ctx *tool.Context, project Project) error {
+func (root FakeJiriRoot) AddProject(ctx *tool.Context, project Project) error {
 	manifest, err := root.ReadRemoteManifest(ctx)
 	if err != nil {
 		return err
@@ -119,7 +119,7 @@ func (root FakeV23Root) AddProject(ctx *tool.Context, project Project) error {
 }
 
 // AddTool adds the given tool to a remote manifest.
-func (root FakeV23Root) AddTool(ctx *tool.Context, tool Tool) error {
+func (root FakeJiriRoot) AddTool(ctx *tool.Context, tool Tool) error {
 	manifest, err := root.ReadRemoteManifest(ctx)
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (root FakeV23Root) AddTool(ctx *tool.Context, tool Tool) error {
 
 // DisableRemoteManifestPush disables pushes to the remote manifest
 // repository.
-func (root FakeV23Root) DisableRemoteManifestPush(ctx *tool.Context) error {
+func (root FakeJiriRoot) DisableRemoteManifestPush(ctx *tool.Context) error {
 	dir := tool.RootDirOpt(filepath.Join(root.remote, manifestProject))
 	if err := ctx.Git(dir).CheckoutBranch("master"); err != nil {
 		return err
@@ -143,7 +143,7 @@ func (root FakeV23Root) DisableRemoteManifestPush(ctx *tool.Context) error {
 
 // EnableRemoteManifestPush enables pushes to the remote manifest
 // repository.
-func (root FakeV23Root) EnableRemoteManifestPush(ctx *tool.Context) error {
+func (root FakeJiriRoot) EnableRemoteManifestPush(ctx *tool.Context) error {
 	dir := tool.RootDirOpt(filepath.Join(root.remote, manifestProject))
 	if !ctx.Git(dir).BranchExists("non-master") {
 		if err := ctx.Git(dir).CreateBranch("non-master"); err != nil {
@@ -157,7 +157,7 @@ func (root FakeV23Root) EnableRemoteManifestPush(ctx *tool.Context) error {
 }
 
 // CreateRemoteProject creates a new remote project.
-func (root FakeV23Root) CreateRemoteProject(ctx *tool.Context, name string) error {
+func (root FakeJiriRoot) CreateRemoteProject(ctx *tool.Context, name string) error {
 	projectDir := filepath.Join(root.remote, name)
 	if err := ctx.Run().MkdirAll(projectDir, os.FileMode(0700)); err != nil {
 		return err
@@ -181,18 +181,18 @@ func getManifest(ctx *tool.Context) string {
 }
 
 // ReadLocalManifest read a manifest from the local manifest project.
-func (root FakeV23Root) ReadLocalManifest(ctx *tool.Context) (*Manifest, error) {
+func (root FakeJiriRoot) ReadLocalManifest(ctx *tool.Context) (*Manifest, error) {
 	path := filepath.Join(root.Dir, manifestProject, manifestVersion, getManifest(ctx))
 	return root.readManifest(ctx, path)
 }
 
 // ReadRemoteManifest read a manifest from the remote manifest project.
-func (root FakeV23Root) ReadRemoteManifest(ctx *tool.Context) (*Manifest, error) {
+func (root FakeJiriRoot) ReadRemoteManifest(ctx *tool.Context) (*Manifest, error) {
 	path := filepath.Join(root.remote, manifestProject, manifestVersion, getManifest(ctx))
 	return root.readManifest(ctx, path)
 }
 
-func (root FakeV23Root) readManifest(ctx *tool.Context, path string) (*Manifest, error) {
+func (root FakeJiriRoot) readManifest(ctx *tool.Context, path string) (*Manifest, error) {
 	bytes, err := ctx.Run().ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -206,12 +206,12 @@ func (root FakeV23Root) readManifest(ctx *tool.Context, path string) (*Manifest,
 
 // UpdateUniverse synchronizes the content of the Vanadium root based
 // on the content of the remote manifest.
-func (root FakeV23Root) UpdateUniverse(ctx *tool.Context, gc bool) error {
-	oldRoot := os.Getenv("V23_ROOT")
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+func (root FakeJiriRoot) UpdateUniverse(ctx *tool.Context, gc bool) error {
+	oldRoot := os.Getenv("JIRI_ROOT")
+	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
 		return fmt.Errorf("Setenv() failed: %v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 	if err := UpdateUniverse(ctx, gc); err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (root FakeV23Root) UpdateUniverse(ctx *tool.Context, gc bool) error {
 
 // WriteLocalManifest writes the given manifest to the local
 // manifest project.
-func (root FakeV23Root) WriteLocalManifest(ctx *tool.Context, manifest *Manifest) error {
+func (root FakeJiriRoot) WriteLocalManifest(ctx *tool.Context, manifest *Manifest) error {
 	dir := filepath.Join(root.Dir, manifestProject)
 	path := filepath.Join(dir, manifestVersion, getManifest(ctx))
 	return root.writeManifest(ctx, manifest, dir, path)
@@ -228,13 +228,13 @@ func (root FakeV23Root) WriteLocalManifest(ctx *tool.Context, manifest *Manifest
 
 // WriteRemoteManifest writes the given manifest to the remote
 // manifest project.
-func (root FakeV23Root) WriteRemoteManifest(ctx *tool.Context, manifest *Manifest) error {
+func (root FakeJiriRoot) WriteRemoteManifest(ctx *tool.Context, manifest *Manifest) error {
 	dir := filepath.Join(root.remote, manifestProject)
 	path := filepath.Join(dir, manifestVersion, getManifest(ctx))
 	return root.writeManifest(ctx, manifest, dir, path)
 }
 
-func (root FakeV23Root) writeManifest(ctx *tool.Context, manifest *Manifest, dir, path string) error {
+func (root FakeJiriRoot) writeManifest(ctx *tool.Context, manifest *Manifest, dir, path string) error {
 	bytes, err := xml.Marshal(manifest)
 	if err != nil {
 		return fmt.Errorf("Marshal(%v) failed: %v", manifest, err)

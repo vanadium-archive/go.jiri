@@ -261,7 +261,7 @@ Jiri snapshot create - Create a new project snapshot
 
 The "jiri snapshot create <label>" command captures the current project state in
 a manifest and, depending on the value of the -remote flag, the command either
-stores the manifest in the local $V23_ROOT/.snapshots directory, or in the
+stores the manifest in the local $JIRI_ROOT/.snapshots directory, or in the
 manifest repository, pushing the change to the remote repository and thus making
 it available globally.
 
@@ -309,13 +309,13 @@ Usage:
 Jiri update - Update all jiri tools and projects
 
 Updates all jiri projects, builds the latest version of jiri tools, and installs
-the resulting binaries into $V23_ROOT/devtools/bin. The sequence in which the
+the resulting binaries into $JIRI_ROOT/devtools/bin. The sequence in which the
 individual updates happen guarantees that we end up with a consistent set of
 tools and source code.
 
 The set of project and tools to update is describe by a manifest. Jiri manifests
 are revisioned and stored in a "manifest" repository, that is available locally
-in $V23_ROOT/.manifest. The manifest uses the following XML schema:
+in $JIRI_ROOT/.manifest. The manifest uses the following XML schema:
 
  <manifest>
    <imports>
@@ -337,15 +337,15 @@ in $V23_ROOT/.manifest. The manifest uses the following XML schema:
  </manifest>
 
 The <import> element can be used to share settings across multiple manifests.
-Import names are interpreted relative to the $V23_ROOT/.manifest/v2 directory.
+Import names are interpreted relative to the $JIRI_ROOT/.manifest/v2 directory.
 Import cycles are not allowed and if a project or a tool is specified multiple
 times, the last specification takes effect. In particular, the elements <project
 name="foo" exclude="true"/> and <tool name="bar" exclude="true"/> can be used to
 exclude previously included projects and tools.
 
 The tool identifies which manifest to use using the following algorithm. If the
-$V23_ROOT/.local_manifest file exists, then it is used. Otherwise, the
-$V23_ROOT/.manifest/v2/<manifest>.xml file is used, which <manifest> is the
+$JIRI_ROOT/.local_manifest file exists, then it is used. Otherwise, the
+$JIRI_ROOT/.manifest/v2/<manifest>.xml file is used, which <manifest> is the
 value of the -manifest command-line flag, which defaults to "default".
 
 NOTE: Unlike the jiri tool commands, the above manifest file format is not an

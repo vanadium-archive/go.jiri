@@ -23,7 +23,7 @@ type Config struct {
 	// copyrightCheckProjects identifies the set of project names for
 	// which the copyright check is required.
 	copyrightCheckProjects map[string]struct{}
-	// goWorkspaces identifies V23_ROOT subdirectories that contain a
+	// goWorkspaces identifies JIRI_ROOT subdirectories that contain a
 	// Go workspace.
 	goWorkspaces []string
 	// jenkinsMatrixJobs identifies the set of matrix (multi-configutation) jobs
@@ -43,7 +43,7 @@ type Config struct {
 	// corresponding test has n+1 parts: the first n parts are identified
 	// by L[0] to L[n-1]. The last part is whatever is left.
 	testParts map[string][]string
-	// vdlWorkspaces identifies V23_ROOT subdirectories that contain
+	// vdlWorkspaces identifies JIRI_ROOT subdirectories that contain
 	// a VDL workspace.
 	vdlWorkspaces []string
 }

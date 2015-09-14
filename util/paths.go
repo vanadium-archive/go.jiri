@@ -36,7 +36,7 @@ func OncallRotationPath(ctx *tool.Context) (string, error) {
 // ThirdPartyBinPath returns the path to the given third-party tool
 // taking into account the host and the target Go architecture.
 func ThirdPartyBinPath(name string) (string, error) {
-	root, err := project.V23Root()
+	root, err := project.JiriRoot()
 	if err != nil {
 		return "", err
 	}
@@ -55,7 +55,7 @@ func ThirdPartyBinPath(name string) (string, error) {
 // ThirdPartyCCodePath returns that path to the directory containing built
 // binaries for the target OS and architecture.
 func ThirdPartyCCodePath(os, arch string) (string, error) {
-	root, err := project.V23Root()
+	root, err := project.JiriRoot()
 	if err != nil {
 		return "", err
 	}

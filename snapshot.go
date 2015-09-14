@@ -54,7 +54,7 @@ var cmdSnapshotCreate = &cmdline.Command{
 The "jiri snapshot create <label>" command captures the current project
 state in a manifest and, depending on the value of the -remote flag,
 the command either stores the manifest in the local
-$V23_ROOT/.snapshots directory, or in the manifest repository, pushing
+$JIRI_ROOT/.snapshots directory, or in the manifest repository, pushing
 the change to the remote repository and thus making it available
 globally.
 

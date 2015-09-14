@@ -222,13 +222,13 @@ func submit(t *testing.T, ctx *tool.Context, originPath string, gerritPath strin
 }
 
 // setupTest creates a setup for testing the review tool.
-func setupTest(t *testing.T, installHook bool) (ctx *tool.Context, cwd string, root *project.FakeV23Root, repoPath, originPath, gerritPath string) {
+func setupTest(t *testing.T, installHook bool) (ctx *tool.Context, cwd string, root *project.FakeJiriRoot, repoPath, originPath, gerritPath string) {
 	ctx = tool.NewDefaultContext()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	root, err = project.NewFakeV23Root(ctx)
+	root, err = project.NewFakeJiriRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -243,7 +243,7 @@ func setupTest(t *testing.T, installHook bool) (ctx *tool.Context, cwd string, r
 }
 
 // teardownTest cleans up the setup for testing the review tool.
-func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *project.FakeV23Root) {
+func teardownTest(t *testing.T, ctx *tool.Context, oldWorkDir string, root *project.FakeJiriRoot) {
 	chdir(t, ctx, oldWorkDir)
 	if err := root.Cleanup(ctx); err != nil {
 		t.Fatalf("%v", err)

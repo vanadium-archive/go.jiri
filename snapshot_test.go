@@ -60,8 +60,8 @@ type label struct {
 func TestList(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	// Setup a fake V23_ROOT.
-	root, err := project.NewFakeV23Root(ctx)
+	// Setup a fake JIRI_ROOT.
+	root, err := project.NewFakeJiriRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -70,11 +70,11 @@ func TestList(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := project.V23Root()
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+	oldRoot, err := project.JiriRoot()
+	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	remoteSnapshotDir, err := project.RemoteSnapshotDir()
 	if err != nil {
@@ -197,8 +197,8 @@ func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 func TestCreate(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	// Setup a fake V23_ROOT instance.
-	root, err := project.NewFakeV23Root(ctx)
+	// Setup a fake JIRI_ROOT instance.
+	root, err := project.NewFakeJiriRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -223,12 +223,12 @@ func TestCreate(t *testing.T) {
 		}
 	}
 
-	// Point the V23_ROOT environment variable to the fake.
-	oldRoot, err := project.V23Root()
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+	// Point the JIRI_ROOT environment variable to the fake.
+	oldRoot, err := project.JiriRoot()
+	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.

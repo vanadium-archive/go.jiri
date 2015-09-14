@@ -12,9 +12,13 @@ import (
 	"v.io/jiri/tool"
 )
 
+// TODO(nlacasse): We are currently supporting both JIRI_ROOT and V23_ROOT.
+// Once the transition to JIRI_ROOT is complete, drop support for V23_ROOT, and
+// make this a const again.  The environment variables will be searched in the
+// order they appear in this slice.
+var rootEnvs = []string{"JIRI_ROOT", "V23_ROOT"}
+
 const (
-	// TODO(nlacasse): Change this to "JIRI_ROOT".
-	rootEnv = "V23_ROOT"
 	// TODO(nlacasse): Change this to ".jiri".
 	metadataDirName  = ".v23"
 	metadataFileName = "metadata.v2"
@@ -45,7 +49,7 @@ func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
 
 // LocalManifestFile returns the path to the local manifest.
 func LocalManifestFile() (string, error) {
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return "", err
 	}
@@ -54,7 +58,7 @@ func LocalManifestFile() (string, error) {
 
 // LocalSnapshotDir returns the path to the local snapshot directory.
 func LocalSnapshotDir() (string, error) {
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return "", err
 	}
@@ -63,7 +67,7 @@ func LocalSnapshotDir() (string, error) {
 
 // ManifestDir returns the path to the manifest directory.
 func ManifestDir() (string, error) {
-	root, err := V23Root()
+	root, err := JiriRoot()
 	if err != nil {
 		return "", err
 	}
@@ -132,11 +136,9 @@ func VanadiumGitHost() string {
 	return "https://vanadium.googlesource.com/"
 }
 
-// TODO(nlacasse): Rename V23ProfilesFile and V23Root.
-
-// V23ProfilesFile returns the path to the jiri profiles file.
-func V23ProfilesFile() (string, error) {
-	root, err := V23Root()
+// JiriProfilesFile returns the path to the jiri profiles file.
+func JiriProfilesFile() (string, error) {
+	root, err := JiriRoot()
 	if err != nil {
 		return "", err
 	}
@@ -144,15 +146,19 @@ func V23ProfilesFile() (string, error) {
 	return filepath.Join(root, ".v23_profiles"), nil
 }
 
-// V23Root returns the root of the jiri universe.
-func V23Root() (string, error) {
-	root := os.Getenv(rootEnv)
-	if root == "" {
-		return "", fmt.Errorf("%v is not set", rootEnv)
+// JiriRoot returns the root of the jiri universe.
+func JiriRoot() (string, error) {
+	for _, rootEnv := range rootEnvs {
+		root := os.Getenv(rootEnv)
+		if root == "" {
+			continue
+		}
+		result, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root, err)
+		} else {
+			return result, nil
+		}
 	}
-	result, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root, err)
-	}
-	return result, nil
+	return "", fmt.Errorf("%v is not set", rootEnvs[0])
 }

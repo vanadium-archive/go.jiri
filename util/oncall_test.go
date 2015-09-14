@@ -52,7 +52,7 @@ func createOncallFile(t *testing.T, ctx *tool.Context) {
 
 func TestOncall(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	root, err := project.NewFakeV23Root(ctx)
+	root, err := project.NewFakeJiriRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -61,14 +61,14 @@ func TestOncall(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := project.V23Root()
+	oldRoot, err := project.JiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	// Create a oncall.v1.xml file.
 	createOncallFile(t, ctx)

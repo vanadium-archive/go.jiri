@@ -14,10 +14,10 @@ import (
 	"v.io/x/lib/envvar"
 )
 
-// TestV23RootSymlink checks that V23Root interprets the value
-// of the V23_ROOT environment variable as a path, evaluates any
+// TestJiriRootSymlink checks that JiriRoot interprets the value
+// of the JIRI_ROOT environment variable as a path, evaluates any
 // symlinks the path might contain, and returns the result.
-func TestV23RootSymlink(t *testing.T) {
+func TestJiriRootSymlink(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
 	// Create a temporary directory.
@@ -43,14 +43,14 @@ func TestV23RootSymlink(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Set the V23_ROOT to the symlink created above and check
-	// that V23Root() evaluates the symlink.
-	oldRoot := os.Getenv("V23_ROOT")
-	if err := os.Setenv("V23_ROOT", symRoot); err != nil {
+	// Set the JIRI_ROOT to the symlink created above and check
+	// that JiriRoot() evaluates the symlink.
+	oldRoot := os.Getenv("JIRI_ROOT")
+	if err := os.Setenv("JIRI_ROOT", symRoot); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
-	got, err := project.V23Root()
+	defer os.Setenv("JIRI_ROOT", oldRoot)
+	got, err := project.JiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -62,8 +62,8 @@ func TestV23RootSymlink(t *testing.T) {
 func testSetPathHelper(t *testing.T, name string) {
 	ctx := tool.NewDefaultContext()
 
-	// Setup a fake V23_ROOT.
-	root, err := project.NewFakeV23Root(ctx)
+	// Setup a fake JIRI_ROOT.
+	root, err := project.NewFakeJiriRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -95,14 +95,14 @@ func testSetPathHelper(t *testing.T, name string) {
 		config = NewConfig(VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
 	}
 
-	oldRoot, err := project.V23Root()
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+	oldRoot, err := project.JiriRoot()
+	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 
-	// Retrieve V23_ROOT through V23Root() to account for symlinks.
-	jiriRoot, err := project.V23Root()
+	// Retrieve JIRI_ROOT through JiriRoot() to account for symlinks.
+	jiriRoot, err := project.JiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

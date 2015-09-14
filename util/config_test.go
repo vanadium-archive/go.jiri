@@ -114,7 +114,7 @@ func TestConfigAPI(t *testing.T) {
 func TestConfigSerialization(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
-	root, err := project.NewFakeV23Root(ctx)
+	root, err := project.NewFakeJiriRoot(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -123,11 +123,11 @@ func TestConfigSerialization(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := project.V23Root()
-	if err := os.Setenv("V23_ROOT", root.Dir); err != nil {
+	oldRoot, err := project.JiriRoot()
+	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("V23_ROOT", oldRoot)
+	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	config := NewConfig(
 		APICheckProjectsOpt(apiCheckProjects),
