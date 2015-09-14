@@ -95,8 +95,8 @@ The jiri cl mail flags are:
    Send a draft changelist.
  -edit=true
    Open an editor to edit the CL description.
- -host=https://vanadium-review.googlesource.com/
-   Gerrit host to use.
+ -host=
+   Gerrit host to use.  Defaults to gerrit host specified in manifest.
  -m=
    CL description.
  -presubmit=all
