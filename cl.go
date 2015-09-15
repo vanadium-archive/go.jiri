@@ -353,7 +353,7 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
 		Edit:         editFlag,
-		Host:         hostFlag,
+		Host:         host,
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
 		Reviewers:    parseEmails(reviewersFlag),
