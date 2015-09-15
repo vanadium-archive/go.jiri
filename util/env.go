@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	// TODO(nlacasse): Rename to JIRI_PROFILE.
-	jiriProfileEnv = "V23_PROFILE"
+	jiriProfileEnv = "JIRI_PROFILE"
 	javaEnv        = "JAVA_HOME"
 )
 
@@ -30,10 +29,10 @@ const (
 // configuration.
 //
 // By default, the Go and VDL workspaces are added to the GOPATH and VDLPATH
-// environment variables respectively. In addition, the V23_PROFILE environment
-// variable can be used to activate an environment variable setting for various
-// development profiles of the project (e.g. arm, android, java, or nacl).
-// Unlike the default setting, the setting enabled by the V23_PROFILE
+// environment variables respectively. In addition, the JIRI_PROFILE
+// environment variable can be used to activate an environment variable setting
+// for various development profiles of the project (e.g. arm, android, java, or
+// nacl).  Unlike the default setting, the setting enabled by the JIRI_PROFILE
 // environment variable can override existing environment.
 func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	env := envvar.VarsFromOS()
