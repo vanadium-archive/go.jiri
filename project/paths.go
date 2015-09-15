@@ -26,7 +26,7 @@ const (
 
 // DataDirPath returns the path to the data directory of the given tool.
 func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
-	projects, tools, _, err := readManifest(ctx, false)
+	_, projects, tools, _, err := readManifest(ctx, false)
 	if err != nil {
 		return "", err
 	}
@@ -121,19 +121,26 @@ func ResolveManifestPath(name string) (string, error) {
 	return path, nil
 }
 
-// TODO(nlacasse): Move VanadiumGerritHost and VanadiumGitHost and make these
-// configurable.
-
-// VanadiumGerritHost returns the URL that hosts Vanadium Gerrit code
-// review system.
-func VanadiumGerritHost() string {
-	return "https://vanadium-review.googlesource.com/"
+func getHost(ctx *tool.Context, name string) (string, error) {
+	hosts, _, _, _, err := readManifest(ctx, false)
+	if err != nil {
+		return "", err
+	}
+	host, found := hosts[name]
+	if !found {
+		return "", fmt.Errorf("host %s not found in manifest", name)
+	}
+	return host.Location, nil
 }
 
-// VanadiumGitHost returns the URL that hosts Vanadium git
-// repositories.
-func VanadiumGitHost() string {
-	return "https://vanadium.googlesource.com/"
+// GerritHost returns the URL that hosts the Gerrit code review system.
+func GerritHost(ctx *tool.Context) (string, error) {
+	return getHost(ctx, "gerrit")
+}
+
+// GitHost returns the URL that hosts the git repositories.
+func GitHost(ctx *tool.Context) (string, error) {
+	return getHost(ctx, "git")
 }
 
 // JiriProfilesFile returns the path to the jiri profiles file.

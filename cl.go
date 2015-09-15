@@ -61,7 +61,7 @@ func init() {
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the CL description.")
-	cmdCLMail.Flags.StringVar(&hostFlag, "host", project.VanadiumGerritHost(), "Gerrit host to use.")
+	cmdCLMail.Flags.StringVar(&hostFlag, "host", "", "Gerrit host to use.  Defaults to gerrit host specified in manifest.")
 	cmdCLMail.Flags.StringVar(&messageFlag, "m", "", "CL description.")
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
@@ -336,6 +336,14 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 	if !checkPresubmitFlag() {
 		return env.UsageErrorf("invalid value for the -presubmit flag. Valid values: %s.",
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
+	}
+
+	host := hostFlag
+	if host == "" {
+		var err error
+		if host, err = project.GerritHost(ctx); err != nil {
+			return err
+		}
 	}
 
 	// Create and run the review.

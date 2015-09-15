@@ -41,6 +41,7 @@ type CL struct {
 // Manifest represents a setting used for updating the universe.
 type Manifest struct {
 	Hooks    []Hook    `xml:"hooks>hook"`
+	Hosts    []Host    `xml:"hosts>host"`
 	Imports  []Import  `xml:"imports>import"`
 	Label    string    `xml:"label,attr"`
 	Projects []Project `xml:"projects>project"`
@@ -70,6 +71,17 @@ type Hook struct {
 
 type HookArg struct {
 	Arg string `xml:",chardata"`
+}
+
+// Hosts map host name to their detailed description.
+type Hosts map[string]Host
+
+// Host represents the locations of git and gerrit repository hosts.
+type Host struct {
+	// Name is the host name.
+	Name string `xml:"name,attr"`
+	// Location is the url of the host.
+	Location string `xml:"location,attr"`
 }
 
 // Imports maps manifest import names to their detailed description.
@@ -289,7 +301,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 	if err != nil {
 		return nil, err
 	}
-	remoteProjects, _, _, err := readManifest(ctx, false)
+	_, remoteProjects, _, _, err := readManifest(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -340,18 +352,18 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 // ReadManifest retrieves and parses the manifest that determines what
 // projects and tools are part of the jiri universe.
 func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
-	p, t, _, e := readManifest(ctx, false)
+	_, p, t, _, e := readManifest(ctx, false)
 	return p, t, e
 }
 
 // readManifest implements the ReadManifest logic and provides an
 // optional flag that can be used to fetch the latest manifest updates
 // from the manifest repository.
-func readManifest(ctx *tool.Context, update bool) (Projects, Tools, Hooks, error) {
+func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks, error) {
 	if update {
 		root, err := JiriRoot()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		project := Project{
 			Path:     filepath.Join(root, ".manifest"),
@@ -359,18 +371,18 @@ func readManifest(ctx *tool.Context, update bool) (Projects, Tools, Hooks, error
 			Revision: "HEAD",
 		}
 		if err := pullProject(ctx, project); err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 	path, err := ResolveManifestPath(ctx.Manifest())
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	projects, tools, hooks, stack := Projects{}, Tools{}, Hooks{}, map[string]struct{}{}
-	if err := loadManifest(ctx, path, projects, tools, hooks, stack); err != nil {
-		return nil, nil, nil, err
+	hosts, projects, tools, hooks, stack := Hosts{}, Projects{}, Tools{}, Hooks{}, map[string]struct{}{}
+	if err := loadManifest(ctx, path, hosts, projects, tools, hooks, stack); err != nil {
+		return nil, nil, nil, nil, err
 	}
-	return projects, tools, hooks, nil
+	return hosts, projects, tools, hooks, nil
 }
 
 // UpdateUniverse updates all local projects and tools to match the
@@ -378,7 +390,7 @@ func readManifest(ctx *tool.Context, update bool) (Projects, Tools, Hooks, error
 // the 'gc' flag can be used to indicate that local projects that no
 // longer exist remotely should be removed.
 func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
-	remoteProjects, remoteTools, remoteHooks, err := readManifest(ctx, true)
+	_, remoteProjects, remoteTools, remoteHooks, err := readManifest(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -765,7 +777,7 @@ func pullProject(ctx *tool.Context, project Project) error {
 
 // loadManifest loads the given manifest, processing all of its
 // imports, projects and tools settings.
-func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools, hooks Hooks, stack map[string]struct{}) error {
+func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects, tools Tools, hooks Hooks, stack map[string]struct{}) error {
 	data, err := ctx.Run().ReadFile(path)
 	if err != nil {
 		return err
@@ -784,7 +796,7 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 			return err
 		}
 		stack[manifest.Name] = struct{}{}
-		if err := loadManifest(ctx, path, projects, tools, hooks, stack); err != nil {
+		if err := loadManifest(ctx, path, hosts, projects, tools, hooks, stack); err != nil {
 			return err
 		}
 		delete(stack, manifest.Name)
@@ -854,6 +866,11 @@ func loadManifest(ctx *tool.Context, path string, projects Projects, tools Tools
 		hook.Path = filepath.Join(project.Path, hook.Path)
 		hooks[hook.Name] = hook
 	}
+	// Process all hosts.
+	for _, host := range m.Hosts {
+		hosts[host.Name] = host
+	}
+
 	return nil
 }
 
@@ -1113,7 +1130,11 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		if err := ctx.Git().Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
-		if strings.HasPrefix(op.project.Remote, VanadiumGitHost()) {
+		gitHost, err := GitHost(ctx)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(op.project.Remote, gitHost) {
 			// Setup the repository for Gerrit code reviews.
 			//
 			// TODO(jsimsa): Decide what to do in case we would want to update the

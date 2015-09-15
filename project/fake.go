@@ -85,6 +85,21 @@ func NewFakeJiriRoot(ctx *tool.Context) (*FakeJiriRoot, error) {
 		return nil, err
 	}
 
+	// Add "gerrit" and "git" hosts to the manifest, as required by the "jiri"
+	// tool.
+	if err := root.AddHost(ctx, Host{
+		Name:     "gerrit",
+		Location: "git://example.com/gerrit",
+	}); err != nil {
+		return nil, err
+	}
+	if err := root.AddHost(ctx, Host{
+		Name:     "git",
+		Location: "git://example.com/git",
+	}); err != nil {
+		return nil, err
+	}
+
 	// Update the contents of the fake JIRI_ROOT instance based on
 	// the information recorded in the remote manifest.
 	if err := root.UpdateUniverse(ctx, false); err != nil {
@@ -101,6 +116,19 @@ func (root FakeJiriRoot) Cleanup(ctx *tool.Context) error {
 	collect.Errors(func() error { return ctx.Run().RemoveAll(root.remote) }, &errs)
 	if len(errs) != 0 {
 		return fmt.Errorf("Cleanup() failed: %v", errs)
+	}
+	return nil
+}
+
+// AddHost adds the given host to a remote manifest.
+func (root FakeJiriRoot) AddHost(ctx *tool.Context, host Host) error {
+	manifest, err := root.ReadRemoteManifest(ctx)
+	if err != nil {
+		return err
+	}
+	manifest.Hosts = append(manifest.Hosts, host)
+	if err := root.WriteRemoteManifest(ctx, manifest); err != nil {
+		return err
 	}
 	return nil
 }

@@ -100,6 +100,16 @@ func createRemoteManifest(t *testing.T, ctx *tool.Context, dir string, remotes [
 		}
 		manifest.Projects = append(manifest.Projects, project)
 	}
+	manifest.Hosts = []Host{
+		Host{
+			Name:     "gerrit",
+			Location: "git://example.com/gerrit",
+		},
+		Host{
+			Name:     "git",
+			Location: "git://example.com/git",
+		},
+	}
 	commitManifest(t, ctx, &manifest, dir)
 }
 
