@@ -19,9 +19,9 @@ import (
 var rootEnvs = []string{"JIRI_ROOT", "V23_ROOT"}
 
 const (
-	// TODO(nlacasse): Change this to ".jiri".
-	metadataDirName  = ".v23"
-	metadataFileName = "metadata.v2"
+	metadataDirName      = ".jiri"
+	metadataFileName     = "metadata.v2"
+	metadataProfilesFile = ".jiri_profiles"
 )
 
 // DataDirPath returns the path to the data directory of the given tool.
@@ -142,8 +142,7 @@ func JiriProfilesFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// TODO(nlacasse): Rename this to ".jiri_profiles".
-	return filepath.Join(root, ".v23_profiles"), nil
+	return filepath.Join(root, metadataProfilesFile), nil
 }
 
 // JiriRoot returns the root of the jiri universe.

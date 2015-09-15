@@ -16,6 +16,7 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/gitutil"
+	"v.io/jiri/profiles"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
@@ -268,7 +269,7 @@ func LocalProjects(ctx *tool.Context) (Projects, error) {
 		return nil, err
 	}
 	projects := Projects{}
-	if err := findLocalProjects(ctx, root, projects); err != nil {
+	if err := findLocalProjects(ctx, root, metadataDirName, projects); err != nil {
 		return nil, err
 	}
 	return projects, nil
@@ -604,7 +605,7 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 }
 
 // findLocalProjects implements LocalProjects.
-func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e error) {
+func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects Projects) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -646,7 +647,7 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) (e err
 	}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
-			if err := findLocalProjects(ctx, filepath.Join(path, fileInfo.Name()), projects); err != nil {
+			if err := findLocalProjects(ctx, filepath.Join(path, fileInfo.Name()), metadataDirName, projects); err != nil {
 				return err
 			}
 		}
@@ -670,13 +671,7 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
 	}
 	failed := false
-	// TODO(jsimsa): Make sure the "$JIRI_ROOT/devtools/bin" directory
-	// exists. This is for backwards compatibility for instances of
-	// jiri root that have been created before go/vcl/9511.
 	binDir := filepath.Join(root, devtoolsBinDir)
-	if err := ctx.Run().MkdirAll(binDir, os.FileMode(0755)); err != nil {
-		return err
-	}
 	for _, fi := range fis {
 		installFn := func() error {
 			src := filepath.Join(dir, fi.Name())
@@ -695,17 +690,22 @@ func InstallTools(ctx *tool.Context, dir string) error {
 	if failed {
 		return cmdline.ErrExitCode(2)
 	}
-	// TODO(jsimsa): Make sure the "$JIRI_ROOT/bin" directory is removed,
-	// forcing people to update their PATH. Remove this once all
-	// instances of jiri root has been updated past go/vcl/9511.
-	oldBinDir := filepath.Join(root, "bin")
-	if err := ctx.Run().RemoveAll(oldBinDir); err != nil {
-		return err
+
+	// Rename ".v23_profiles" to ".jiri_profiles".
+	// TODO(nlacasse): Remove this code once the v23->jiri transition is
+	// complete and everybody has had time to update.
+	v23ProfilesFile := filepath.Join(root, ".v23_profiles")
+	jiriProfilesFile := filepath.Join(root, metadataProfilesFile)
+	if profiles.FileExists(ctx, v23ProfilesFile) {
+		if err := ctx.Run().Rename(v23ProfilesFile, jiriProfilesFile); err != nil {
+			return fmt.Errorf("Rename(%v,%v) failed: %v", v23ProfilesFile, jiriProfilesFile, err)
+		}
 	}
-	// TODO(nlacasse): Remove old "v23-" subcommands.  Remove this once the
-	// transition from v23->jiri is complete.
+
+	// Delete old "v23-" subcommands.
 	// TODO(nlacasse): Once transition is complete, remove the "v23" tool
-	// itself from devtoolsBinDir.
+	// itself from devtoolsBinDir.  Then, once everybody has had time to upate,
+	// remove this code.
 	v23SubCmds := []string{
 		"v23-api",
 		"v23-copyright",
@@ -925,6 +925,27 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 
 // updateProjects updates all jiri projects.
 func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
+	// Rename ".v23" to ".jiri" in the root of every project.
+	// TODO(nlacasse): Remove this code once the v23->jiri transition is
+	// complete and everybody has had time to update.
+	root, err := JiriRoot()
+	if err != nil {
+		return err
+	}
+	v23Projects := Projects{}
+	if err := findLocalProjects(ctx, root, ".v23", v23Projects); err != nil {
+		return err
+	}
+	for _, p := range v23Projects {
+		dotV23Dir := filepath.Join(p.Path, ".v23")
+		if profiles.DirectoryExists(ctx, dotV23Dir) {
+			dotJiriDir := filepath.Join(p.Path, metadataDirName)
+			if err := ctx.Run().Rename(dotV23Dir, dotJiriDir); err != nil {
+				return fmt.Errorf("Rename(%v, %v) failed: %v", dotV23Dir, dotJiriDir, err)
+			}
+		}
+	}
+
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
 		return err
