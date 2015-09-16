@@ -21,12 +21,10 @@ const (
 	javaEnv        = "JAVA_HOME"
 )
 
-// TODO(nlacasse): Rename this.
-// VanadiumEnvironment returns the environment variables setting for the
-// project. The util package captures the original state of the relevant
-// environment variables when the tool is initialized and every invocation of
-// this function updates this original state according to the jiri tool
-// configuration.
+// JiriEnvironment returns the environment variables setting for the project.
+// The util package captures the original state of the relevant environment
+// variables when the tool is initialized and every invocation of this function
+// updates this original state according to the jiri tool configuration.
 //
 // By default, the Go and VDL workspaces are added to the GOPATH and VDLPATH
 // environment variables respectively. In addition, the JIRI_PROFILE
@@ -34,7 +32,7 @@ const (
 // for various development profiles of the project (e.g. arm, android, java, or
 // nacl).  Unlike the default setting, the setting enabled by the JIRI_PROFILE
 // environment variable can override existing environment.
-func VanadiumEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
+func JiriEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	env := envvar.VarsFromOS()
 	root, err := project.JiriRoot()
 	if err != nil {
