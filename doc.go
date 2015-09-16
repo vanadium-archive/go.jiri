@@ -115,8 +115,8 @@ Jiri cl new - Create a new local branch for a changelist
 
 Command "new" creates a new local branch for a changelist. In particular, it
 forks a new branch with the given name from the current branch and records the
-relationship between the current branch and the new branch in the .v23 metadata
-directory. The information recorded in the .v23 metadata directory tracks
+relationship between the current branch and the new branch in the .jiri metadata
+directory. The information recorded in the .jiri metadata directory tracks
 dependencies between CLs and is used by the "jiri cl sync" and "jiri cl mail"
 commands.
 
@@ -129,11 +129,12 @@ Jiri cl sync - Bring a changelist up to date
 
 Command "sync" brings the CL identified by the current branch up to date with
 the branch tracking the remote branch this CL pertains to. To do that, the
-command uses the information recorded in the .v23 metadata directory to identify
-the sequence of dependent CLs leading to the current branch. The command then
-iterates over this sequence bringing each of the CLs up to date with its
-ancestor. The end result of this process is that all CLs in the sequence are up
-to date with the branch that tracks the remote branch this CL pertains to.
+command uses the information recorded in the .jiri metadata directory to
+identify the sequence of dependent CLs leading to the current branch. The
+command then iterates over this sequence bringing each of the CLs up to date
+with its ancestor. The end result of this process is that all CLs in the
+sequence are up to date with the branch that tracks the remote branch this CL
+pertains to.
 
 NOTE: It is possible that the command cannot automatically merge changes in an
 ancestor into its dependent. When that occurs, the command is aborted and prints
