@@ -100,7 +100,7 @@ func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 
 // Clone clones the given repository to the given local path.
 func (g *Git) Clone(repo, path string) error {
-	return g.run("clone", repo, path)
+	return g.run("clone", "--recursive", repo, path)
 }
 
 // Commit commits all files in staging with an empty message.
