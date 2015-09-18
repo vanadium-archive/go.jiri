@@ -23,7 +23,6 @@ import (
 	"v.io/x/lib/set"
 )
 
-var DevToolsProject = "release.go.x.devtools"
 var JiriProject = "release.go.jiri"
 var JiriName = "jiri"
 var JiriPackage = "v.io/jiri"
@@ -139,7 +138,7 @@ type Tool struct {
 	// Package is the package path of the tool.
 	Package string `xml:"package,attr"`
 	// Project identifies the project that contains the tool. If not
-	// set, "https://vanadium.googlesource.com/<DevToolsProject>" is
+	// set, "https://vanadium.googlesource.com/<JiriProject>" is
 	// used as the default.
 	Project string `xml:"project,attr"`
 }
@@ -165,31 +164,16 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	// If the $JIRI_ROOT/devtools/bin/jiri binary exists, add the "jiri"
-	// tool to the manifest. The binary might not exist if we are
-	// dealing with a fake jiri root used for testing.
-	root, err := JiriRoot()
+
+	// Add all tools from the current manifest to the snapshot manifest.
+	_, tools, err := ReadManifest(ctx)
 	if err != nil {
 		return err
 	}
-	if _, err := ctx.Run().Stat(filepath.Join(root, devtoolsBinDir, "jiri")); err == nil {
-		manifest.Tools = append(manifest.Tools, Tool{
-			Data:    "../x/devtools/data",
-			Name:    JiriName,
-			Package: JiriPackage,
-			Project: JiriProject,
-		})
-		otherTools := []string{"api", "copyright", "env", "go", "goext", "oncall", "profile", "run", "test"}
-		for _, t := range otherTools {
-			toolName := fmt.Sprintf("jiri-%s", t)
-			manifest.Tools = append(manifest.Tools, Tool{
-				Data:    "data",
-				Name:    toolName,
-				Package: fmt.Sprintf("v.io/x/devtools/%s", toolName),
-				Project: DevToolsProject,
-			})
-		}
+	for _, tool := range tools {
+		manifest.Tools = append(manifest.Tools, tool)
 	}
+
 	perm := os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(filepath.Dir(path), perm); err != nil {
 		return err
@@ -839,9 +823,9 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 			delete(tools, tool.Name)
 			continue
 		}
-		// Use <DevToolsProject> as the default project.
+		// Use <JiriProject> as the default project.
 		if tool.Project == "" {
-			tool.Project = "https://vanadium.googlesource.com/" + DevToolsProject
+			tool.Project = "https://vanadium.googlesource.com/" + JiriProject
 		}
 		// Use "data" as the default data.
 		if tool.Data == "" {
@@ -1209,8 +1193,8 @@ type deleteOperation struct {
 
 func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 	if op.gc {
-		// Never delete the <DevToolsProject>.
-		if op.project.Name == DevToolsProject {
+		// Never delete the <JiriProject>.
+		if op.project.Name == JiriProject {
 			lines := []string{
 				fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
 				"however this project is required for correct operation of the jiri",
