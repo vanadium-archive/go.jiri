@@ -43,7 +43,7 @@ type Environment struct {
 // Targets are equal if they have a tag and it's the same, otherwise
 // they are only equal if they have exactly the same contents.
 func (pt *Target) Equals(pt2 *Target) bool {
-	if len(pt.Tag) > 0 && pt.Tag == pt2.Tag {
+	if len(pt.Tag) > 0 && len(pt2.Tag) > 0 && pt.Tag == pt2.Tag {
 		return true
 	}
 	if pt.Arch != pt2.Arch || pt.OS != pt2.OS || pt.Version != pt2.Version || len(pt.Env.Vars) != len(pt2.Env.Vars) {
@@ -67,7 +67,7 @@ func (pt Target) CrossCompiling() bool {
 
 // Usage returns the usage string for Target.
 func (pt *Target) Usage() string {
-	return "[<tag>=]<arch>-<os>"
+	return "specifies a profile target in the following form: [<tag>=]<arch>-<os>"
 }
 
 // Set implements flag.Value.
@@ -144,7 +144,7 @@ func (e *Environment) String() string {
 
 // Usage returns the usage string for Environment.
 func (e *Environment) Usage() string {
-	return "<key>=<val>,..."
+	return "specifcy an environment variable in the form: <var>=[<val>],..."
 }
 
 // AddTarget adds the given target to a slice of Target if it's not

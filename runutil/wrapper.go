@@ -189,3 +189,18 @@ func (r *Run) TempDir(dir, prefix string) (string, error) {
 func (r *Run) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return r.helper(func() error { return ioutil.WriteFile(filename, data, perm) }, fmt.Sprintf("write %q", filename))
 }
+
+// DirectoryExists tests if a directory exists with appropriate logging.
+func (r *Run) DirectoryExists(dir string) bool {
+	isdir, err := r.IsDir(dir)
+	if err != nil {
+		return false
+	}
+	return isdir
+}
+
+// FileExists tests if a file exists with appropriate logging.
+func (r *Run) FileExists(file string) bool {
+	_, err := r.Stat(file)
+	return err == nil
+}

@@ -16,7 +16,6 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/gitutil"
-	"v.io/jiri/profiles"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
@@ -692,7 +691,7 @@ func InstallTools(ctx *tool.Context, dir string) error {
 	// complete and everybody has had time to update.
 	v23ProfilesFile := filepath.Join(root, ".v23_profiles")
 	jiriProfilesFile := filepath.Join(root, metadataProfilesFile)
-	if profiles.FileExists(ctx, v23ProfilesFile) {
+	if ctx.Run().FileExists(v23ProfilesFile) {
 		if err := ctx.Run().Rename(v23ProfilesFile, jiriProfilesFile); err != nil {
 			return fmt.Errorf("Rename(%v,%v) failed: %v", v23ProfilesFile, jiriProfilesFile, err)
 		}
@@ -939,7 +938,7 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	}
 	for _, p := range v23Projects {
 		dotV23Dir := filepath.Join(p.Path, ".v23")
-		if profiles.DirectoryExists(ctx, dotV23Dir) {
+		if ctx.Run().DirectoryExists(dotV23Dir) {
 			dotJiriDir := filepath.Join(p.Path, metadataDirName)
 			if err := ctx.Run().Rename(dotV23Dir, dotJiriDir); err != nil {
 				return fmt.Errorf("Rename(%v, %v) failed: %v", dotV23Dir, dotJiriDir, err)

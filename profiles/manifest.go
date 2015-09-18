@@ -19,6 +19,13 @@ const (
 	defaultFileMode = os.FileMode(0644)
 )
 
+type Version int
+
+const (
+	Original Version = 0
+	V2       Version = 2
+)
+
 // Profile represents a suite of software that is managed by an implementation
 // of profiles.Manager.
 type Profile struct {
@@ -29,6 +36,7 @@ type Profile struct {
 
 type profilesSchema struct {
 	XMLName  xml.Name         `xml:"profiles"`
+	Version  Version          `xml:"version,attr"`
 	Profiles []*profileSchema `xml:"profile"`
 }
 
@@ -52,15 +60,21 @@ type targetSchema struct {
 
 type profileDB struct {
 	sync.Mutex
-	db map[string]*Profile
+	version Version
+	db      map[string]*Profile
 }
 
 func newDB() *profileDB {
-	return &profileDB{db: make(map[string]*Profile)}
+	return &profileDB{db: make(map[string]*Profile), version: 0}
 }
 
 var (
 	db = newDB()
+)
+
+const (
+	DefaultManifestFilename = ".jiri_profiles"
+	LegacyManifestFilename  = ".v23_profiles"
 )
 
 // Profiles returns the names, in lexicographic order, of all of the currently
@@ -68,6 +82,10 @@ var (
 // be used to lookup a profile manager or the current state of a profile.
 func Profiles() []string {
 	return db.profiles()
+}
+
+func SchemaVersion() Version {
+	return db.schemaVersion()
 }
 
 // LookupProfile returns the profile for the name profile or nil if one is
@@ -224,6 +242,7 @@ func (pdb *profileDB) profile(name string) *Profile {
 func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 	pdb.Lock()
 	defer pdb.Unlock()
+	pdb.db = make(map[string]*Profile)
 
 	data, err := ctx.Run().ReadFile(filename)
 	if err != nil {
@@ -237,10 +256,12 @@ func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 	if err := xml.Unmarshal(data, &schema); err != nil {
 		return fmt.Errorf("Unmarshal(%v) failed: %v", string(data), err)
 	}
+	pdb.version = schema.Version
 	for _, profile := range schema.Profiles {
 		name := profile.Name
 		pdb.db[name] = &Profile{
 			Name: name,
+
 			Root: profile.Root,
 		}
 		for _, target := range profile.Targets {
@@ -264,6 +285,7 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 	defer pdb.Unlock()
 
 	var schema profilesSchema
+	schema.Version = V2
 	for i, name := range pdb.profilesUnlocked() {
 		profile := pdb.db[name]
 		schema.Profiles = append(schema.Profiles, &profileSchema{
@@ -297,7 +319,7 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 		return err
 	}
 
-	if FileExists(ctx, filename) {
+	if ctx.Run().FileExists(filename) {
 		if err := ctx.Run().Rename(filename, oldName); err != nil {
 			return err
 		}
@@ -308,4 +330,18 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 	}
 
 	return nil
+}
+
+func (pdb *profileDB) schemaVersion() Version {
+	pdb.Lock()
+	defer pdb.Unlock()
+	return pdb.version
+}
+
+func ProfileTargetNeedsUpdate(name string, target Target, version string) bool {
+	profile := LookupProfileTarget(name, target)
+	if profile.Version > version {
+		panic(fmt.Sprintf("unsupported profile version: %v", profile.Version))
+	}
+	return profile.Version < version
 }

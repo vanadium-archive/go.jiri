@@ -1,0 +1,21 @@
+<profiles version="2">
+  <profile name="go" root="/Volumes/code2/vanadium/darwin/r_3/profiles/go">
+    <target tag="native" arch="amd64" os="darwin" installation-directory="" version="1.5">
+      <envvars>
+        <var>CGO_ENABLED=1</var>
+        <var>GOARCH=amd64</var>
+        <var>GOOS=darwin</var>
+        <var>GOROOT=/goroot</var>
+         <var>CGO_CFLAGS=-IX -IY</var>
+      </envvars>
+    </target>
+  </profile>
+  <profile name="syncbase" root="/Volumes/code2/vanadium/darwin/r_3/profiles/cout">
+    <target tag="native" arch="amd64" os="darwin" installation-directory="" version="1">
+      <envvars>
+        <var>CGO_CFLAGS=-IA -IB</var>
+        <var>CGO_LDFLAGS=-LA -LB</var>
+      </envvars>
+    </target>
+  </profile>
+</profiles>

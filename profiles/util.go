@@ -7,11 +7,11 @@ package profiles
 import (
 	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 
 	"v.io/jiri/collect"
 	"v.io/jiri/tool"
@@ -23,59 +23,14 @@ const (
 	DefaultFilePerm = os.FileMode(0644)
 )
 
-// GoFlags lists all of the Go environment variables and will be sorted in the
-// init function for this package.
-var GoFlags = []string{
-	"CGO_ENABLED",
-	"CGO_CFLAGS",
-	"CGO_CXXFLAGS",
-	"CGO_LDFLAGS",
-	"GOARCH",
-	"GOBIN",
-	"GOOS",
-	"GOPATH",
-	"GOROOT",
-}
-
-func init() {
-	sort.Strings(GoFlags)
-}
-
-// UnsetGoEnv unsets Go environment variables in the given environment.
-func UnsetGoEnv(env *envvar.Vars) {
-	for _, k := range GoFlags {
-		env.Set(k, "")
-	}
-}
-
-// GoEnvironmentFromOS() returns the values of all Go environment variables
-// as set via the OS; unset variables are omitted.
-func GoEnvironmentFromOS() []string {
-	os := envvar.SliceToMap(os.Environ())
-	vars := make([]string, 0, len(GoFlags))
-	for _, k := range GoFlags {
-		v, present := os[k]
-		if !present {
-			continue
-		}
-		vars = append(vars, envvar.JoinKeyValue(k, v))
-	}
-	return vars
-}
-
-// DirectoryExists tests if a directory exists with appropriate logging.
-func DirectoryExists(ctx *tool.Context, dir string) bool {
-	isdir, err := ctx.Run().IsDir(dir)
-	if err != nil {
-		return false
-	}
-	return isdir
-}
-
-// FileExists tests if a file exists with appropriate logging.
-func FileExists(ctx *tool.Context, file string) bool {
-	_, err := ctx.Run().Stat(file)
-	return err == nil
+// RegisterProfileFlags register the commonly used --manifest, --profiles and --target
+// flags with the supplied FlagSet.
+func RegisterProfileFlags(flags *flag.FlagSet, manifest, profiles *string, target *Target) {
+	*target = NativeTarget()
+	flags.StringVar(manifest, "manifest", DefaultManifestFilename, "specify the profiles XML manifest filename.")
+	flags.StringVar(profiles, "profiles", "base", "a comma separated list of profiles to use")
+	flags.Var(target, "target", target.Usage())
+	flags.Lookup("target").DefValue = "native=<runtime.GOARCH>-<runtime.GOOS>"
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -86,11 +41,11 @@ func FileExists(ctx *tool.Context, file string) bool {
 func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
 		completionLogPath := filepath.Join(dir, ".complete")
-		if dir != "" && DirectoryExists(ctx, dir) {
+		if dir != "" && ctx.Run().DirectoryExists(dir) {
 			// If the dir exists but the completionLogPath doesn't, then it means
 			// the previous action didn't finish.
 			// Remove the dir so we can perform the action again.
-			if !FileExists(ctx, completionLogPath) {
+			if !ctx.Run().FileExists(completionLogPath) {
 				ctx.Run().RemoveAll(dir)
 			} else {
 				return nil

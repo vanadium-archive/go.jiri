@@ -21,7 +21,11 @@ const (
 	javaEnv        = "JAVA_HOME"
 )
 
-// JiriEnvironment returns the environment variables setting for the project.
+// WARNING: this function is in the proces of being removed and replaced
+// by the profiles based configuration (see jiri/profiles). Use
+// profiles.ConfigHelper instead of this for new code.
+//
+// JiriLegacyEnvironment returns the environment variables setting for the project.
 // The util package captures the original state of the relevant environment
 // variables when the tool is initialized and every invocation of this function
 // updates this original state according to the jiri tool configuration.
@@ -32,7 +36,7 @@ const (
 // for various development profiles of the project (e.g. arm, android, java, or
 // nacl).  Unlike the default setting, the setting enabled by the JIRI_PROFILE
 // environment variable can override existing environment.
-func JiriEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
+func JiriLegacyEnvironment(ctx *tool.Context) (*envvar.Vars, error) {
 	env := envvar.VarsFromOS()
 	root, err := project.JiriRoot()
 	if err != nil {

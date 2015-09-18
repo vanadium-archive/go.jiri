@@ -1,4 +1,4 @@
-<profiles>
+<profiles version="2">
   <profile name="a" root="">
     <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="">
       <envvars>

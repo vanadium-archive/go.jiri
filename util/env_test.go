@@ -11,7 +11,6 @@ import (
 
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
-	"v.io/x/lib/envvar"
 )
 
 // TestJiriRootSymlink checks that JiriRoot interprets the value
@@ -57,82 +56,4 @@ func TestJiriRootSymlink(t *testing.T) {
 	if want := root; got != want {
 		t.Fatalf("unexpected output: got %v, want %v", got, want)
 	}
-}
-
-func testSetPathHelper(t *testing.T, name string) {
-	ctx := tool.NewDefaultContext()
-
-	// Setup a fake JIRI_ROOT.
-	root, err := project.NewFakeJiriRoot(ctx)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer func() {
-		if err := root.Cleanup(ctx); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
-
-	// Create a test project and identify it as a Go workspace.
-	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := root.AddProject(ctx, project.Project{
-		Name:   "test",
-		Path:   "test",
-		Remote: root.Projects["test"],
-	}); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := root.UpdateUniverse(ctx, false); err != nil {
-		t.Fatalf("%v", err)
-	}
-	var config *Config
-	switch name {
-	case "GOPATH":
-		config = NewConfig(GoWorkspacesOpt([]string{"test", "does/not/exist"}))
-	case "VDLPATH":
-		config = NewConfig(VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
-	}
-
-	oldRoot, err := project.JiriRoot()
-	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
-
-	// Retrieve JIRI_ROOT through JiriRoot() to account for symlinks.
-	jiriRoot, err := project.JiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	env := new(envvar.Vars)
-	var want string
-	switch name {
-	case "GOPATH":
-		want = filepath.Join(jiriRoot, "test")
-		if err := setGoPath(ctx, env, jiriRoot, config); err != nil {
-			t.Fatalf("%v", err)
-		}
-	case "VDLPATH":
-		// Make a fake src directory.
-		want = filepath.Join(jiriRoot, "test", "src")
-		if err := ctx.Run().MkdirAll(want, 0755); err != nil {
-			t.Fatalf("%v", err)
-		}
-		if err := setVdlPath(ctx, env, jiriRoot, config); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-	if got := env.Get(name); got != want {
-		t.Fatalf("unexpected value: got %v, want %v", got, want)
-	}
-}
-
-func TestSetGoPath(t *testing.T) {
-	testSetPathHelper(t, "GOPATH")
-}
-
-func TestSetVdlPath(t *testing.T) {
-	testSetPathHelper(t, "VDLPATH")
 }

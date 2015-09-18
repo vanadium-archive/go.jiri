@@ -144,9 +144,13 @@ func TestBackwardsCompatibility(t *testing.T) {
 	if err := profiles.Read(ctx, "./testdata/legacy.xml"); err != nil {
 		t.Fatal(err)
 	}
+
+	if got, want := profiles.SchemaVersion(), profiles.Original; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
 	oprofiles := getProfiles()
 	if got, want := len(oprofiles), 5; got != want {
-		t.Logf("XX %v\n", profiles.Profiles())
 		t.Errorf("got %v, want %v", got, want)
 	}
 	filename := tmpFile()
@@ -164,6 +168,9 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if got, want := profiles.SchemaVersion(), profiles.V2; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
 	nprofiles := getProfiles()
 	if got, want := len(nprofiles), 6; got != want {
 		t.Errorf("got %v, want %v", got, want)
