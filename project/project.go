@@ -164,13 +164,20 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 		return err
 	}
 
-	// Add all tools from the current manifest to the snapshot manifest.
-	_, tools, err := ReadManifest(ctx)
+	// Add all hosts, tools, and hooks from the current manifest to the snapshot
+	// manifest.
+	hosts, _, tools, hooks, err := readManifest(ctx, true)
 	if err != nil {
 		return err
 	}
 	for _, tool := range tools {
 		manifest.Tools = append(manifest.Tools, tool)
+	}
+	for _, host := range hosts {
+		manifest.Hosts = append(manifest.Hosts, host)
+	}
+	for _, hook := range hooks {
+		manifest.Hooks = append(manifest.Hooks, hook)
 	}
 
 	perm := os.FileMode(0755)
