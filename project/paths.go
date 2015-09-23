@@ -12,13 +12,8 @@ import (
 	"v.io/jiri/tool"
 )
 
-// TODO(nlacasse): We are currently supporting both JIRI_ROOT and V23_ROOT.
-// Once the transition to JIRI_ROOT is complete, drop support for V23_ROOT, and
-// make this a const again.  The environment variables will be searched in the
-// order they appear in this slice.
-var rootEnvs = []string{"JIRI_ROOT", "V23_ROOT"}
-
 const (
+	rootEnv              = "JIRI_ROOT"
 	metadataDirName      = ".jiri"
 	metadataFileName     = "metadata.v2"
 	metadataProfilesFile = ".jiri_profiles"
@@ -154,17 +149,13 @@ func JiriProfilesFile() (string, error) {
 
 // JiriRoot returns the root of the jiri universe.
 func JiriRoot() (string, error) {
-	for _, rootEnv := range rootEnvs {
-		root := os.Getenv(rootEnv)
-		if root == "" {
-			continue
-		}
-		result, err := filepath.EvalSymlinks(root)
-		if err != nil {
-			return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root, err)
-		} else {
-			return result, nil
-		}
+	root := os.Getenv(rootEnv)
+	if root == "" {
+		return "", fmt.Errorf("%v is not set", rootEnv)
 	}
-	return "", fmt.Errorf("%v is not set", rootEnvs[0])
+	result, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root, err)
+	}
+	return result, nil
 }
