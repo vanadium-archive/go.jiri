@@ -28,6 +28,7 @@ The jiri commands are:
    profile      Manage vanadium profiles
    run          Run an executable using the vanadium environment
    test         Manage vanadium tests
+   xprofile     Manage profiles
    help         Display help for commands or topics
 
 The jiri flags are:
@@ -805,6 +806,132 @@ List vanadium tests.
 
 Usage:
    jiri test list
+
+Jiri xprofile - Manage profiles
+
+Profiles provide a means of managing software dependencies that can be built
+natively as well as being cross compiled. A profile generally manages a suite of
+related software components that are required for a particular application (e.g.
+for android development).
+
+Each profile can be in one of three states: absent, up-to-date, or out-of-date.
+The subcommands of the profile command realize the following transitions:
+
+  install:   absent => up-to-date
+  update:    out-of-date => up-to-date
+  uninstall: up-to-date or out-of-date => absent
+
+In addition, a profile can transition from being up-to-date to out-of-date by
+the virtue of a new version of the profile being released.
+
+To enable cross-compilation, a profile can be installed for multiple targets. If
+a profile supports multiple targets the above state transitions are applied on a
+profile + target basis.
+
+Usage:
+   jiri xprofile [flags] <command>
+
+The jiri xprofile commands are:
+   install     Install the given profiles
+   list        List supported and installed profiles
+   env         Display profile environment variables
+   uninstall   Uninstall the given profiles
+   update      Update the given profiles
+
+The jiri xprofile flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri xprofile install - Install the given profiles
+
+Install the given profiles.
+
+Usage:
+   jiri xprofile install [flags] <profiles>
+
+<profiles> is a list of profiles to install.
+
+The jiri xprofile install flags are:
+ -env=
+   specifcy an environment variable in the form: <var>=[<val>],...
+ -manifest=$JIRI_ROOT/.jiri_profiles
+   specify the XML manifest to file read/write from.
+ -target=native=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: [<tag>=]<arch>-<os>
+
+Jiri xprofile list - List supported and installed profiles
+
+List supported and installed profiles.
+
+Usage:
+   jiri xprofile list [flags]
+
+The jiri xprofile list flags are:
+ -manifest=$JIRI_ROOT/.jiri_profiles
+   specify the XML manifest to file read/write from.
+ -show-manifest=false
+   print out the manifest file
+
+Jiri xprofile env - Display profile environment variables
+
+List profile specific and target specific environment variables. env
+--profile=<profile-name> --tag=<tag as appears in a target> [env var name]*
+
+If no environment variable names are requested then all will be printed.
+
+Usage:
+   jiri xprofile env [flags] [<environment variable names>]
+
+[<environment variable names>] is an optional list of environment variables to
+display
+
+The jiri xprofile env flags are:
+ -manifest=$JIRI_ROOT/.jiri_profiles
+   specify the XML manifest to file read/write from.
+ -profile=
+   the profile whose environment is to be displayed
+ -target=native=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: [<tag>=]<arch>-<os>
+
+Jiri xprofile uninstall - Uninstall the given profiles
+
+Uninstall the given profiles.
+
+Usage:
+   jiri xprofile uninstall [flags] <profiles>
+
+<profiles> is a list of profiles to uninstall.
+
+The jiri xprofile uninstall flags are:
+ -env=
+   specifcy an environment variable in the form: <var>=[<val>],...
+ -manifest=$JIRI_ROOT/.jiri_profiles
+   specify the XML manifest to file read/write from.
+ -target=native=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: [<tag>=]<arch>-<os>
+
+Jiri xprofile update - Update the given profiles
+
+Update the given profiles.
+
+Usage:
+   jiri xprofile update [flags] <profiles>
+
+<profiles> is a list of profiles to update.
+
+The jiri xprofile update flags are:
+ -env=
+   specifcy an environment variable in the form: <var>=[<val>],...
+ -force=false
+   force an uninstall followed by install
+ -manifest=$JIRI_ROOT/.jiri_profiles
+   specify the XML manifest to file read/write from.
+ -target=native=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: [<tag>=]<arch>-<os>
 
 Jiri help - Display help for commands or topics
 
