@@ -131,7 +131,7 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 var cmdProjectShellPrompt = &cmdline.Command{
 	Runner: cmdline.RunnerFunc(runProjectShellPrompt),
 	Name:   "shell-prompt",
-	Short:  "Print a succinct status of projects, suitable for shell prompts",
+	Short:  "Print a succinct status of projects suitable for shell prompts",
 	Long: `
 Reports current branches of jiri projects (repositories) as well as an
 indication of each project's status:

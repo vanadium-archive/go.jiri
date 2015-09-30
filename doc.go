@@ -165,7 +165,7 @@ Usage:
 The jiri project commands are:
    clean        Restore jiri projects to their pristine state
    list         List existing jiri projects and branches
-   shell-prompt Print a succinct status of projects, suitable for shell prompts
+   shell-prompt Print a succinct status of projects suitable for shell prompts
    poll         Poll existing jiri projects
 
 Jiri project clean - Restore jiri projects to their pristine state
@@ -196,7 +196,7 @@ The jiri project list flags are:
    If true, omit pristine projects, i.e. projects with a clean master branch and
    no other branches.
 
-Jiri project shell-prompt
+Jiri project shell-prompt - Print a succinct status of projects suitable for shell prompts
 
 Reports current branches of jiri projects (repositories) as well as an
 indication of each project's status:
