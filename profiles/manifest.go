@@ -73,7 +73,7 @@ var (
 )
 
 const (
-	DefaultManifestFilename = ".jiri_profiles"
+	DefaultManifestFilename = ".jiri_xprofiles"
 	LegacyManifestFilename  = ".v23_profiles"
 )
 
@@ -126,8 +126,8 @@ func RemoveProfileTarget(name string, target Target) bool {
 
 // UpdateProfileTarget updates the specified target from the named profile.
 // The UpdateTime of the updated target will be set to time.Now()
-func UpdateProfileTarget(name string, target Target) {
-	db.updateProfileTarget(name, &target)
+func UpdateProfileTarget(name string, target Target) error {
+	return db.updateProfileTarget(name, &target)
 }
 
 // HasTarget returns true if the named profile exists and has the specified
@@ -176,7 +176,7 @@ func (pdb *profileDB) addProfileTarget(name string, target *Target) error {
 	target.UpdateTime = time.Now()
 	if pi, present := pdb.db[name]; present {
 		if existing := FindTargetByTag(pi.Targets, target); existing != nil {
-			return fmt.Errorf("tag %q is already used by %s", target.Tag, existing)
+			return fmt.Errorf("tag %q is already used by profile: %v, existing target: %v", target.Tag, name, existing)
 		}
 		pi.Targets = AddTarget(pi.Targets, target)
 		return nil
@@ -186,19 +186,22 @@ func (pdb *profileDB) addProfileTarget(name string, target *Target) error {
 	return nil
 }
 
-func (pdb *profileDB) updateProfileTarget(name string, target *Target) {
+func (pdb *profileDB) updateProfileTarget(name string, target *Target) error {
 	pdb.Lock()
 	defer pdb.Unlock()
 	target.UpdateTime = time.Now()
 	pi, present := pdb.db[name]
 	if !present {
-		return
+		return fmt.Errorf("profile %v is not installed", name)
 	}
-	tg := FindTarget(pi.Targets, target)
-	if tg != nil {
-		tg.UpdateTime = time.Now()
-		tg.Version = target.Version
+	for _, t := range pi.Targets {
+		if target.Equals(t) {
+			*t = *target
+			t.UpdateTime = time.Now()
+			return nil
+		}
 	}
+	return fmt.Errorf("profile %v does not have target: %v", name, target)
 }
 
 func (pdb *profileDB) removeProfileTarget(name string, target *Target) bool {
@@ -261,7 +264,6 @@ func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 		name := profile.Name
 		pdb.db[name] = &Profile{
 			Name: name,
-
 			Root: profile.Root,
 		}
 		for _, target := range profile.Targets {
@@ -338,10 +340,13 @@ func (pdb *profileDB) schemaVersion() Version {
 	return pdb.version
 }
 
-func ProfileTargetNeedsUpdate(name string, target Target, version string) bool {
+func ProfileTargetNeedsUpdate(name string, target Target, version string) (bool, error) {
 	profile := LookupProfileTarget(name, target)
-	if profile.Version > version {
-		panic(fmt.Sprintf("unsupported profile version: %v", profile.Version))
+	if profile == nil {
+		return false, fmt.Errorf("profile %v for target %v is not installed", name, target)
 	}
-	return profile.Version < version
+	if profile.Version > version {
+		return false, fmt.Errorf("unsupported profile version: %v", profile.Version)
+	}
+	return profile.Version < version, nil
 }

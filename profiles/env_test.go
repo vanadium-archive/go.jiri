@@ -5,6 +5,7 @@
 package profiles_test
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,6 +33,7 @@ func TestConfigHelper(t *testing.T) {
 
 func TestEnvFromTarget(t *testing.T) {
 	profiles.Clear()
+	root, _ := project.JiriRoot()
 	ctx := tool.NewDefaultContext()
 	profiles.InstallProfile("a", "root")
 	profiles.InstallProfile("b", "root")
@@ -42,7 +44,16 @@ func TestEnvFromTarget(t *testing.T) {
 	t2.Env.Set("A=Z,B=Z")
 	profiles.AddProfileTarget("a", *t1)
 	profiles.AddProfileTarget("b", *t2)
-	ch, err := profiles.NewConfigHelper(ctx, "")
+	tmpdir, err := ioutil.TempDir(".", "pdb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	filename := filepath.Join("release", "go", "src", "v.io", "jiri", "profiles", tmpdir, "manifest")
+	if err := profiles.Write(ctx, filepath.Join(root, filename)); err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+	ch, err := profiles.NewConfigHelper(ctx, filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,6 +114,10 @@ func testSetPathHelper(t *testing.T, name string) {
 	}
 	defer os.Setenv("JIRI_ROOT", oldRoot)
 
+	if err := profiles.Write(ctx, filepath.Join(root.Dir, "profiles-manifest")); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := util.SaveConfig(ctx, config); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -113,7 +128,7 @@ func testSetPathHelper(t *testing.T, name string) {
 		t.Fatalf("%v", err)
 	}
 
-	ch, err := profiles.NewConfigHelper(ctx, "")
+	ch, err := profiles.NewConfigHelper(ctx, "profiles-manifest")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,4 +159,24 @@ func TestSetGoPath(t *testing.T) {
 
 func TestSetVdlPath(t *testing.T) {
 	testSetPathHelper(t, "VDLPATH")
+}
+
+func TestMergeEnv(t *testing.T) {
+	a := []string{"A=B", "C=D"}
+	b := []string{"W=X", "Y=Z"}
+	env := envvar.VarsFromSlice(a)
+	profiles.MergeEnv(map[string]string{}, env, b)
+	if got, want := len(env.ToSlice()), 4; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := env.Get("W"), "X"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	profiles.MergeEnv(map[string]string{"W": " "}, env, []string{"W=an option"})
+	if got, want := len(env.ToSlice()), 4; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := env.Get("W"), "X an option"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }

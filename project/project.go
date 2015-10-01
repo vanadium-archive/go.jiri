@@ -693,12 +693,12 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		return cmdline.ErrExitCode(2)
 	}
 
-	// Rename ".v23_profiles" to ".jiri_profiles".
+	// Rename ".v23_profiles" to ".jiri_profiles" iff ".jiri_profiles" doesn't exist"
 	// TODO(nlacasse): Remove this code once the v23->jiri transition is
 	// complete and everybody has had time to update.
 	v23ProfilesFile := filepath.Join(root, ".v23_profiles")
-	jiriProfilesFile := filepath.Join(root, metadataProfilesFile)
-	if ctx.Run().FileExists(v23ProfilesFile) {
+	jiriProfilesFile := filepath.Join(root, ".jiri_profiles")
+	if ctx.Run().FileExists(v23ProfilesFile) && !ctx.Run().FileExists(jiriProfilesFile) {
 		if err := ctx.Run().Rename(v23ProfilesFile, jiriProfilesFile); err != nil {
 			return fmt.Errorf("Rename(%v,%v) failed: %v", v23ProfilesFile, jiriProfilesFile, err)
 		}

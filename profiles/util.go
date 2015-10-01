@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"v.io/jiri/collect"
 	"v.io/jiri/tool"
@@ -26,11 +27,36 @@ const (
 // RegisterProfileFlags register the commonly used --manifest, --profiles and --target
 // flags with the supplied FlagSet.
 func RegisterProfileFlags(flags *flag.FlagSet, manifest, profiles *string, target *Target) {
-	*target = NativeTarget()
+	*target = DefaultTarget()
 	flags.StringVar(manifest, "manifest", DefaultManifestFilename, "specify the profiles XML manifest filename.")
 	flags.StringVar(profiles, "profiles", "base", "a comma separated list of profiles to use")
 	flags.Var(target, "target", target.Usage())
-	flags.Lookup("target").DefValue = "native=<runtime.GOARCH>-<runtime.GOOS>"
+	flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
+}
+
+// ValidateRequestProfiles checks that the supplied slice of profiles
+// names is supported.
+func ValidateRequestedProfiles(profileNames []string) error {
+	for _, n := range profileNames {
+		if LookupManager(n) == nil {
+			return fmt.Errorf("%q is not a supported profile, use the \"list --available\" command to see the ones that are available.", n)
+		}
+	}
+	return nil
+}
+
+// ValidateRequestProfilesAndTarget checks that the supplied slice of profiles
+// names is supported and that each has the specified target installed.
+func ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
+	for _, n := range profileNames {
+		if LookupProfile(n) == nil {
+			return fmt.Errorf("%q is not a supported profile, use the \"list --available\" command to see the ones that are available.", n)
+		}
+		if LookupProfileTarget(n, target) == nil {
+			return fmt.Errorf("%q is not a supported target for profile %q, use the \"list --available\" command to see the ones that are available.", target, n)
+		}
+	}
+	return nil
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -68,7 +94,7 @@ func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string
 // RunCommand runs the specified command with the specified args and environment
 // whilst logging the output to ctx.Stdout() on error or if tracing is requested
 // via the -v flag.
-func RunCommand(ctx *tool.Context, bin string, args []string, env map[string]string) error {
+func RunCommand(ctx *tool.Context, env map[string]string, bin string, args ...string) error {
 	var out bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Stdout = &out
@@ -106,15 +132,18 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 		case "linux":
 			installPkgs := []string{}
 			for _, pkg := range pkgs {
-				if err := RunCommand(ctx, "dpkg", []string{"-s", pkg}, nil); err != nil {
+				if err := RunCommand(ctx, nil, "dpkg", "-L", pkg); err != nil {
 					installPkgs = append(installPkgs, pkg)
 				}
 			}
 			if len(installPkgs) > 0 {
 				args := append([]string{"apt-get", "install", "-y"}, installPkgs...)
-				if err := RunCommand(ctx, "sudo", args, nil); err != nil {
+				fmt.Fprintf(ctx.Stdout(), "Running: sudo %s: ", strings.Join(args, " "))
+				if err := RunCommand(ctx, nil, "sudo", args...); err != nil {
+					fmt.Fprintf(ctx.Stdout(), "%v\n", err)
 					return err
 				}
+				fmt.Fprintf(ctx.Stdout(), "success\n")
 			}
 		case "darwin":
 			installPkgs := []string{}
@@ -129,14 +158,41 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 			}
 			if len(installPkgs) > 0 {
 				args := append([]string{"install"}, installPkgs...)
-				if err := RunCommand(ctx, "brew", args, nil); err != nil {
+				fmt.Fprintf(ctx.Stdout(), "Running: brew %s: ", strings.Join(args, " "))
+				if err := RunCommand(ctx, nil, "brew", args...); err != nil {
+					fmt.Fprintf(ctx.Stdout(), "%v\n", err)
 					return err
 				}
+				fmt.Fprintf(ctx.Stdout(), "success\n")
 			}
 		}
 		return nil
 	}
 	return ctx.Run().Function(installDepsFn, "Install dependencies")
+}
+
+// EnsureProfileTargetIsInstalled ensures that the requested profile and target
+// is installed, installing it if only if necessary.
+func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Target, root string) error {
+	if HasTarget(profile, target) {
+		if ctx.Run().Opts().Verbose {
+			fmt.Fprintf(ctx.Stdout(), "%v is already installed: %v", profile, target)
+		}
+		return nil
+	}
+	mgr := LookupManager(profile)
+	if mgr == nil {
+		return fmt.Errorf("profile %v is not available", profile)
+	}
+	mgr.SetRoot(root)
+	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
+		fmt.Fprintf(ctx.Stdout(), "install --target=%s=%s-%s --env=%s %s\n",
+			target.Tag, target.Arch, target.OS, strings.Join(target.Env.Vars, ","), profile)
+	}
+	if err := mgr.Install(ctx, target); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GitCloneRepo clones a repo at a specific revision in outDir.

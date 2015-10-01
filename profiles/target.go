@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"v.io/x/lib/envvar"
 )
 
 // Target represents specification for the environment that the profile is
@@ -40,21 +38,26 @@ type Environment struct {
 	Vars []string `xml:"var"`
 }
 
-// Targets are equal if they have a tag and it's the same, otherwise
-// they are only equal if they have exactly the same contents.
-func (pt *Target) Equals(pt2 *Target) bool {
-	if len(pt.Tag) > 0 && len(pt2.Tag) > 0 && pt.Tag == pt2.Tag {
-		return true
+func NewTarget(target string) (Target, error) {
+	t := &Target{}
+	err := t.Set(target)
+	return *t, err
+}
+
+// Targets are equal if they both have a tag and it's the same, otherwise
+// they are only equal if they have exactly the same contents except
+// for their environment variables.
+// TODO(cnicolaou): call this match and clean up the semantics, also make
+// it possible to specify a version on the command line etc.
+func (pt Target) Equals(pt2 *Target) bool {
+	if len(pt.Tag) > 0 && len(pt2.Tag) > 0 {
+		return pt.Tag == pt2.Tag
 	}
-	if pt.Arch != pt2.Arch || pt.OS != pt2.OS || pt.Version != pt2.Version || len(pt.Env.Vars) != len(pt2.Env.Vars) {
+	if pt.Arch != pt2.Arch || pt.OS != pt2.OS {
 		return false
 	}
-	envvar.SortByKey(pt.Env.Vars)
-	envvar.SortByKey(pt2.Env.Vars)
-	for i, v := range pt.Env.Vars {
-		if v != pt2.Env.Vars[i] {
-			return false
-		}
+	if (len(pt.Version) > 0) && (pt.Version != pt2.Version) {
+		return false
 	}
 	return true
 }
@@ -80,6 +83,8 @@ func (t *Target) Set(val string) error {
 	} else {
 		if strings.IndexByte(val, '-') < 0 {
 			t.Tag = val
+			t.Arch = ""
+			t.OS = ""
 			t.isSet = true
 			return nil
 		}
@@ -100,7 +105,7 @@ func (t Target) Get() interface{} {
 	if !t.isSet {
 		// Default value.
 		return Target{
-			Tag:  "native",
+			Tag:  "",
 			Arch: runtime.GOARCH,
 			OS:   runtime.GOOS,
 			Env:  t.Env,
@@ -109,9 +114,32 @@ func (t Target) Get() interface{} {
 	return t
 }
 
+// DefaultTarget returns a default value for a Target. Use this function to
+// initialize Targets that are expected to set from the command line via
+// the flags package.
+func DefaultTarget() Target {
+	return Target{
+		Tag:  "",
+		Arch: runtime.GOARCH,
+		OS:   runtime.GOOS,
+	}
+}
+
+// NativeTarget returns a value for Target for the host on which it is running.
+// Use this function for Target values that are passed into other functions
+// and libraries where a native target is specifically required.
 func NativeTarget() Target {
-	var t Target
-	return t.Get().(Target)
+	return Target{
+		isSet: true,
+		Tag:   "",
+		Arch:  runtime.GOARCH,
+		OS:    runtime.GOOS,
+	}
+}
+
+// IsSet returns true if this target has had its value set.
+func (pt Target) IsSet() bool {
+	return pt.isSet
 }
 
 // String implements flag.Getter.
@@ -169,10 +197,16 @@ func RemoveTarget(targets []*Target, target *Target) []*Target {
 	return targets
 }
 
-// FindTarget returns the requested target from the slice of Targets; note
-// that the requested target need only include a tag name. It returns nil
-// if the requested target does not exist.
+// FindTarget returns the first target that matches the requested target from
+// the slice of Targets; note that the requested target need only include a
+// tag name. It returns nil if the requested target does not exist. If there
+// is only one target in the slice and the requested target has not been
+// explicitly set (IsSet is false) then that one target is returned by default.
 func FindTarget(targets []*Target, target *Target) *Target {
+	if len(targets) == 1 && !target.IsSet() {
+		tmp := *targets[0]
+		return &tmp
+	}
 	for _, t := range targets {
 		if target.Equals(t) {
 			tmp := *t

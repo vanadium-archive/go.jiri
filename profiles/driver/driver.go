@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Package driver provides a command line driver (for v.io/x/lib/cmdline)
+// for implement jiri 'profile' subcommands
 package driver
 
 import (
@@ -70,10 +72,12 @@ var cmdInstall = &cmdline.Command{
 
 // cmdList represents the "profile list" command.
 var cmdList = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runList),
-	Name:   "list",
-	Short:  "List supported and installed profiles",
-	Long:   "List supported and installed profiles.",
+	Runner:   cmdline.RunnerFunc(runList),
+	Name:     "list",
+	Short:    "List available or installed profiles",
+	Long:     "List available or installed profiles.",
+	ArgsName: "[<profiles>]",
+	ArgsLong: "<profiles> is a list of profiles to list, defaulting to all profiles if none are specifically requested.",
 }
 
 // cmdList represents the "profile env" command.
@@ -83,7 +87,7 @@ var cmdEnv = &cmdline.Command{
 	Short:  "Display profile environment variables",
 	Long: `
 List profile specific and target specific environment variables.
-env --profile=<profile-name> --tag=<tag as appears in a target> [env var name]*
+env --profile=<profile-name> --target=<tag>=<arch>-<os> [env var name]*
 
 If no environment variable names are requested then all will be printed.
 `,
@@ -118,10 +122,13 @@ var (
 	profileFlag      string
 	rootDir          string
 	forceFlag        bool
+	availableFlag    bool
+	verboseFlag      bool
+	allFlag          bool
 )
 
 func init() {
-	targetFlag = profiles.NativeTarget()
+	targetFlag = profiles.DefaultTarget()
 
 	var err error
 	rootDir, err = project.JiriRoot()
@@ -132,7 +139,7 @@ func init() {
 
 	commonFlags := func(flags *flag.FlagSet) {
 		flags.Var(&targetFlag, "target", targetFlag.Usage())
-		flags.Lookup("target").DefValue = "native=<runtime.GOARCH>-<runtime.GOOS>"
+		flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
 		flags.Var(&targetFlag.Env, "env", targetFlag.Env.Usage())
 		flags.StringVar(&manifestFlag, "manifest", manifest, "specify the XML manifest to file read/write from.")
 		flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + profiles.DefaultManifestFilename
@@ -143,11 +150,13 @@ func init() {
 	cmdList.Flags.StringVar(&manifestFlag, "manifest", manifest, "specify the XML manifest to file read/write from.")
 	cmdList.Flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + profiles.DefaultManifestFilename
 	cmdList.Flags.BoolVar(&showManifestFlag, "show-manifest", false, "print out the manifest file")
+	cmdList.Flags.BoolVar(&availableFlag, "available", false, "print the list of available profiles")
+	cmdList.Flags.BoolVar(&verboseFlag, "v", false, "print more detailed information")
 	cmdEnv.Flags.StringVar(&manifestFlag, "manifest", manifest, "specify the XML manifest to file read/write from.")
 	cmdEnv.Flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + profiles.DefaultManifestFilename
 	cmdEnv.Flags.StringVar(&profileFlag, "profile", "", "the profile whose environment is to be displayed")
 	cmdEnv.Flags.Var(&targetFlag, "target", targetFlag.Usage())
-	cmdEnv.Flags.Lookup("target").DefValue = "native=<runtime.GOARCH>-<runtime.GOOS>"
+	cmdEnv.Flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
 
 	for _, mgr := range profiles.Managers() {
 		profiles.LookupManager(mgr).AddFlags(&cmdInstall.Flags, profiles.Install)
@@ -155,15 +164,7 @@ func init() {
 		profiles.LookupManager(mgr).AddFlags(&cmdUninstall.Flags, profiles.Uninstall)
 	}
 	cmdUpdate.Flags.BoolVar(&forceFlag, "force", false, "force an uninstall followed by install")
-}
-
-func validateRequestedProfiles(names []string) error {
-	for _, n := range names {
-		if profiles.LookupManager(n) == nil {
-			return fmt.Errorf("%q is not a supported profile, use the \"list\" command to see the ones that are available.", n)
-		}
-	}
-	return nil
+	cmdUninstall.Flags.BoolVar(&allFlag, "all", false, "uninstall all targets for the specified profile(s)")
 }
 
 func applyCommand(names []string, env *cmdline.Env, ctx *tool.Context, target profiles.Target, fn func(profiles.Manager, *tool.Context, profiles.Target) error) error {
@@ -187,18 +188,45 @@ func runList(env *cmdline.Env, args []string) error {
 		fmt.Fprintln(ctx.Stdout(), string(data))
 		return nil
 	}
-	fmt.Fprintf(ctx.Stdout(), "Manifest: %s\n", manifestFlag)
-	fmt.Fprintf(ctx.Stdout(), "Available Profiles: %s\n", strings.Join(profiles.Managers(), ", "))
+	if verboseFlag {
+		fmt.Fprintf(ctx.Stdout(), "Manifest: %s\n", manifestFlag)
+	}
+	if availableFlag {
+		if verboseFlag {
+			fmt.Fprintf(ctx.Stdout(), "Available Profiles: ")
+		}
+		fmt.Fprintf(ctx.Stdout(), "%s\n", strings.Join(profiles.Managers(), ", "))
+	}
 	if err := profiles.Read(ctx, manifestFlag); err != nil {
 		fmt.Fprintf(ctx.Stderr(), "Failed to read manifest: %v", err)
 		return err
 	}
-	fmt.Fprintf(ctx.Stdout(), "Installed Profiles: %s\n", strings.Join(profiles.Profiles(), ", "))
-	for _, name := range profiles.Profiles() {
-		profile := profiles.LookupProfile(name)
-		fmt.Fprintf(ctx.Stdout(), "Profile: %s @ %s\n", profile.Name, profile.Root)
-		for _, target := range profile.Targets {
-			fmt.Fprintf(ctx.Stdout(), "\t%s\n", target)
+	profileNames := args
+	if len(args) == 0 {
+		profileNames = profiles.Profiles()
+	}
+	availableNames := []string{}
+	for _, name := range profileNames {
+		if profiles.LookupProfile(name) != nil {
+			availableNames = append(availableNames, name)
+		}
+	}
+	if verboseFlag {
+		fmt.Fprintf(ctx.Stdout(), "Installed Profiles: ")
+		fmt.Fprintf(ctx.Stdout(), "%s\n", strings.Join(profiles.Profiles(), ", "))
+		for _, name := range availableNames {
+			profile := profiles.LookupProfile(name)
+			fmt.Fprintf(ctx.Stdout(), "Profile: %s @ %s\n", profile.Name, profile.Root)
+			for _, target := range profile.Targets {
+				fmt.Fprintf(ctx.Stdout(), "\t%s\n", target)
+			}
+		}
+	} else {
+		for _, name := range availableNames {
+			profile := profiles.LookupProfile(name)
+			for _, target := range profile.Targets {
+				fmt.Fprintf(ctx.Stdout(), "%s %s=%s-%s\n", name, target.Tag, target.Arch, target.OS)
+			}
 		}
 	}
 	return nil
@@ -214,11 +242,11 @@ func runEnv(env *cmdline.Env, args []string) error {
 	}
 	profile := profiles.LookupProfile(profileFlag)
 	if profile == nil {
-		return fmt.Errorf("Profile %q is not installed", profileFlag)
+		return fmt.Errorf("profile %q is not installed", profileFlag)
 	}
 	target := profiles.FindTarget(profile.Targets, &targetFlag)
 	if target == nil {
-		return fmt.Errorf("Target %q is not installed for profile %q", profileFlag, profileFlag)
+		return fmt.Errorf("target %q is not installed for profile %q", targetFlag, profileFlag)
 	}
 	vars := envvar.SliceToMap(target.Env.Vars)
 	buf := bytes.Buffer{}
@@ -240,7 +268,10 @@ func runEnv(env *cmdline.Env, args []string) error {
 }
 
 func initCommand(ctx *tool.Context, args []string) error {
-	if err := validateRequestedProfiles(args); err != nil {
+	if len(args) == 0 {
+		return fmt.Errorf("no profiles specified")
+	}
+	if err := profiles.ValidateRequestedProfiles(args); err != nil {
 		return err
 	}
 	if err := profiles.Read(ctx, manifestFlag); err != nil {
@@ -248,6 +279,10 @@ func initCommand(ctx *tool.Context, args []string) error {
 		return err
 	}
 	return nil
+}
+
+func logAction(ctx *tool.Context, action string, mgr profiles.Manager, target profiles.Target) {
+	fmt.Fprintf(ctx.Stdout(), "%s: %s %s=%s-%s\n", action, mgr.Name(), target.Tag, target.Arch, target.OS)
 }
 
 func runInstall(env *cmdline.Env, args []string) error {
@@ -259,13 +294,13 @@ func runInstall(env *cmdline.Env, args []string) error {
 	for _, name := range args {
 		if profiles.HasTarget(name, targetFlag) {
 			fmt.Fprintf(ctx.Stdout(), "%v %v is already installed\n", name, targetFlag)
-
 			continue
 		}
 		names = append(names, name)
 	}
 	if err := applyCommand(names, env, ctx, targetFlag,
 		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
+			logAction(ctx, "Installing", mgr, target)
 			return mgr.Install(ctx, target)
 		}); err != nil {
 		return err
@@ -278,22 +313,26 @@ func runUpdate(env *cmdline.Env, args []string) error {
 	if err := initCommand(ctx, args); err != nil {
 		return err
 	}
-	applyCommand(args, env, ctx, targetFlag,
+	if err := applyCommand(args, env, ctx, targetFlag,
 		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
+			logAction(ctx, "Updating", mgr, target)
 			err := mgr.Update(ctx, target)
-			if forceFlag || (err == profiles.ErrNoIncrementalUpdate) {
-				if err := runUninstall(env, args); err != nil {
+			if (forceFlag && err == nil) || err == profiles.ErrNoIncrementalUpdate {
+				logAction(ctx, "Uninstalling", mgr, target)
+				if err := mgr.Uninstall(ctx, target); err != nil {
 					return err
 				}
-				if err := runInstall(env, args); err != nil {
+				logAction(ctx, "Installing", mgr, target)
+				if err := mgr.Install(ctx, target); err != nil {
 					return err
 				}
-				err = nil
+				return nil
 			}
 			return err
-		})
-	return nil
-
+		}); err != nil {
+		return err
+	}
+	return profiles.Write(ctx, manifestFlag)
 }
 
 func runUninstall(env *cmdline.Env, args []string) error {
@@ -301,9 +340,30 @@ func runUninstall(env *cmdline.Env, args []string) error {
 	if err := initCommand(ctx, args); err != nil {
 		return err
 	}
-	applyCommand(args, env, ctx, targetFlag,
-		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
-			return mgr.Uninstall(ctx, target)
-		})
+	if allFlag && targetFlag.IsSet() {
+		return fmt.Errorf("don't specify a target in conjunction with --all")
+	}
+	if allFlag {
+		for _, name := range args {
+			profile := profiles.LookupProfile(name)
+			mgr := profiles.LookupManager(name)
+			if mgr == nil {
+				continue
+			}
+			mgr.SetRoot(rootDir)
+			for _, target := range profile.Targets {
+				logAction(ctx, "Uninstalling", mgr, *target)
+				if err := mgr.Uninstall(ctx, *target); err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		applyCommand(args, env, ctx, targetFlag,
+			func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
+				logAction(ctx, "Uninstalling", mgr, target)
+				return mgr.Uninstall(ctx, target)
+			})
+	}
 	return profiles.Write(ctx, manifestFlag)
 }

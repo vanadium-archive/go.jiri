@@ -5,6 +5,7 @@
 package profiles
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -69,11 +70,12 @@ func GoEnvironmentFromOS() []string {
 // environment that is mutated by its various methods.
 type ConfigHelper struct {
 	*envvar.Vars
-	root     string
-	ctx      *tool.Context
-	config   *util.Config
-	projects project.Projects
-	tools    project.Tools
+	legacyMode bool
+	root       string
+	ctx        *tool.Context
+	config     *util.Config
+	projects   project.Projects
+	tools      project.Tools
 }
 
 // NewConfigHelper creates a new config helper. If filename is of non-zero
@@ -97,13 +99,24 @@ func NewConfigHelper(ctx *tool.Context, filename string) (*ConfigHelper, error) 
 			return nil, err
 		}
 	}
-	return &ConfigHelper{
+	ch := &ConfigHelper{
 		ctx:      ctx,
 		root:     root,
 		config:   config,
 		projects: projects,
 		tools:    tools,
-	}, nil
+	}
+	ch.legacyMode = (SchemaVersion() == Original) || (len(os.Getenv("JIRI_PROFILE")) > 0)
+	if ch.legacyMode {
+		vars, err := util.JiriLegacyEnvironment(ch.ctx)
+		if err != nil {
+			return nil, err
+		}
+		ch.Vars = vars
+	} else {
+		ch.Vars = envvar.VarsFromOS()
+	}
+	return ch, nil
 }
 
 // Root returns the root of the jiri universe.
@@ -111,18 +124,9 @@ func (ch *ConfigHelper) Root() string {
 	return ch.root
 }
 
-// UsingProfilesForEnv returns true if environment variables are available
-// from the profiles manifest. Typical usage is:
-//
-// if !ch.UsingProfilesForEnv() {
-//     return project.EnvFromSomeSharedAssumptions()
-// }
-// ch.method()
-// ch.method()...
-// return ch.Vars
-//
-func (ch *ConfigHelper) UsingProfilesForEnv() bool {
-	return SchemaVersion() != Original
+// LegacyProfiles returns true if the old-style profiles are being used.
+func (ch *ConfigHelper) LegacyProfiles() bool {
+	return ch.legacyMode
 }
 
 // CommonConcatVariables returns a map of variables commonly
@@ -139,9 +143,11 @@ func CommonConcatVariables() map[string]string {
 	}
 }
 
-// SetEnvFromProfiles populates the stored environment with the environment
-// variables stored in the specified profiles for the specified target. The
-// profiles parameter contains a comma separated list of profile names; if the
+// SetEnvFromProfiles populates the embedded environment with the environment
+// variables stored in the specified profiles for the specified target if
+// new-style profiles are being used, otherwise it uses compiled in values as per
+// the original profiles implementation.
+// The profiles parameter contains a comma separated list of profile names; if the
 // requested target does not exist for any of these profiles then those profiles
 // will be ignored. The 'concat' parameter includes a map of variable names
 // whose values are to concatenated with any existing ones rather than
@@ -149,6 +155,9 @@ func CommonConcatVariables() map[string]string {
 // is the separator to use for that environment  variable (e.g. space for
 // CFLAGs or ':' for PATH-like ones).
 func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, profiles string, target Target) {
+	if ch.legacyMode {
+		return
+	}
 	for _, profile := range strings.Split(profiles, ",") {
 		t := LookupProfileTarget(profile, target)
 		if t == nil {
@@ -167,17 +176,58 @@ func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, profiles st
 	}
 }
 
+// MergeEnv merges vars with the variables in env taking care to concatenate
+// values as per the concat parameter similarly to SetEnvFromProfiles.
+func MergeEnv(concat map[string]string, env *envvar.Vars, vars ...[]string) {
+	for _, ev := range vars {
+		for _, tmp := range ev {
+			k, v := envvar.SplitKeyValue(tmp)
+			if sep := concat[k]; len(sep) > 0 {
+				ov := env.GetTokens(k, sep)
+				nv := envvar.SplitTokens(v, sep)
+				env.SetTokens(k, append(ov, nv...), " ")
+				continue
+			}
+			env.Set(k, v)
+		}
+	}
+}
+
+// MergeEnvFromProfiles merges the environment variables stored in the specified
+// profiles and target with the env parameter. It uses MergeEnv to do so.
+func MergeEnvFromProfiles(concat map[string]string, env *envvar.Vars, target Target, profileNames ...string) ([]string, error) {
+	vars := [][]string{}
+	for _, name := range profileNames {
+		t := LookupProfileTarget(name, target)
+		if t == nil {
+			return nil, fmt.Errorf("failed to lookup %v --target=%v", name, target)
+		}
+		vars = append(vars, t.Env.Vars)
+	}
+	MergeEnv(concat, env, vars...)
+	return env.ToSlice(), nil
+}
+
+// PrependToPath prepends its argument to the PATH environment variable.
 func (ch *ConfigHelper) PrependToPATH(path string) {
 	existing := ch.GetTokens("PATH", ":")
-	ch.SetTokens("PATH", append(existing, path), ":")
+	ch.SetTokens("PATH", append([]string{path}, existing...), ":")
 }
 
+// SetGoPath computes and sets the GOPATH environment variable based on the
+// current jiri configuration.
 func (ch *ConfigHelper) SetGoPath() {
-	ch.pathHelper("GOPATH", ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+	if !ch.legacyMode {
+		ch.pathHelper("GOPATH", ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+	}
 }
 
+// SetVDLPath computes and sets the VDLPATH environment variable based on the
+// current jiri configuration.
 func (ch *ConfigHelper) SetVDLPath() {
-	ch.pathHelper("VDLPATH", ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+	if !ch.legacyMode {
+		ch.pathHelper("VDLPATH", ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+	}
 }
 
 // pathHelper is a utility function for determining paths for project workspaces.

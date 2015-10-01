@@ -138,15 +138,6 @@ func GitHost(ctx *tool.Context) (string, error) {
 	return getHost(ctx, "git")
 }
 
-// JiriProfilesFile returns the path to the jiri profiles file.
-func JiriProfilesFile() (string, error) {
-	root, err := JiriRoot()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, metadataProfilesFile), nil
-}
-
 // JiriRoot returns the root of the jiri universe.
 func JiriRoot() (string, error) {
 	root := os.Getenv(rootEnv)

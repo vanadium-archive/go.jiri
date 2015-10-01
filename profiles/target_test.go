@@ -103,6 +103,7 @@ func TestProfileEquality(t *testing.T) {
 		{s{"--t=a-b", "-e=a=b,c=d"}, s{"--t=c-b"}, false},
 	} {
 		t1, t2 := &profiles.Target{}, &profiles.Target{}
+		t1.Env.Vars = []string{"Oh"} // Env vars don't matter.
 		fl1 := flag.NewFlagSet("test1", flag.ContinueOnError)
 		fl2 := flag.NewFlagSet("test2", flag.ContinueOnError)
 		fl1.Var(t1, "t", t1.Usage())
@@ -121,6 +122,13 @@ func TestProfileEquality(t *testing.T) {
 			t.Errorf("%v --- %v", t1, t2)
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
+		if len(t1.Tag) == 0 && len(t2.Tag) == 0 {
+			t1.Version = "foo" // Different versions will fail.
+			if got, want := t1.Equals(t2), false; got != want {
+				t.Errorf("%v --- %v", t1, t2)
+				t.Errorf("%d: got %v, want %v", i, got, want)
+			}
+		}
 	}
 }
 
@@ -132,6 +140,11 @@ func TestTargetVersion(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t2.Version = "bar"
+	if got, want := t1.Equals(t2), true; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	t2.Version = ""
+	t1.Version = "baz"
 	if got, want := t1.Equals(t2), false; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -139,12 +152,44 @@ func TestTargetVersion(t *testing.T) {
 
 func TestDefaults(t *testing.T) {
 	t1 := &profiles.Target{}
-	native := fmt.Sprintf("tag:native arch:%s os:%s version: installdir: env:[]", runtime.GOARCH, runtime.GOOS)
+	native := fmt.Sprintf("tag: arch:%s os:%s version: installdir: env:[]", runtime.GOARCH, runtime.GOOS)
 	if got, want := t1.String(), native; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t1.Set("tag=cpu-os")
 	if got, want := t1.String(), "tag:tag arch:cpu os:os version: installdir: env:[]"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestFindTarget(t *testing.T) {
+	t1 := &profiles.Target{}
+	t1.Set("bar=a-o")
+	ts := []*profiles.Target{t1}
+	def := profiles.DefaultTarget()
+	if got, want := profiles.FindTarget(ts, &def), t1; !got.Equals(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	t2 := &profiles.Target{}
+	t2.Set("baz=a-o1")
+	ts = append(ts, t2)
+	if got := profiles.FindTarget(ts, &def); got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+
+	w := &profiles.Target{}
+	w.Set("bar")
+	if got, want := profiles.FindTarget(ts, w), t1; !got.Equals(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	w.Set("a-o1")
+	if got, want := profiles.FindTarget(ts, w), t2; !got.Equals(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	w.Set("baz=a-o")
+	if got, want := profiles.FindTarget(ts, w), t2; !got.Equals(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }

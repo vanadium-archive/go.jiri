@@ -56,9 +56,12 @@ func removeDate(s string) string {
 }
 
 func TestDuplicateTag(t *testing.T) {
+	profiles.Clear()
 	addProfileAndTargets(t, "b")
-	err := profiles.AddProfileTarget("b", profiles.Target{Tag: "t2"})
-	if got, want := err.Error(), "already used by tag:t2"; !strings.Contains(got, want) {
+	t1 := &profiles.Target{}
+	t1.Set("t2")
+	err := profiles.AddProfileTarget("b", *t1)
+	if got, want := err.Error(), "tag \"t2\" is already used"; !strings.Contains(got, want) {
 		t.Fatalf("got %v doesn't contain %v", got, want)
 
 	}
@@ -83,7 +86,6 @@ func TestWrite(t *testing.T) {
 
 func TestRead(t *testing.T) {
 	profiles.Clear()
-
 	ctx := tool.NewDefaultContext()
 	if err := profiles.Read(ctx, "./testdata/m1.xml"); err != nil {
 		t.Fatal(err)
