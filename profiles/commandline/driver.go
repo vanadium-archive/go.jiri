@@ -29,7 +29,7 @@ func init() {
 // CommandLineDriver implements the command line for the 'profile'
 // subcommand.
 var CommandLineDriver = &cmdline.Command{
-	Name:  "xprofile",
+	Name:  "profile",
 	Short: "Manage profiles",
 	Long: `
 Profiles provide a means of managing software dependencies that can
@@ -128,7 +128,8 @@ var (
 	allFlag          bool
 )
 
-func Main() {
+func Main(name string) {
+	CommandLineDriver.Name = name
 	cmdline.Main(CommandLineDriver)
 }
 
