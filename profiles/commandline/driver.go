@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package driver provides a command line driver (for v.io/x/lib/cmdline)
-// for implement jiri 'profile' subcommands
-package driver
+// Package commandline provides a command line driver (for v.io/x/lib/cmdline)
+// for implementing jiri 'profile' subcommands. The intent is to support
+// project specific instances of such profiles for managing software
+// dependencies.
+package commandline
 
 import (
 	"bytes"
@@ -87,7 +89,6 @@ var cmdEnv = &cmdline.Command{
 	Short:  "Display profile environment variables",
 	Long: `
 List profile specific and target specific environment variables.
-env --profile=<profile-name> --target=<tag>=<arch>-<os> [env var name]*
 
 If no environment variable names are requested then all will be printed.
 `,
@@ -127,7 +128,11 @@ var (
 	allFlag          bool
 )
 
-func init() {
+func Main() {
+	cmdline.Main(CommandLineDriver)
+}
+
+func Init(defaultManifestFilename string) {
 	targetFlag = profiles.DefaultTarget()
 
 	var err error
@@ -135,28 +140,30 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	manifest := filepath.Join(rootDir, profiles.DefaultManifestFilename)
+	manifest := filepath.Join(rootDir, defaultManifestFilename)
 
 	commonFlags := func(flags *flag.FlagSet) {
 		flags.Var(&targetFlag, "target", targetFlag.Usage())
 		flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
 		flags.Var(&targetFlag.Env, "env", targetFlag.Env.Usage())
+		flags.StringVar(&targetFlag.Version, "version", "", "target version")
 		flags.StringVar(&manifestFlag, "manifest", manifest, "specify the XML manifest to file read/write from.")
-		flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + profiles.DefaultManifestFilename
+		flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + defaultManifestFilename
 	}
 	commonFlags(&cmdInstall.Flags)
 	commonFlags(&cmdUpdate.Flags)
 	commonFlags(&cmdUninstall.Flags)
 	cmdList.Flags.StringVar(&manifestFlag, "manifest", manifest, "specify the XML manifest to file read/write from.")
-	cmdList.Flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + profiles.DefaultManifestFilename
+	cmdList.Flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + defaultManifestFilename
 	cmdList.Flags.BoolVar(&showManifestFlag, "show-manifest", false, "print out the manifest file")
 	cmdList.Flags.BoolVar(&availableFlag, "available", false, "print the list of available profiles")
 	cmdList.Flags.BoolVar(&verboseFlag, "v", false, "print more detailed information")
 	cmdEnv.Flags.StringVar(&manifestFlag, "manifest", manifest, "specify the XML manifest to file read/write from.")
-	cmdEnv.Flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + profiles.DefaultManifestFilename
+	cmdEnv.Flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + defaultManifestFilename
 	cmdEnv.Flags.StringVar(&profileFlag, "profile", "", "the profile whose environment is to be displayed")
 	cmdEnv.Flags.Var(&targetFlag, "target", targetFlag.Usage())
 	cmdEnv.Flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
+	cmdEnv.Flags.StringVar(&targetFlag.Version, "version", "", "target version")
 
 	for _, mgr := range profiles.Managers() {
 		profiles.LookupManager(mgr).AddFlags(&cmdInstall.Flags, profiles.Install)
@@ -282,7 +289,15 @@ func initCommand(ctx *tool.Context, args []string) error {
 }
 
 func logAction(ctx *tool.Context, action string, mgr profiles.Manager, target profiles.Target) {
-	fmt.Fprintf(ctx.Stdout(), "%s: %s %s=%s-%s\n", action, mgr.Name(), target.Tag, target.Arch, target.OS)
+	fmt.Fprintf(ctx.Stdout(), "%s: %s %s=%s-%s@%s...", action, mgr.Name(), target.Tag, target.Arch, target.OS, target.Version)
+}
+
+func logResult(ctx *tool.Context, err error) {
+	if err == nil {
+		fmt.Fprintf(ctx.Stdout(), " done\n")
+	} else {
+		fmt.Fprintf(ctx.Stdout(), " %v\n", err)
+	}
 }
 
 func runInstall(env *cmdline.Env, args []string) error {
@@ -301,7 +316,9 @@ func runInstall(env *cmdline.Env, args []string) error {
 	if err := applyCommand(names, env, ctx, targetFlag,
 		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
 			logAction(ctx, "Installing", mgr, target)
-			return mgr.Install(ctx, target)
+			err := mgr.Install(ctx, target)
+			logResult(ctx, err)
+			return err
 		}); err != nil {
 		return err
 	}
@@ -317,15 +334,19 @@ func runUpdate(env *cmdline.Env, args []string) error {
 		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
 			logAction(ctx, "Updating", mgr, target)
 			err := mgr.Update(ctx, target)
+			logResult(ctx, err)
 			if (forceFlag && err == nil) || err == profiles.ErrNoIncrementalUpdate {
 				logAction(ctx, "Uninstalling", mgr, target)
 				if err := mgr.Uninstall(ctx, target); err != nil {
+					logResult(ctx, err)
 					return err
 				}
 				logAction(ctx, "Installing", mgr, target)
 				if err := mgr.Install(ctx, target); err != nil {
+					logResult(ctx, err)
 					return err
 				}
+				logResult(ctx, err)
 				return nil
 			}
 			return err
@@ -354,15 +375,20 @@ func runUninstall(env *cmdline.Env, args []string) error {
 			for _, target := range profile.Targets {
 				logAction(ctx, "Uninstalling", mgr, *target)
 				if err := mgr.Uninstall(ctx, *target); err != nil {
+					logResult(ctx, err)
 					return err
 				}
+				logResult(ctx, nil)
+
 			}
 		}
 	} else {
 		applyCommand(args, env, ctx, targetFlag,
 			func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
 				logAction(ctx, "Uninstalling", mgr, target)
-				return mgr.Uninstall(ctx, target)
+				err := mgr.Uninstall(ctx, target)
+				logResult(ctx, err)
+				return err
 			})
 	}
 	return profiles.Write(ctx, manifestFlag)

@@ -12,15 +12,11 @@ import (
 )
 
 // Target represents specification for the environment that the profile is
-// to be built for. Target may be named (via the Tag field) in which case
-// just that the Tag value is used to compare targets. If the tag is not
-// speficied then all fields are compared when comparing targets.
-// If the Arch or OS values differ from those compiled into the runtime then
-// cross compilation is requested.
-// Targets include a version string to allow for transitions between
-// incompatible implementations of that profile. The versions are intended
-// to be managed internally by each profile implementation and cannot be
-// specified on the command line by a user.
+// to be built for. Target may be named (via the Tag field), see the Match
+// method for a definition of how Targets are compated.
+// Targets include a version string to allow for upgrades and for
+// the simultaneous existence of incompatible versions.
+//
 // Target and Environment implement flag.Getter so that they may be used
 // with the flag package. Two flags are required, one to specify the target
 // in <tag>=<arch>-<os> format and a second to specify environment variables
@@ -44,12 +40,16 @@ func NewTarget(target string) (Target, error) {
 	return *t, err
 }
 
-// Targets are equal if they both have a tag and it's the same, otherwise
-// they are only equal if they have exactly the same contents except
-// for their environment variables.
-// TODO(cnicolaou): call this match and clean up the semantics, also make
-// it possible to specify a version on the command line etc.
-func (pt Target) Equals(pt2 *Target) bool {
+// Match returns true if pt and pt2 meet the following criteria in the
+// order they are listed:
+// - if both targets have a non-zero length Tag field that is
+//   identical
+// - if the Arch and OS fields are exactly the same
+// - if pt has a non-zero length Version field, then it must be
+//   the same as that in pt2
+// Match is used by the various methods and functions in this package
+// when looking up Targets unless otherwise specified.
+func (pt Target) Match(pt2 *Target) bool {
 	if len(pt.Tag) > 0 && len(pt2.Tag) > 0 {
 		return pt.Tag == pt2.Tag
 	}
@@ -105,10 +105,11 @@ func (t Target) Get() interface{} {
 	if !t.isSet {
 		// Default value.
 		return Target{
-			Tag:  "",
-			Arch: runtime.GOARCH,
-			OS:   runtime.GOOS,
-			Env:  t.Env,
+			Tag:     "",
+			Arch:    runtime.GOARCH,
+			OS:      runtime.GOOS,
+			Version: t.Version,
+			Env:     t.Env,
 		}
 	}
 	return t
@@ -145,7 +146,7 @@ func (pt Target) IsSet() bool {
 // String implements flag.Getter.
 func (pt Target) String() string {
 	v := pt.Get().(Target)
-	return fmt.Sprintf("tag:%v arch:%v os:%v version:%s installdir:%s env:%s", v.Tag, v.Arch, v.OS, v.Version, pt.InstallationDir, pt.Env.Vars)
+	return fmt.Sprintf("%v=%v-%v@%s dir:%s env:%s", v.Tag, v.Arch, v.OS, v.Version, pt.InstallationDir, pt.Env.Vars)
 }
 
 // Set implements flag.Getter.
@@ -179,7 +180,7 @@ func (e *Environment) Usage() string {
 // already there and returns a new slice.
 func AddTarget(targets []*Target, target *Target) []*Target {
 	for _, t := range targets {
-		if target.Equals(t) {
+		if target.Match(t) {
 			return targets
 		}
 	}
@@ -190,7 +191,7 @@ func AddTarget(targets []*Target, target *Target) []*Target {
 // a slice.
 func RemoveTarget(targets []*Target, target *Target) []*Target {
 	for i, t := range targets {
-		if target.Equals(t) {
+		if target.Match(t) {
 			return append(targets[:i], targets[i+1:]...)
 		}
 	}
@@ -208,7 +209,7 @@ func FindTarget(targets []*Target, target *Target) *Target {
 		return &tmp
 	}
 	for _, t := range targets {
-		if target.Equals(t) {
+		if target.Match(t) {
 			tmp := *t
 			return &tmp
 		}

@@ -129,7 +129,7 @@ func (ch *ConfigHelper) LegacyProfiles() bool {
 	return ch.legacyMode
 }
 
-// CommonConcatVariables returns a map of variables commonly
+// CommonConcatVariables returns a map of variables that are commonly
 // used for the concat parameter to SetEnvFromProfilesAndTarget.
 func CommonConcatVariables() map[string]string {
 	return map[string]string{
@@ -140,6 +140,14 @@ func CommonConcatVariables() map[string]string {
 		"CGO_CFLAGS":   " ",
 		"CGO_CXXFLAGS": " ",
 		"CGO_LDFLAGS":  " ",
+	}
+}
+
+// CommonIgnoreVariables returns a map of variables that are commonly
+// used for the ignore parameter to SetEnvFromProfilesAndTarget.
+func CommonIgnoreVariables() map[string]bool {
+	return map[string]bool{
+		"GOPATH": true,
 	}
 }
 
@@ -154,7 +162,7 @@ func CommonConcatVariables() map[string]string {
 // overwriting them (e.g. CFLAGS for example). The value of the concat map
 // is the separator to use for that environment  variable (e.g. space for
 // CFLAGs or ':' for PATH-like ones).
-func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, profiles string, target Target) {
+func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, ignore map[string]bool, profiles string, target Target) {
 	if ch.legacyMode {
 		return
 	}
@@ -165,6 +173,9 @@ func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, profiles st
 		}
 		for _, tmp := range t.Env.Vars {
 			k, v := envvar.SplitKeyValue(tmp)
+			if ignore[k] {
+				continue
+			}
 			if sep := concat[k]; len(sep) > 0 {
 				ov := ch.Vars.GetTokens(k, sep)
 				nv := envvar.SplitTokens(v, sep)
@@ -177,11 +188,14 @@ func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, profiles st
 }
 
 // MergeEnv merges vars with the variables in env taking care to concatenate
-// values as per the concat parameter similarly to SetEnvFromProfiles.
-func MergeEnv(concat map[string]string, env *envvar.Vars, vars ...[]string) {
+// values as per the concat and ignore parameters similarly to SetEnvFromProfiles.
+func MergeEnv(concat map[string]string, ignore map[string]bool, env *envvar.Vars, vars ...[]string) {
 	for _, ev := range vars {
 		for _, tmp := range ev {
 			k, v := envvar.SplitKeyValue(tmp)
+			if ignore[k] {
+				continue
+			}
 			if sep := concat[k]; len(sep) > 0 {
 				ov := env.GetTokens(k, sep)
 				nv := envvar.SplitTokens(v, sep)
@@ -195,7 +209,7 @@ func MergeEnv(concat map[string]string, env *envvar.Vars, vars ...[]string) {
 
 // MergeEnvFromProfiles merges the environment variables stored in the specified
 // profiles and target with the env parameter. It uses MergeEnv to do so.
-func MergeEnvFromProfiles(concat map[string]string, env *envvar.Vars, target Target, profileNames ...string) ([]string, error) {
+func MergeEnvFromProfiles(concat map[string]string, ignore map[string]bool, env *envvar.Vars, target Target, profileNames ...string) ([]string, error) {
 	vars := [][]string{}
 	for _, name := range profileNames {
 		t := LookupProfileTarget(name, target)
@@ -204,7 +218,7 @@ func MergeEnvFromProfiles(concat map[string]string, env *envvar.Vars, target Tar
 		}
 		vars = append(vars, t.Env.Vars)
 	}
-	MergeEnv(concat, env, vars...)
+	MergeEnv(concat, ignore, env, vars...)
 	return env.ToSlice(), nil
 }
 

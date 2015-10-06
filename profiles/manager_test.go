@@ -121,13 +121,13 @@ func ExampleManager() {
 
 	// Output:
 	// Profile: myNewProfile: installed
-	// [tag:myTarget arch:arm os:linux version: installdir: env:[A=B C=D E=F]]
+	// [myTarget=arm-linux@ dir: env:[A=B C=D E=F]]
 	//
 	// Profile: myNewProfile: installed
-	// [tag:myTarget arch:arm os:linux version: installdir: env:[A=B C=D E=F]]
+	// [myTarget=arm-linux@ dir: env:[A=B C=D E=F]]
 	//
 	// Profile: myNewProfile: updated
-	// [tag:myTarget arch:arm os:linux version: installdir: env:[A=B C=D E=F]]
+	// [myTarget=arm-linux@ dir: env:[A=B C=D E=F]]
 	//
 	// Profile: myNewProfile: uninstalled
 	//

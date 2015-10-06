@@ -25,7 +25,7 @@ func TestConfigHelper(t *testing.T) {
 	}
 	ch.Vars = envvar.VarsFromOS()
 	ch.Delete("CGO_CFLAGS")
-	ch.SetEnvFromProfiles(profiles.CommonConcatVariables(), "go,syncbase", profiles.Target{Tag: "native"})
+	ch.SetEnvFromProfiles(profiles.CommonConcatVariables(), map[string]bool{}, "go,syncbase", profiles.Target{Tag: "native"})
 	if got, want := ch.Get("CGO_CFLAGS"), "-IX -IY -IA -IB"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -39,9 +39,9 @@ func TestEnvFromTarget(t *testing.T) {
 	profiles.InstallProfile("b", "root")
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
 	t1.Set("t1=cpu1-os1")
-	t1.Env.Set("A=B C=D, B=C")
+	t1.Env.Set("A=B C=D, B=C Z=Z")
 	t2.Set("t1=cpu1-os1")
-	t2.Env.Set("A=Z,B=Z")
+	t2.Env.Set("A=Z,B=Z,Z=Z")
 	profiles.AddProfileTarget("a", *t1)
 	profiles.AddProfileTarget("b", *t2)
 	tmpdir, err := ioutil.TempDir(".", "pdb")
@@ -58,7 +58,7 @@ func TestEnvFromTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	ch.Vars = envvar.VarsFromSlice([]string{})
-	ch.SetEnvFromProfiles(map[string]string{"A": " "}, "a,b", profiles.Target{Tag: "t1"})
+	ch.SetEnvFromProfiles(map[string]string{"A": " "}, map[string]bool{"Z": true}, "a,b", profiles.Target{Tag: "t1"})
 	vars := ch.ToMap()
 	if got, want := len(vars), 3; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -163,16 +163,16 @@ func TestSetVdlPath(t *testing.T) {
 
 func TestMergeEnv(t *testing.T) {
 	a := []string{"A=B", "C=D"}
-	b := []string{"W=X", "Y=Z"}
+	b := []string{"W=X", "Y=Z", "GP=X"}
 	env := envvar.VarsFromSlice(a)
-	profiles.MergeEnv(map[string]string{}, env, b)
+	profiles.MergeEnv(map[string]string{}, map[string]bool{"GP": true}, env, b)
 	if got, want := len(env.ToSlice()), 4; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	if got, want := env.Get("W"), "X"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	profiles.MergeEnv(map[string]string{"W": " "}, env, []string{"W=an option"})
+	profiles.MergeEnv(map[string]string{"W": " "}, map[string]bool{"GP": true}, env, []string{"W=an option"})
 	if got, want := len(env.ToSlice()), 4; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}

@@ -72,11 +72,6 @@ var (
 	db = newDB()
 )
 
-const (
-	DefaultManifestFilename = ".jiri_xprofiles"
-	LegacyManifestFilename  = ".v23_profiles"
-)
-
 // Profiles returns the names, in lexicographic order, of all of the currently
 // available profiles as read or stored in the manifest. A profile name may
 // be used to lookup a profile manager or the current state of a profile.
@@ -195,7 +190,7 @@ func (pdb *profileDB) updateProfileTarget(name string, target *Target) error {
 		return fmt.Errorf("profile %v is not installed", name)
 	}
 	for _, t := range pi.Targets {
-		if target.Equals(t) {
+		if target.Match(t) {
 			*t = *target
 			t.UpdateTime = time.Now()
 			return nil

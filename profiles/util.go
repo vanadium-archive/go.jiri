@@ -26,12 +26,13 @@ const (
 
 // RegisterProfileFlags register the commonly used --manifest, --profiles and --target
 // flags with the supplied FlagSet.
-func RegisterProfileFlags(flags *flag.FlagSet, manifest, profiles *string, target *Target) {
+func RegisterProfileFlags(flags *flag.FlagSet, manifest, profiles *string, defaultManifest string, target *Target) {
 	*target = DefaultTarget()
-	flags.StringVar(manifest, "manifest", DefaultManifestFilename, "specify the profiles XML manifest filename.")
+	flags.StringVar(manifest, "manifest", defaultManifest, "specify the profiles XML manifest filename.")
 	flags.StringVar(profiles, "profiles", "base", "a comma separated list of profiles to use")
 	flags.Var(target, "target", target.Usage())
 	flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
+	flags.StringVar(&target.Version, "version", "", "target version")
 }
 
 // ValidateRequestProfiles checks that the supplied slice of profiles

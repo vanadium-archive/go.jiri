@@ -21,7 +21,7 @@ func ExampleProfileTarget() {
 	flags.Parse([]string{"--target=name=arm-linux", "--env=A=B,C=D", "--env=E=F"})
 	fmt.Println(target.String())
 	// Output:
-	// tag:name arch:arm os:linux version: installdir: env:[A=B C=D E=F]
+	// name=arm-linux@ dir: env:[A=B C=D E=F]
 }
 
 func TestProfileTargetArgs(t *testing.T) {
@@ -118,13 +118,13 @@ func TestProfileEquality(t *testing.T) {
 			t.Errorf("%d: %v\n", i, err)
 			continue
 		}
-		if got, want := t1.Equals(t2), c.equal; got != want {
+		if got, want := t1.Match(t2), c.equal; got != want {
 			t.Errorf("%v --- %v", t1, t2)
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
 		if len(t1.Tag) == 0 && len(t2.Tag) == 0 {
 			t1.Version = "foo" // Different versions will fail.
-			if got, want := t1.Equals(t2), false; got != want {
+			if got, want := t1.Match(t2), false; got != want {
 				t.Errorf("%v --- %v", t1, t2)
 				t.Errorf("%d: got %v, want %v", i, got, want)
 			}
@@ -136,28 +136,28 @@ func TestTargetVersion(t *testing.T) {
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
 	t1.Set("tag=cpu,os")
 	t2.Set("tag=cpu,os")
-	if got, want := t1.Equals(t2), true; got != want {
+	if got, want := t1.Match(t2), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t2.Version = "bar"
-	if got, want := t1.Equals(t2), true; got != want {
+	if got, want := t1.Match(t2), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t2.Version = ""
 	t1.Version = "baz"
-	if got, want := t1.Equals(t2), false; got != want {
+	if got, want := t1.Match(t2), false; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
 func TestDefaults(t *testing.T) {
 	t1 := &profiles.Target{}
-	native := fmt.Sprintf("tag: arch:%s os:%s version: installdir: env:[]", runtime.GOARCH, runtime.GOOS)
+	native := fmt.Sprintf("=%s-%s@ dir: env:[]", runtime.GOARCH, runtime.GOOS)
 	if got, want := t1.String(), native; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t1.Set("tag=cpu-os")
-	if got, want := t1.String(), "tag:tag arch:cpu os:os version: installdir: env:[]"; got != want {
+	if got, want := t1.String(), "tag=cpu-os@ dir: env:[]"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
@@ -167,7 +167,7 @@ func TestFindTarget(t *testing.T) {
 	t1.Set("bar=a-o")
 	ts := []*profiles.Target{t1}
 	def := profiles.DefaultTarget()
-	if got, want := profiles.FindTarget(ts, &def), t1; !got.Equals(want) {
+	if got, want := profiles.FindTarget(ts, &def), t1; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t2 := &profiles.Target{}
@@ -179,17 +179,17 @@ func TestFindTarget(t *testing.T) {
 
 	w := &profiles.Target{}
 	w.Set("bar")
-	if got, want := profiles.FindTarget(ts, w), t1; !got.Equals(want) {
+	if got, want := profiles.FindTarget(ts, w), t1; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	w.Set("a-o1")
-	if got, want := profiles.FindTarget(ts, w), t2; !got.Equals(want) {
+	if got, want := profiles.FindTarget(ts, w), t2; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	w.Set("baz=a-o")
-	if got, want := profiles.FindTarget(ts, w), t2; !got.Equals(want) {
+	if got, want := profiles.FindTarget(ts, w), t2; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
