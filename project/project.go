@@ -80,6 +80,18 @@ type Host struct {
 	Name string `xml:"name,attr"`
 	// Location is the url of the host.
 	Location string `xml:"location,attr"`
+	// Git hooks to apply to repos from this host.
+	GitHooks []GitHook `xml:"githooks>githook"`
+}
+
+// GitHook represents the name and source of git hooks.
+type GitHook struct {
+	// The hook name, as required by git (e.g. commit-msg, pre-rebase, etc.)
+	Name string `xml:"name,attr"`
+	// The filename of the hook implementation.  When editing the manifest,
+	// specify this path as relative to the manifest dir.  In loadManifest,
+	// this gets resolved to the absolute path.
+	Path string `xml:"source,attr"`
 }
 
 // Imports maps manifest import names to their detailed description.
@@ -859,6 +871,24 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 	// Process all hosts.
 	for _, host := range m.Hosts {
 		hosts[host.Name] = host
+
+		// Prefix the git hook sources with the manifest directory.
+		if host.Name == "git" {
+			mdir, err := ManifestDir()
+			if err != nil {
+				return err
+			}
+			for i, githook := range host.GitHooks {
+				githook.Path = filepath.Join(mdir, githook.Path)
+				host.GitHooks[i] = githook
+			}
+
+		} else {
+			// Sanity check that we only have githooks for git hosts.
+			if len(host.GitHooks) > 0 {
+				return fmt.Errorf("githook provided for a non-Git host: %s", host.Location)
+			}
+		}
 	}
 
 	return nil
@@ -1103,6 +1133,11 @@ type createOperation struct {
 }
 
 func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
+	hosts, _, _, _, err := readManifest(ctx, false)
+	if err != nil {
+		return err
+	}
+
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	if err := ctx.Run().MkdirAll(path, perm); err != nil {
 		return err
@@ -1120,28 +1155,45 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		if err := ctx.Git().Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
-		gitHost, err := GitHost(ctx)
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(op.project.Remote, gitHost) {
-			// Setup the repository for Gerrit code reviews.
-			//
-			// TODO(jsimsa): Decide what to do in case we would want to update the
-			// commit hooks for existing repositories. Overwriting the existing
-			// hooks is not a good idea as developers might have customized the
-			// hooks.
-			file := filepath.Join(tmpDir, ".git", "hooks", "commit-msg")
-			if err := ctx.Run().WriteFile(file, []byte(commitMsgHook), perm); err != nil {
-				return err
+
+		// Apply git hooks.  We're creating this repo, so there's no danger of
+		// overriding existing hooks.  Customizing your git hooks with jiri is a bad
+		// idea anyway, since jiri won't know to not delete the project when you
+		// switch between manifests or do a cleanup.
+		host, found := hosts["git"]
+		if found && strings.HasPrefix(op.project.Remote, host.Location) {
+			hooksFromManifest := false
+			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
+			for _, githook := range host.GitHooks {
+				hooksFromManifest = true
+				src, err := ctx.Run().ReadFile(githook.Path)
+				if err != nil {
+					return err
+				}
+				dst := filepath.Join(gitHookDir, githook.Name)
+				if err := ctx.Run().WriteFile(dst, src, perm); err != nil {
+					return err
+				}
 			}
-			file = filepath.Join(tmpDir, ".git", "hooks", "pre-commit")
-			if err := ctx.Run().WriteFile(file, []byte(preCommitHook), perm); err != nil {
-				return err
-			}
-			file = filepath.Join(tmpDir, ".git", "hooks", "pre-push")
-			if err := ctx.Run().WriteFile(file, []byte(prePushHook), perm); err != nil {
-				return err
+
+			// TODO(lanechr): Remove this block once v23 has moved their hooks.
+			if !hooksFromManifest && strings.HasPrefix(op.project.Remote, host.Location) {
+				// TODO(jsimsa): Decide what to do in case we would want to update the
+				// commit hooks for existing repositories. Overwriting the existing
+				// hooks is not a good idea as developers might have customized the
+				// hooks.
+				file := filepath.Join(tmpDir, ".git", "hooks", "commit-msg")
+				if err := ctx.Run().WriteFile(file, []byte(commitMsgHook), perm); err != nil {
+					return err
+				}
+				file = filepath.Join(tmpDir, ".git", "hooks", "pre-commit")
+				if err := ctx.Run().WriteFile(file, []byte(preCommitHook), perm); err != nil {
+					return err
+				}
+				file = filepath.Join(tmpDir, ".git", "hooks", "pre-push")
+				if err := ctx.Run().WriteFile(file, []byte(prePushHook), perm); err != nil {
+					return err
+				}
 			}
 		}
 		cwd, err := os.Getwd()
