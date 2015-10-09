@@ -177,7 +177,7 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Target, root string) error {
 	if HasTarget(profile, target) {
 		if ctx.Run().Opts().Verbose {
-			fmt.Fprintf(ctx.Stdout(), "%v is already installed: %v", profile, target)
+			fmt.Fprintf(ctx.Stdout(), "%v is already installed: %v\n", profile, target)
 		}
 		return nil
 	}

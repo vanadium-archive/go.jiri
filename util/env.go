@@ -96,23 +96,9 @@ func setJavaEnv(ctx *tool.Context, env *envvar.Vars, root string) error {
 	if jdkHome == "" {
 		return nil
 	}
-
-	// Compile using Java Go 1.5 (installed via 'jiri profile install java').
-	javaGoDir := filepath.Join(root, "third_party", "java", "go")
-
-	// Set Go-specific environment variables.
 	cflags := env.GetTokens("CGO_CFLAGS", " ")
 	cflags = append(cflags, filepath.Join("-I"+jdkHome, "include"), filepath.Join("-I"+jdkHome, "include", runtime.GOOS))
 	env.SetTokens("CGO_CFLAGS", cflags, " ")
-	env.Set("GOROOT", javaGoDir)
-
-	// Update PATH.
-	if _, err := ctx.Run().Stat(javaGoDir); err != nil {
-		return fmt.Errorf("Couldn't find java go installation directory %s: did you run \"jiri profile install java\"?", javaGoDir)
-	}
-	path := env.GetTokens("PATH", ":")
-	path = append([]string{filepath.Join(javaGoDir, "bin")}, path...)
-	env.SetTokens("PATH", path, ":")
 	return nil
 }
 
