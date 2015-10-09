@@ -6,6 +6,7 @@ package profiles
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -65,7 +66,8 @@ func (pt Target) Match(pt2 *Target) bool {
 // CrossCompiling returns true if the target differs from that of
 // the runtime.
 func (pt Target) CrossCompiling() bool {
-	return (pt.Arch != runtime.GOARCH) || (pt.OS != runtime.GOOS)
+	arch, _ := goarch()
+	return (pt.Arch != arch) || (pt.OS != runtime.GOOS)
 }
 
 // Usage returns the usage string for Target.
@@ -104,9 +106,11 @@ func (t *Target) Set(val string) error {
 func (t Target) Get() interface{} {
 	if !t.isSet {
 		// Default value.
+		arch, isSet := goarch()
 		return Target{
+			isSet:   isSet,
 			Tag:     "",
-			Arch:    runtime.GOARCH,
+			Arch:    arch,
 			OS:      runtime.GOOS,
 			Version: t.Version,
 			Env:     t.Env,
@@ -115,14 +119,23 @@ func (t Target) Get() interface{} {
 	return t
 }
 
+func goarch() (string, bool) {
+	if a := os.Getenv("GOARCH"); len(a) > 0 {
+		return a, true
+	}
+	return runtime.GOARCH, false
+}
+
 // DefaultTarget returns a default value for a Target. Use this function to
 // initialize Targets that are expected to set from the command line via
 // the flags package.
 func DefaultTarget() Target {
+	arch, isSet := goarch()
 	return Target{
-		Tag:  "",
-		Arch: runtime.GOARCH,
-		OS:   runtime.GOOS,
+		isSet: isSet,
+		Tag:   "",
+		Arch:  arch,
+		OS:    runtime.GOOS,
 	}
 }
 
@@ -130,10 +143,11 @@ func DefaultTarget() Target {
 // Use this function for Target values that are passed into other functions
 // and libraries where a native target is specifically required.
 func NativeTarget() Target {
+	arch, _ := goarch()
 	return Target{
 		isSet: true,
 		Tag:   "",
-		Arch:  runtime.GOARCH,
+		Arch:  arch,
 		OS:    runtime.GOOS,
 	}
 }

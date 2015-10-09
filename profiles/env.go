@@ -148,6 +148,8 @@ func CommonConcatVariables() map[string]string {
 func CommonIgnoreVariables() map[string]bool {
 	return map[string]bool{
 		"GOPATH": true,
+		"GOARCH": true,
+		"GOOS":   true,
 	}
 }
 

@@ -196,6 +196,30 @@ func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Ta
 	return nil
 }
 
+// EnsureProfileTargetIsUninstalled ensures that the requested profile and target
+// are no longer installed.
+func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, target Target, root string) error {
+	if !HasTarget(profile, target) {
+		if ctx.Run().Opts().Verbose {
+			fmt.Fprintf(ctx.Stdout(), "%v is not installed: %v", profile, target)
+		}
+		return nil
+	}
+	mgr := LookupManager(profile)
+	if mgr == nil {
+		return fmt.Errorf("profile %v is not available", profile)
+	}
+	mgr.SetRoot(root)
+	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
+		fmt.Fprintf(ctx.Stdout(), "uninstall --target=%s=%s-%s %s\n",
+			target.Tag, target.Arch, target.OS, profile)
+	}
+	if err := mgr.Uninstall(ctx, target); err != nil {
+		return err
+	}
+	return nil
+}
+
 // GitCloneRepo clones a repo at a specific revision in outDir.
 func GitCloneRepo(ctx *tool.Context, remote, revision, outDir string, outDirPerm os.FileMode) (e error) {
 	cwd, err := os.Getwd()
