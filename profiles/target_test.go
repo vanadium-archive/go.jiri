@@ -7,6 +7,7 @@ package profiles_test
 import (
 	"flag"
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 
@@ -166,6 +167,12 @@ func TestFindTarget(t *testing.T) {
 	t1 := &profiles.Target{}
 	t1.Set("bar=a-o")
 	ts := []*profiles.Target{t1}
+	prev := os.Getenv("GOARCH")
+	if len(prev) > 0 {
+		// Clear GOARCH so that DefaultTarget is not set.
+		os.Setenv("GOARCH", "")
+		defer os.Setenv("GOARCH", prev)
+	}
 	def := profiles.DefaultTarget()
 	if got, want := profiles.FindTarget(ts, &def), t1; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
