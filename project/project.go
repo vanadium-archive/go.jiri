@@ -1162,36 +1162,14 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		// switch between manifests or do a cleanup.
 		host, found := hosts["git"]
 		if found && strings.HasPrefix(op.project.Remote, host.Location) {
-			hooksFromManifest := false
 			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
 			for _, githook := range host.GitHooks {
-				hooksFromManifest = true
 				src, err := ctx.Run().ReadFile(githook.Path)
 				if err != nil {
 					return err
 				}
 				dst := filepath.Join(gitHookDir, githook.Name)
 				if err := ctx.Run().WriteFile(dst, src, perm); err != nil {
-					return err
-				}
-			}
-
-			// TODO(lanechr): Remove this block once v23 has moved their hooks.
-			if !hooksFromManifest && strings.HasPrefix(op.project.Remote, host.Location) {
-				// TODO(jsimsa): Decide what to do in case we would want to update the
-				// commit hooks for existing repositories. Overwriting the existing
-				// hooks is not a good idea as developers might have customized the
-				// hooks.
-				file := filepath.Join(tmpDir, ".git", "hooks", "commit-msg")
-				if err := ctx.Run().WriteFile(file, []byte(commitMsgHook), perm); err != nil {
-					return err
-				}
-				file = filepath.Join(tmpDir, ".git", "hooks", "pre-commit")
-				if err := ctx.Run().WriteFile(file, []byte(preCommitHook), perm); err != nil {
-					return err
-				}
-				file = filepath.Join(tmpDir, ".git", "hooks", "pre-push")
-				if err := ctx.Run().WriteFile(file, []byte(prePushHook), perm); err != nil {
 					return err
 				}
 			}
