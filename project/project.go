@@ -91,7 +91,7 @@ type GitHook struct {
 	// The filename of the hook implementation.  When editing the manifest,
 	// specify this path as relative to the manifest dir.  In loadManifest,
 	// this gets resolved to the absolute path.
-	Path string `xml:"source,attr"`
+	Path string `xml:"path,attr"`
 }
 
 // Imports maps manifest import names to their detailed description.
