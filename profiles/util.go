@@ -26,7 +26,8 @@ const (
 
 // RegisterProfileFlags register the commonly used --manifest, --profiles and --target
 // flags with the supplied FlagSet.
-func RegisterProfileFlags(flags *flag.FlagSet, manifest, profiles *string, defaultManifest string, target *Target) {
+func RegisterProfileFlags(flags *flag.FlagSet, profilesMode *ProfilesMode, manifest, profiles *string, defaultManifest string, target *Target) {
+	flags.Var(profilesMode, "skip-profiles", "if set, no profiles will be used")
 	*target = DefaultTarget()
 	flags.StringVar(manifest, "manifest", defaultManifest, "specify the profiles XML manifest filename.")
 	flags.StringVar(profiles, "profiles", "base", "a comma separated list of profiles to use")

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"v.io/jiri/project"
@@ -37,6 +38,25 @@ var GoFlags = []string{
 	"GOROOT",
 	"GOTOOLDIR",
 }
+
+type ProfilesMode bool
+
+func (pm *ProfilesMode) Set(s string) error {
+	v, err := strconv.ParseBool(s)
+	*pm = ProfilesMode(v)
+	return err
+}
+
+func (pm *ProfilesMode) Get() interface{} { return bool(*pm) }
+
+func (pm *ProfilesMode) String() string { return fmt.Sprintf("%v", *pm) }
+
+func (pm *ProfilesMode) IsBoolFlag() bool { return true }
+
+const (
+	UseProfiles  ProfilesMode = false
+	SkipProfiles ProfilesMode = true
+)
 
 func init() {
 	sort.Strings(GoFlags)
@@ -70,18 +90,20 @@ func GoEnvironmentFromOS() []string {
 // environment that is mutated by its various methods.
 type ConfigHelper struct {
 	*envvar.Vars
-	legacyMode bool
-	root       string
-	ctx        *tool.Context
-	config     *util.Config
-	projects   project.Projects
-	tools      project.Tools
+	legacyMode   bool
+	profilesMode bool
+	root         string
+	ctx          *tool.Context
+	config       *util.Config
+	projects     project.Projects
+	tools        project.Tools
 }
 
 // NewConfigHelper creates a new config helper. If filename is of non-zero
 // length then that file will be read as a profiles manifest file, if not, the
-// existing, if any, in-memory profiles information will be used.
-func NewConfigHelper(ctx *tool.Context, filename string) (*ConfigHelper, error) {
+// existing, if any, in-memory profiles information will be used. If SkipProfiles
+// is specified for profilesMode, then no profiles are used.
+func NewConfigHelper(ctx *tool.Context, profilesMode ProfilesMode, filename string) (*ConfigHelper, error) {
 	root, err := project.JiriRoot()
 	if err != nil {
 		return nil, err
@@ -94,17 +116,21 @@ func NewConfigHelper(ctx *tool.Context, filename string) (*ConfigHelper, error) 
 	if err != nil {
 		return nil, err
 	}
-	if len(filename) > 0 {
+	if profilesMode == UseProfiles && len(filename) > 0 {
 		if err := Read(ctx, filepath.Join(root, filename)); err != nil {
 			return nil, err
 		}
 	}
 	ch := &ConfigHelper{
-		ctx:      ctx,
-		root:     root,
-		config:   config,
-		projects: projects,
-		tools:    tools,
+		ctx:          ctx,
+		root:         root,
+		config:       config,
+		projects:     projects,
+		tools:        tools,
+		profilesMode: bool(profilesMode),
+	}
+	if profilesMode == SkipProfiles {
+		return ch, nil
 	}
 	ch.legacyMode = (SchemaVersion() == Original) || (len(os.Getenv("JIRI_PROFILE")) > 0)
 	if ch.legacyMode {
@@ -127,6 +153,11 @@ func (ch *ConfigHelper) Root() string {
 // LegacyProfiles returns true if the old-style profiles are being used.
 func (ch *ConfigHelper) LegacyProfiles() bool {
 	return ch.legacyMode
+}
+
+// SkippingProfiles returns true if no profiles are being used.
+func (ch *ConfigHelper) SkippingProfiles() bool {
+	return ch.profilesMode == bool(SkipProfiles)
 }
 
 // CommonConcatVariables returns a map of variables that are commonly
@@ -165,7 +196,7 @@ func CommonIgnoreVariables() map[string]bool {
 // is the separator to use for that environment  variable (e.g. space for
 // CFLAGs or ':' for PATH-like ones).
 func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, ignore map[string]bool, profiles string, target Target) {
-	if ch.legacyMode {
+	if ch.profilesMode || ch.legacyMode {
 		return
 	}
 	for _, profile := range strings.Split(profiles, ",") {
@@ -187,6 +218,64 @@ func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, ignore map[
 			ch.Vars.Set(k, v)
 		}
 	}
+}
+
+// ValidateRequestProfilesAndTarget checks that the supplied slice of profiles
+// names is supported and that each has the specified target installed taking
+// account if runnin in bootstrap mode or with old-style profiles.
+func (ch *ConfigHelper) ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
+	if !ch.profilesMode && !ch.legacyMode {
+		return ValidateRequestedProfilesAndTarget(profileNames, target)
+	}
+	return nil
+}
+
+// PrependToPath prepends its argument to the PATH environment variable.
+func (ch *ConfigHelper) PrependToPATH(path string) {
+	existing := ch.GetTokens("PATH", ":")
+	ch.SetTokens("PATH", append([]string{path}, existing...), ":")
+}
+
+// SetGoPath computes and sets the GOPATH environment variable based on the
+// current jiri configuration.
+func (ch *ConfigHelper) SetGoPath() {
+	if !ch.profilesMode && !ch.legacyMode {
+		ch.pathHelper("GOPATH", ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+	}
+}
+
+// SetVDLPath computes and sets the VDLPATH environment variable based on the
+// current jiri configuration.
+func (ch *ConfigHelper) SetVDLPath() {
+	if !ch.profilesMode && !ch.legacyMode {
+		ch.pathHelper("VDLPATH", ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+	}
+}
+
+// pathHelper is a utility function for determining paths for project workspaces.
+func (ch *ConfigHelper) pathHelper(name, root string, projects project.Projects, workspaces []string, suffix string) {
+	path := ch.GetTokens(name, ":")
+	for _, workspace := range workspaces {
+		absWorkspace := filepath.Join(root, workspace, suffix)
+		// Only append an entry to the path if the workspace is rooted
+		// under a jiri project that exists locally or vice versa.
+		for _, project := range projects {
+			// We check if <project.Path> is a prefix of <absWorkspace> to
+			// account for Go workspaces nested under a single jiri project,
+			// such as: $JIRI_ROOT/release/projects/chat/go.
+			//
+			// We check if <absWorkspace> is a prefix of <project.Path> to
+			// account for Go workspaces that span multiple jiri projects,
+			// such as: $JIRI_ROOT/release/go.
+			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
+				if _, err := ch.ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
+					path = append(path, absWorkspace)
+					break
+				}
+			}
+		}
+	}
+	ch.SetTokens(name, path, ":")
 }
 
 // MergeEnv merges vars with the variables in env taking care to concatenate
@@ -222,52 +311,4 @@ func MergeEnvFromProfiles(concat map[string]string, ignore map[string]bool, env 
 	}
 	MergeEnv(concat, ignore, env, vars...)
 	return env.ToSlice(), nil
-}
-
-// PrependToPath prepends its argument to the PATH environment variable.
-func (ch *ConfigHelper) PrependToPATH(path string) {
-	existing := ch.GetTokens("PATH", ":")
-	ch.SetTokens("PATH", append([]string{path}, existing...), ":")
-}
-
-// SetGoPath computes and sets the GOPATH environment variable based on the
-// current jiri configuration.
-func (ch *ConfigHelper) SetGoPath() {
-	if !ch.legacyMode {
-		ch.pathHelper("GOPATH", ch.root, ch.projects, ch.config.GoWorkspaces(), "")
-	}
-}
-
-// SetVDLPath computes and sets the VDLPATH environment variable based on the
-// current jiri configuration.
-func (ch *ConfigHelper) SetVDLPath() {
-	if !ch.legacyMode {
-		ch.pathHelper("VDLPATH", ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
-	}
-}
-
-// pathHelper is a utility function for determining paths for project workspaces.
-func (ch *ConfigHelper) pathHelper(name, root string, projects project.Projects, workspaces []string, suffix string) {
-	path := ch.GetTokens(name, ":")
-	for _, workspace := range workspaces {
-		absWorkspace := filepath.Join(root, workspace, suffix)
-		// Only append an entry to the path if the workspace is rooted
-		// under a jiri project that exists locally or vice versa.
-		for _, project := range projects {
-			// We check if <project.Path> is a prefix of <absWorkspace> to
-			// account for Go workspaces nested under a single jiri project,
-			// such as: $JIRI_ROOT/release/projects/chat/go.
-			//
-			// We check if <absWorkspace> is a prefix of <project.Path> to
-			// account for Go workspaces that span multiple jiri projects,
-			// such as: $JIRI_ROOT/release/go.
-			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := ch.ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
-					path = append(path, absWorkspace)
-					break
-				}
-			}
-		}
-	}
-	ch.SetTokens(name, path, ":")
 }

@@ -19,7 +19,7 @@ import (
 
 func TestConfigHelper(t *testing.T) {
 	ctx := tool.NewDefaultContext()
-	ch, err := profiles.NewConfigHelper(ctx, "release/go/src/v.io/jiri/profiles/testdata/m2.xml")
+	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, "release/go/src/v.io/jiri/profiles/testdata/m2.xml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestEnvFromTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpdir)
-	ch, err := profiles.NewConfigHelper(ctx, filename)
+	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func testSetPathHelper(t *testing.T, name string) {
 		t.Fatalf("%v", err)
 	}
 
-	ch, err := profiles.NewConfigHelper(ctx, "profiles-manifest")
+	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, "profiles-manifest")
 	if err != nil {
 		t.Fatal(err)
 	}
