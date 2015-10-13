@@ -716,11 +716,12 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		}
 	}
 
-	// Delete old "v23-" subcommands.
+	// Delete old "v23-" subcommands, and the old jiri-xprofile command.
 	// TODO(nlacasse): Once transition is complete, remove the "v23" tool
 	// itself from devtoolsBinDir.  Then, once everybody has had time to upate,
 	// remove this code.
 	v23SubCmds := []string{
+		"jiri-xprofile",
 		"v23-api",
 		"v23-copyright",
 		"v23-env",
