@@ -651,7 +651,6 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 			project.Path = filepath.Join(root, project.Path)
 		}
 		projects[project.Name] = project
-		return nil
 	} else if !os.IsNotExist(err) {
 		return err
 	}
@@ -1386,7 +1385,8 @@ func (ops operations) Len() int {
 // in which operations are performed. For correctness and also to
 // minimize the chance of a conflict, the delete operations should
 // happen before move operations, which should happen before create
-// operations.
+// operations. If two create operations make nested directories, the
+// outermost should be created first.
 func (ops operations) Less(i, j int) bool {
 	vals := make([]int, 2)
 	for idx, op := range []operation{ops[i], ops[j]} {
@@ -1403,6 +1403,16 @@ func (ops operations) Less(i, j int) bool {
 	}
 	if vals[0] != vals[1] {
 		return vals[0] < vals[1]
+	}
+	if vals[0] == 2 && vals[1] == 2 {
+		pathI := ops[i].Project().Path
+		pathJ := ops[j].Project().Path
+		if strings.HasPrefix(pathI, pathJ) {
+			return false
+		}
+		if strings.HasPrefix(pathJ, pathI) {
+			return true
+		}
 	}
 	return ops[i].Project().Name < ops[j].Project().Name
 }
