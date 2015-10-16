@@ -771,7 +771,7 @@ func pullProject(ctx *tool.Context, project Project) error {
 			if err := ctx.Git().Pull("origin", "master"); err != nil {
 				return err
 			}
-			return ctx.Git().Reset(project.Revision)
+			return ctx.Git().Reset("HEAD")
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
