@@ -874,19 +874,8 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 	for _, host := range m.Hosts {
 		hosts[host.Name] = host
 
-		// Prefix the git hook sources with the manifest directory.
-		if host.Name == "git" {
-			mdir, err := ManifestDir()
-			if err != nil {
-				return err
-			}
-			for i, githook := range host.GitHooks {
-				githook.Path = filepath.Join(mdir, githook.Path)
-				host.GitHooks[i] = githook
-			}
-
-		} else {
-			// Sanity check that we only have githooks for git hosts.
+		// Sanity check that we only have githooks for git hosts.
+		if host.Name != "git" {
 			if len(host.GitHooks) > 0 {
 				return fmt.Errorf("githook provided for a non-Git host: %s", host.Location)
 			}
@@ -1182,7 +1171,11 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		if found && strings.HasPrefix(op.project.Remote, host.Location) {
 			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
 			for _, githook := range host.GitHooks {
-				src, err := ctx.Run().ReadFile(githook.Path)
+				mdir, err := ManifestDir()
+				if err != nil {
+					return err
+				}
+				src, err := ctx.Run().ReadFile(filepath.Join(mdir, githook.Path))
 				if err != nil {
 					return err
 				}
