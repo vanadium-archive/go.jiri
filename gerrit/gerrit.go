@@ -164,7 +164,7 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 	if err != nil {
 		return fmt.Errorf("Do(%v) failed: %v", req, err)
 	}
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("SetTopic:Do(%v) failed: %v", req, res.StatusCode)
 	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
