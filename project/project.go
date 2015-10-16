@@ -16,6 +16,7 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/gitutil"
+	"v.io/jiri/googlesource"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
@@ -963,35 +964,51 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 
 // updateProjects updates all jiri projects.
 func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
-	// Rename ".v23" to ".jiri" in the root of every project.
-	// TODO(nlacasse): Remove this code once the v23->jiri transition is
-	// complete and everybody has had time to update.
 	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
-	v23Projects := Projects{}
-	if err := findLocalProjects(ctx, root, ".v23", v23Projects); err != nil {
+	gitHost, err := GitHost(ctx)
+	if err != nil {
 		return err
 	}
-	for _, p := range v23Projects {
-		dotV23Dir := filepath.Join(p.Path, ".v23")
-		if ctx.Run().DirectoryExists(dotV23Dir) {
-			dotJiriDir := filepath.Join(p.Path, metadataDirName)
-			if err := ctx.Run().Rename(dotV23Dir, dotJiriDir); err != nil {
-				return fmt.Errorf("Rename(%v, %v) failed: %v", dotV23Dir, dotJiriDir, err)
+	localManifest, err := snapshotLocalProjects(ctx)
+	if err != nil {
+		return err
+	}
+	localProjects := make(Projects)
+	for _, project := range localManifest.Projects {
+		project.Path = filepath.Join(root, project.Path)
+		localProjects[project.Name] = project
+	}
+
+	if googlesource.IsGoogleSourceHost(gitHost) {
+		// Attempt to get the repo statuses from remote so we can detect when a
+		// local project is already up-to-date.
+		if repoStatuses, err := googlesource.GetRepoStatuses(gitHost); err != nil {
+			// Log the error but don't fail.
+			fmt.Fprintf(ctx.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
+		} else {
+			for name, rp := range remoteProjects {
+				status, ok := repoStatuses[rp.Name]
+				if !ok {
+					continue
+				}
+				masterRev, ok := status.Branches["master"]
+				if !ok || masterRev == "" {
+					continue
+				}
+				rp.Revision = masterRev
+				remoteProjects[name] = rp
 			}
 		}
 	}
 
-	localProjects, err := LocalProjects(ctx)
-	if err != nil {
-		return err
-	}
 	ops, err := computeOperations(localProjects, remoteProjects, gc)
 	if err != nil {
 		return err
 	}
+
 	for _, op := range ops {
 		if err := op.Test(ctx); err != nil {
 			return err
@@ -1322,7 +1339,7 @@ func (op moveOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 }
 
 func (op moveOperation) String() string {
-	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q", op.project.Name, op.source, op.destination, op.project.Revision)
+	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q", op.project.Name, op.source, op.destination, fmtRevision(op.project.Revision))
 }
 
 func (op moveOperation) Test(ctx *tool.Context) error {
@@ -1364,10 +1381,27 @@ func (op updateOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 }
 
 func (op updateOperation) String() string {
-	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, op.project.Revision)
+	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, fmtRevision(op.project.Revision))
 }
 
 func (op updateOperation) Test(ctx *tool.Context) error {
+	return nil
+}
+
+// nullOperation represents a noop.  Used only for logging.
+type nullOperation struct {
+	commonOperation
+}
+
+func (op nullOperation) Run(ctx *tool.Context, manifest *Manifest) error {
+	return nil
+}
+
+func (op nullOperation) String() string {
+	return fmt.Sprintf("project %q located in %q at revision %q is up-to-date", op.project.Name, op.source, fmtRevision(op.project.Revision))
+}
+
+func (op nullOperation) Test(ctx *tool.Context) error {
 	return nil
 }
 
@@ -1399,6 +1433,8 @@ func (ops operations) Less(i, j int) bool {
 			vals[idx] = 2
 		case updateOperation:
 			vals[idx] = 3
+		case nullOperation:
+			vals[idx] = 4
 		}
 	}
 	if vals[0] != vals[1] {
@@ -1429,18 +1465,28 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) (operati
 	for name, _ := range allProjects {
 		if localProject, ok := localProjects[name]; ok {
 			if remoteProject, ok := remoteProjects[name]; ok {
-				if localProject.Path == remoteProject.Path {
-					result = append(result, updateOperation{commonOperation{
-						destination: remoteProject.Path,
-						project:     remoteProject,
-						source:      localProject.Path,
-					}})
-				} else {
+				if localProject.Path != remoteProject.Path {
+					// moveOperation also does an update, so we don't need to
+					// check the revision here.
 					result = append(result, moveOperation{commonOperation{
 						destination: remoteProject.Path,
 						project:     remoteProject,
 						source:      localProject.Path,
 					}})
+				} else {
+					if localProject.Revision != remoteProject.Revision {
+						result = append(result, updateOperation{commonOperation{
+							destination: remoteProject.Path,
+							project:     remoteProject,
+							source:      localProject.Path,
+						}})
+					} else {
+						result = append(result, nullOperation{commonOperation{
+							destination: remoteProject.Path,
+							project:     remoteProject,
+							source:      localProject.Path,
+						}})
+					}
 				}
 			} else {
 				result = append(result, deleteOperation{commonOperation{
@@ -1485,4 +1531,13 @@ func ParseNames(ctx *tool.Context, args []string, defaultProjects map[string]str
 		}
 	}
 	return result, nil
+}
+
+// fmtRevision returns the first 8 chars of a revision hash.
+func fmtRevision(r string) string {
+	l := 8
+	if len(r) < l {
+		return r
+	}
+	return r[:l]
 }
