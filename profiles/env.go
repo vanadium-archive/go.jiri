@@ -62,10 +62,17 @@ func init() {
 	sort.Strings(GoFlags)
 }
 
-// UnsetGoEnv unsets Go environment variables in the given environment.
-func UnsetGoEnv(env *envvar.Vars) {
+// UnsetGoEnvVars unsets Go environment variables in the given environment.
+func UnsetGoEnvVars(env *envvar.Vars) {
 	for _, k := range GoFlags {
-		env.Set(k, "")
+		env.Delete(k)
+	}
+}
+
+// UnsetGoEnvMap unsets Go environment variables in the given environment.
+func UnsetGoEnvMap(env map[string]string) {
+	for _, k := range GoFlags {
+		delete(env, k)
 	}
 }
 
