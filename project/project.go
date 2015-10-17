@@ -771,7 +771,7 @@ func pullProject(ctx *tool.Context, project Project) error {
 			if err := ctx.Git().Pull("origin", "master"); err != nil {
 				return err
 			}
-			return ctx.Git().Reset("HEAD")
+			return ctx.Git().Reset(project.Revision)
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
@@ -957,10 +957,6 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	if err != nil {
 		return err
 	}
-	gitHost, err := GitHost(ctx)
-	if err != nil {
-		return err
-	}
 	localManifest, err := snapshotLocalProjects(ctx)
 	if err != nil {
 		return err
@@ -970,8 +966,8 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 		project.Path = filepath.Join(root, project.Path)
 		localProjects[project.Name] = project
 	}
-
-	if googlesource.IsGoogleSourceHost(gitHost) {
+	gitHost, err := GitHost(ctx)
+	if err == nil && googlesource.IsGoogleSourceHost(gitHost) {
 		// Attempt to get the repo statuses from remote so we can detect when a
 		// local project is already up-to-date.
 		if repoStatuses, err := googlesource.GetRepoStatuses(gitHost); err != nil {
