@@ -966,8 +966,8 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 		project.Path = filepath.Join(root, project.Path)
 		localProjects[project.Name] = project
 	}
-	gitHost, err := GitHost(ctx)
-	if err == nil && googlesource.IsGoogleSourceHost(gitHost) {
+	gitHost, gitHostErr := GitHost(ctx)
+	if gitHostErr == nil && googlesource.IsGoogleSourceHost(gitHost) {
 		// Attempt to get the repo statuses from remote so we can detect when a
 		// local project is already up-to-date.
 		if repoStatuses, err := googlesource.GetRepoStatuses(gitHost); err != nil {
