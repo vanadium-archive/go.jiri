@@ -717,21 +717,12 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		}
 	}
 
-	// Delete old "v23-" subcommands, and the old jiri-xprofile command.
-	// TODO(nlacasse): Once transition is complete, remove the "v23" tool
-	// itself from devtoolsBinDir.  Then, once everybody has had time to upate,
-	// remove this code.
+	// Delete old "v23" tool, and the old jiri-xprofile command.
+	// TODO(nlacasse): Once everybody has had a chance to update, remove this
+	// code.
 	v23SubCmds := []string{
 		"jiri-xprofile",
-		"v23-api",
-		"v23-copyright",
-		"v23-env",
-		"v23-go",
-		"v23-goext",
-		"v23-oncall",
-		"v23-profile",
-		"v23-run",
-		"v23-test",
+		"v23",
 	}
 	for _, subCmd := range v23SubCmds {
 		subCmdPath := filepath.Join(binDir, subCmd)
