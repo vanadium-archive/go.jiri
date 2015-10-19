@@ -645,7 +645,9 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 			return fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
 		}
 		if p, ok := projects[project.Name]; ok {
-			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
+			// TODO(nlacasse): Remove the "projects=..." debugging line once
+			// issues in go/vcl/16709 has been resolved.
+			return fmt.Errorf("name conflict: both %v and %v contain the project %v\nprojects=%#v", p.Path, project.Path, project.Name, projects)
 		}
 		// Root relative paths in the $JIRI_ROOT directory.
 		if !filepath.IsAbs(project.Path) {
