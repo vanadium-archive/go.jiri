@@ -644,14 +644,12 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 		if err := xml.Unmarshal(bytes, &project); err != nil {
 			return fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
 		}
-		if p, ok := projects[project.Name]; ok {
-			// TODO(nlacasse): Remove the "projects=..." debugging line once
-			// issues in go/vcl/16709 has been resolved.
-			return fmt.Errorf("name conflict: both %v and %v contain the project %v\nprojects=%#v\npath=%v", p.Path, project.Path, project.Name, projects, path)
-		}
 		// Root relative paths in the $JIRI_ROOT directory.
 		if !filepath.IsAbs(project.Path) {
 			project.Path = filepath.Join(root, project.Path)
+		}
+		if p, ok := projects[project.Name]; ok {
+			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
 		projects[project.Name] = project
 		return nil
@@ -706,17 +704,6 @@ func InstallTools(ctx *tool.Context, dir string) error {
 	}
 	if failed {
 		return cmdline.ErrExitCode(2)
-	}
-
-	// Rename ".v23_profiles" to ".jiri_profiles" iff ".jiri_profiles" doesn't exist"
-	// TODO(nlacasse): Remove this code once the v23->jiri transition is
-	// complete and everybody has had time to update.
-	v23ProfilesFile := filepath.Join(root, ".v23_profiles")
-	jiriProfilesFile := filepath.Join(root, ".jiri_profiles")
-	if ctx.Run().FileExists(v23ProfilesFile) && !ctx.Run().FileExists(jiriProfilesFile) {
-		if err := ctx.Run().Rename(v23ProfilesFile, jiriProfilesFile); err != nil {
-			return fmt.Errorf("Rename(%v,%v) failed: %v", v23ProfilesFile, jiriProfilesFile, err)
-		}
 	}
 
 	// Delete old "v23" tool, and the old jiri-xprofile command.
