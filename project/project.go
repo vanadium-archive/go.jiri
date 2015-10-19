@@ -961,7 +961,7 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	if gitHostErr == nil && googlesource.IsGoogleSourceHost(gitHost) {
 		// Attempt to get the repo statuses from remote so we can detect when a
 		// local project is already up-to-date.
-		if repoStatuses, err := googlesource.GetRepoStatuses(gitHost); err != nil {
+		if repoStatuses, err := googlesource.GetRepoStatuses(ctx, gitHost); err != nil {
 			// Log the error but don't fail.
 			fmt.Fprintf(ctx.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
 		} else {
@@ -1202,7 +1202,7 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 }
 
 func (op createOperation) String() string {
-	return fmt.Sprintf("create project %q in %q and advance it to %q", op.project.Name, op.destination, op.project.Revision)
+	return fmt.Sprintf("create project %q in %q and advance it to %q", op.project.Name, op.destination, fmtRevision(op.project.Revision))
 }
 
 func (op createOperation) Test(ctx *tool.Context) error {
