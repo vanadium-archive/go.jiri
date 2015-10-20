@@ -434,7 +434,11 @@ func getRemoteURL(run *runutil.Run, clOpts CLOpts) (string, error) {
 	if err := run.CommandWithOpts(opts, "git", args...); err != nil {
 		return "", gitutil.Error(stdout.String(), stderr.String(), args...)
 	}
-	return clOpts.Host + filepath.Base(strings.TrimSpace(stdout.String())), nil
+	baseUrl := clOpts.Host
+	if !strings.HasSuffix(baseUrl, "/") {
+		baseUrl = baseUrl + "/"
+	}
+	return baseUrl + filepath.Base(strings.TrimSpace(stdout.String())), nil
 }
 
 // Push pushes the current branch to Gerrit.
