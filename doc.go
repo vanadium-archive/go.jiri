@@ -32,6 +32,8 @@ The jiri flags are:
 The global flags are:
  -metadata=<just specify -metadata to activate>
    Displays metadata for the program and exits.
+ -time=false
+   Dump timing information to stderr before exiting the program.
 
 Jiri cl - Manage project changelists
 

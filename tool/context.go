@@ -13,6 +13,7 @@ import (
 	"v.io/jiri/jenkins"
 	"v.io/jiri/runutil"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/timing"
 )
 
 // Context represents an execution context of a tool command
@@ -35,6 +36,7 @@ type ContextOpts struct {
 	Stdout   io.Writer
 	Stderr   io.Writer
 	Verbose  *bool
+	Timer    timing.Timer
 }
 
 // newContextOpts is the ContextOpts factory.
@@ -48,6 +50,7 @@ func newContextOpts() *ContextOpts {
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
 		Verbose:  &VerboseFlag,
+		Timer:    nil,
 	}
 }
 
@@ -77,6 +80,9 @@ func initOpts(defaultOpts, opts *ContextOpts) {
 	if opts.Verbose == nil {
 		opts.Verbose = defaultOpts.Verbose
 	}
+	if opts.Timer == nil {
+		opts.Timer = defaultOpts.Timer
+	}
 }
 
 // NewContext is the Context factory.
@@ -101,6 +107,7 @@ func NewContextFromEnv(env *cmdline.Env) *Context {
 	opts.Stdin = env.Stdin
 	opts.Stdout = env.Stdout
 	opts.Stderr = env.Stderr
+	opts.Timer = env.Timer
 	return NewContext(opts)
 }
 
@@ -218,4 +225,23 @@ func (ctx Context) Stderr() io.Writer {
 // Verbose returns the verbosity setting of the context.
 func (ctx Context) Verbose() bool {
 	return *ctx.opts.Verbose
+}
+
+// Timer returns the timer associated with the context, which may be nil.
+func (ctx Context) Timer() timing.Timer {
+	return ctx.opts.Timer
+}
+
+// TimerPush calls ctx.Timer().Push(name), only if the Timer is non-nil.
+func (ctx Context) TimerPush(name string) {
+	if ctx.opts.Timer != nil {
+		ctx.opts.Timer.Push(name)
+	}
+}
+
+// TimerPop calls ctx.Timer().Pop(), only if the Timer is non-nil.
+func (ctx Context) TimerPop() {
+	if ctx.opts.Timer != nil {
+		ctx.opts.Timer.Pop()
+	}
 }

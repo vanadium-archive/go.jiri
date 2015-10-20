@@ -171,6 +171,8 @@ var devtoolsBinDir = filepath.Join("devtools", "bin")
 // master branches of all projects and writes this snapshot out to the
 // given file.
 func CreateSnapshot(ctx *tool.Context, path string) error {
+	ctx.TimerPush("create snapshot")
+	defer ctx.TimerPop()
 	// Create an in-memory representation of the current projects.
 	manifest, err := snapshotLocalProjects(ctx)
 	if err != nil {
@@ -363,6 +365,8 @@ func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
 // optional flag that can be used to fetch the latest manifest updates
 // from the manifest repository.
 func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks, error) {
+	ctx.TimerPush("read manifest")
+	defer ctx.TimerPop()
 	if update {
 		root, err := JiriRoot()
 		if err != nil {
@@ -393,6 +397,8 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 // the 'gc' flag can be used to indicate that local projects that no
 // longer exist remotely should be removed.
 func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
+	ctx.TimerPush("update universe")
+	defer ctx.TimerPop()
 	_, remoteProjects, remoteTools, remoteHooks, err := readManifest(ctx, true)
 	if err != nil {
 		return err
@@ -456,6 +462,8 @@ func ApplyToLocalMaster(ctx *tool.Context, project Project, fn func() error) (e 
 // version by counting the number of commits in current version-controlled
 // directory, and places the resulting binary into the given directory.
 func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Project) error {
+	ctx.TimerPush("build " + name)
+	defer ctx.TimerPop()
 	// Change to tools project's local dir.
 	wd, err := os.Getwd()
 	if err != nil {
@@ -515,6 +523,8 @@ func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Proj
 // the local master branch of the tools repository. Notably, this function does
 // not perform any version control operation on the master branch.
 func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
+	ctx.TimerPush("build tools")
+	defer ctx.TimerPop()
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
 		return err
@@ -673,6 +683,8 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 // InstallTools installs the tools from the given directory into
 // $JIRI_ROOT/devtools/bin.
 func InstallTools(ctx *tool.Context, dir string) error {
+	ctx.TimerPush("install tools")
+	defer ctx.TimerPop()
 	if ctx.DryRun() {
 		// In "dry run" mode, no binaries are built.
 		return nil
@@ -725,6 +737,8 @@ func InstallTools(ctx *tool.Context, dir string) error {
 
 // runHooks runs the specified hooks
 func runHooks(ctx *tool.Context, hooks Hooks) error {
+	ctx.TimerPush("run hooks")
+	defer ctx.TimerPop()
 	for _, hook := range hooks {
 		command := hook.Path
 		args := []string{}
@@ -933,6 +947,8 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 
 // updateProjects updates all jiri projects.
 func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
+	ctx.TimerPush("update projects")
+	defer ctx.TimerPop()
 	root, err := JiriRoot()
 	if err != nil {
 		return err
