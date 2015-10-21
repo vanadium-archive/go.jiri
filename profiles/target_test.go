@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 
 	"v.io/jiri/profiles"
@@ -17,12 +18,13 @@ import (
 func ExampleProfileTarget() {
 	var target profiles.Target
 	flags := flag.NewFlagSet("test", flag.ContinueOnError)
-	flags.Var(&target, "target", target.Usage())
-	flags.Var(&target.Env, "env", target.Env.Usage())
+	profiles.RegisterTargetAndEnvFlags(flags, &target)
 	flags.Parse([]string{"--target=name=arm-linux", "--env=A=B,C=D", "--env=E=F"})
 	fmt.Println(target.String())
+	fmt.Println(target.DebugString())
 	// Output:
-	// name=arm-linux@ dir: env:[A=B C=D E=F]
+	// name=arm-linux@
+	// name=arm-linux@ dir: --env=A=B,C=D,E=F envvars:[]
 }
 
 func TestProfileTargetArgs(t *testing.T) {
@@ -47,13 +49,13 @@ func TestProfileTargetArgs(t *testing.T) {
 			}
 			continue
 		}
-		if got, want := target.Tag, c.tag; got != want {
+		if got, want := target.Tag(), c.tag; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
-		if got, want := target.Arch, c.arch; got != want {
+		if got, want := target.Arch(), c.arch; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
-		if got, want := target.OS, c.os; got != want {
+		if got, want := target.OS(), c.os; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
 	}
@@ -88,15 +90,34 @@ func TestProfileEnvArgs(t *testing.T) {
 	}
 }
 
-func TestProfileEquality(t *testing.T) {
+func TestCopyCommandLineEnv(t *testing.T) {
+	env := "A=B,C=D"
+	target, _ := profiles.NewTargetWithEnv("a=a-o", env)
+	clenv := target.CommandLineEnv()
+	if got, want := strings.Join(clenv.Vars, ","), env; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	// Make sure we can't mutate the command line env stored in target.
+	clenv.Vars[0] = "oops"
+	clenv2 := target.CommandLineEnv()
+	if got, want := strings.Join(clenv2.Vars, ","), env; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestTargetEquality(t *testing.T) {
 	type s []string
 	for i, c := range []struct {
 		args1, args2 []string
 		equal        bool
 	}{
 		{s{""}, s{""}, true},
+		{s{"--t=tag"}, s{"--t=tag"}, true},
+		{s{"--t=tag"}, s{"--t=tag2"}, false},
 		{s{"--t=tag=a-b"}, s{"--t=tag=c-d"}, true}, // tag trumps all else.
 		{s{"--t=a-b"}, s{"--t=a-b"}, true},
+		{s{"--t=a-b@foo"}, s{"--t=a-b@foo"}, true},
+		{s{"--t=a-b@foo"}, s{"--t=a-b"}, false},
 		{s{"--t=a-b", "-e=a=b,c=d"}, s{"--t=a-b", "--e=c=d,a=b"}, true},
 		{s{"--t=a-b", "-e=a=b,c=d"}, s{"--t=a-b", "--e=a=b,c=d"}, true},
 		{s{"--t=a-b", "-e=a=b,c=d"}, s{"--t=a-b", "--e=c=d", "--e=a=b"}, true},
@@ -123,13 +144,6 @@ func TestProfileEquality(t *testing.T) {
 			t.Errorf("%v --- %v", t1, t2)
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
-		if len(t1.Tag) == 0 && len(t2.Tag) == 0 {
-			t1.Version = "foo" // Different versions will fail.
-			if got, want := t1.Match(t2), false; got != want {
-				t.Errorf("%v --- %v", t1, t2)
-				t.Errorf("%d: got %v, want %v", i, got, want)
-			}
-		}
 	}
 }
 
@@ -140,12 +154,12 @@ func TestTargetVersion(t *testing.T) {
 	if got, want := t1.Match(t2), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	t2.Version = "bar"
+	t2.Set("tag=cpu,os@var")
 	if got, want := t1.Match(t2), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	t2.Version = ""
-	t1.Version = "baz"
+	t2.Set("tag=cpu,os")
+	t1.Set("tag=cpu,os@baz")
 	if got, want := t1.Match(t2), false; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -153,12 +167,12 @@ func TestTargetVersion(t *testing.T) {
 
 func TestDefaults(t *testing.T) {
 	t1 := &profiles.Target{}
-	native := fmt.Sprintf("=%s-%s@ dir: env:[]", runtime.GOARCH, runtime.GOOS)
+	native := fmt.Sprintf("=%s-%s@", runtime.GOARCH, runtime.GOOS)
 	if got, want := t1.String(), native; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t1.Set("tag=cpu-os")
-	if got, want := t1.String(), "tag=cpu-os@ dir: env:[]"; got != want {
+	if got, want := t1.String(), "tag=cpu-os@"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
@@ -174,7 +188,7 @@ func TestFindTarget(t *testing.T) {
 		defer os.Setenv("GOARCH", prev)
 	}
 	def := profiles.DefaultTarget()
-	if got, want := profiles.FindTarget(ts, &def), t1; !got.Match(want) {
+	if got, want := profiles.FindTargetWithDefault(ts, &def), t1; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t2 := &profiles.Target{}
@@ -199,4 +213,61 @@ func TestFindTarget(t *testing.T) {
 	if got, want := profiles.FindTarget(ts, w), t2; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
+}
+
+func TestOrderedTargets(t *testing.T) {
+	for i, c := range []struct {
+		a, b string
+		r    bool
+	}{
+		{"x-b", "y-b", true},
+		{"x-b", "w-b", false},
+		{"x-b", "x-a", false},
+		{"x-b", "x-c", true},
+		{"x-b", "x-b@1", true},
+		{"x-b@1", "x-b@", false},
+		{"x-b@1", "x-b@2", false},
+		{"x-b@12", "x-b@2", false},
+		{"x-b@2", "x-b@1", true},
+		{"x-b", "x-b", false},
+	} {
+		a, err := profiles.NewTarget(c.a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := profiles.NewTarget(c.b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := a.Less(&b), c.r; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+	}
+
+	ol := profiles.OrderedTargets{}
+	data := []string{"a-b@2", "x-y", "a-b@12", "a-b@3", "foo=a-b@3", "a-b@0", "x-y@3", "tag=x-y@2"}
+	for _, s := range data {
+		target, err := profiles.NewTarget(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ol = profiles.InsertTarget(ol, &target)
+	}
+	if got, want := len(ol), len(data); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i, _ := range ol[:len(ol)-1] {
+		j := i + 1
+		if !ol.Less(i, j) {
+			t.Errorf("%v is not less than %v", ol[i], ol[j])
+		}
+	}
+	if got, want := ol[0].String(), "=a-b@3"; got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if got, want := ol[len(ol)-1].String(), "tag=x-y@2"; got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	t2, _ := profiles.NewTarget("a-b@12")
+	ol = profiles.RemoveTarget(ol, &t2)
 }

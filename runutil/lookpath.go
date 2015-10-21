@@ -57,5 +57,5 @@ func LookPath(file string, env map[string]string) (string, error) {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("failed to find %v in %v", file, envPath)
+	return "", fmt.Errorf("failed to find %v in %q", file, envPath)
 }

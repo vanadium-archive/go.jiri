@@ -20,20 +20,15 @@ import (
 )
 
 func addProfileAndTargets(t *testing.T, name string) {
-	t1, t2 := &profiles.Target{}, &profiles.Target{}
-	t1.Set("t1=cpu1-os1")
-	t1.Env.Set("A=B,C=D")
-	t2.Set("t2=cpu2-os2")
-	t2.Env.Set("A=B,C=D")
-	t2.Version = "bar"
-	if err := profiles.AddProfileTarget(name, *t1); err != nil {
+	t1, _ := profiles.NewTargetWithEnv("t1=cpu1-os1", "A=B,C=D")
+	t2, _ := profiles.NewTargetWithEnv("t2=cpu2-os2@bar", "A=B,C=D")
+	if err := profiles.AddProfileTarget(name, t1); err != nil {
 		t.Fatal(err)
 	}
 	t2.InstallationDir = "bar"
-	if err := profiles.AddProfileTarget(name, *t2); err != nil {
+	if err := profiles.AddProfileTarget(name, t2); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func tmpFile() string {
@@ -63,7 +58,6 @@ func TestDuplicateTag(t *testing.T) {
 	err := profiles.AddProfileTarget("b", *t1)
 	if got, want := err.Error(), "tag \"t2\" is already used"; !strings.Contains(got, want) {
 		t.Fatalf("got %v doesn't contain %v", got, want)
-
 	}
 }
 
@@ -108,13 +102,13 @@ func TestRead(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	p := profiles.LookupProfile("a")
-	if got, want := p.Targets[0].Tag, "t1"; got != want {
+	if got, want := p.Targets()[0].Tag(), "t1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := p.Targets[0].OS, "os1"; got != want {
+	if got, want := p.Targets()[0].OS(), "os1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := p.Targets[1].Version, "bar"; got != want {
+	if got, want := p.Targets()[1].Version(), "bar"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
@@ -170,7 +164,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := profiles.SchemaVersion(), profiles.V2; got != want {
+	if got, want := profiles.SchemaVersion(), profiles.V3; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	nprofiles := getProfiles()

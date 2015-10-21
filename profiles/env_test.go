@@ -25,7 +25,8 @@ func TestConfigHelper(t *testing.T) {
 	}
 	ch.Vars = envvar.VarsFromOS()
 	ch.Delete("CGO_CFLAGS")
-	ch.SetEnvFromProfiles(profiles.CommonConcatVariables(), map[string]bool{}, "go,syncbase", profiles.Target{Tag: "native"})
+	target, _ := profiles.NewTarget("native=")
+	ch.SetEnvFromProfiles(profiles.CommonConcatVariables(), map[string]bool{}, "go,syncbase", target)
 	if got, want := ch.Get("CGO_CFLAGS"), "-IX -IY -IA -IB"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -58,7 +59,8 @@ func TestEnvFromTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	ch.Vars = envvar.VarsFromSlice([]string{})
-	ch.SetEnvFromProfiles(map[string]string{"A": " "}, map[string]bool{"Z": true}, "a,b", profiles.Target{Tag: "t1"})
+	target, _ := profiles.NewTarget("t1=")
+	ch.SetEnvFromProfiles(map[string]string{"A": " "}, map[string]bool{"Z": true}, "a,b", target)
 	vars := ch.ToMap()
 	if got, want := len(vars), 3; got != want {
 		t.Errorf("got %v, want %v", got, want)

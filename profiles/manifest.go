@@ -24,6 +24,7 @@ type Version int
 const (
 	Original Version = 0
 	V2       Version = 2
+	V3       Version = 3
 )
 
 // Profile represents a suite of software that is managed by an implementation
@@ -31,7 +32,13 @@ const (
 type Profile struct {
 	Name    string
 	Root    string
-	Targets []*Target
+	targets OrderedTargets
+}
+
+func (p *Profile) Targets() OrderedTargets {
+	r := make(OrderedTargets, len(p.targets))
+	copy(r, p.targets)
+	return r
 }
 
 type profilesSchema struct {
@@ -56,6 +63,7 @@ type targetSchema struct {
 	Version         string      `xml:"version,attr"`
 	UpdateTime      time.Time   `xml:"date,attr"`
 	Env             Environment `xml:"envvars"`
+	CommandLineEnv  Environment `xml:"command-line"`
 }
 
 type profileDB struct {
@@ -96,7 +104,7 @@ func LookupProfileTarget(name string, target Target) *Target {
 	if mgr == nil {
 		return nil
 	}
-	return FindTarget(mgr.Targets, &target)
+	return FindTarget(mgr.targets, &target)
 }
 
 // InstallProfile will create a new profile and store in the profiles manifest,
@@ -125,26 +133,6 @@ func UpdateProfileTarget(name string, target Target) error {
 	return db.updateProfileTarget(name, &target)
 }
 
-// HasTarget returns true if the named profile exists and has the specified
-// target already installed.
-func HasTarget(name string, target Target) bool {
-	profile := db.profile(name)
-	if profile == nil {
-		return false
-	}
-	return FindTarget(profile.Targets, &target) != nil
-}
-
-// HasTargetTsg returns true if the named profile exists and has the specified
-// target tag already installed.
-func HasTargetTag(name string, target Target) bool {
-	profile := db.profile(name)
-	if profile == nil {
-		return false
-	}
-	return FindTargetByTag(profile.Targets, &target) != nil
-}
-
 // Read reads the specified manifest file to obtain the current set of
 // installed profiles.
 func Read(ctx *tool.Context, filename string) error {
@@ -170,14 +158,14 @@ func (pdb *profileDB) addProfileTarget(name string, target *Target) error {
 	defer pdb.Unlock()
 	target.UpdateTime = time.Now()
 	if pi, present := pdb.db[name]; present {
-		if existing := FindTargetByTag(pi.Targets, target); existing != nil {
-			return fmt.Errorf("tag %q is already used by profile: %v, existing target: %v", target.Tag, name, existing)
+		if existing := FindTargetByTag(pi.targets, target); existing != nil {
+			return fmt.Errorf("tag %q is already used by profile: %v, existing target: %v", target.tag, name, existing)
 		}
-		pi.Targets = AddTarget(pi.Targets, target)
+		pi.targets = InsertTarget(pi.targets, target)
 		return nil
 	}
 	pdb.db[name] = &Profile{Name: name}
-	pdb.db[name].Targets = AddTarget(nil, target)
+	pdb.db[name].targets = InsertTarget(nil, target)
 	return nil
 }
 
@@ -189,7 +177,7 @@ func (pdb *profileDB) updateProfileTarget(name string, target *Target) error {
 	if !present {
 		return fmt.Errorf("profile %v is not installed", name)
 	}
-	for _, t := range pi.Targets {
+	for _, t := range pi.targets {
 		if target.Match(t) {
 			*t = *target
 			t.UpdateTime = time.Now()
@@ -207,8 +195,8 @@ func (pdb *profileDB) removeProfileTarget(name string, target *Target) bool {
 	if !present {
 		return true
 	}
-	pi.Targets = RemoveTarget(pi.Targets, target)
-	if len(pi.Targets) == 0 {
+	pi.targets = RemoveTarget(pi.targets, target)
+	if len(pi.targets) == 0 {
 		delete(pdb.db, name)
 		return true
 	}
@@ -262,12 +250,13 @@ func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 			Root: profile.Root,
 		}
 		for _, target := range profile.Targets {
-			pdb.db[name].Targets = append(pdb.db[name].Targets, &Target{
-				Tag:             target.Tag,
-				Arch:            target.Arch,
-				OS:              target.OS,
+			pdb.db[name].targets = append(pdb.db[name].targets, &Target{
+				tag:             target.Tag,
+				arch:            target.Arch,
+				opsys:           target.OS,
 				Env:             target.Env,
-				Version:         target.Version,
+				commandLineEnv:  target.CommandLineEnv,
+				version:         target.Version,
 				UpdateTime:      target.UpdateTime,
 				InstallationDir: target.InstallationDir,
 				isSet:           true,
@@ -282,22 +271,24 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 	defer pdb.Unlock()
 
 	var schema profilesSchema
-	schema.Version = V2
+	schema.Version = V3
 	for i, name := range pdb.profilesUnlocked() {
 		profile := pdb.db[name]
 		schema.Profiles = append(schema.Profiles, &profileSchema{
 			Name: name,
 			Root: profile.Root,
 		})
-		for _, target := range profile.Targets {
+
+		for _, target := range profile.targets {
 			sort.Strings(target.Env.Vars)
 			schema.Profiles[i].Targets = append(schema.Profiles[i].Targets,
 				&targetSchema{
-					Tag:             target.Tag,
-					Arch:            target.Arch,
-					OS:              target.OS,
+					Tag:             target.tag,
+					Arch:            target.arch,
+					OS:              target.opsys,
 					Env:             target.Env,
-					Version:         target.Version,
+					CommandLineEnv:  target.commandLineEnv,
+					Version:         target.version,
 					InstallationDir: target.InstallationDir,
 					UpdateTime:      target.UpdateTime,
 				})
@@ -333,15 +324,4 @@ func (pdb *profileDB) schemaVersion() Version {
 	pdb.Lock()
 	defer pdb.Unlock()
 	return pdb.version
-}
-
-func ProfileTargetNeedsUpdate(name string, target Target, version string) (bool, error) {
-	profile := LookupProfileTarget(name, target)
-	if profile == nil {
-		return false, fmt.Errorf("profile %v for target %v is not installed", name, target)
-	}
-	if profile.Version > version {
-		return false, fmt.Errorf("unsupported profile version: %v", profile.Version)
-	}
-	return profile.Version < version, nil
 }

@@ -16,49 +16,45 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/tool"
-	"v.io/x/lib/envvar"
 )
 
 const (
 	DefaultDirPerm  = os.FileMode(0755)
 	DefaultFilePerm = os.FileMode(0644)
+	targetDefValue  = "<runtime.GOARCH>-<runtime.GOOS>"
 )
 
-// RegisterProfileFlags register the commonly used --manifest, --profiles and --target
-// flags with the supplied FlagSet.
+// RegisterTargetFlag registers the commonly used --target flag with
+// the supplied FlagSet.
+func RegisterTargetFlag(flags *flag.FlagSet, target *Target) {
+	*target = DefaultTarget()
+	flags.Var(target, "target", target.Usage())
+	flags.Lookup("target").DefValue = targetDefValue
+}
+
+// RegisterTargetAndEnvFlags registers the commonly used --target and --env
+// flags with the supplied FlagSet
+func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
+	*target = DefaultTarget()
+	flags.Var(target, "target", target.Usage())
+	flags.Lookup("target").DefValue = targetDefValue
+	flags.Var(&target.commandLineEnv, "env", target.commandLineEnv.Usage())
+}
+
+// RegisterManifestFlag registers the commonly used --manifest
+// flag with the supplied FlagSet.
+func RegisterManifestFlag(flags *flag.FlagSet, manifest *string, defaultManifest string) {
+	flags.StringVar(manifest, "manifest", defaultManifest, "specify the profiles XML manifest filename.")
+	flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + defaultManifest
+}
+
+// RegisterProfileFlags registers the commonly used --manifest, --profiles and
+// --target flags with the supplied FlagSet.
 func RegisterProfileFlags(flags *flag.FlagSet, profilesMode *ProfilesMode, manifest, profiles *string, defaultManifest string, target *Target) {
 	flags.Var(profilesMode, "skip-profiles", "if set, no profiles will be used")
-	*target = DefaultTarget()
-	flags.StringVar(manifest, "manifest", defaultManifest, "specify the profiles XML manifest filename.")
 	flags.StringVar(profiles, "profiles", "base", "a comma separated list of profiles to use")
-	flags.Var(target, "target", target.Usage())
-	flags.Lookup("target").DefValue = "<runtime.GOARCH>-<runtime.GOOS>"
-	flags.StringVar(&target.Version, "version", "", "target version")
-}
-
-// ValidateRequestProfiles checks that the supplied slice of profiles
-// names is supported.
-func ValidateRequestedProfiles(profileNames []string) error {
-	for _, n := range profileNames {
-		if LookupManager(n) == nil {
-			return fmt.Errorf("%q is not a supported profile, use the \"list --available\" command to see the ones that are available.", n)
-		}
-	}
-	return nil
-}
-
-// ValidateRequestProfilesAndTarget checks that the supplied slice of profiles
-// names is supported and that each has the specified target installed.
-func ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
-	for _, n := range profileNames {
-		if LookupProfile(n) == nil {
-			return fmt.Errorf("%q is not a supported profile, use the \"list --available\" command to see the ones that are available.", n)
-		}
-		if LookupProfileTarget(n, target) == nil {
-			return fmt.Errorf("%q is not a supported target for profile %q, use the \"list --available\" command to see the ones that are available.", target, n)
-		}
-	}
-	return nil
+	RegisterManifestFlag(flags, manifest, defaultManifest)
+	RegisterTargetFlag(flags, target)
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -176,20 +172,19 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 // EnsureProfileTargetIsInstalled ensures that the requested profile and target
 // is installed, installing it if only if necessary.
 func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Target, root string) error {
-	if HasTarget(profile, target) {
+	if t := LookupProfileTarget(profile, target); t != nil {
 		if ctx.Run().Opts().Verbose {
-			fmt.Fprintf(ctx.Stdout(), "%v is already installed: %v\n", profile, target)
+			fmt.Fprintf(ctx.Stdout(), "%v %v is already installed as %v\n", profile, target, t)
 		}
 		return nil
 	}
 	mgr := LookupManager(profile)
 	if mgr == nil {
-		return fmt.Errorf("profile %v is not available", profile)
+		return fmt.Errorf("profile %v is not supported", profile)
 	}
 	mgr.SetRoot(root)
 	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
-		fmt.Fprintf(ctx.Stdout(), "install --target=%s=%s-%s --env=%s %s\n",
-			target.Tag, target.Arch, target.OS, strings.Join(target.Env.Vars, ","), profile)
+		fmt.Fprintf(ctx.Stdout(), "install %s %s\n", profile, target.DebugString())
 	}
 	if err := mgr.Install(ctx, target); err != nil {
 		return err
@@ -200,7 +195,7 @@ func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Ta
 // EnsureProfileTargetIsUninstalled ensures that the requested profile and target
 // are no longer installed.
 func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, target Target, root string) error {
-	if !HasTarget(profile, target) {
+	if LookupProfileTarget(profile, target) != nil {
 		if ctx.Run().Opts().Verbose {
 			fmt.Fprintf(ctx.Stdout(), "%v is not installed: %v", profile, target)
 		}
@@ -208,12 +203,11 @@ func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, target 
 	}
 	mgr := LookupManager(profile)
 	if mgr == nil {
-		return fmt.Errorf("profile %v is not available", profile)
+		return fmt.Errorf("profile %v is not supported", profile)
 	}
 	mgr.SetRoot(root)
 	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
-		fmt.Fprintf(ctx.Stdout(), "uninstall --target=%s=%s-%s %s\n",
-			target.Tag, target.Arch, target.OS, profile)
+		fmt.Fprintf(ctx.Stdout(), "uninstall %s %s\n", profile, target.DebugString())
 	}
 	if err := mgr.Uninstall(ctx, target); err != nil {
 		return err
@@ -242,23 +236,4 @@ func GitCloneRepo(ctx *tool.Context, remote, revision, outDir string, outDirPerm
 		return err
 	}
 	return nil
-}
-
-// TargetSpecificDirname returns a directory name that is specific
-// to that target taking the Tag, Arch, OS and environment variables
-// if relevant into account (e.g GOARM={5,6,7}). If ignoreTag is set
-// then the target Tag will never be used a shorthand for the entire target.
-// It is intended to be used
-func TargetSpecificDirname(target Target, ignoreTag bool) string {
-	if !ignoreTag && len(target.Tag) > 0 {
-		return target.Tag
-	}
-	env := envvar.SliceToMap(target.Env.Vars)
-	dir := target.Arch + "_" + target.OS
-	if target.Arch == "arm" {
-		if armv, present := env["GOARM"]; present {
-			dir += "_armv" + armv
-		}
-	}
-	return dir
 }

@@ -136,6 +136,7 @@ func NewConfigHelper(ctx *tool.Context, profilesMode ProfilesMode, filename stri
 		tools:        tools,
 		profilesMode: bool(profilesMode),
 	}
+	ch.Vars = envvar.VarsFromOS()
 	if profilesMode == SkipProfiles {
 		return ch, nil
 	}
@@ -146,8 +147,6 @@ func NewConfigHelper(ctx *tool.Context, profilesMode ProfilesMode, filename stri
 			return nil, err
 		}
 		ch.Vars = vars
-	} else {
-		ch.Vars = envvar.VarsFromOS()
 	}
 	return ch, nil
 }
@@ -231,8 +230,13 @@ func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, ignore map[
 // names is supported and that each has the specified target installed taking
 // account if runnin in bootstrap mode or with old-style profiles.
 func (ch *ConfigHelper) ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
-	if !ch.profilesMode && !ch.legacyMode {
-		return ValidateRequestedProfilesAndTarget(profileNames, target)
+	if ch.profilesMode || ch.legacyMode {
+		return nil
+	}
+	for _, n := range profileNames {
+		if LookupProfileTarget(n, target) == nil {
+			return fmt.Errorf("%q for %q is not available or not installed, use the \"list\" command to see the installed/available profiles.", target, n)
+		}
 	}
 	return nil
 }
@@ -246,7 +250,7 @@ func (ch *ConfigHelper) PrependToPATH(path string) {
 // SetGoPath computes and sets the GOPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) SetGoPath() {
-	if !ch.profilesMode && !ch.legacyMode {
+	if !ch.legacyMode {
 		ch.pathHelper("GOPATH", ch.root, ch.projects, ch.config.GoWorkspaces(), "")
 	}
 }
@@ -254,7 +258,7 @@ func (ch *ConfigHelper) SetGoPath() {
 // SetVDLPath computes and sets the VDLPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) SetVDLPath() {
-	if !ch.profilesMode && !ch.legacyMode {
+	if !ch.legacyMode {
 		ch.pathHelper("VDLPATH", ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
 	}
 }

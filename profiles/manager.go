@@ -37,7 +37,6 @@
 package profiles
 
 import (
-	"errors"
 	"flag"
 	"sort"
 	"sync"
@@ -91,11 +90,8 @@ type Action int
 
 const (
 	Install Action = iota
-	Update
 	Uninstall
 )
-
-var ErrNoIncrementalUpdate = errors.New("incremental update is not supported")
 
 // Manager is the interface that must be implemented in order to
 // manage (i.e. install/uninstall/update) a profile.
@@ -111,6 +107,8 @@ type Manager interface {
 	Root() string
 	// Name returns the name of this profile.
 	Name() string
+	// VersionInfo returns the VersionInfo instance for this profile.
+	VersionInfo() *VersionInfo
 	// String returns a string representation of the profile, conventionally this
 	// is its name and version.
 	String() string
@@ -120,8 +118,4 @@ type Manager interface {
 	// the last target for any given profile is uninstalled, then the profile
 	// itself (i.e. the source code) will be uninstalled.
 	Uninstall(ctx *tool.Context, target Target) error
-	// Update updates the specified build target. Update may return
-	// ErrNoIncrementalUpdate to its caller so that the caller may instead
-	// opt to Uninstall and re-Install the profile in lieu of an incremental update.
-	Update(ctx *tool.Context, target Target) error
 }

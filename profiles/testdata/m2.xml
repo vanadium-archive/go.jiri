@@ -6,7 +6,7 @@
         <var>GOARCH=amd64</var>
         <var>GOOS=darwin</var>
         <var>GOROOT=/goroot</var>
-         <var>CGO_CFLAGS=-IX -IY</var>
+        <var>CGO_CFLAGS=-IX -IY</var>
       </envvars>
     </target>
   </profile>
