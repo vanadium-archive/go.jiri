@@ -281,6 +281,8 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 
 // LocalProjects scans the local filesystem to identify existing projects.
 func LocalProjects(ctx *tool.Context) (Projects, error) {
+	ctx.TimerPush("find local projects")
+	defer ctx.TimerPop()
 	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
@@ -296,6 +298,8 @@ func LocalProjects(ctx *tool.Context) (Projects, error) {
 // locally. Changes are grouped by projects and contain author identification
 // and a description of their content.
 func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, e error) {
+	ctx.TimerPush("poll projects")
+	defer ctx.TimerPop()
 	update := Update{}
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -413,7 +417,7 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 		return fmt.Errorf("TempDir() failed: %v", err)
 	}
 	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-	if err := buildTools(ctx, remoteTools, tmpDir); err != nil {
+	if err := buildToolsFromMaster(ctx, remoteTools, tmpDir); err != nil {
 		return err
 	}
 	// 3. Install the tools into $JIRI_ROOT/devtools/bin.
@@ -424,119 +428,130 @@ func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
 	return runHooks(ctx, remoteHooks)
 }
 
-// ApplyToLocalMaster applies an operation expressed as the given
-// function to the local master branch of the given project.
-func ApplyToLocalMaster(ctx *tool.Context, project Project, fn func() error) (e error) {
+// ApplyToLocalMaster applies an operation expressed as the given function to
+// the local master branch of the given projects.
+func ApplyToLocalMaster(ctx *tool.Context, projects Projects, fn func() error) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	if err := ctx.Run().Chdir(project.Path); err != nil {
-		return err
-	}
-	switch project.Protocol {
-	case "git":
-		branch, err := ctx.Git().CurrentBranchName()
-		if err != nil {
+
+	// Loop through all projects, checking out master and stashing any unstaged
+	// changes.
+	for _, project := range projects {
+		p := project
+		if err := ctx.Run().Chdir(p.Path); err != nil {
 			return err
 		}
-		stashed, err := ctx.Git().Stash()
-		if err != nil {
-			return err
+		switch p.Protocol {
+		case "git":
+			branch, err := ctx.Git().CurrentBranchName()
+			if err != nil {
+				return err
+			}
+			stashed, err := ctx.Git().Stash()
+			if err != nil {
+				return err
+			}
+			if err := ctx.Git().CheckoutBranch("master"); err != nil {
+				return err
+			}
+			// After running the function, return to this project's directory,
+			// checkout the original branch, and stash pop if necessary.
+			defer collect.Error(func() error {
+				if err := ctx.Run().Chdir(p.Path); err != nil {
+					return err
+				}
+				if err := ctx.Git().CheckoutBranch(branch); err != nil {
+					return err
+				}
+				if stashed {
+					return ctx.Git().StashPop()
+				}
+				return nil
+			}, &e)
+		default:
+			return UnsupportedProtocolErr(p.Protocol)
 		}
-		if stashed {
-			defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
-		}
-		if err := ctx.Git().CheckoutBranch("master"); err != nil {
-			return err
-		}
-		defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch) }, &e)
-	default:
-		return UnsupportedProtocolErr(project.Protocol)
 	}
 	return fn()
 }
 
-// BuildTool builds the given tool specified by its name and package, sets its
-// version by counting the number of commits in current version-controlled
-// directory, and places the resulting binary into the given directory.
-func BuildTool(ctx *tool.Context, outputDir, name, pkg string, toolsProject Project) error {
-	ctx.TimerPush("build " + name)
+// BuildTools builds the given tools and places the resulting binaries into the
+// given directory.
+func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
+	ctx.TimerPush("build tools")
 	defer ctx.TimerPop()
-	// Change to tools project's local dir.
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("Getwd() failed: %v", err)
+	if len(tools) == 0 {
+		// Nothing to do here...
+		return nil
 	}
-	defer ctx.Run().Chdir(wd)
-	if err := ctx.Run().Chdir(toolsProject.Path); err != nil {
+	projects, err := LocalProjects(ctx)
+	if err != nil {
 		return err
 	}
-	// Identify the Go workspace the tool is in. To this end we use a
-	// heuristic that identifies the maximal suffix of the project path
-	// that corresponds to a prefix of the package name.
-	workspace, path := "", toolsProject.Path
-	for i := 0; i < len(path); i++ {
-		if path[i] == filepath.Separator {
-			if strings.HasPrefix("src/"+pkg, filepath.ToSlash(path[i+1:])) {
-				workspace = path[:i]
-				break
+	toolPkgs := []string{}
+	workspaceSet := map[string]bool{}
+	for _, tool := range tools {
+		toolPkgs = append(toolPkgs, tool.Package)
+		toolProject, ok := projects[tool.Project]
+		if !ok {
+			return fmt.Errorf("project not found for tool %v", tool.Name)
+		}
+		// Identify the Go workspace the tool is in. To this end we use a
+		// heuristic that identifies the maximal suffix of the project path
+		// that corresponds to a prefix of the package name.
+		workspace := ""
+		for i := 0; i < len(toolProject.Path); i++ {
+			if toolProject.Path[i] == filepath.Separator {
+				if strings.HasPrefix("src/"+tool.Package, filepath.ToSlash(toolProject.Path[i+1:])) {
+					workspace = toolProject.Path[:i]
+					break
+				}
 			}
 		}
+		if workspace == "" {
+			return fmt.Errorf("could not identify go workspace for tool %v", tool.Name)
+		}
+		workspaceSet[workspace] = true
 	}
-	if workspace == "" {
-		return fmt.Errorf("could not identify go workspace for %v", pkg)
+	workspaces := []string{}
+	for workspace := range workspaceSet {
+		workspaces = append(workspaces, workspace)
 	}
-	workspaces := []string{workspace}
 	if envGoPath := os.Getenv("GOPATH"); envGoPath != "" {
 		workspaces = append(workspaces, strings.Split(envGoPath, string(filepath.ListSeparator))...)
 	}
-	output := filepath.Join(outputDir, name)
-	count := 0
-	switch toolsProject.Protocol {
-	case "git":
-		gitCount, err := ctx.Git().CountCommits("HEAD", "")
-		if err != nil {
-			return err
-		}
-		count = gitCount
-	default:
-		return UnsupportedProtocolErr(toolsProject.Protocol)
-	}
-	ldflags := fmt.Sprintf("-X v.io/jiri/tool.Name %s -X v.io/jiri/tool.Version %d", name, count)
-	args := []string{"build", "-ldflags", ldflags, "-o", output, pkg}
 	var stderr bytes.Buffer
 	opts := ctx.Run().Opts()
 	opts.Env = map[string]string{
+		"GOBIN":  outputDir,
 		"GOPATH": strings.Join(workspaces, string(filepath.ListSeparator)),
 	}
 	opts.Stdout = ioutil.Discard
 	opts.Stderr = &stderr
+	args := append([]string{"install"}, toolPkgs...)
 	if err := ctx.Run().CommandWithOpts(opts, "go", args...); err != nil {
-		return fmt.Errorf("%v tool build failed\n%v", name, stderr.String())
+		return fmt.Errorf("tool build failed\n%v", stderr.String())
 	}
 	return nil
 }
 
-// buildTools builds and installs all jiri tools using the version available in
-// the local master branch of the tools repository. Notably, this function does
-// not perform any version control operation on the master branch.
-func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
-	ctx.TimerPush("build tools")
-	defer ctx.TimerPop()
+// buildToolsFromMaster builds and installs all jiri tools using the version
+// available in the local master branch of the tools repository. Notably, this
+// function does not perform any version control operation on the master
+// branch.
+func buildToolsFromMaster(ctx *tool.Context, tools Tools, outputDir string) error {
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
 		return err
 	}
 	failed := false
-	names := []string{}
-	for name, _ := range remoteTools {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		tool := remoteTools[name]
+
+	toolsToBuild, toolProjects := Tools{}, Projects{}
+	toolNames := []string{} // Used for logging purposes.
+	for _, tool := range tools {
 		// Skip tools with no package specified. Besides increasing
 		// robustness, this step also allows us to create jiri root
 		// fakes without having to provide an implementation for the "jiri"
@@ -544,22 +559,27 @@ func buildTools(ctx *tool.Context, remoteTools Tools, outputDir string) error {
 		if tool.Package == "" {
 			continue
 		}
-		updateFn := func() error {
-			project, ok := localProjects[tool.Project]
-			if !ok {
-				return fmt.Errorf("unknown project %v", tool.Project)
-			}
-			return ApplyToLocalMaster(ctx, project, func() error {
-				return BuildTool(ctx, outputDir, tool.Name, tool.Package, project)
-			})
+		project, ok := localProjects[tool.Project]
+		if !ok {
+			fmt.Errorf("unknown project %v for tool %v", tool.Project, tool.Name)
 		}
-		// Always log the output of updateFn, irrespective of
-		// the value of the verbose flag.
-		opts := runutil.Opts{Verbose: true}
-		if err := ctx.Run().FunctionWithOpts(opts, updateFn, "build tool %q", tool.Name); err != nil {
-			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
-			failed = true
-		}
+		toolProjects[tool.Project] = project
+		toolsToBuild[tool.Name] = tool
+		toolNames = append(toolNames, tool.Name)
+	}
+
+	updateFn := func() error {
+		return ApplyToLocalMaster(ctx, toolProjects, func() error {
+			return BuildTools(ctx, toolsToBuild, outputDir)
+		})
+	}
+
+	// Always log the output of updateFn, irrespective of
+	// the value of the verbose flag.
+	opts := runutil.Opts{Verbose: true}
+	if err := ctx.Run().FunctionWithOpts(opts, updateFn, "build tools: %v", strings.Join(toolNames, " ")); err != nil {
+		fmt.Fprintf(ctx.Stderr(), "%v\n", err)
+		failed = true
 	}
 	if failed {
 		return cmdline.ErrExitCode(2)
@@ -769,7 +789,7 @@ func pullProject(ctx *tool.Context, project Project) error {
 			return UnsupportedProtocolErr(project.Protocol)
 		}
 	}
-	return ApplyToLocalMaster(ctx, project, pullFn)
+	return ApplyToLocalMaster(ctx, Projects{project.Name: project}, pullFn)
 }
 
 // loadManifest loads the given manifest, processing all of its
@@ -910,6 +930,8 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 // snapshotLocalProjects returns an in-memory representation of the
 // current state of all local projects
 func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
+	ctx.TimerPush("snapshot projects")
+	defer ctx.TimerPop()
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
 		return nil, err
@@ -934,7 +956,7 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 				return UnsupportedProtocolErr(project.Protocol)
 			}
 		}
-		if err := ApplyToLocalMaster(ctx, project, revisionFn); err != nil {
+		if err := ApplyToLocalMaster(ctx, Projects{project.Name: project}, revisionFn); err != nil {
 			return nil, err
 		}
 		project.Revision = revision
