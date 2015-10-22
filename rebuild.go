@@ -21,11 +21,12 @@ var cmdRebuild = &cmdline.Command{
 	Long:   "Rebuild the jiri command line tool.",
 }
 
-// Implements cmdRebuild.  This function is like project.buildTools except it only
-// builds the jiri project.  We also don't update anything before we do so.
+// Implements cmdRebuild.  This function is like project.BuildTools except it
+// only builds the jiri tool.  We also don't update anything before we do so.
 func runRebuild(env *cmdline.Env, args []string) (e error) {
 	ctx := tool.NewContextFromEnv(env)
-	localProjects, err := project.LocalProjects(ctx)
+
+	_, tools, err := project.ReadManifest(ctx)
 	if err != nil {
 		return err
 	}
@@ -40,14 +41,13 @@ func runRebuild(env *cmdline.Env, args []string) (e error) {
 	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
 
 	// Paranoid sanity checking.
-	lp, ok := localProjects[project.JiriProject]
+	jiriTool, ok := tools[project.JiriName]
 	if !ok {
-		return fmt.Errorf("jiri project (%s) not found", project.JiriProject)
+		return fmt.Errorf("jiri tool (%s) not found", project.JiriName)
 	}
 
 	// Build jiri.
-	err = project.BuildTool(ctx, tmpDir, project.JiriName, project.JiriPackage, lp)
-	if err != nil {
+	if err = project.BuildTools(ctx, project.Tools{jiriTool.Name: jiriTool}, tmpDir); err != nil {
 		return err
 	}
 
