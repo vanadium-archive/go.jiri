@@ -36,7 +36,7 @@ type ContextOpts struct {
 	Stdout   io.Writer
 	Stderr   io.Writer
 	Verbose  *bool
-	Timer    timing.Timer
+	Timer    *timing.Timer
 }
 
 // newContextOpts is the ContextOpts factory.
@@ -228,7 +228,7 @@ func (ctx Context) Verbose() bool {
 }
 
 // Timer returns the timer associated with the context, which may be nil.
-func (ctx Context) Timer() timing.Timer {
+func (ctx Context) Timer() *timing.Timer {
 	return ctx.opts.Timer
 }
 
