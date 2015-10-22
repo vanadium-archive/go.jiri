@@ -20,11 +20,6 @@ const (
 )
 
 // DataDirPath returns the path to the data directory of the given tool.
-// TODO(nlacasse): DataDirPath is currently broken because we don't set the
-// tool.Name variable when building each tool.  Luckily, only the jiri tool has
-// uses DataDirPath, and the default tool name is "jiri", so nothing actually
-// breaks.  We should revisit the whole data directory thing, and in particular
-// see if we can get rid of tools having to know their own names.
 func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
 	_, projects, tools, _, err := readManifest(ctx, false)
 	if err != nil {

@@ -120,7 +120,7 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 		Protocol: "git",
 		Revision: "HEAD",
 	}
-	if err := project.ApplyToLocalMaster(ctx, project.Projects{p.Name: p}, createFn); err != nil {
+	if err := project.ApplyToLocalMaster(ctx, p, createFn); err != nil {
 		return err
 	}
 	return nil
