@@ -683,6 +683,9 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 		if !filepath.IsAbs(project.Path) {
 			project.Path = filepath.Join(root, project.Path)
 		}
+		if path != project.Path {
+			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, path)
+		}
 		if p, ok := projects[project.Name]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
