@@ -359,7 +359,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 				}
 
 				// Fetch the latest from remote.
-				if err := ctx.Git().Fetch("origin", "master"); err != nil {
+				if err := ctx.Git().FetchRefspec("origin", "master"); err != nil {
 					return nil, err
 				}
 
@@ -372,7 +372,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 				// Format those commits and add them to the results.
 				for _, commitText := range commitsText {
 					if got, want := len(commitText), 3; got < want {
-							return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
+						return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
 					}
 					cls = append(cls, CL{
 						Author:      commitText[0],
@@ -837,10 +837,20 @@ func pullProject(ctx *tool.Context, project Project) error {
 	pullFn := func() error {
 		switch project.Protocol {
 		case "git":
-			if err := ctx.Git().Pull("origin", "master"); err != nil {
+			if err := ctx.Git().Fetch("origin"); err != nil {
 				return err
 			}
-			return ctx.Git().Reset(project.Revision)
+			// If the project wants to pin to a specific revision, try to rebase to
+			// that. If the revision is the default value HEAD try to rebase to the
+			// remote master branch.
+			upstream := project.Revision
+			if project.Revision == "HEAD" {
+				upstream = "origin/master"
+			}
+			if err := ctx.Git().Rebase(upstream); err != nil {
+				return err
+			}
+			return ctx.Git().Reset("HEAD")
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}

@@ -157,7 +157,7 @@ func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 		}
 		return nil
 	}, &e)
-	if err := ctx.Git().Fetch("origin", remoteBranchFlag); err != nil {
+	if err := ctx.Git().FetchRefspec("origin", remoteBranchFlag); err != nil {
 		return err
 	}
 	for _, branch := range branches {
@@ -547,7 +547,7 @@ func (review *review) cleanup(stashed bool) error {
 // the commit message for the last commit.
 func (review *review) createReviewBranch(message string) (e error) {
 	// Create the review branch.
-	if err := review.ctx.Git().Fetch("origin", review.CLOpts.RemoteBranch); err != nil {
+	if err := review.ctx.Git().FetchRefspec("origin", review.CLOpts.RemoteBranch); err != nil {
 		return err
 	}
 	if review.ctx.Git().BranchExists(review.reviewBranch) {

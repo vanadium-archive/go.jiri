@@ -149,8 +149,8 @@ func deleteProject(t *testing.T, ctx *tool.Context, manifestDir, project string)
 	commitManifest(t, ctx, &manifest, manifestDir)
 }
 
-func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project string) {
-	// Identify the current revision.
+// Identify the current revision for a given project.
+func currentRevision(t *testing.T, ctx *tool.Context, project string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -163,8 +163,11 @@ func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project strin
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
+	return revision
+}
 
-	// Fix the revision in the manifest file.
+// Fix the revision in the manifest file.
+func setRevisionForProject(t *testing.T, ctx *tool.Context, manifestDir, project, revision string) {
 	manifestFile := filepath.Join(manifestDir, "v2", "default")
 	data, err := ioutil.ReadFile(manifestFile)
 	if err != nil {
@@ -187,6 +190,11 @@ func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project strin
 		t.Fatalf("failed to fix revision for project %v", project)
 	}
 	commitManifest(t, ctx, &manifest, manifestDir)
+}
+
+func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project string) {
+	revision := currentRevision(t, ctx, project)
+	setRevisionForProject(t, ctx, manifestDir, project, revision)
 }
 
 func localProjectName(i int) string {
@@ -289,6 +297,34 @@ func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
 	}
 }
 
+func createAndCheckoutBranch(t *testing.T, ctx *tool.Context, projectDir, branch string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer ctx.Run().Chdir(cwd)
+	if err := ctx.Run().Chdir(projectDir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().CreateAndCheckoutBranch(branch); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+func resetToOriginMaster(t *testing.T, ctx *tool.Context, projectDir string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer ctx.Run().Chdir(cwd)
+	if err := ctx.Run().Chdir(projectDir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := ctx.Git().Reset("origin/master"); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
 // TestUpdateUniverse is a comprehensive test of the "jiri update"
 // logic that handles projects.
 //
@@ -309,7 +345,7 @@ func TestUpdateUniverse(t *testing.T) {
 	writeEmptyMetadata(t, ctx, localManifest)
 	remoteManifest := setupNewProject(t, ctx, remoteDir, "test-remote-manifest", false)
 	addRemote(t, ctx, localManifest, "origin", remoteManifest)
-	numProjects, remoteProjects := 4, []string{}
+	numProjects, remoteProjects := 5, []string{}
 	for i := 0; i < numProjects; i++ {
 		remoteProject := setupNewProject(t, ctx, remoteDir, remoteProjectName(i), true)
 		remoteProjects = append(remoteProjects, remoteProject)
@@ -347,7 +383,7 @@ func TestUpdateUniverse(t *testing.T) {
 	}
 
 	// Commit more work to the remote repositories and check that
-	// calling UpdateUnivers() advances project to HEAD or to the
+	// calling UpdateUniverse() advances project to HEAD or to the
 	// fixed revision set in the manifest.
 	holdProjectBack(t, ctx, remoteManifest, remoteProjects[1])
 	for _, remoteProject := range remoteProjects {
@@ -429,14 +465,41 @@ func TestUpdateUniverse(t *testing.T) {
 		checkDeleteFn(i, "revision 3")
 	}
 
+	// Commit to a non-master branch of a remote project and check that
+	// UpdateUniverse() can update the local project to point to a revision on
+	// that branch.
+	writeReadme(t, ctx, remoteProjects[4], "master commit")
+	createAndCheckoutBranch(t, ctx, remoteProjects[4], "non_master")
+	writeReadme(t, ctx, remoteProjects[4], "non master commit")
+	remoteBranchRevision := currentRevision(t, ctx, remoteProjects[4])
+	setRevisionForProject(t, ctx, remoteManifest, remoteProjects[4], remoteBranchRevision)
+	if err := UpdateUniverse(ctx, true); err != nil {
+		t.Fatalf("%v", err)
+	}
+	localProject := filepath.Join(localDir, localProjectName(4))
+	localBranchRevision := currentRevision(t, ctx, localProject)
+	if localBranchRevision != remoteBranchRevision {
+		t.Fatalf("project 4 is at revision %v, expected %v\n", localBranchRevision, remoteBranchRevision)
+	}
+	// Reset back to origin/master so the next update without a "revision" works.
+	resetToOriginMaster(t, ctx, localProject)
+
 	// Create a local manifest that imports the remote manifest
 	// and check that UpdateUniverse() has no effect.
 	createLocalManifestStub(t, ctx, localDir)
 	if err := UpdateUniverse(ctx, true); err != nil {
 		t.Fatalf("%v", err)
 	}
+
+	checkRebaseFn := func(i int, revision string) {
+		if i == 4 {
+			checkReadme(t, ctx, localProject, "non master commit")
+		} else {
+			checkDeleteFn(i, revision)
+		}
+	}
 	for i, _ := range remoteProjects {
-		checkDeleteFn(i, "revision 3")
+		checkRebaseFn(i, "revision 3")
 	}
 
 	// Create a local manifest that matches the remote manifest,
@@ -448,6 +511,6 @@ func TestUpdateUniverse(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		checkDeleteFn(i, "revision 3")
+		checkRebaseFn(i, "revision 3")
 	}
 }

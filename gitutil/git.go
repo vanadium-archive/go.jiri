@@ -270,8 +270,13 @@ func (g *Git) DeleteBranch(branch string, opts ...DeleteBranchOpt) error {
 }
 
 // Fetch fetches refs and tags from the given remote.
-func (g *Git) Fetch(remote, branch string) error {
-	return g.run("fetch", remote, branch)
+func (g *Git) Fetch(remote string) error {
+	return g.run("fetch", remote)
+}
+
+// FetchRefspec fetches refs and tags from the given remote for a particular refspec.
+func (g *Git) FetchRefspec(remote, refspec string) error {
+	return g.run("fetch", remote, refspec)
 }
 
 // FilesWithUncommittedChanges returns the list of files that have
@@ -482,6 +487,11 @@ func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
 	}
 	args = append(args, remote, branch)
 	return g.run(args...)
+}
+
+// Rebase rebases to a particular upstream branch.
+func (g *Git) Rebase(upstream string) error {
+	return g.run("rebase", upstream)
 }
 
 // RebaseAbort aborts an in-progress rebase operation.
