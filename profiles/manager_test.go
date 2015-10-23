@@ -40,6 +40,12 @@ func (p *myNewProfile) Root() string {
 	return p.root
 }
 
+func (p *myNewProfile) Info() string {
+	return `
+The myNewProfile is for testing purposes only
+`
+}
+
 func (p *myNewProfile) VersionInfo() *profiles.VersionInfo {
 	return p.versionInfo
 }

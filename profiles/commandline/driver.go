@@ -20,6 +20,7 @@ import (
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/envvar"
+	"v.io/x/lib/textutil"
 )
 
 func init() {
@@ -31,37 +32,14 @@ func init() {
 var CommandLineDriver = &cmdline.Command{
 	Name:  "profile",
 	Short: "Manage profiles",
-	Long: `
-Profiles provide a means of managing software dependencies that can
-be built natively as well as being cross compiled. A profile generally
-manages a suite of related software components that are required for
-a particular application (e.g. for android development).
-
-Each profile can be in one of three states: absent, up-to-date, or
-out-of-date. The subcommands of the profile command realize the
-following transitions:
-
-  install:   absent => up-to-date
-  update:    out-of-date => up-to-date
-  uninstall: up-to-date or out-of-date => absent
-
-A profile can simultaneously have multiple versions, one of which is
-configured as the default. A profile installation is out of date if the
-installed versions are older than the current default. Updating that
-profile will install the default version which will then be used by default.
-Newer versions than the default may be installed and used via appropriate
-command line flags.
-
-To enable cross-compilation, a profile can be installed for multiple
-targets. If a profile supports multiple targets the above state
-transitions are applied on a profile + target basis.
-`,
+	Long:  helpMsg,
 	Children: []*cmdline.Command{
 		cmdInstall,
 		cmdList,
 		cmdEnv,
 		cmdUninstall,
 		cmdUpdate,
+		cmdInfo,
 		cmdRecreate,
 	},
 }
@@ -142,6 +120,16 @@ var cmdUninstall = &cmdline.Command{
 	Long:     "Uninstall the given profiles.",
 	ArgsName: "<profiles>",
 	ArgsLong: "<profiles> is a list of profiles to uninstall.",
+}
+
+// cmdInfo represents the "profile info" command.
+var cmdInfo = &cmdline.Command{
+	Runner:   cmdline.RunnerFunc(runInfo),
+	Name:     "info",
+	Short:    "Display info about the available profiles",
+	Long:     "Display info about the available profiles.",
+	ArgsName: "<profiles>",
+	ArgsLong: "<profiles> is a list of profiles to show info for, if omitted, info is shown for all profiles.",
 }
 
 var (
@@ -296,6 +284,28 @@ func runRecreate(env *cmdline.Env, args []string) error {
 			}
 			fmt.Fprintf(ctx.Stdout(), " %s\n", name)
 		}
+	}
+	return nil
+}
+
+func runInfo(env *cmdline.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(env)
+	profileNames := args
+	if len(args) == 0 {
+		profileNames = profiles.Managers()
+	}
+	_, width, err := textutil.TerminalSize()
+	if err != nil {
+		width = 80
+	}
+	w := textutil.NewUTF8LineWriter(ctx.Stdout(), width)
+	defer w.Flush()
+	for _, name := range profileNames {
+		mgr := profiles.LookupManager(name)
+		if mgr == nil {
+			return fmt.Errorf("profile %q is not available", name)
+		}
+		fmt.Fprintf(w, "%s: %s\n\n", name, mgr.Info())
 	}
 	return nil
 }
