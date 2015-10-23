@@ -937,9 +937,14 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 
 // snapshotLocalProjects returns an in-memory representation of the
 // current state of all local projects
-func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
+func snapshotLocalProjects(ctx *tool.Context) (_ *Manifest, e error) {
 	ctx.TimerPush("snapshot projects")
 	defer ctx.TimerPop()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
 		return nil, err
@@ -950,24 +955,19 @@ func snapshotLocalProjects(ctx *tool.Context) (*Manifest, error) {
 	}
 	manifest := Manifest{}
 	for _, project := range localProjects {
-		revision := ""
-		revisionFn := func() error {
-			switch project.Protocol {
-			case "git":
-				gitRevision, err := ctx.Git().CurrentRevision()
-				if err != nil {
-					return err
-				}
-				revision = gitRevision
-				return nil
-			default:
-				return UnsupportedProtocolErr(project.Protocol)
+		switch project.Protocol {
+		case "git":
+			if err := ctx.Run().Chdir(project.Path); err != nil {
+				return nil, err
 			}
+			revision, err := ctx.Git().CurrentRevisionOfBranch("master")
+			if err != nil {
+				return nil, err
+			}
+			project.Revision = revision
+		default:
+			return nil, UnsupportedProtocolErr(project.Protocol)
 		}
-		if err := ApplyToLocalMaster(ctx, Projects{project.Name: project}, revisionFn); err != nil {
-			return nil, err
-		}
-		project.Revision = revision
 		project.Path = strings.TrimPrefix(project.Path, root)
 		manifest.Projects = append(manifest.Projects, project)
 	}

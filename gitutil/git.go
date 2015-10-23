@@ -235,7 +235,12 @@ func (g *Git) CurrentBranchName() (string, error) {
 
 // CurrentRevision returns the current revision.
 func (g *Git) CurrentRevision() (string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", "HEAD")
+	return g.CurrentRevisionOfBranch("HEAD")
+}
+
+// CurrentRevisionOfBranch returns the current revision of the given branch.
+func (g *Git) CurrentRevisionOfBranch(branch string) (string, error) {
+	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", branch)
 	if err != nil {
 		return "", err
 	}
