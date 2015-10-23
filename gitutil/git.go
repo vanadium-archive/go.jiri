@@ -189,6 +189,7 @@ func (g *Git) CountCommits(branch, base string) (int, error) {
 	if base != "" {
 		args = append(args, "^"+base)
 	}
+	args = append(args, "--")
 	out, err := g.runOutputWithOpts(g.disableDryRun(), args...)
 	if err != nil {
 		return 0, err
@@ -518,7 +519,7 @@ func (g *Git) Reset(target string, opts ...ResetOpt) error {
 			mode = string(typedOpt)
 		}
 	}
-	args = append(args, fmt.Sprintf("--%v", mode), target)
+	args = append(args, fmt.Sprintf("--%v", mode), target, "--")
 	return g.run(args...)
 }
 
