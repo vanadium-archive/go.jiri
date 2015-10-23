@@ -200,7 +200,7 @@ func (e *executor) terminateProcessGroup(command *exec.Cmd) {
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		fmt.Fprintf(e.opts.Stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGTERM, err)
 	}
-	fmt.Fprintf(e.opts.Stderr, "Waiting for command to exit: %q\n", command.Path)
+	fmt.Fprintf(e.opts.Stderr, "Waiting for command to exit: %q\n", command.Args)
 	// Give the process some time to shut down cleanly.
 	for i := 0; i < 10; i++ {
 		select {
