@@ -16,10 +16,9 @@ pkg profiles, func EnsureProfileTargetIsInstalled(*tool.Context, string, Target,
 pkg profiles, func EnsureProfileTargetIsUninstalled(*tool.Context, string, Target, string) error
 pkg profiles, func FindTarget(OrderedTargets, *Target) *Target
 pkg profiles, func FindTargetByTag(OrderedTargets, *Target) *Target
+pkg profiles, func FindTargetWithDefault(OrderedTargets, *Target) *Target
 pkg profiles, func GitCloneRepo(*tool.Context, string, string, string, os.FileMode) error
 pkg profiles, func GoEnvironmentFromOS() []string
-pkg profiles, func HasTarget(string, Target) bool
-pkg profiles, func HasTargetTag(string, Target) bool
 pkg profiles, func InsertTarget(OrderedTargets, *Target) OrderedTargets
 pkg profiles, func InstallPackages(*tool.Context, []string) error
 pkg profiles, func InstallProfile(string, string)
@@ -45,7 +44,8 @@ pkg profiles, func RemoveProfileTarget(string, Target) bool
 pkg profiles, func RemoveTarget(OrderedTargets, *Target) OrderedTargets
 pkg profiles, func RunCommand(*tool.Context, map[string]string, string, ...string) error
 pkg profiles, func SchemaVersion() Version
-pkg profiles, func UnsetGoEnv(*envvar.Vars)
+pkg profiles, func UnsetGoEnvMap(map[string]string)
+pkg profiles, func UnsetGoEnvVars(*envvar.Vars)
 pkg profiles, func UpdateProfileTarget(string, Target) error
 pkg profiles, func Write(*tool.Context, string) error
 pkg profiles, method (*ConfigHelper) LegacyProfiles() bool
@@ -97,8 +97,9 @@ pkg profiles, type ConfigHelper struct
 pkg profiles, type ConfigHelper struct, embedded *envvar.Vars
 pkg profiles, type Environment struct
 pkg profiles, type Environment struct, Vars []string
-pkg profiles, type Manager interface { AddFlags, Install, Name, Root, SetRoot, String, Uninstall, VersionInfo }
+pkg profiles, type Manager interface { AddFlags, Info, Install, Name, Root, SetRoot, String, Uninstall, VersionInfo }
 pkg profiles, type Manager interface, AddFlags(*flag.FlagSet, Action)
+pkg profiles, type Manager interface, Info() string
 pkg profiles, type Manager interface, Install(*tool.Context, Target) error
 pkg profiles, type Manager interface, Name() string
 pkg profiles, type Manager interface, Root() string

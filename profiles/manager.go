@@ -107,6 +107,8 @@ type Manager interface {
 	Root() string
 	// Name returns the name of this profile.
 	Name() string
+	// Info returns an informative description of the profile.
+	Info() string
 	// VersionInfo returns the VersionInfo instance for this profile.
 	VersionInfo() *VersionInfo
 	// String returns a string representation of the profile, conventionally this
