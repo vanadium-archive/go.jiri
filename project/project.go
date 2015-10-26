@@ -280,13 +280,23 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 }
 
 // LocalProjects scans the local filesystem to identify existing projects.
+// The Project struct returned contains data read directly from the metadata
+// files, but with absolute paths instead of relative ones.  Otherwise the data
+// is as found on disk.
 func LocalProjects(ctx *tool.Context) (Projects, error) {
+
+	// Timer boilerplate.
 	ctx.TimerPush("find local projects")
 	defer ctx.TimerPop()
+
+	// Start in the JiriRoot directory.
 	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
 	}
+
+	// Initial call to findLocalProjects -- it will recursively search all the
+	// directories under JiriRoot.
 	projects := Projects{}
 	if err := findLocalProjects(ctx, root, metadataDirName, projects); err != nil {
 		return nil, err
@@ -298,15 +308,20 @@ func LocalProjects(ctx *tool.Context) (Projects, error) {
 // locally. Changes are grouped by projects and contain author identification
 // and a description of their content.
 func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, e error) {
+
+	// Timer boilerplate.
 	ctx.TimerPush("poll projects")
 	defer ctx.TimerPop()
-	update := Update{}
+
+	// Switch back to current working directory when we're done.
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	localProjects, err := LocalProjects(ctx)
+
+	// Gather local & remote project data.
+	localProjects, err := snapshotLocalProjectsAsMap(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -314,34 +329,50 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 	if err != nil {
 		return nil, err
 	}
+
+	// Compute difference between local and remote.
+	update := Update{}
 	ops, err := computeOperations(localProjects, remoteProjects, false)
 	if err != nil {
 		return nil, err
 	}
+
 	for _, op := range ops {
 		name := op.Project().Name
+
+		// If given a project set, limit our results to those projects in the set.
 		if len(projectSet) > 0 {
 			if _, ok := projectSet[name]; !ok {
 				continue
 			}
 		}
+
+		// We only inspect this project if an update operation is required.
 		cls := []CL{}
 		if updateOp, ok := op.(updateOperation); ok {
 			switch updateOp.project.Protocol {
 			case "git":
+
+				// Enter project directory - this assumes absolute paths.
 				if err := ctx.Run().Chdir(updateOp.destination); err != nil {
 					return nil, err
 				}
+
+				// Fetch the latest from remote.
 				if err := ctx.Git().Fetch("origin", "master"); err != nil {
 					return nil, err
 				}
+
+				// Collect commits visible from FETCH_HEAD that aren't visible from master.
 				commitsText, err := ctx.Git().Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
 				if err != nil {
 					return nil, err
 				}
+
+				// Format those commits and add them to the results.
 				for _, commitText := range commitsText {
 					if got, want := len(commitText), 3; got < want {
-						return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
+							return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
 					}
 					cls = append(cls, CL{
 						Author:      commitText[0],
@@ -656,33 +687,48 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 
 // findLocalProjects implements LocalProjects.
 func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects Projects) (e error) {
+
+	// Return to current working directory when done.
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+
+	// Enter the directory to inspect.
 	if err := ctx.Run().Chdir(path); err != nil {
 		return err
 	}
+
+	// Need JiriRoot so we can convert from relative to absolute paths.
 	root, err := JiriRoot()
 	if err != nil {
 		return err
 	}
+
+	// Metadata files are how we know we've found a Jiri-maintained project.
 	metadataDir := filepath.Join(path, metadataDirName)
 	if _, err := ctx.Run().Stat(metadataDir); err == nil {
+
+		// Found a jiri-maintained project: read the metadata file to buffer.
 		metadataFile := filepath.Join(metadataDir, metadataFileName)
 		bytes, err := ctx.Run().ReadFile(metadataFile)
 		if err != nil {
 			return err
 		}
+
+		// Parse buffer to Project object.
 		var project Project
 		if err := xml.Unmarshal(bytes, &project); err != nil {
 			return fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
 		}
-		// Root relative paths in the $JIRI_ROOT directory.
+
+		// Convert relative paths to absolute ones.
 		if !filepath.IsAbs(project.Path) {
 			project.Path = filepath.Join(root, project.Path)
 		}
+
+		// Check for some error conditions.
 		if path != project.Path {
 			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, path)
 		}
@@ -693,6 +739,8 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 	} else if !os.IsNotExist(err) {
 		return err
 	}
+
+	// Recurse into all the sub directories.
 	fileInfos, err := ctx.Run().ReadDir(path)
 	if err != nil {
 		return err
@@ -938,21 +986,32 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 // snapshotLocalProjects returns an in-memory representation of the
 // current state of all local projects
 func snapshotLocalProjects(ctx *tool.Context) (_ *Manifest, e error) {
+
+	// Timing boilerplate.
 	ctx.TimerPush("snapshot projects")
 	defer ctx.TimerPop()
+
+	// Return to current working directory when done.
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+
+	// Grab the current metadata for the local projects.
 	localProjects, err := LocalProjects(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// We need JiriRoot so we can construct JiriRoot-relative paths later.
 	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
 	}
+
+	// Tweak the local projects data a bit: convert HEAD revisions to
+	// actual SHAs, and convert full paths to ones relative to JiriRoot.
 	manifest := Manifest{}
 	for _, project := range localProjects {
 		switch project.Protocol {
@@ -974,23 +1033,43 @@ func snapshotLocalProjects(ctx *tool.Context) (_ *Manifest, e error) {
 	return &manifest, nil
 }
 
-// updateProjects updates all jiri projects.
-func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
-	ctx.TimerPush("update projects")
-	defer ctx.TimerPop()
+// Returns snapshotLocalProjects data converted to a Projects map.
+func snapshotLocalProjectsAsMap(ctx *tool.Context) (Projects, error) {
+
+	// We need JiriRoot to convert relative paths to absolute.
 	root, err := JiriRoot()
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	// Get the local manifest from snapshotLocalProjects.
 	localManifest, err := snapshotLocalProjects(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	// Construct a Projects map with absolute project paths.
 	localProjects := make(Projects)
 	for _, project := range localManifest.Projects {
 		project.Path = filepath.Join(root, project.Path)
 		localProjects[project.Name] = project
 	}
+
+	return localProjects, nil
+}
+
+// updateProjects updates all jiri projects.
+func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
+
+	// Timer boilerplate.
+	ctx.TimerPush("update projects")
+	defer ctx.TimerPop()
+
+	localProjects, err := snapshotLocalProjectsAsMap(ctx)
+	if err != nil {
+		return err
+	}
+
 	gitHost, gitHostErr := GitHost(ctx)
 	if gitHostErr == nil && googlesource.IsGoogleSourceHost(gitHost) {
 		// Attempt to get the repo statuses from remote so we can detect when a
