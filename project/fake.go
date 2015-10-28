@@ -39,6 +39,13 @@ func NewFakeJiriRoot(ctx *tool.Context) (*FakeJiriRoot, error) {
 	if err != nil {
 		return nil, err
 	}
+	doCleanup := true
+	defer func() {
+		if doCleanup {
+			root.Cleanup(ctx)
+		}
+	}()
+
 	root.remote = remoteDir
 	if err := root.CreateRemoteProject(ctx, manifestProject); err != nil {
 		return nil, err
@@ -106,13 +113,19 @@ func NewFakeJiriRoot(ctx *tool.Context) (*FakeJiriRoot, error) {
 		return nil, err
 	}
 
+	doCleanup = false
 	return root, nil
 }
 
 // Cleanup cleans up the given Vanadium root fake.
 func (root FakeJiriRoot) Cleanup(ctx *tool.Context) error {
 	var errs []error
-	collect.Errors(func() error { return ctx.Run().RemoveAll(root.Dir) }, &errs)
+	collect.Errors(func() error {
+		if root.Dir == "" {
+			return nil
+		}
+		return ctx.Run().RemoveAll(root.Dir)
+	}, &errs)
 	collect.Errors(func() error { return ctx.Run().RemoveAll(root.remote) }, &errs)
 	if len(errs) != 0 {
 		return fmt.Errorf("Cleanup() failed: %v", errs)
