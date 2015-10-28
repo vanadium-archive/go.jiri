@@ -126,6 +126,9 @@ type Project struct {
 	Protocol string `xml:"protocol,attr"`
 	// Remote is the project remote.
 	Remote string `xml:"remote,attr"`
+	// RemoteBranch is the name of the remote branch to track.  It doesn't affect
+	// the name of the local branch that jiri maintains, which is always "master".
+	RemoteBranch string `xml:"remotebranch,attr"`
 	// Revision is the revision the project should be advanced to
 	// during "jiri update". If not set, "HEAD" is used as the
 	// default.
@@ -445,7 +448,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 				}
 
 				// Fetch the latest from remote.
-				if err := ctx.Git().FetchRefspec("origin", "master"); err != nil {
+				if err := ctx.Git().FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
 					return nil, err
 				}
 
@@ -497,8 +500,9 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 			Path:     manifestPath,
 			Protocol: "git",
 			Revision: "HEAD",
+			RemoteBranch: "master",
 		}
-		if err := pullProject(ctx, project); err != nil {
+		if err := resetProject(ctx, project); err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
@@ -723,7 +727,7 @@ func CleanupProjects(ctx *tool.Context, projects Projects, cleanupBranches bool)
 		if err := ctx.Run().Chdir(localProjectDir); err != nil {
 			return err
 		}
-		if err := resetLocalProject(ctx, cleanupBranches); err != nil {
+		if err := resetLocalProject(ctx, cleanupBranches, project.RemoteBranch); err != nil {
 			return err
 		}
 	}
@@ -732,7 +736,7 @@ func CleanupProjects(ctx *tool.Context, projects Projects, cleanupBranches bool)
 
 // resetLocalProject checks out the master branch, cleans up untracked files
 // and uncommitted changes, and optionally deletes all the other branches.
-func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
+func resetLocalProject(ctx *tool.Context, cleanupBranches bool, remoteBranch string) error {
 	// Check out master and clean up changes.
 	curBranchName, err := ctx.Git().CurrentBranchName()
 	if err != nil {
@@ -747,7 +751,7 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 		return err
 	}
 	// Discard any uncommitted changes.
-	if err := ctx.Git().Reset("origin/master"); err != nil {
+	if err := ctx.Git().Reset("origin/" + remoteBranch); err != nil {
 		return err
 	}
 
@@ -929,31 +933,29 @@ func runHooks(ctx *tool.Context, hooks Hooks) error {
 	return nil
 }
 
-// pullProject advances the local master branch of the given
+// resetProject advances the local master branch of the given
 // project, which is expected to exist locally at project.Path.
-func pullProject(ctx *tool.Context, project Project) error {
-	pullFn := func() error {
+func resetProject(ctx *tool.Context, project Project) error {
+	fn := func() error {
 		switch project.Protocol {
 		case "git":
 			if err := ctx.Git().Fetch("origin"); err != nil {
 				return err
 			}
-			// If the project wants to pin to a specific revision, try to rebase to
-			// that. If the revision is the default value HEAD try to rebase to the
-			// remote master branch.
-			upstream := project.Revision
-			if project.Revision == "HEAD" {
-				upstream = "origin/master"
+
+			// Having a specific revision trumps everything else - once fetched,
+			// always reset to that revision.
+			if project.Revision != "" && project.Revision != "HEAD" {
+				return ctx.Git().Reset(project.Revision)
 			}
-			if err := ctx.Git().Rebase(upstream); err != nil {
-				return err
-			}
-			return ctx.Git().Reset("HEAD")
+
+			// If no revision, reset to the configured remote branch.
+			return ctx.Git().Reset("origin/" + project.RemoteBranch)
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
 	}
-	return ApplyToLocalMaster(ctx, Projects{project.Name: project}, pullFn)
+	return ApplyToLocalMaster(ctx, Projects{project.Name: project}, fn)
 }
 
 // loadManifest loads the given manifest, processing all of its
@@ -1009,6 +1011,10 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 			default:
 				return UnsupportedProtocolErr(project.Protocol)
 			}
+		}
+		// Default to "master" branch if none is provided.
+		if project.RemoteBranch == "" {
+			project.RemoteBranch = "master"
 		}
 		projects[project.Name] = project
 	}
@@ -1352,6 +1358,9 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 	if err := ctx.Run().Rename(tmpDir, op.destination); err != nil {
 		return err
 	}
+	if err := resetProject(ctx, op.project); err != nil {
+		return err
+	}
 	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
 		return err
 	}
@@ -1463,7 +1472,7 @@ func (op moveOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 	if err := reportNonMaster(ctx, op.project); err != nil {
 		return err
 	}
-	if err := pullProject(ctx, op.project); err != nil {
+	if err := resetProject(ctx, op.project); err != nil {
 		return err
 	}
 	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
@@ -1505,7 +1514,7 @@ func (op updateOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 	if err := reportNonMaster(ctx, op.project); err != nil {
 		return err
 	}
-	if err := pullProject(ctx, op.project); err != nil {
+	if err := resetProject(ctx, op.project); err != nil {
 		return err
 	}
 	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
