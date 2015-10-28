@@ -825,7 +825,7 @@ func runHooks(ctx *tool.Context, hooks Hooks) error {
 			args = append(args, arg.Arg)
 		}
 		if err := ctx.Run().Command(command, args...); err != nil {
-			return fmt.Errorf("Hook %v failed: %v", hook.Name, err)
+			return fmt.Errorf("Hook %v failed: %v command: %v args: %v", hook.Name, err, command, args)
 		}
 	}
 	return nil
