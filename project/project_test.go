@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"v.io/jiri/tool"
@@ -43,6 +44,22 @@ func checkReadme(t *testing.T, ctx *tool.Context, project, message string) {
 	}
 	if got, want := data, []byte(message); bytes.Compare(got, want) != 0 {
 		t.Fatalf("unexpected content %v:\ngot\n%s\nwant\n%s\n", project, got, want)
+	}
+}
+
+// Checks that /.jiri/ is ignored in a local project checkout
+func checkGitIgnore(t *testing.T, ctx *tool.Context, project string) {
+	if _, err := ctx.Run().Stat(project); err != nil {
+		t.Fatalf("%v", err)
+	}
+	gitInfoExcludeFile := filepath.Join(project, ".git", "info", "exclude")
+	data, err := ioutil.ReadFile(gitInfoExcludeFile)
+	if err != nil {
+		t.Fatalf("ReadFile(%v) failed: %v", gitInfoExcludeFile, err)
+	}
+	excludeString := "/.jiri/"
+	if !strings.Contains(string(data), excludeString) {
+		t.Fatalf("Did not find \"%v\" in exclude file", excludeString)
 	}
 }
 
@@ -372,6 +389,7 @@ func TestUpdateUniverse(t *testing.T) {
 	}
 	checkCreateFn := func(i int, revision string) {
 		localProject := filepath.Join(localDir, localProjectName(i))
+		checkGitIgnore(t, ctx, localProject)
 		if i == 0 {
 			checkReadme(t, ctx, localProject, "revision 1")
 		} else {
