@@ -38,6 +38,7 @@ var (
 	setTopicFlag     bool
 	topicFlag        string
 	uncommittedFlag  bool
+	verifyFlag       bool
 )
 
 // Special labels stored in the commit message.
@@ -70,6 +71,7 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&setTopicFlag, "set-topic", true, "Set Gerrit CL topic.")
 	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", "CL topic, defaults to <username>-<branchname>.")
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
+	cmdCLMail.Flags.BoolVar(&verifyFlag, "verify", true, "Run pre-push git hooks.")
 	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 }
 
@@ -357,6 +359,7 @@ func runCLMail(env *cmdline.Env, _ []string) error {
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
 		Reviewers:    parseEmails(reviewersFlag),
+		Verify:       verifyFlag,
 	})
 	if err != nil {
 		return err

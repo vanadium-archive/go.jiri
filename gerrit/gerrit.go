@@ -73,6 +73,8 @@ type CLOpts struct {
 	Reviewers []string
 	// Topic records the CL topic.
 	Topic string
+	// Verify controls whether git pre-push hooks should be run before uploading.
+	Verify bool
 }
 
 // Gerrit records a hostname of a Gerrit instance.
@@ -453,6 +455,14 @@ func Push(run *runutil.Run, clOpts CLOpts) error {
 	}
 	refspec := "HEAD:" + Reference(clOpts)
 	args := []string{"push", remote, refspec}
+	// TODO(jamesr): This should really reuse gitutil/git.go's Push which knows
+	// how to set this option but doesn't yet know how to pipe stdout/stderr the way
+	// this function wants.
+	if clOpts.Verify {
+		args = append(args, "--verify")
+	} else {
+		args = append(args, "--no-verify")
+	}
 	var stdout, stderr bytes.Buffer
 	opts := run.Opts()
 	opts.Stdout = &stdout

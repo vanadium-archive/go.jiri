@@ -103,6 +103,8 @@ The jiri cl mail flags are:
    Set Gerrit CL topic.
  -topic=
    CL topic, defaults to <username>-<branchname>.
+ -verify=true
+   Run pre-push git hooks.
 
 Jiri cl new - Create a new local branch for a changelist
 
