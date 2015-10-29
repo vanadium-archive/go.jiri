@@ -192,6 +192,11 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 		return err
 	}
 	for _, project := range localProjects {
+		relPath, err := ToRel(project.Path)
+		if err != nil {
+			return err
+		}
+		project.Path = relPath
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
