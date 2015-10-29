@@ -155,10 +155,20 @@ type Tool struct {
 	Project string `xml:"project,attr"`
 }
 
+// ScanMode determines whether LocalProjects should scan the local filesystem
+// for projects (FullScan), or optimistically assume that the local projects
+// will match those in the manifest (FastScan).
+type ScanMode bool
+
+const (
+	FastScan = ScanMode(false)
+	FullScan = ScanMode(true)
+)
+
 type UnsupportedProtocolErr string
 
 func (e UnsupportedProtocolErr) Error() string {
-	return fmt.Sprintf("unsupported protocol %v", e)
+	return "unsupported protocol: " + string(e)
 }
 
 // Update represents an update of projects as a map from
@@ -173,14 +183,20 @@ var devtoolsBinDir = filepath.Join("devtools", "bin")
 func CreateSnapshot(ctx *tool.Context, path string) error {
 	ctx.TimerPush("create snapshot")
 	defer ctx.TimerPop()
-	// Create an in-memory representation of the current projects.
-	manifest, err := snapshotLocalProjects(ctx)
+
+	manifest := Manifest{}
+
+	// Add all local projects to manifest.
+	localProjects, err := LocalProjects(ctx, FullScan)
 	if err != nil {
 		return err
 	}
+	for _, project := range localProjects {
+		manifest.Projects = append(manifest.Projects, project)
+	}
 
-	// Add all hosts, tools, and hooks from the current manifest to the snapshot
-	// manifest.
+	// Add all hosts, tools, and hooks from the current manifest to the
+	// snapshot manifest.
 	hosts, _, tools, hooks, err := readManifest(ctx, true)
 	if err != nil {
 		return err
@@ -215,18 +231,17 @@ const currentManifestFileName = ".current_manifest"
 // CurrentManifest returns a manifest that identifies the result of
 // the most recent "jiri update" invocation.
 func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
-	root, err := JiriRoot()
+	currentManifestPath, err := ToAbs(currentManifestFileName)
 	if err != nil {
 		return nil, err
 	}
-	currentManifestFile := filepath.Join(root, currentManifestFileName)
-	bytes, err := ctx.Run().ReadFile(currentManifestFile)
+	bytes, err := ctx.Run().ReadFile(currentManifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Fprintf(ctx.Stderr(), `WARNING: Could not find %s.
 The contents of this file are stored as metadata in binaries the jiri
 tool builds. To fix this problem, please run "jiri update".
-`, currentManifestFile)
+`, currentManifestPath)
 			return &Manifest{}, nil
 		}
 		return nil, err
@@ -241,7 +256,7 @@ tool builds. To fix this problem, please run "jiri update".
 // writeCurrentManifest writes the given manifest to a file that
 // stores the result of the most recent "jiri update" invocation.
 func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
-	root, err := JiriRoot()
+	currentManifestPath, err := ToAbs(currentManifestFileName)
 	if err != nil {
 		return err
 	}
@@ -249,7 +264,7 @@ func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
 	if err != nil {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
 	}
-	if err := ctx.Run().WriteFile(filepath.Join(root, currentManifestFileName), bytes, os.FileMode(0644)); err != nil {
+	if err := ctx.Run().WriteFile(currentManifestPath, bytes, os.FileMode(0644)); err != nil {
 		return err
 	}
 	return nil
@@ -279,17 +294,64 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 	return "", nil
 }
 
-// LocalProjects scans the local filesystem to identify existing projects.
-// The Project struct returned contains data read directly from the metadata
-// files, but with absolute paths instead of relative ones.  Otherwise the data
-// is as found on disk.
-func LocalProjects(ctx *tool.Context) (Projects, error) {
+// setProjectRevisions sets the current project revision from the master for
+// each project as found on the filesystem
+func setProjectRevisions(ctx *tool.Context, projects Projects) (_ Projects, e error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
 
-	// Timer boilerplate.
-	ctx.TimerPush("find local projects")
+	for name, project := range projects {
+		switch project.Protocol {
+		case "git":
+			if err := ctx.Run().Chdir(project.Path); err != nil {
+				return nil, err
+			}
+			revision, err := ctx.Git().CurrentRevisionOfBranch("master")
+			if err != nil {
+				return nil, err
+			}
+			project.Revision = revision
+		default:
+			return nil, UnsupportedProtocolErr(project.Protocol)
+		}
+		projects[name] = project
+	}
+	return projects, nil
+}
+
+// LocalProjects returns projects on the local filesystem.  If all projects in
+// the manifest exist locally and scanMode is set to FastScan, then only the
+// projects in the manifest that exist locally will be returned.  Otherwise, a
+// full scan of the filesystem will take place, and all found projects will be
+// returned.
+func LocalProjects(ctx *tool.Context, scanMode ScanMode) (Projects, error) {
+	ctx.TimerPush("local projects")
 	defer ctx.TimerPop()
 
-	// Start in the JiriRoot directory.
+	projects := Projects{}
+	if scanMode == FastScan {
+		// Fast path:  Full scan was not requested, and all projects in
+		// manifest exist on local filesystem.  We just use the projects
+		// directly from the manifest.
+		manifestProjects, _, err := ReadManifest(ctx)
+		if err != nil {
+			return nil, err
+		}
+		projectsExist, err := projectsExistLocally(ctx, manifestProjects)
+		if err != nil {
+			return nil, err
+		}
+		if projectsExist {
+			return setProjectRevisions(ctx, manifestProjects)
+		}
+	}
+
+	// Slow path: Either full scan was not requested, or projects exist in
+	// manifest that were not found locally.   Do a scan of all projects in
+	// JIRI_ROOT.
 	root, err := JiriRoot()
 	if err != nil {
 		return nil, err
@@ -297,19 +359,38 @@ func LocalProjects(ctx *tool.Context) (Projects, error) {
 
 	// Initial call to findLocalProjects -- it will recursively search all the
 	// directories under JiriRoot.
-	projects := Projects{}
-	if err := findLocalProjects(ctx, root, metadataDirName, projects); err != nil {
+	ctx.TimerPush("scan fs for local projects")
+	err = findLocalProjects(ctx, root, projects)
+	ctx.TimerPop()
+	if err != nil {
 		return nil, err
 	}
-	return projects, nil
+	return setProjectRevisions(ctx, projects)
+}
+
+// projectsExistLocally returns true iff all the given projects exist on the
+// local filesystem.
+// Note that this may return true even if there are projects on the local
+// filesystem not included in the provided projects argument.
+func projectsExistLocally(ctx *tool.Context, projects Projects) (bool, error) {
+	ctx.TimerPush("local projects match manifest")
+	defer ctx.TimerPop()
+	for _, p := range projects {
+		isLocal, err := isLocalProject(ctx, p.Path)
+		if err != nil {
+			return false, err
+		}
+		if !isLocal {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // PollProjects returns the set of changelists that exist remotely but not
 // locally. Changes are grouped by projects and contain author identification
 // and a description of their content.
 func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, e error) {
-
-	// Timer boilerplate.
 	ctx.TimerPush("poll projects")
 	defer ctx.TimerPop()
 
@@ -321,7 +402,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
 
 	// Gather local & remote project data.
-	localProjects, err := snapshotLocalProjectsAsMap(ctx)
+	localProjects, err := LocalProjects(ctx, FastScan)
 	if err != nil {
 		return nil, err
 	}
@@ -403,12 +484,12 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 	ctx.TimerPush("read manifest")
 	defer ctx.TimerPop()
 	if update {
-		root, err := JiriRoot()
+		manifestPath, err := ToAbs(".manifest")
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 		project := Project{
-			Path:     filepath.Join(root, ".manifest"),
+			Path:     manifestPath,
 			Protocol: "git",
 			Revision: "HEAD",
 		}
@@ -518,7 +599,7 @@ func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
 		// Nothing to do here...
 		return nil
 	}
-	projects, err := LocalProjects(ctx)
+	projects, err := LocalProjects(ctx, FastScan)
 	if err != nil {
 		return err
 	}
@@ -579,7 +660,7 @@ func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
 // function does not perform any version control operation on the master
 // branch.
 func buildToolsFromMaster(ctx *tool.Context, tools Tools, outputDir string) error {
-	localProjects, err := LocalProjects(ctx)
+	localProjects, err := LocalProjects(ctx, FastScan)
 	if err != nil {
 		return err
 	}
@@ -685,59 +766,72 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool) error {
 	return nil
 }
 
-// findLocalProjects implements LocalProjects.
-func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects Projects) (e error) {
+// isLocalProject returns true if there is a project at the given path.
+func isLocalProject(ctx *tool.Context, path string) (bool, error) {
+	absPath, err := ToAbs(path)
+	if err != nil {
+		return false, err
+	}
+	// Existence of a metadata directory is how we know we've found a
+	// Jiri-maintained project.
+	metadataDir := filepath.Join(absPath, metadataDirName)
+	_, err = ctx.Run().Stat(metadataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
 
-	// Return to current working directory when done.
-	cwd, err := os.Getwd()
+// projectAtPath returns a Project struct corresponding to the project at the
+// path in the filesystem.
+func projectAtPath(ctx *tool.Context, path string) (Project, error) {
+	var project Project
+	absPath, err := ToAbs(path)
+	if err != nil {
+		return project, err
+	}
+	metadataFile := filepath.Join(absPath, metadataDirName, metadataFileName)
+	bytes, err := ctx.Run().ReadFile(metadataFile)
+	if err != nil {
+		return project, err
+	}
+	if err := xml.Unmarshal(bytes, &project); err != nil {
+		return project, fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
+	}
+	projectPath, err := ToAbs(project.Path)
+	if err != nil {
+		return project, err
+	}
+	project.Path = projectPath
+	return project, nil
+}
+
+// findLocalProjects scans the filesystem for all projects.  Note that project
+// directories can be nested recursively.
+func findLocalProjects(ctx *tool.Context, path string, projects Projects) error {
+	absPath, err := ToAbs(path)
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-
-	// Enter the directory to inspect.
-	if err := ctx.Run().Chdir(path); err != nil {
-		return err
-	}
-
-	// Need JiriRoot so we can convert from relative to absolute paths.
-	root, err := JiriRoot()
+	isLocal, err := isLocalProject(ctx, absPath)
 	if err != nil {
 		return err
 	}
-
-	// Metadata files are how we know we've found a Jiri-maintained project.
-	metadataDir := filepath.Join(path, metadataDirName)
-	if _, err := ctx.Run().Stat(metadataDir); err == nil {
-
-		// Found a jiri-maintained project: read the metadata file to buffer.
-		metadataFile := filepath.Join(metadataDir, metadataFileName)
-		bytes, err := ctx.Run().ReadFile(metadataFile)
+	if isLocal {
+		project, err := projectAtPath(ctx, absPath)
 		if err != nil {
 			return err
 		}
-
-		// Parse buffer to Project object.
-		var project Project
-		if err := xml.Unmarshal(bytes, &project); err != nil {
-			return fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
-		}
-
-		// Convert relative paths to absolute ones.
-		if !filepath.IsAbs(project.Path) {
-			project.Path = filepath.Join(root, project.Path)
-		}
-
-		// Check for some error conditions.
-		if path != project.Path {
-			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, path)
+		if absPath != project.Path {
+			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, absPath)
 		}
 		if p, ok := projects[project.Name]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
 		projects[project.Name] = project
-	} else if !os.IsNotExist(err) {
-		return err
 	}
 
 	// Recurse into all the sub directories.
@@ -747,7 +841,7 @@ func findLocalProjects(ctx *tool.Context, path, metadataDirName string, projects
 	}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
-			if err := findLocalProjects(ctx, filepath.Join(path, fileInfo.Name()), metadataDirName, projects); err != nil {
+			if err := findLocalProjects(ctx, filepath.Join(path, fileInfo.Name()), projects); err != nil {
 				return err
 			}
 		}
@@ -764,7 +858,7 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		// In "dry run" mode, no binaries are built.
 		return nil
 	}
-	root, err := JiriRoot()
+	binDir, err := ToAbs(devtoolsBinDir)
 	if err != nil {
 		return err
 	}
@@ -773,7 +867,6 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
 	}
 	failed := false
-	binDir := filepath.Join(root, devtoolsBinDir)
 	for _, fi := range fis {
 		installFn := func() error {
 			src := filepath.Join(dir, fi.Name())
@@ -885,10 +978,6 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 		delete(stack, manifest.Name)
 	}
 	// Process all projects.
-	root, err := JiriRoot()
-	if err != nil {
-		return err
-	}
 	for _, project := range m.Projects {
 		if project.Exclude {
 			// Exclude the project in case it was
@@ -897,7 +986,11 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 			continue
 		}
 		// Replace the relative path with an absolute one.
-		project.Path = filepath.Join(root, project.Path)
+		absPath, err := ToAbs(project.Path)
+		if err != nil {
+			return err
+		}
+		project.Path = absPath
 		// Use git as the default protocol.
 		if project.Protocol == "" {
 			project.Protocol = "git"
@@ -993,89 +1086,15 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 	}
 }
 
-// snapshotLocalProjects returns an in-memory representation of the
-// current state of all local projects
-func snapshotLocalProjects(ctx *tool.Context) (_ *Manifest, e error) {
-
-	// Timing boilerplate.
-	ctx.TimerPush("snapshot projects")
-	defer ctx.TimerPop()
-
-	// Return to current working directory when done.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-
-	// Grab the current metadata for the local projects.
-	localProjects, err := LocalProjects(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// We need JiriRoot so we can construct JiriRoot-relative paths later.
-	root, err := JiriRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	// Tweak the local projects data a bit: convert HEAD revisions to
-	// actual SHAs, and convert full paths to ones relative to JiriRoot.
-	manifest := Manifest{}
-	for _, project := range localProjects {
-		switch project.Protocol {
-		case "git":
-			if err := ctx.Run().Chdir(project.Path); err != nil {
-				return nil, err
-			}
-			revision, err := ctx.Git().CurrentRevisionOfBranch("master")
-			if err != nil {
-				return nil, err
-			}
-			project.Revision = revision
-		default:
-			return nil, UnsupportedProtocolErr(project.Protocol)
-		}
-		project.Path = strings.TrimPrefix(project.Path, root)
-		manifest.Projects = append(manifest.Projects, project)
-	}
-	return &manifest, nil
-}
-
-// Returns snapshotLocalProjects data converted to a Projects map.
-func snapshotLocalProjectsAsMap(ctx *tool.Context) (Projects, error) {
-
-	// We need JiriRoot to convert relative paths to absolute.
-	root, err := JiriRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the local manifest from snapshotLocalProjects.
-	localManifest, err := snapshotLocalProjects(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Construct a Projects map with absolute project paths.
-	localProjects := make(Projects)
-	for _, project := range localManifest.Projects {
-		project.Path = filepath.Join(root, project.Path)
-		localProjects[project.Name] = project
-	}
-
-	return localProjects, nil
-}
-
-// updateProjects updates all jiri projects.
 func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
-
-	// Timer boilerplate.
 	ctx.TimerPush("update projects")
 	defer ctx.TimerPop()
 
-	localProjects, err := snapshotLocalProjectsAsMap(ctx)
+	scanMode := FastScan
+	if gc {
+		scanMode = FullScan
+	}
+	localProjects, err := LocalProjects(ctx, scanMode)
 	if err != nil {
 		return err
 	}
@@ -1151,14 +1170,11 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 	}
 	// Replace absolute project paths with relative paths to make it
 	// possible to move the $JIRI_ROOT directory locally.
-	root, err := JiriRoot()
+	relPath, err := ToRel(project.Path)
 	if err != nil {
 		return err
 	}
-	if !strings.HasSuffix(root, string(filepath.Separator)) {
-		root += string(filepath.Separator)
-	}
-	project.Path = strings.TrimPrefix(project.Path, root)
+	project.Path = relPath
 	bytes, err := xml.Marshal(project)
 	if err != nil {
 		return fmt.Errorf("Marhsal() failed: %v", err)
@@ -1195,12 +1211,11 @@ func addProjectToManifest(ctx *tool.Context, manifest *Manifest, project Project
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
-	// Replace absolute path with a relative one.
-	root, err := JiriRoot()
+	relPath, err := ToRel(project.Path)
 	if err != nil {
 		return err
 	}
-	project.Path = strings.TrimPrefix(project.Path, root+string(filepath.Separator))
+	project.Path = relPath
 	manifest.Projects = append(manifest.Projects, project)
 	return nil
 }

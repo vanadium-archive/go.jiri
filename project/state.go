@@ -70,7 +70,7 @@ func setProjectState(ctx *tool.Context, state *ProjectState, checkDirty bool, ch
 }
 
 func GetProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*ProjectState, error) {
-	projects, err := LocalProjects(ctx)
+	projects, err := LocalProjects(ctx, FastScan)
 	if err != nil {
 		return nil, err
 	}

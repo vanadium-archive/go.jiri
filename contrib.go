@@ -127,7 +127,7 @@ func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
 func runContributors(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env)
 
-	projects, err := project.LocalProjects(ctx)
+	projects, err := project.LocalProjects(ctx, project.FastScan)
 	if err != nil {
 		return err
 	}

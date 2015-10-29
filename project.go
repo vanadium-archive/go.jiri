@@ -58,7 +58,7 @@ var cmdProjectClean = &cmdline.Command{
 
 func runProjectClean(env *cmdline.Env, args []string) (e error) {
 	ctx := tool.NewContextFromEnv(env)
-	localProjects, err := project.LocalProjects(ctx)
+	localProjects, err := project.LocalProjects(ctx, project.FullScan)
 	if err != nil {
 		return err
 	}

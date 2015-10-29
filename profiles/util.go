@@ -45,7 +45,7 @@ func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
 // flag with the supplied FlagSet.
 func RegisterManifestFlag(flags *flag.FlagSet, manifest *string, defaultManifest string) {
 	flags.StringVar(manifest, "manifest", defaultManifest, "specify the profiles XML manifest filename.")
-	flags.Lookup("manifest").DefValue = "$JIRI_ROOT/" + defaultManifest
+	flags.Lookup("manifest").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
 }
 
 // RegisterProfileFlags registers the commonly used --manifest, --profiles and

@@ -13,6 +13,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -215,7 +217,7 @@ func holdProjectBack(t *testing.T, ctx *tool.Context, manifestDir, project strin
 }
 
 func localProjectName(i int) string {
-	return "test-local-project-" + fmt.Sprintf("%d", i+1)
+	return "test-local-project-" + fmt.Sprintf("%d", i)
 }
 
 func moveProject(t *testing.T, ctx *tool.Context, manifestDir, project, dst string) {
@@ -244,7 +246,7 @@ func moveProject(t *testing.T, ctx *tool.Context, manifestDir, project, dst stri
 }
 
 func remoteProjectName(i int) string {
-	return "test-remote-project-" + fmt.Sprintf("%d", i+1)
+	return "test-remote-project-" + fmt.Sprintf("%d", i)
 }
 
 func setupNewProject(t *testing.T, ctx *tool.Context, dir, name string, ignore bool) string {
@@ -340,6 +342,81 @@ func resetToOriginMaster(t *testing.T, ctx *tool.Context, projectDir string) {
 	if err := ctx.Git().Reset("origin/master"); err != nil {
 		t.Fatalf("%v", err)
 	}
+}
+
+func checkProjectsMatchPaths(t *testing.T, gotProjects Projects, wantProjectPaths []string) {
+	gotProjectPaths := []string{}
+	for _, p := range gotProjects {
+		gotProjectPaths = append(gotProjectPaths, p.Path)
+	}
+	sort.Strings(gotProjectPaths)
+	sort.Strings(wantProjectPaths)
+	if !reflect.DeepEqual(gotProjectPaths, wantProjectPaths) {
+		t.Errorf("project paths got %v, want %v", gotProjectPaths, wantProjectPaths)
+	}
+}
+
+// TestLocalProjects tests the behavior of the LocalProjects method with
+// different ScanModes.
+func TestLocalProjects(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	rootDir, err := ctx.Run().TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir() failed: %v", err)
+	}
+	defer ctx.Run().RemoveAll(rootDir)
+	oldRoot := os.Getenv("JIRI_ROOT")
+	if err := os.Setenv("JIRI_ROOT", rootDir); err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer os.Setenv("JIRI_ROOT", oldRoot)
+
+	manifestDir := setupNewProject(t, ctx, rootDir, ".manifest", false)
+
+	// Create some projects.
+	numProjects, projectPaths := 3, []string{}
+	for i := 0; i < numProjects; i++ {
+		projectName := localProjectName(i)
+		projectPath := setupNewProject(t, ctx, rootDir, projectName, true)
+		project := Project{
+			Path:     projectPath,
+			Name:     projectName,
+			Protocol: "git",
+		}
+		if err := writeMetadata(ctx, project, projectPath); err != nil {
+			t.Fatalf("writeMetadata %v %v) failed: %v\n", project, projectPath, err)
+		}
+		projectPaths = append(projectPaths, projectPath)
+	}
+
+	// Create manifest but only tell it about the first project.
+	createRemoteManifest(t, ctx, manifestDir, projectPaths[:1])
+
+	// LocalProjects with scanMode = FastScan should only find the first
+	// project.
+	foundProjects, err := LocalProjects(ctx, FastScan)
+	if err != nil {
+		t.Fatalf("LocalProjects(%v) failed: %v", FastScan, err)
+	}
+	checkProjectsMatchPaths(t, foundProjects, projectPaths[:1])
+
+	// LocalProjects with scanMode = FullScan should find all projects.
+	foundProjects, err = LocalProjects(ctx, FullScan)
+	if err != nil {
+		t.Fatalf("LocalProjects(%v) failed: %v", FastScan, err)
+	}
+	checkProjectsMatchPaths(t, foundProjects, projectPaths[:])
+
+	// Check that deleting a project forces LocalProjects to run a full scan,
+	// even if FastScan is specified.
+	if err := ctx.Run().RemoveAll(projectPaths[0]); err != nil {
+		t.Fatalf("RemoveAll(%v) failed: %v", projectPaths[0])
+	}
+	foundProjects, err = LocalProjects(ctx, FastScan)
+	if err != nil {
+		t.Fatalf("LocalProjects(%v) failed: %v", FastScan, err)
+	}
+	checkProjectsMatchPaths(t, foundProjects, projectPaths[1:])
 }
 
 // TestUpdateUniverse is a comprehensive test of the "jiri update"
@@ -531,4 +608,11 @@ func TestUpdateUniverse(t *testing.T) {
 	for i, _ := range remoteProjects {
 		checkRebaseFn(i, "revision 3")
 	}
+}
+
+// TestUnsupportedProtocolErr checks that calling
+// UnsupportedPrototoclErr.Error() does not result in an infinite loop.
+func TestUnsupportedPrototocolErr(t *testing.T) {
+	err := UnsupportedProtocolErr("foo")
+	_ = err.Error()
 }

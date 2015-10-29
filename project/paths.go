@@ -153,5 +153,34 @@ func JiriRoot() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("EvalSymlinks(%v) failed: %v", root, err)
 	}
-	return result, nil
+	if !filepath.IsAbs(result) {
+		return "", fmt.Errorf("JIRI_ROOT must be absolute path: %v", rootEnv)
+	}
+	return filepath.Clean(result), nil
+}
+
+// ToAbs returns the given path rooted in JIRI_ROOT, if it is not already an
+// absolute path.
+func ToAbs(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return path, nil
+	}
+	root, err := JiriRoot()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, path), nil
+}
+
+// ToRel returns the given path relative to JIRI_ROOT, if it is not already a
+// relative path.
+func ToRel(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return path, nil
+	}
+	root, err := JiriRoot()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Rel(root, path)
 }
