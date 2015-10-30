@@ -400,6 +400,7 @@ func runUpdate(env *cmdline.Env, args []string) error {
 			continue
 		}
 		vi := mgr.VersionInfo()
+		mgr.SetRoot(rootDir)
 		for _, target := range profile.Targets() {
 			if vi.IsNewerThanDefault(target.Version()) {
 				if verboseFlag {
