@@ -1282,7 +1282,8 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
 	// $JIRI_ROOT directory in an inconsistent state.
-	tmpDir, err := ctx.Run().TempDir(path, "")
+	tmpDirPrefix := strings.Replace(op.Project().Name, "/", ".", -1) + "-"
+	tmpDir, err := ctx.Run().TempDir(path, tmpDirPrefix)
 	if err != nil {
 		return err
 	}
