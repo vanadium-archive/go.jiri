@@ -151,8 +151,7 @@ func createRepo(t *testing.T, ctx *tool.Context, workingDir, prefix string) stri
 }
 
 // Simple commit-msg hook that adds a fake Change Id.
-var commitMsgHook string = `
-#!/bin/sh
+var commitMsgHook string = `#!/bin/sh
 MSG="$1"
 echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 `
