@@ -1320,7 +1320,11 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		// Apply exclusion for /.jiri/. We're creating the repo so we can safely
 		// write to .git/info/exclude
 		excludeString := "/.jiri/\n"
-		excludeFile := filepath.Join(tmpDir, ".git", "info", "exclude")
+		excludeDir := filepath.Join(tmpDir, ".git", "info")
+		if err := ctx.Run().MkdirAll(excludeDir, os.FileMode(0750)); err != nil {
+			return err
+		}
+		excludeFile := filepath.Join(excludeDir, "exclude")
 		if err := ctx.Run().WriteFile(excludeFile, []byte(excludeString), perm); err != nil {
 			return err
 		}
