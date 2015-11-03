@@ -364,7 +364,7 @@ func LocalProjects(ctx *tool.Context, scanMode ScanMode) (Projects, error) {
 
 	// Initial call to findLocalProjects -- it will recursively search all the
 	// directories under JiriRoot.
-	ctx.TimerPush("scan fs for local projects")
+	ctx.TimerPush("scan fs")
 	err = findLocalProjects(ctx, root, projects)
 	ctx.TimerPop()
 	if err != nil {
@@ -378,7 +378,7 @@ func LocalProjects(ctx *tool.Context, scanMode ScanMode) (Projects, error) {
 // Note that this may return true even if there are projects on the local
 // filesystem not included in the provided projects argument.
 func projectsExistLocally(ctx *tool.Context, projects Projects) (bool, error) {
-	ctx.TimerPush("local projects match manifest")
+	ctx.TimerPush("match manifest")
 	defer ctx.TimerPop()
 	for _, p := range projects {
 		isLocal, err := isLocalProject(ctx, p.Path)
