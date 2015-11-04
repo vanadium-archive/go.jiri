@@ -497,9 +497,9 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 			return nil, nil, nil, nil, err
 		}
 		project := Project{
-			Path:     manifestPath,
-			Protocol: "git",
-			Revision: "HEAD",
+			Path:         manifestPath,
+			Protocol:     "git",
+			Revision:     "HEAD",
 			RemoteBranch: "master",
 		}
 		if err := resetProject(ctx, project); err != nil {
@@ -751,6 +751,9 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool, remoteBranch str
 		return err
 	}
 	// Discard any uncommitted changes.
+	if remoteBranch == "" {
+		remoteBranch = "master"
+	}
 	if err := ctx.Git().Reset("origin/" + remoteBranch); err != nil {
 		return err
 	}
@@ -949,8 +952,13 @@ func resetProject(ctx *tool.Context, project Project) error {
 				return ctx.Git().Reset(project.Revision)
 			}
 
-			// If no revision, reset to the configured remote branch.
-			return ctx.Git().Reset("origin/" + project.RemoteBranch)
+			// If no revision, reset to the configured remote branch, or master
+			// if no remote branch.
+			remoteBranch := project.RemoteBranch
+			if remoteBranch == "" {
+				remoteBranch = "master"
+			}
+			return ctx.Git().Reset("origin/" + remoteBranch)
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
