@@ -32,52 +32,13 @@ var cmdUpdate = &cmdline.Command{
 	Name:   "update",
 	Short:  "Update all jiri tools and projects",
 	Long: `
-Updates all jiri projects, builds the latest version of jiri
-tools, and installs the resulting binaries into
-$JIRI_ROOT/devtools/bin. The sequence in which the individual updates
-happen guarantees that we end up with a consistent set of tools and
-source code.
+Updates all projects, builds the latest version of all tools, and installs the
+resulting binaries into $JIRI_ROOT/devtools/bin. The sequence in which the
+individual updates happen guarantees that we end up with a consistent set of
+tools and source code. The set of projects and tools to update is described in
+the manifest.
 
-The set of project and tools to update is describe by a
-manifest. Jiri manifests are revisioned and stored in a "manifest"
-repository, that is available locally in $JIRI_ROOT/.manifest. The
-manifest uses the following XML schema:
-
- <manifest>
-   <imports>
-     <import name="default"/>
-     ...
-   </imports>
-   <projects>
-     <project name="release.go.jiri"
-              path="release/go/src/v.io/jiri"
-              protocol="git"
-              name="https://vanadium.googlesource.com/release.go.jiri"
-              revision="HEAD"/>
-     ...
-   </projects>
-   <tools>
-     <tool name="jiri" package="v.io/jiri"/>
-     ...
-   </tools>
- </manifest>
-
-The <import> element can be used to share settings across multiple
-manifests. Import names are interpreted relative to the
-$JIRI_ROOT/.manifest/v2 directory. Import cycles are not allowed and
-if a project or a tool is specified multiple times, the last
-specification takes effect. In particular, the elements <project
-name="foo" exclude="true"/> and <tool name="bar" exclude="true"/> can
-be used to exclude previously included projects and tools.
-
-The tool identifies which manifest to use using the following
-algorithm. If the $JIRI_ROOT/.local_manifest file exists, then it is
-used. Otherwise, the $JIRI_ROOT/.manifest/v2/<manifest>.xml file is
-used, which <manifest> is the value of the -manifest command-line
-flag, which defaults to "default".
-
-NOTE: Unlike the jiri tool commands, the above manifest file format
-is not an API. It is an implementation and can change without notice.
+Run "jiri help manifest" for details on manifests.
 `,
 }
 
