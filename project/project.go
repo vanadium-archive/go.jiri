@@ -1262,20 +1262,8 @@ type commonOperation struct {
 	source string
 }
 
-func (commonOperation) Run(*tool.Context, *Manifest) error {
-	return nil
-}
-
 func (op commonOperation) Project() Project {
 	return op.project
-}
-
-func (commonOperation) String() string {
-	return ""
-}
-
-func (commonOperation) Test(*tool.Context) error {
-	return nil
 }
 
 // createOperation represents the creation of a project.
@@ -1369,10 +1357,7 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 	if err := resetProject(ctx, op.project); err != nil {
 		return err
 	}
-	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
-		return err
-	}
-	return nil
+	return addProjectToManifest(ctx, manifest, op.project)
 }
 
 func (op createOperation) String() string {
@@ -1486,10 +1471,7 @@ func (op moveOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
 		return err
 	}
-	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
-		return err
-	}
-	return nil
+	return addProjectToManifest(ctx, manifest, op.project)
 }
 
 func (op moveOperation) String() string {
@@ -1528,10 +1510,7 @@ func (op updateOperation) Run(ctx *tool.Context, manifest *Manifest) error {
 	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
 		return err
 	}
-	if err := addProjectToManifest(ctx, manifest, op.project); err != nil {
-		return err
-	}
-	return nil
+	return addProjectToManifest(ctx, manifest, op.project)
 }
 
 func (op updateOperation) String() string {
@@ -1542,13 +1521,14 @@ func (op updateOperation) Test(ctx *tool.Context) error {
 	return nil
 }
 
-// nullOperation represents a noop.  Used only for logging.
+// nullOperation represents a noop.  It is used for logging and adding project
+// information to the current manifest.
 type nullOperation struct {
 	commonOperation
 }
 
 func (op nullOperation) Run(ctx *tool.Context, manifest *Manifest) error {
-	return nil
+	return addProjectToManifest(ctx, manifest, op.project)
 }
 
 func (op nullOperation) String() string {
