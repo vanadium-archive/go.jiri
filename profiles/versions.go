@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 // VersionInfo represents the supported and default versions offered
@@ -82,14 +83,13 @@ func (vi *VersionInfo) Select(requested string) (string, error) {
 // default.
 func (vi *VersionInfo) String() string {
 	r := bytes.Buffer{}
-	r.WriteString(vi.name + ":")
 	for _, v := range vi.ordered {
 		r.WriteString(" " + v)
 		if v == vi.defaultVersion {
 			r.WriteString("*")
 		}
 	}
-	return r.String()
+	return strings.TrimLeft(r.String(), " ")
 }
 
 // Default returns the default version.

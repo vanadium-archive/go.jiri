@@ -69,6 +69,14 @@ func (pt Target) CommandLineEnv() Environment {
 	return r
 }
 
+// UseCommandLineEnv copies the command line supplied environment variables
+// into the mutable environment of the Target. It should be called as soon
+// as all command line parsing has been completed and before the target is
+// otherwise used.
+func (pt *Target) UseCommandLineEnv() {
+	pt.Env = pt.CommandLineEnv()
+}
+
 // TargetSpecificDirname returns a directory name that is specific
 // to that target taking account the tag, architecture, operating system and
 // command line environment variables, if relevant, into account (e.g

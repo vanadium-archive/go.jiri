@@ -5,6 +5,7 @@
 package profiles
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -124,7 +125,7 @@ func NewConfigHelper(ctx *tool.Context, profilesMode ProfilesMode, filename stri
 		return nil, err
 	}
 	if profilesMode == UseProfiles && len(filename) > 0 {
-		if err := Read(ctx, filepath.Join(root, filename)); err != nil {
+		if err := Read(ctx, filename); err != nil {
 			return nil, err
 		}
 	}
@@ -161,79 +162,56 @@ func (ch *ConfigHelper) LegacyProfiles() bool {
 	return ch.legacyMode
 }
 
+// MergeEnv merges the embedded environment with the environment
+// variables provided by the vars parameter according to the policies parameter.
+func (ch *ConfigHelper) MergeEnv(policies map[string]MergePolicy, vars ...[]string) {
+	if ch.legacyMode {
+		return
+	}
+	MergeEnv(policies, ch.Vars, vars...)
+}
+
+// MergeEnvFromProfiles merges the embedded environment with the environment
+// variables stored in the requested profiles. The profiles are those read from
+// the manifest and in addition the 'jiri' profile may be used which refers to
+// the environment variables maintained by the jiri tool itself.
+func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, target Target, profileNames ...string) {
+	if ch.legacyMode {
+		return
+	}
+	envs := [][]string{}
+	for _, profile := range profileNames {
+		var e []string
+		if profile == "jiri" {
+			e = ch.JiriProfile()
+		} else {
+			e = EnvFromProfile(target, profile)
+		}
+		if e == nil {
+			continue
+		}
+		envs = append(envs, e)
+	}
+	MergeEnv(policies, ch.Vars, envs...)
+}
+
 // SkippingProfiles returns true if no profiles are being used.
 func (ch *ConfigHelper) SkippingProfiles() bool {
 	return ch.profilesMode == bool(SkipProfiles)
 }
 
-// CommonConcatVariables returns a map of variables that are commonly
-// used for the concat parameter to SetEnvFromProfilesAndTarget.
-func CommonConcatVariables() map[string]string {
-	return map[string]string{
-		"PATH":         ":",
-		"CCFLAGS":      " ",
-		"CXXFLAGS":     " ",
-		"LDFLAGS":      " ",
-		"CGO_CFLAGS":   " ",
-		"CGO_CXXFLAGS": " ",
-		"CGO_LDFLAGS":  " ",
-	}
-}
-
-// CommonIgnoreVariables returns a map of variables that are commonly
-// used for the ignore parameter to SetEnvFromProfilesAndTarget.
-func CommonIgnoreVariables() map[string]bool {
-	return map[string]bool{
-		"GOPATH": true,
-		"GOARCH": true,
-		"GOOS":   true,
-	}
-}
-
-// SetEnvFromProfiles populates the embedded environment with the environment
-// variables stored in the specified profiles for the specified target if
-// new-style profiles are being used, otherwise it uses compiled in values as per
-// the original profiles implementation.
-// The profiles parameter contains a comma separated list of profile names; if the
-// requested target does not exist for any of these profiles then those profiles
-// will be ignored. The 'concat' parameter includes a map of variable names
-// whose values are to concatenated with any existing ones rather than
-// overwriting them (e.g. CFLAGS for example). The value of the concat map
-// is the separator to use for that environment  variable (e.g. space for
-// CFLAGs or ':' for PATH-like ones).
-func (ch *ConfigHelper) SetEnvFromProfiles(concat map[string]string, ignore map[string]bool, profiles string, target Target) {
-	if ch.profilesMode || ch.legacyMode {
-		return
-	}
-	for _, profile := range strings.Split(profiles, ",") {
-		t := LookupProfileTarget(profile, target)
-		if t == nil {
-			continue
-		}
-		for _, tmp := range t.Env.Vars {
-			k, v := envvar.SplitKeyValue(tmp)
-			if ignore[k] {
-				continue
-			}
-			if sep := concat[k]; len(sep) > 0 {
-				ov := ch.Vars.GetTokens(k, sep)
-				nv := envvar.SplitTokens(v, sep)
-				ch.Vars.SetTokens(k, append(ov, nv...), " ")
-				continue
-			}
-			ch.Vars.Set(k, v)
-		}
-	}
-}
-
 // ValidateRequestProfilesAndTarget checks that the supplied slice of profiles
-// names is supported and that each has the specified target installed taking
-// account if runnin in bootstrap mode or with old-style profiles.
+// names is supported (including the 'jiri' profile) and that each has
+// the specified target installed taking account if running using profiles
+// at all or if using old-style profiles.
 func (ch *ConfigHelper) ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
 	if ch.profilesMode || ch.legacyMode {
 		return nil
 	}
 	for _, n := range profileNames {
+		if n == "jiri" {
+			continue
+		}
 		if LookupProfileTarget(n, target) == nil {
 			return fmt.Errorf("%q for %q is not available or not installed, use the \"list\" command to see the installed/available profiles.", target, n)
 		}
@@ -247,25 +225,37 @@ func (ch *ConfigHelper) PrependToPATH(path string) {
 	ch.SetTokens("PATH", append([]string{path}, existing...), ":")
 }
 
-// SetGoPath computes and sets the GOPATH environment variable based on the
-// current jiri configuration.
-func (ch *ConfigHelper) SetGoPath() {
-	if !ch.legacyMode {
-		ch.pathHelper("GOPATH", ch.root, ch.projects, ch.config.GoWorkspaces(), "")
-	}
+// JiriProfile returns a pseudo profile that is maintained by the Jiri
+// tool itself, this currently consists of the GoPath and VDLPath variables.
+// It will generally be used as the last profile in the set of profiles
+// passed to MergeEnv.
+func (ch *ConfigHelper) JiriProfile() []string {
+	return []string{ch.GoPath(), ch.VDLPath()}
 }
 
-// SetVDLPath computes and sets the VDLPATH environment variable based on the
+// GoPath computes and returns the GOPATH environment variable based on the
 // current jiri configuration.
-func (ch *ConfigHelper) SetVDLPath() {
+func (ch *ConfigHelper) GoPath() string {
 	if !ch.legacyMode {
-		ch.pathHelper("VDLPATH", ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+		path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+		return "GOPATH=" + envvar.JoinTokens(path, ":")
 	}
+	return ""
+}
+
+// VDLPath computes and returns the VDLPATH environment variable based on the
+// current jiri configuration.
+func (ch *ConfigHelper) VDLPath() string {
+	if !ch.legacyMode {
+		path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+		return "VDLPATH=" + envvar.JoinTokens(path, ":")
+	}
+	return ""
 }
 
 // pathHelper is a utility function for determining paths for project workspaces.
-func (ch *ConfigHelper) pathHelper(name, root string, projects project.Projects, workspaces []string, suffix string) {
-	path := ch.GetTokens(name, ":")
+func pathHelper(ctx *tool.Context, root string, projects project.Projects, workspaces []string, suffix string) []string {
+	path := []string{}
 	for _, workspace := range workspaces {
 		absWorkspace := filepath.Join(root, workspace, suffix)
 		// Only append an entry to the path if the workspace is rooted
@@ -279,47 +269,358 @@ func (ch *ConfigHelper) pathHelper(name, root string, projects project.Projects,
 			// account for Go workspaces that span multiple jiri projects,
 			// such as: $JIRI_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := ch.ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
+				if _, err := ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
 					path = append(path, absWorkspace)
 					break
 				}
 			}
 		}
 	}
-	ch.SetTokens(name, path, ":")
+	return path
 }
 
-// MergeEnv merges vars with the variables in env taking care to concatenate
-// values as per the concat and ignore parameters similarly to SetEnvFromProfiles.
-func MergeEnv(concat map[string]string, ignore map[string]bool, env *envvar.Vars, vars ...[]string) {
+// The environment variables passed to a subprocess are the result
+// of merging those in the processes environment and those from
+// one or more profiles according to the policies defined below.
+// There is a starting environment, nominally called 'base', and one
+// or profile environments. The base environment will typically be that
+// inherited by the running process from its invoking shell. A policy
+// consists of an 'action' and an optional separator to use when concatenating
+// variables.
+type MergePolicy struct {
+	Action    MergeAction
+	Separator string
+}
+
+type MergeAction int
+
+const (
+	// Use the first value encountered
+	First MergeAction = iota
+	// Use the last value encountered.
+	Last
+	// Ignore the variable regardless of where it occurs.
+	Ignore
+	// Append the current value to the values already accumulated.
+	Append
+	// Prepend the current value to the values already accumulated.
+	Prepend
+	// Ignore the value in the base environment, but append in the profiles.
+	IgnoreBaseAndAppend
+	// Ignore the value in the base environment, but prepend in the profiles.
+	IgnoreBaseAndPrepend
+	// Ignore the value in the base environment, but use the first value from profiles.
+	IgnoreBaseAndUseFirst
+	// Ignore the value in the base environment, but use the last value from profiles.
+	IgnoreBaseAndUseLast
+	// Ignore the values in the profiles.
+	IgnoreProfiles
+)
+
+var (
+	// A MergePolicy with a Last action.
+	UseLast = MergePolicy{Action: Last}
+	// A MergePolicy with a First action.
+	UseFirst = MergePolicy{Action: First}
+	// A MergePolicy that ignores the variable, regardless of where it occurs.
+	IgnoreVariable = MergePolicy{Action: Ignore}
+	// A MergePolicy that appends using : as a separator.
+	AppendPath = MergePolicy{Action: Append, Separator: ":"}
+	// A MergePolicy that appends using " " as a separator.
+	AppendFlag = MergePolicy{Action: Append, Separator: " "}
+	// A MergePolicy that prepends using : as a separator.
+	PrependPath = MergePolicy{Action: Prepend, Separator: ":"}
+	// A MergePolicy that prepends using " " as a separator.
+	PrependFlag = MergePolicy{Action: Prepend, Separator: " "}
+	// A MergePolicy that will ignore base, but append across profiles using ':'
+	IgnoreBaseAppendPath = MergePolicy{Action: IgnoreBaseAndAppend, Separator: ":"}
+	// A MergePolicy that will ignore base, but append across profiles using ' '
+	IgnoreBaseAppendFlag = MergePolicy{Action: IgnoreBaseAndAppend, Separator: " "}
+	// A MergePolicy that will ignore base, but prepend across profiles using ':'
+	IgnoreBasePrependPath = MergePolicy{Action: IgnoreBaseAndPrepend, Separator: ":"}
+	// A MergePolicy that will ignore base, but prepend across profiles using ' '
+	IgnoreBasePrependFlag = MergePolicy{Action: IgnoreBaseAndPrepend, Separator: " "}
+	// A MergePolicy that will ignore base, but use the last value from profiles.
+	IgnoreBaseUseFirst = MergePolicy{Action: IgnoreBaseAndUseFirst}
+	// A MergePolicy that will ignore base, but use the last value from profiles.
+	IgnoreBaseUseLast = MergePolicy{Action: IgnoreBaseAndUseLast}
+	// A MergePolicy that will always use the value from base and ignore profiles.
+	UseBaseIgnoreProfiles = MergePolicy{Action: IgnoreProfiles}
+)
+
+// ProfileMergePolicies returns an instance of MergePolicies that containts
+// appropriate default policies for use with MergeEnv from within
+// profile implementations.
+func ProfileMergePolicies() MergePolicies {
+	values := MergePolicies{
+		"PATH":         AppendPath,
+		"CCFLAGS":      AppendFlag,
+		"CXXFLAGS":     AppendFlag,
+		"LDFLAGS":      AppendFlag,
+		"CGO_CFLAGS":   AppendFlag,
+		"CGO_CXXFLAGS": AppendFlag,
+		"CGO_LDFLAGS":  AppendFlag,
+		"GOPATH":       IgnoreBaseAppendPath,
+		"GOARCH":       UseBaseIgnoreProfiles,
+		"GOOS":         UseBaseIgnoreProfiles,
+	}
+	mp := MergePolicies{}
+	for k, v := range values {
+		mp[k] = v
+	}
+	return mp
+}
+
+// JiriMergePolicies returns an instance of MergePolicies that contains
+// appropriate default policies for use with MergeEnv from jiri packages
+// and subcommands such as those used to build go, java etc.
+func JiriMergePolicies() MergePolicies {
+	mp := ProfileMergePolicies()
+	mp["GOPATH"] = PrependPath
+	mp["VDLPATH"] = PrependPath
+	mp["GOARCH"] = UseFirst
+	mp["GOOS"] = UseFirst
+	mp["GOROOT"] = IgnoreBaseUseLast
+	return mp
+}
+
+// MergeEnv merges environment variables in base with those
+// in vars according to the suppled policies.
+func MergeEnv(policies map[string]MergePolicy, base *envvar.Vars, vars ...[]string) {
+	// Remove any variables that have the IgnoreBase policy.
+	for k, _ := range base.ToMap() {
+		switch policies[k].Action {
+		case Ignore, IgnoreBaseAndAppend, IgnoreBaseAndPrepend, IgnoreBaseAndUseFirst, IgnoreBaseAndUseLast:
+			base.Delete(k)
+		}
+	}
 	for _, ev := range vars {
 		for _, tmp := range ev {
 			k, v := envvar.SplitKeyValue(tmp)
-			if ignore[k] {
-				continue
+			policy := policies[k]
+			action := policy.Action
+			switch policy.Action {
+			case IgnoreBaseAndAppend:
+				action = Append
+			case IgnoreBaseAndPrepend:
+				action = Prepend
+			case IgnoreBaseAndUseLast:
+				action = Last
+			case IgnoreBaseAndUseFirst:
+				action = First
 			}
-			if sep := concat[k]; len(sep) > 0 {
-				ov := env.GetTokens(k, sep)
+			switch action {
+			case Ignore, IgnoreProfiles:
+				continue
+			case Append, Prepend:
+				sep := policy.Separator
+				ov := base.GetTokens(k, sep)
 				nv := envvar.SplitTokens(v, sep)
-				env.SetTokens(k, append(ov, nv...), " ")
-				continue
+				if action == Append {
+					base.SetTokens(k, append(ov, nv...), sep)
+				} else {
+					base.SetTokens(k, append(nv, ov...), sep)
+				}
+			case First:
+				if !base.Contains(k) {
+					base.Set(k, v)
+				}
+			case Last:
+				base.Set(k, v)
 			}
-			env.Set(k, v)
 		}
 	}
 }
 
-// MergeEnvFromProfiles merges the environment variables stored in the specified
-// profiles and target with the env parameter. It uses MergeEnv to do so.
-func MergeEnvFromProfiles(concat map[string]string, ignore map[string]bool, env *envvar.Vars, target Target, profileNames ...string) ([]string, error) {
-	vars := [][]string{}
-	for _, name := range profileNames {
-		t := LookupProfileTarget(name, target)
-		if t == nil {
-			return nil, fmt.Errorf("failed to lookup %v --target=%v", name, target)
-		}
-		vars = append(vars, t.Env.Vars)
+// EnvFromProfile obtains the environment variable settings from the specified
+// profile and target. It returns nil if the target and/or profile could not
+// be found.
+func EnvFromProfile(target Target, profileName string) []string {
+	t := LookupProfileTarget(profileName, target)
+	if t == nil {
+		return nil
 	}
-	MergeEnv(concat, ignore, env, vars...)
-	return env.ToSlice(), nil
+	return t.Env.Vars
+}
+
+// WithDefaultVersion returns a copy of the supplied target with its
+// version set to the default (i.e. emtpy string).
+func WithDefaultVersion(target Target) Target {
+	t := &target
+	t.SetVersion("")
+	return target
+}
+
+type MergePolicies map[string]MergePolicy
+
+func (mp *MergePolicy) String() string {
+	switch mp.Action {
+	case First:
+		return "use first"
+	case Last:
+		return "use last"
+	case Append:
+		return "append using '" + mp.Separator + "'"
+	case Prepend:
+		return "prepend using '" + mp.Separator + "'"
+	case IgnoreBaseAndAppend:
+		return "ignore in environment/base, append using '" + mp.Separator + "'"
+	case IgnoreBaseAndPrepend:
+		return "ignore in environment/base, prepend using '" + mp.Separator + "'"
+	case IgnoreBaseAndUseLast:
+		return "ignore in environment/base, use last value from profiles"
+	case IgnoreBaseAndUseFirst:
+		return "ignore in environment/base, use first value from profiles"
+	case IgnoreProfiles:
+		return "ignore in profiles"
+	}
+	return "unrecognised action"
+}
+
+func (mp MergePolicies) Usage() string {
+	return `<var>:<var>|<var>:|+<var>|<var>+|=<var>|<var>=
+<var> - use the first value of <var> encountered, this is the default action.
+<var>* - use the last value of <var> encountered.
+-<var> - ignore the variable, regardless of where it occurs.
+:<var> - append instances of <var> using : as a separator.
+<var>: - prepend instances of <var> using : as a separator.
++<var> - append instances of <var> using space as a separator.
+<var>+ - prepend instances of <var> using space as a separator.
+^:<var> - ignore <var> from the base/inherited environment but append in profiles as per :<var>.
+^<var>: - ignore <var> from the base/inherited environment but prepend in profiles as per <var>:.
+^+<var> - ignore <var> from the base/inherited environment but append in profiles as per +<var>.
+^<var>+ - ignore <var> from the base/inherited environment but prepend in profiles as per <var>+.
+^<var> - ignore <var> from the base/inherited environment but use the first value encountered in profiles.
+^<var>* - ignore <var> from the base/inherited environment but use the last value encountered in profiles.
+<var>^ - ignore <var> from profiles.`
+}
+
+func separator(s string) string {
+	switch s {
+	case ":":
+		return ":"
+	default:
+		return "+"
+	}
+}
+
+// String implements flag.Value. It generates a string that can be used
+// to recreate the MergePolicies value and that can be passed as a parameter
+// to another process.
+func (mp MergePolicies) String() string {
+	buf := bytes.Buffer{}
+	// Ensure a stable order.
+	keys := make([]string, 0, len(mp))
+	for k, _ := range mp {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := mp[k]
+		var s string
+		switch v.Action {
+		case First:
+			s = k
+		case Last:
+			s = k + "*"
+		case Append:
+			s = separator(v.Separator) + k
+		case Prepend:
+			s = k + separator(v.Separator)
+		case IgnoreBaseAndAppend:
+			s = "^" + separator(v.Separator) + k
+		case IgnoreBaseAndPrepend:
+			s = "^" + k + separator(v.Separator)
+		case IgnoreBaseAndUseLast:
+			s = "^" + k + "*"
+		case IgnoreBaseAndUseFirst:
+			s = "^" + k
+		case IgnoreProfiles:
+			s = k + "^"
+		}
+		buf.WriteString(s)
+		buf.WriteString(",")
+	}
+	return strings.TrimSuffix(buf.String(), ",")
+}
+
+func (mp MergePolicies) DebugString() string {
+	buf := bytes.Buffer{}
+	for k, v := range mp {
+		buf.WriteString(k + ": " + v.String() + ", ")
+	}
+	return strings.TrimSuffix(buf.String(), ", ")
+}
+
+// Get implements flag.Getter
+func (mp MergePolicies) Get() interface{} {
+	r := make(MergePolicies, len(mp))
+	for k, v := range mp {
+		r[k] = v
+	}
+	return r
+}
+
+func parseIgnoreBase(val string) (MergePolicy, string) {
+	if len(val) == 0 {
+		return IgnoreBaseUseLast, val
+	}
+	// [:+]<var>
+	switch val[0] {
+	case ':':
+		return IgnoreBaseAppendPath, val[1:]
+	case '+':
+		return IgnoreBaseAppendFlag, val[1:]
+	}
+	// <var>[:+]
+	last := len(val) - 1
+	switch val[last] {
+	case ':':
+		return IgnoreBasePrependPath, val[:last]
+	case '+':
+		return IgnoreBasePrependFlag, val[:last]
+	case '*':
+		return IgnoreBaseUseLast, val[:last]
+	}
+	return IgnoreBaseUseFirst, val
+}
+
+// Set implements flag.Value
+func (mp MergePolicies) Set(values string) error {
+	if len(values) == 0 {
+		return fmt.Errorf("no value!")
+	}
+	for _, val := range strings.Split(values, ",") {
+		// [:+^-]<var>
+		switch val[0] {
+		case '^':
+			a, s := parseIgnoreBase(val[1:])
+			mp[s] = a
+			continue
+		case '-':
+			mp[val[1:]] = IgnoreVariable
+			continue
+		case ':':
+			mp[val[1:]] = AppendPath
+			continue
+		case '+':
+			mp[val[1:]] = AppendFlag
+			continue
+		}
+		// <var>[:+^]
+		last := len(val) - 1
+		switch val[last] {
+		case ':':
+			mp[val[:last]] = PrependPath
+		case '+':
+			mp[val[:last]] = PrependFlag
+		case '*':
+			mp[val[:last]] = UseLast
+		case '^':
+			mp[val[:last]] = UseBaseIgnoreProfiles
+		default:
+			mp[val] = UseFirst
+		}
+	}
+	return nil
 }

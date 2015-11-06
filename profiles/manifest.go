@@ -233,6 +233,7 @@ func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 	data, err := ctx.Run().ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
+			fmt.Fprintf(ctx.Stderr(), "WARNING: %v doesn't exist\n", filename)
 			return nil
 		}
 		return err

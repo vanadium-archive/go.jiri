@@ -76,7 +76,7 @@ func TestVersionInfo(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if ver, err := vi.Select("2"); ver != "" || err.Error() != "unsupported version: \"2\" for test: 6 5 4 3*" {
-		t.Errorf("failed to detect unsupported version: %v", err)
+	if ver, err := vi.Select("2"); ver != "" || err.Error() != "unsupported version: \"2\" for 6 5 4 3*" {
+		t.Errorf("failed to detect unsupported version: %q", err)
 	}
 }

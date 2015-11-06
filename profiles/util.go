@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"v.io/jiri/collect"
+	"v.io/jiri/project"
 	"v.io/jiri/tool"
 )
 
@@ -41,20 +42,50 @@ func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
 	flags.Var(&target.commandLineEnv, "env", target.commandLineEnv.Usage())
 }
 
-// RegisterManifestFlag registers the commonly used --manifest
+// RegisterManifestFlag registers the commonly used --profiles-manifest
 // flag with the supplied FlagSet.
 func RegisterManifestFlag(flags *flag.FlagSet, manifest *string, defaultManifest string) {
-	flags.StringVar(manifest, "manifest", defaultManifest, "specify the profiles XML manifest filename.")
-	flags.Lookup("manifest").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
+	root, _ := project.JiriRoot()
+	flags.StringVar(manifest, "profiles-manifest", filepath.Join(root, defaultManifest), "specify the profiles XML manifest filename.")
+	flags.Lookup("profiles-manifest").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
 }
 
-// RegisterProfileFlags registers the commonly used --manifest, --profiles and
-// --target flags with the supplied FlagSet.
-func RegisterProfileFlags(flags *flag.FlagSet, profilesMode *ProfilesMode, manifest, profiles *string, defaultManifest string, target *Target) {
+// RegisterProfileFlags registers the commonly used --profiles-manifest, --profiles,
+// --target and --merge-policies flags with the supplied FlagSet.
+func RegisterProfileFlags(flags *flag.FlagSet, profilesMode *ProfilesMode, manifest, profiles *string, defaultManifest string, policies *MergePolicies, target *Target) {
 	flags.Var(profilesMode, "skip-profiles", "if set, no profiles will be used")
-	flags.StringVar(profiles, "profiles", "base", "a comma separated list of profiles to use")
+	RegisterProfilesFlag(flags, profiles)
+	RegisterMergePoliciesFlag(flags, policies)
 	RegisterManifestFlag(flags, manifest, defaultManifest)
 	RegisterTargetFlag(flags, target)
+}
+
+// RegisterProfilesFlag registers the --profiles flag
+func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
+	flags.StringVar(profiles, "profiles", "base,jiri", "a comma separated list of profiles to use")
+}
+
+// RegisterMergePoliciesFlag registers the --merge-policies flag
+func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *MergePolicies) {
+	flags.Var(policies, "merge-policies", "specify policies for merging environment variables")
+}
+
+type AppendJiriProfileMode bool
+
+const (
+	AppendJiriProfile      AppendJiriProfileMode = true
+	DoNotAppendJiriProfile                       = false
+)
+
+// InitProfilesFromFlag splits a comma separated list of profile names into
+// a slice and optionally appends the 'jiri' profile if it's not already
+// present.
+func InitProfilesFromFlag(flag string, appendJiriProfile AppendJiriProfileMode) []string {
+	n := strings.Split(flag, ",")
+	if appendJiriProfile == AppendJiriProfile && !strings.Contains(flag, "jiri") {
+		n = append(n, "jiri")
+	}
+	return n
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -72,6 +103,7 @@ func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string
 			if !ctx.Run().FileExists(completionLogPath) {
 				ctx.Run().RemoveAll(dir)
 			} else {
+				fmt.Fprintf(ctx.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
 				return nil
 			}
 		}
