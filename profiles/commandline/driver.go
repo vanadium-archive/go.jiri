@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 	"text/template"
 
@@ -320,11 +319,8 @@ func infoUsage() string {
 func fmtOutput(ctx *tool.Context, o string) string {
 	_, width, err := textutil.TerminalSize()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %v\n", err)
 		width = 80
 	}
-	fmt.Fprintf(os.Stderr, "width %d\n", width)
-
 	if len(o) < width {
 		return o
 	}
