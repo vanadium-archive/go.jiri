@@ -16,6 +16,7 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/project"
+  "v.io/jiri/runutil"
 	"v.io/jiri/tool"
 )
 
@@ -160,6 +161,11 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 	installDepsFn := func() error {
 		switch runtime.GOOS {
 		case "linux":
+			if runutil.IsFNLHost() {
+				fmt.Fprintf(ctx.Stdout(), "skipping installation of %v on FNL host", pkgs)
+				fmt.Fprintf(ctx.Stdout(), "success\n")
+				break
+			}
 			installPkgs := []string{}
 			for _, pkg := range pkgs {
 				if err := RunCommand(ctx, nil, "dpkg", "-L", pkg); err != nil {
