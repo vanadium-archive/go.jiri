@@ -5,10 +5,12 @@
 package profiles
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -247,7 +249,30 @@ func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, target 
 	return nil
 }
 
+// Fetch downloads the specified url and saves it to dst.
+// TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
+// so it does not pollute the profile package namespace.
+func Fetch(ctx *tool.Context, dst, url string) error {
+	ctx.Run().Output([]string{"fetching " + url})
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("got non-200 status code while getting %v: %v", url, resp.StatusCode)
+	}
+	file, err := ctx.Run().Create(dst)
+	if err != nil {
+		return err
+	}
+	_, err = ctx.Run().Copy(file, resp.Body)
+	return err
+}
+
 // GitCloneRepo clones a repo at a specific revision in outDir.
+// TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
+// so it does not pollute the profile package namespace.
 func GitCloneRepo(ctx *tool.Context, remote, revision, outDir string, outDirPerm os.FileMode) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -264,8 +289,45 @@ func GitCloneRepo(ctx *tool.Context, remote, revision, outDir string, outDirPerm
 	if err := ctx.Run().Chdir(outDir); err != nil {
 		return err
 	}
-	if err := ctx.Git().Reset(revision); err != nil {
+	return ctx.Git().Reset(revision)
+}
+
+// Unzip unzips the file in srcFile and puts resulting files in directory dstDir.
+// TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
+// so it does not pollute the profile package namespace.
+func Unzip(ctx *tool.Context, srcFile, dstDir string) error {
+	r, err := zip.OpenReader(srcFile)
+	if err != nil {
 		return err
+	}
+	defer r.Close()
+
+	unzipFn := func(zFile *zip.File) error {
+		rc, err := zFile.Open()
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+
+		fileDst := filepath.Join(dstDir, zFile.Name)
+		if zFile.FileInfo().IsDir() {
+			return ctx.Run().MkdirAll(fileDst, zFile.Mode())
+		}
+		file, err := ctx.Run().OpenFile(fileDst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zFile.Mode())
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		_, err = ctx.Run().Copy(file, rc)
+		return err
+	}
+
+	ctx.Run().Output([]string{"unzipping " + srcFile})
+	for _, zFile := range r.File {
+		ctx.Run().Output([]string{"extracting " + zFile.Name})
+		if err := unzipFn(zFile); err != nil {
+			return err
+		}
 	}
 	return nil
 }
