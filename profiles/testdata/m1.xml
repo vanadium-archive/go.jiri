@@ -1,6 +1,6 @@
 <profiles version="3">
   <profile name="a" root="">
-    <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="">
+    <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="1">
       <envvars></envvars>
       <command-line>
         <var>A=B</var>
@@ -16,7 +16,7 @@
     </target>
   </profile>
   <profile name="b" root="">
-    <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="">
+    <target tag="t1" arch="cpu1" os="os1" installation-directory="" version="1">
       <envvars></envvars>
       <command-line>
         <var>A=B</var>

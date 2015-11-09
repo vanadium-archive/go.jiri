@@ -38,7 +38,7 @@ var CommandLineDriver = &cmdline.Command{
 		cmdEnv,
 		cmdUninstall,
 		cmdUpdate,
-		cmdRecreate,
+		cmdCleanup,
 	},
 }
 
@@ -90,24 +90,14 @@ var cmdUpdate = &cmdline.Command{
 	ArgsLong: "<profiles> is a list of profiles to update, if omitted all profiles are updated.",
 }
 
-// cmdCleanup represents the "profile cleanup" command.
+// cmdCleanup represents the "profile Cleanup" command.
 var cmdCleanup = &cmdline.Command{
 	Runner:   cmdline.RunnerFunc(runCleanup),
 	Name:     "cleanup",
-	Short:    "Uninstall versions of the given profiles that are older than the default",
-	Long:     "Uninstall versions of the given profiles that are older than the default.",
+	Short:    "Cleanup the locally installed profiles",
+	Long:     "Cleanup the locally installed profiles. This is generally required when recovering from earlier bugs or when preparing for a subsequent change to the profiles implementation.",
 	ArgsName: "<profiles>",
 	ArgsLong: "<profiles> is a list of profiles to cleanup, if omitted all profiles are cleaned.",
-}
-
-// cmdRecreate represents the "profile recreate" command.
-var cmdRecreate = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runRecreate),
-	Name:     "recreate",
-	Short:    "Display a list of commands that will recreate the currently installed profiles",
-	Long:     "Display a list of commands that will recreate the currently installed profiles.",
-	ArgsName: "<profiles>",
-	ArgsLong: "<profiles> is a list of profiles to be recreated, if omitted commands to recreate all profiles are displayed.",
 }
 
 // cmdUninstall represents the "profile uninstall" command.
@@ -121,16 +111,18 @@ var cmdUninstall = &cmdline.Command{
 }
 
 var (
-	targetFlag        profiles.Target
-	manifestFlag      string
-	showManifestFlag  bool
-	profilesFlag      string
-	rootDir           string
-	availableFlag     bool
-	verboseFlag       bool
-	allFlag           bool
-	infoFlag          string
-	mergePoliciesFlag profiles.MergePolicies
+	targetFlag           profiles.Target
+	manifestFlag         string
+	showManifestFlag     bool
+	profilesFlag         string
+	rootDir              string
+	availableFlag        bool
+	verboseFlag          bool
+	allFlag              bool
+	infoFlag             string
+	mergePoliciesFlag    profiles.MergePolicies
+	specificVersionsFlag bool
+	cleanupFlag          bool
 )
 
 func Main(name string) {
@@ -152,11 +144,10 @@ func Init(defaultManifestFilename string) {
 	for _, fs := range []*flag.FlagSet{
 		&cmdInstall.Flags,
 		&cmdUpdate.Flags,
-		&cmdCleanup.Flags,
 		&cmdUninstall.Flags,
+		&cmdCleanup.Flags,
 		&cmdEnv.Flags,
-		&cmdList.Flags,
-		&cmdRecreate.Flags} {
+		&cmdList.Flags} {
 		profiles.RegisterManifestFlag(fs, &manifestFlag, defaultManifestFilename)
 	}
 
@@ -175,10 +166,11 @@ func Init(defaultManifestFilename string) {
 	profiles.RegisterProfilesFlag(&cmdEnv.Flags, &profilesFlag)
 	profiles.RegisterMergePoliciesFlag(&cmdEnv.Flags, &mergePoliciesFlag)
 
-	// uninstall, list and env accept: --v
+	// uninstall, list, env and cleanup accept: --v
 	for _, fs := range []*flag.FlagSet{
 		&cmdUpdate.Flags,
 		&cmdList.Flags,
+		&cmdCleanup.Flags,
 		&cmdEnv.Flags} {
 		fs.BoolVar(&verboseFlag, "v", false, "print more detailed information")
 	}
@@ -195,6 +187,10 @@ func Init(defaultManifestFilename string) {
 		profiles.LookupManager(mgr).AddFlags(&cmdInstall.Flags, profiles.Install)
 		profiles.LookupManager(mgr).AddFlags(&cmdUninstall.Flags, profiles.Uninstall)
 	}
+
+	// cleanup accepts the following flags:
+	cmdCleanup.Flags.BoolVar(&cleanupFlag, "gc", false, "uninstall profile targets that are older than the current default")
+	cmdCleanup.Flags.BoolVar(&specificVersionsFlag, "ensure-specific-versions-are-set", false, "ensure that profile targets have a specific version set")
 }
 
 func runList(env *cmdline.Env, args []string) error {
@@ -263,7 +259,7 @@ func runList(env *cmdline.Env, args []string) error {
 					out.WriteString(fmtHeader(name, target))
 					out.WriteString(" ")
 				}
-				r, err := fmtInfo(mgr, profile, target)
+				r, err := fmtInfo(ctx, mgr, profile, target)
 				if err != nil {
 					return err
 				}
@@ -272,7 +268,7 @@ func runList(env *cmdline.Env, args []string) error {
 					out.WriteString("\n")
 				}
 			}
-			fmt.Fprint(ctx.Stdout(), fmtOutput(ctx, out.String()))
+			fmt.Fprint(ctx.Stdout(), out.String())
 		}
 	}
 	return nil
@@ -291,6 +287,7 @@ type listInfo struct {
 		InstallationDir string
 		CommandLineEnv  []string
 		Env             []string
+		Command         string
 	}
 	Profile struct {
 		Description    string
@@ -307,13 +304,14 @@ func infoUsage() string {
 	Target.InstallationDir - the installation directory of the requested profile.
 	Target.CommandLineEnv - the environment variables specified via the command line when installing this profile target.
 	Target.Env - the environment variables computed by the profile installation process for this target.
-	Note: if no --target is specified then metadata for all targets will be displayed.
+	Target.Command - a command that can be used to create this profile.
+	Note: if no --target is specified then the requested field will be displayed for all targets.
 	Profile.Description - description of the requested profile.
 	Profile.Root - the root directory of the requested profile.
 	Profile.Versions - the set of supported versions for this profile.
 	Profile.DefaultVersion - the default version of the requested profile.
 	Profile.LatestVersion - the latest version available for the requested profile.
-	Note: if no profiles are specified then metadata for all profiles will be displayed.`
+	Note: if no profiles are specified then the requested field will be displayed for all profiles.`
 }
 
 func fmtOutput(ctx *tool.Context, o string) string {
@@ -331,27 +329,39 @@ func fmtOutput(ctx *tool.Context, o string) string {
 	return out.String()
 }
 
-func fmtInfo(mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
+func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
 	if len(infoFlag) > 0 {
+		// Populate an instance listInfo
 		info := &listInfo{}
-		info.SchemaVersion = profiles.SchemaVersion()
-		if target != nil {
-			info.Target.InstallationDir = target.InstallationDir
-			info.Target.CommandLineEnv = target.CommandLineEnv().Vars
-			info.Target.Env = target.Env.Vars
-		}
-		if profile != nil {
-			info.Profile.Root = profile.Root
-		}
+		name := ""
 		if mgr != nil {
-			info.Profile.Description = mgr.Info()
+			// Format the description on its own, without any preceeding
+			// text so that the line breaks work correctly.
+			info.Profile.Description = "\n" + fmtOutput(ctx, mgr.Info()) + "\n"
 			vi := mgr.VersionInfo()
 			if supported := vi.Supported(); len(supported) > 0 {
 				info.Profile.Versions = supported
 				info.Profile.LatestVersion = supported[0]
 			}
 			info.Profile.DefaultVersion = vi.Default()
+			name = mgr.Name()
 		}
+		info.SchemaVersion = profiles.SchemaVersion()
+		if target != nil {
+			info.Target.InstallationDir = target.InstallationDir
+			info.Target.CommandLineEnv = target.CommandLineEnv().Vars
+			info.Target.Env = target.Env.Vars
+			clenv := ""
+			if len(info.Target.CommandLineEnv) > 0 {
+				clenv = fmt.Sprintf(" --env=\"%s\" ", strings.Join(info.Target.CommandLineEnv, ","))
+			}
+			info.Target.Command = fmt.Sprintf("jiri v23-profile install --target=%s %s%s", target, clenv, name)
+		}
+		if profile != nil {
+			info.Profile.Root = profile.Root
+		}
+
+		// Use a template to print out any field in our instance of listInfo.
 		tmpl, err := template.New("list").Parse("{{ ." + infoFlag + "}}")
 		if err != nil {
 			return "", err
@@ -363,34 +373,6 @@ func fmtInfo(mgr profiles.Manager, profile *profiles.Profile, target *profiles.T
 		return out.String(), nil
 	}
 	return "", nil
-}
-
-func runRecreate(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	if err := profiles.Read(ctx, manifestFlag); err != nil {
-		fmt.Fprintf(ctx.Stderr(), "Failed to read manifest: %v", err)
-		return err
-	}
-	profileNames := args
-	if len(args) == 0 {
-		profileNames = profiles.Profiles()
-	}
-	prefix := "jiri v23-profile install"
-	for _, name := range profileNames {
-		profile := profiles.LookupProfile(name)
-		if profile == nil {
-			return fmt.Errorf("Profile %v is not installed", name)
-		}
-		for _, target := range profile.Targets() {
-			fmt.Fprintf(ctx.Stdout(), "%s --target=%s", prefix, target)
-			cmdEnv := target.CommandLineEnv()
-			if len(cmdEnv.Vars) > 0 {
-				fmt.Fprintf(ctx.Stdout(), " --env=\"%s\"", strings.Join(cmdEnv.Vars, ","))
-			}
-			fmt.Fprintf(ctx.Stdout(), " %s\n", name)
-		}
-	}
-	return nil
 }
 
 func runEnv(env *cmdline.Env, args []string) error {
@@ -494,14 +476,7 @@ func runUpdate(env *cmdline.Env, args []string) error {
 	return profiles.Write(ctx, manifestFlag)
 }
 
-func runCleanup(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	if len(args) == 0 {
-		args = profiles.Managers()
-	}
-	if err := initCommand(ctx, args); err != nil {
-		return err
-	}
+func runGC(ctx *tool.Context, args []string) error {
 	for _, n := range args {
 		mgr := profiles.LookupManager(n)
 		vi := mgr.VersionInfo()
@@ -509,12 +484,71 @@ func runCleanup(env *cmdline.Env, args []string) error {
 		for _, target := range profile.Targets() {
 			if vi.IsOlderThanDefault(target.Version()) {
 				err := mgr.Uninstall(ctx, *target)
-				logResult(ctx, "Cleanup", mgr, *target, err)
+				logResult(ctx, "gc", mgr, *target, err)
 				if err != nil {
 					return err
 				}
 			}
 		}
+	}
+	return nil
+}
+
+func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
+	for _, name := range args {
+		profile := profiles.LookupProfile(name)
+		mgr := profiles.LookupManager(name)
+		if mgr == nil {
+			fmt.Fprintf(ctx.Stderr(), "%s is not linked into this binary", name)
+			continue
+		}
+		for _, target := range profile.Targets() {
+			if len(target.Version()) == 0 {
+				prior := target
+				version, err := mgr.VersionInfo().Select(target.Version())
+				if err != nil {
+					return err
+				}
+				target.SetVersion(version)
+				if verboseFlag {
+					fmt.Fprintf(ctx.Stdout(), "%s %s had no version, now set to: %s\n", name, prior, target)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func runCleanup(env *cmdline.Env, args []string) error {
+	ctx := tool.NewContextFromEnv(env)
+	if err := profiles.Read(ctx, manifestFlag); err != nil {
+		fmt.Fprintf(ctx.Stderr(), "Failed to read manifest: %v", err)
+		return err
+	}
+	if len(args) == 0 {
+		args = profiles.Profiles()
+	}
+	dirty := false
+	if specificVersionsFlag {
+		if verboseFlag {
+			fmt.Fprintf(ctx.Stdout(), "Ensuring that all targets have a specific version set for %s\n", args)
+		}
+		if err := runEnsureVersionsAreSet(ctx, args); err != nil {
+			return fmt.Errorf("ensure-specific-versions-are-set: %v", err)
+		}
+		dirty = true
+	}
+	if cleanupFlag {
+		if verboseFlag {
+			fmt.Fprintf(ctx.Stdout(), "Removing targets older than the default version for %s\n", args)
+		}
+		if err := runGC(ctx, args); err != nil {
+			return fmt.Errorf("gc: %v", err)
+		}
+		dirty = true
+	}
+	if !dirty {
+		return fmt.Errorf("at least one option must be specified")
 	}
 	return profiles.Write(ctx, manifestFlag)
 }

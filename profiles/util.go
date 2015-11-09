@@ -222,6 +222,11 @@ func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Ta
 	if mgr == nil {
 		return fmt.Errorf("profile %v is not supported", profile)
 	}
+	version, err := mgr.VersionInfo().Select(target.Version())
+	if err != nil {
+		return err
+	}
+	target.SetVersion(version)
 	mgr.SetRoot(root)
 	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
 		fmt.Fprintf(ctx.Stdout(), "install %s %s\n", profile, target.DebugString())
@@ -245,6 +250,11 @@ func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, target 
 	if mgr == nil {
 		return fmt.Errorf("profile %v is not supported", profile)
 	}
+	version, err := mgr.VersionInfo().Select(target.Version())
+	if err != nil {
+		return err
+	}
+	target.SetVersion(version)
 	mgr.SetRoot(root)
 	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
 		fmt.Fprintf(ctx.Stdout(), "uninstall %s %s\n", profile, target.DebugString())

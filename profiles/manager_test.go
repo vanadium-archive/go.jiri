@@ -83,7 +83,7 @@ func ExampleManager() {
 		profiles.Register(myProfile, newProfile(myProfile))
 		flags := flag.NewFlagSet("example", flag.ContinueOnError)
 		profiles.RegisterTargetAndEnvFlags(flags, &target)
-		flags.Parse([]string{"--target=myTarget=arm-linux", "--env=A=B,C=D", "--env=E=F"})
+		flags.Parse([]string{"--target=myTarget=arm-linux@1", "--env=A=B,C=D", "--env=E=F"})
 	}
 	init()
 
@@ -127,10 +127,10 @@ func ExampleManager() {
 
 	// Output:
 	// Profile: myNewProfile: installed
-	// [myTarget=arm-linux@]
+	// [myTarget=arm-linux@1]
 	//
 	// Profile: myNewProfile: installed
-	// [myTarget=arm-linux@]
+	// [myTarget=arm-linux@1]
 	//
 	// Profile: myNewProfile: uninstalled
 	//

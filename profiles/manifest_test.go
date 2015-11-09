@@ -20,7 +20,7 @@ import (
 )
 
 func addProfileAndTargets(t *testing.T, name string) {
-	t1, _ := profiles.NewTargetWithEnv("t1=cpu1-os1", "A=B,C=D")
+	t1, _ := profiles.NewTargetWithEnv("t1=cpu1-os1@1", "A=B,C=D")
 	t2, _ := profiles.NewTargetWithEnv("t2=cpu2-os2@bar", "A=B,C=D")
 	if err := profiles.AddProfileTarget(name, t1); err != nil {
 		t.Fatal(err)
@@ -67,9 +67,21 @@ func TestWrite(t *testing.T) {
 	defer os.RemoveAll(filepath.Dir(filename))
 	ctx := tool.NewDefaultContext()
 
+	// test for no version being set.
+	t1, _ := profiles.NewTargetWithEnv("t1=cpu1-os1", "A=B,C=D")
+	if err := profiles.AddProfileTarget("b", t1); err != nil {
+		t.Fatal(err)
+	}
+	if err := profiles.Write(ctx, filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
+		t.Fatalf("was expecing a missing version error, but got %v", err)
+	}
+	profiles.RemoveProfileTarget("b", t1)
+
 	addProfileAndTargets(t, "b")
 	addProfileAndTargets(t, "a")
-	profiles.Write(ctx, filename)
+	if err := profiles.Write(ctx, filename); err != nil {
+		t.Fatal(err)
+	}
 
 	g, _ := ioutil.ReadFile(filename)
 	w, _ := ioutil.ReadFile("./testdata/m1.xml")
@@ -153,7 +165,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 	defer os.RemoveAll(filepath.Dir(filename))
 
 	var t1 profiles.Target
-	t1.Set("tag=cpu,os")
+	t1.Set("tag=cpu-os@1")
 	profiles.AddProfileTarget("__first", t1)
 
 	if err := profiles.Write(ctx, filename); err != nil {

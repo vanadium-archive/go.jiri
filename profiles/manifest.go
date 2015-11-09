@@ -282,6 +282,9 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 
 		for _, target := range profile.targets {
 			sort.Strings(target.Env.Vars)
+			if len(target.version) == 0 {
+				return fmt.Errorf("missing version for profile %s target: %s", name, target)
+			}
 			schema.Profiles[i].Targets = append(schema.Profiles[i].Targets,
 				&targetSchema{
 					Tag:             target.tag,
