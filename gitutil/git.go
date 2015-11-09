@@ -646,6 +646,11 @@ func (g *Git) commandWithOpts(opts runutil.Opts, args ...string) error {
 	if g.rootDir != "" {
 		opts.Dir = g.rootDir
 	}
+	if runutil.IsFNLHost() {
+		// TODO(bprosnitz) Remove this after certificates are installed on FNL
+		// Disable SSL verification because certificates are not present on FNL.
+		args = append([]string{"-c", "http.sslVerify=false"}, args...)
+	}
 	if err := g.r.CommandWithOpts(opts, "git", args...); err != nil {
 		stdout, stderr := "", ""
 		buf, ok := opts.Stdout.(*bytes.Buffer)
