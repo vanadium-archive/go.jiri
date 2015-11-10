@@ -154,7 +154,7 @@ func (e *executor) timedCommand(timeout time.Duration, opts Opts, command *exec.
 	// Kill this process group explicitly when receiving SIGTERM
 	// or SIGINT signals.
 	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 	go func() {
 		<-sigchan
 		e.terminateProcessGroup(command)
@@ -193,12 +193,14 @@ func (e *executor) timedCommand(timeout time.Duration, opts Opts, command *exec.
 	}
 }
 
-// terminateProcessGroup sends SIGTERM followed by SIGKILL to the
+// terminateProcessGroup sends SIGQUIT followed by SIGKILL to the
 // process group (the negative value of the process's pid).
 func (e *executor) terminateProcessGroup(command *exec.Cmd) {
 	pid := -command.Process.Pid
-	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-		fmt.Fprintf(e.opts.Stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGTERM, err)
+	// Use SIGQUIT in order to get a stack dump of potentially hanging
+	// commands.
+	if err := syscall.Kill(pid, syscall.SIGQUIT); err != nil {
+		fmt.Fprintf(e.opts.Stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGQUIT, err)
 	}
 	fmt.Fprintf(e.opts.Stderr, "Waiting for command to exit: %q\n", command.Args)
 	// Give the process some time to shut down cleanly.
