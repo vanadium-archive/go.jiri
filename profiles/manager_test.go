@@ -9,10 +9,38 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"v.io/jiri/profiles"
 	"v.io/jiri/tool"
 )
+
+func TestRelativePath(t *testing.T) {
+	rp := profiles.NewRelativePath("VAR", "var")
+	if got, want := rp.Expand(), "var"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := rp.String(), "${VAR}"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	rp = rp.Join("a", "b")
+	if got, want := rp.Expand(), filepath.Join("var", "a", "b"); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := rp.String(), "${VAR}"+string(filepath.Separator)+filepath.Join("a", "b"); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	rp = rp.Join("x")
+	if got, want := rp.RootJoin("a").Expand(), filepath.Join("var", "a"); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := rp.Join("y").Expand(), filepath.Join("var", "a", "b", "x", "y"); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := rp.RelativePath(), filepath.Join("a", "b", "x"); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
 
 type myNewProfile struct {
 	name, root, status string
@@ -30,14 +58,6 @@ func newProfile(name string) *myNewProfile {
 
 func (p *myNewProfile) Name() string {
 	return p.name
-}
-
-func (p *myNewProfile) SetRoot(root string) {
-	p.root = root
-}
-
-func (p *myNewProfile) Root() string {
-	return p.root
 }
 
 func (p *myNewProfile) Info() string {
@@ -61,13 +81,13 @@ func (p *myNewProfile) String() string {
 func (p *myNewProfile) AddFlags(*flag.FlagSet, profiles.Action) {
 }
 
-func (p *myNewProfile) Install(ctx *tool.Context, target profiles.Target) error {
+func (p *myNewProfile) Install(ctx *tool.Context, root profiles.RelativePath, target profiles.Target) error {
 	p.status = "installed"
 	profiles.AddProfileTarget(p.name, target)
 	return nil
 }
 
-func (p *myNewProfile) Uninstall(ctx *tool.Context, target profiles.Target) error {
+func (p *myNewProfile) Uninstall(ctx *tool.Context, root profiles.RelativePath, target profiles.Target) error {
 	profiles.RemoveProfileTarget(p.name, target)
 	if profiles.LookupProfile(p.name) == nil {
 		p.status = "uninstalled"
@@ -87,6 +107,7 @@ func ExampleManager() {
 	}
 	init()
 
+	rootPath := profiles.NewRelativePath("JIRI_ROOT", ".").Join("profiles")
 	mgr := profiles.LookupManager(myProfile)
 	if mgr == nil {
 		panic("manager not found for: " + myProfile)
@@ -94,7 +115,7 @@ func ExampleManager() {
 
 	ctx := tool.NewDefaultContext()
 	// Install myNewProfile for target.
-	if err := mgr.Install(ctx, target); err != nil {
+	if err := mgr.Install(ctx, rootPath, target); err != nil {
 		panic("failed to find manager for: " + myProfile)
 	}
 
@@ -120,7 +141,7 @@ func ExampleManager() {
 	}
 
 	fmt.Println(mgr.String())
-	mgr.Uninstall(ctx, target)
+	mgr.Uninstall(ctx, rootPath, target)
 	fmt.Println(mgr.String())
 	fmt.Println(mgr.VersionInfo().Supported())
 	fmt.Println(mgr.VersionInfo().Default())

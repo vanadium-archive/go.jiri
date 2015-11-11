@@ -18,7 +18,7 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/project"
-  "v.io/jiri/runutil"
+	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 )
 
@@ -106,7 +106,9 @@ func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string
 			if !ctx.Run().FileExists(completionLogPath) {
 				ctx.Run().RemoveAll(dir)
 			} else {
-				fmt.Fprintf(ctx.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
+				if ctx.Verbose() {
+					fmt.Fprintf(ctx.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
+				}
 				return nil
 			}
 		}
@@ -209,12 +211,22 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 	return ctx.Run().Function(installDepsFn, "Install dependencies")
 }
 
-// EnsureProfileTargetIsInstalled ensures that the requested profile and target
-// is installed, installing it if only if necessary.
-func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Target, root string) error {
+// ensureAction ensures that the requested profile and target
+// is installed/uninstalled, installing/uninstalling it if only if necessary.
+func ensureAction(ctx *tool.Context, action Action, profile string, root RelativePath, target Target) error {
+	verb := ""
+	switch action {
+	case Install:
+		verb = "install"
+	case Uninstall:
+		verb = "uninstall"
+	default:
+		return fmt.Errorf("unrecognised action %v", action)
+	}
+
 	if t := LookupProfileTarget(profile, target); t != nil {
 		if ctx.Run().Opts().Verbose {
-			fmt.Fprintf(ctx.Stdout(), "%v %v is already installed as %v\n", profile, target, t)
+			fmt.Fprintf(ctx.Stdout(), "%v %v is already %sed as %v\n", profile, target, verb, t)
 		}
 		return nil
 	}
@@ -227,42 +239,25 @@ func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, target Ta
 		return err
 	}
 	target.SetVersion(version)
-	mgr.SetRoot(root)
 	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
-		fmt.Fprintf(ctx.Stdout(), "install %s %s\n", profile, target.DebugString())
+		fmt.Fprintf(ctx.Stdout(), "%s %s %s\n", verb, profile, target.DebugString())
 	}
-	if err := mgr.Install(ctx, target); err != nil {
-		return err
+	if action == Install {
+		return mgr.Install(ctx, root, target)
 	}
-	return nil
+	return mgr.Uninstall(ctx, root, target)
+}
+
+// EnsureProfileTargetIsInstalled ensures that the requested profile and target
+// is installed, installing it if only if necessary.
+func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, root RelativePath, target Target) error {
+	return ensureAction(ctx, Install, profile, root, target)
 }
 
 // EnsureProfileTargetIsUninstalled ensures that the requested profile and target
 // are no longer installed.
-func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, target Target, root string) error {
-	if LookupProfileTarget(profile, target) != nil {
-		if ctx.Run().Opts().Verbose {
-			fmt.Fprintf(ctx.Stdout(), "%v is not installed: %v", profile, target)
-		}
-		return nil
-	}
-	mgr := LookupManager(profile)
-	if mgr == nil {
-		return fmt.Errorf("profile %v is not supported", profile)
-	}
-	version, err := mgr.VersionInfo().Select(target.Version())
-	if err != nil {
-		return err
-	}
-	target.SetVersion(version)
-	mgr.SetRoot(root)
-	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
-		fmt.Fprintf(ctx.Stdout(), "uninstall %s %s\n", profile, target.DebugString())
-	}
-	if err := mgr.Uninstall(ctx, target); err != nil {
-		return err
-	}
-	return nil
+func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, root RelativePath, target Target) error {
+	return ensureAction(ctx, Uninstall, profile, root, target)
 }
 
 // Fetch downloads the specified url and saves it to dst.

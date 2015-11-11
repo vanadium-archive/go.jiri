@@ -22,9 +22,14 @@ const (
 type Version int
 
 const (
+	// Original, old-style profiles without a version #
 	Original Version = 0
-	V2       Version = 2
-	V3       Version = 3
+	// First version of new-style profiles.
+	V2 Version = 2
+	// V3 added support for recording the options that were used to install profiles.
+	V3 Version = 3
+	// V4 adds support for relative path names in profiles and environment variables.
+	V4 Version = 4
 )
 
 // Profile represents a suite of software that is managed by an implementation

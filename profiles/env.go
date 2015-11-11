@@ -174,7 +174,8 @@ func (ch *ConfigHelper) MergeEnv(policies map[string]MergePolicy, vars ...[]stri
 // MergeEnvFromProfiles merges the embedded environment with the environment
 // variables stored in the requested profiles. The profiles are those read from
 // the manifest and in addition the 'jiri' profile may be used which refers to
-// the environment variables maintained by the jiri tool itself.
+// the environment variables maintained by the jiri tool itself. It will also
+// expand all instances of ${JIRI_ROOT} in the returned environment.
 func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, target Target, profileNames ...string) {
 	if ch.legacyMode {
 		return
@@ -193,6 +194,8 @@ func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, ta
 		envs = append(envs, e)
 	}
 	MergeEnv(policies, ch.Vars, envs...)
+	rp := NewRelativePath("JIRI_ROOT", ch.root)
+	rp.ExpandEnv(ch.Vars)
 }
 
 // SkippingProfiles returns true if no profiles are being used.

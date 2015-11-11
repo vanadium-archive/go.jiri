@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -111,6 +112,7 @@ var cmdUninstall = &cmdline.Command{
 }
 
 var (
+	rootPath             profiles.RelativePath
 	targetFlag           profiles.Target
 	manifestFlag         string
 	showManifestFlag     bool
@@ -123,6 +125,7 @@ var (
 	mergePoliciesFlag    profiles.MergePolicies
 	specificVersionsFlag bool
 	cleanupFlag          bool
+	rmAllFlag            bool
 )
 
 func Main(name string) {
@@ -139,6 +142,8 @@ func Init(defaultManifestFilename string) {
 	if err != nil {
 		panic(err)
 	}
+
+	rootPath = profiles.NewRelativePath("JIRI_ROOT", rootDir).Join("profiles")
 
 	// Every sub-command accepts: --manifest
 	for _, fs := range []*flag.FlagSet{
@@ -191,6 +196,7 @@ func Init(defaultManifestFilename string) {
 	// cleanup accepts the following flags:
 	cmdCleanup.Flags.BoolVar(&cleanupFlag, "gc", false, "uninstall profile targets that are older than the current default")
 	cmdCleanup.Flags.BoolVar(&specificVersionsFlag, "ensure-specific-versions-are-set", false, "ensure that profile targets have a specific version set")
+	cmdCleanup.Flags.BoolVar(&rmAllFlag, "rm-all", false, "remove profile manifest and all profile generated output files.")
 }
 
 func runList(env *cmdline.Env, args []string) error {
@@ -329,6 +335,14 @@ func fmtOutput(ctx *tool.Context, o string) string {
 	return out.String()
 }
 
+func handleRelativePath(root profiles.RelativePath, s string) string {
+	// Handle the transition from absolute to relative paths.
+	if filepath.IsAbs(s) {
+		return s
+	}
+	return root.RootJoin(s).Expand()
+}
+
 func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
 	if len(infoFlag) > 0 {
 		// Populate an instance listInfo
@@ -348,7 +362,7 @@ func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile,
 		}
 		info.SchemaVersion = profiles.SchemaVersion()
 		if target != nil {
-			info.Target.InstallationDir = target.InstallationDir
+			info.Target.InstallationDir = handleRelativePath(rootPath, target.InstallationDir)
 			info.Target.CommandLineEnv = target.CommandLineEnv().Vars
 			info.Target.Env = target.Env.Vars
 			clenv := ""
@@ -358,7 +372,7 @@ func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile,
 			info.Target.Command = fmt.Sprintf("jiri v23-profile install --target=%s %s%s", target, clenv, name)
 		}
 		if profile != nil {
-			info.Profile.Root = profile.Root
+			info.Profile.Root = handleRelativePath(rootPath, profile.Root)
 		}
 
 		// Use a template to print out any field in our instance of listInfo.
@@ -454,14 +468,13 @@ func runUpdate(env *cmdline.Env, args []string) error {
 			continue
 		}
 		vi := mgr.VersionInfo()
-		mgr.SetRoot(rootDir)
 		for _, target := range profile.Targets() {
 			if vi.IsNewerThanDefault(target.Version()) {
 				if verboseFlag {
 					fmt.Fprintf(ctx.Stdout(), "Updating %s %s from %q to %s\n", n, target, target.Version(), vi)
 				}
 				target.SetVersion(vi.Default())
-				err := mgr.Install(ctx, *target)
+				err := mgr.Install(ctx, rootPath, *target)
 				logResult(ctx, "Update", mgr, *target, err)
 				if err != nil {
 					return err
@@ -483,7 +496,7 @@ func runGC(ctx *tool.Context, args []string) error {
 		profile := profiles.LookupProfile(n)
 		for _, target := range profile.Targets() {
 			if vi.IsOlderThanDefault(target.Version()) {
-				err := mgr.Uninstall(ctx, *target)
+				err := mgr.Uninstall(ctx, rootPath, *target)
 				logResult(ctx, "gc", mgr, *target, err)
 				if err != nil {
 					return err
@@ -519,6 +532,16 @@ func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
 	return nil
 }
 
+func runRmAll(ctx *tool.Context) error {
+	if err := ctx.Run().Remove(manifestFlag); err != nil {
+		return err
+	}
+	if err := ctx.Run().RemoveAll(rootPath.Expand()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func runCleanup(env *cmdline.Env, args []string) error {
 	ctx := tool.NewContextFromEnv(env)
 	if err := profiles.Read(ctx, manifestFlag); err != nil {
@@ -547,6 +570,16 @@ func runCleanup(env *cmdline.Env, args []string) error {
 		}
 		dirty = true
 	}
+	if rmAllFlag {
+		if verboseFlag {
+			fmt.Fprintf(ctx.Stdout(), "Removing profile manifest and all profile output files\n")
+		}
+		if err := runRmAll(ctx); err != nil {
+			return err
+		}
+		// Don't write out the profiles manifest file again.
+		return nil
+	}
 	if !dirty {
 		return fmt.Errorf("at least one option must be specified")
 	}
@@ -570,7 +603,6 @@ func applyCommand(names []string, env *cmdline.Env, ctx *tool.Context, target pr
 			return err
 		}
 		target.SetVersion(version)
-		mgr.SetRoot(rootDir)
 		if err := fn(mgr, ctx, target); err != nil {
 			return err
 		}
@@ -599,7 +631,7 @@ func runInstall(env *cmdline.Env, args []string) error {
 	}
 	if err := applyCommand(names, env, ctx, targetFlag,
 		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
-			err := mgr.Install(ctx, target)
+			err := mgr.Install(ctx, rootPath, target)
 			logResult(ctx, "Install:", mgr, target, err)
 			return err
 		}); err != nil {
@@ -623,9 +655,8 @@ func runUninstall(env *cmdline.Env, args []string) error {
 			if profile == nil || mgr == nil {
 				continue
 			}
-			mgr.SetRoot(rootDir)
 			for _, target := range profile.Targets() {
-				if err := mgr.Uninstall(ctx, *target); err != nil {
+				if err := mgr.Uninstall(ctx, rootPath, *target); err != nil {
 					logResult(ctx, "Uninstall", mgr, *target, err)
 					return err
 				}
@@ -635,7 +666,7 @@ func runUninstall(env *cmdline.Env, args []string) error {
 	} else {
 		applyCommand(args, env, ctx, targetFlag,
 			func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
-				err := mgr.Uninstall(ctx, target)
+				err := mgr.Uninstall(ctx, rootPath, target)
 				logResult(ctx, "Uninstall", mgr, target, err)
 				return err
 			})
