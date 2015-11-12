@@ -20,8 +20,8 @@ import (
 )
 
 func addProfileAndTargets(t *testing.T, name string) {
-	t1, _ := profiles.NewTargetWithEnv("t1=cpu1-os1@1", "A=B,C=D")
-	t2, _ := profiles.NewTargetWithEnv("t2=cpu2-os2@bar", "A=B,C=D")
+	t1, _ := profiles.NewTargetWithEnv("cpu1-os1@1", "A=B,C=D")
+	t2, _ := profiles.NewTargetWithEnv("cpu2-os2@bar", "A=B,C=D")
 	if err := profiles.AddProfileTarget(name, t1); err != nil {
 		t.Fatal(err)
 	}
@@ -50,17 +50,6 @@ func removeDate(s string) string {
 	return strings.TrimSpace(result.String())
 }
 
-func TestDuplicateTag(t *testing.T) {
-	profiles.Clear()
-	addProfileAndTargets(t, "b")
-	t1 := &profiles.Target{}
-	t1.Set("t2")
-	err := profiles.AddProfileTarget("b", *t1)
-	if got, want := err.Error(), "tag \"t2\" is already used"; !strings.Contains(got, want) {
-		t.Fatalf("got %v doesn't contain %v", got, want)
-	}
-}
-
 func TestWrite(t *testing.T) {
 	profiles.Clear()
 	filename := tmpFile()
@@ -68,7 +57,7 @@ func TestWrite(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
 	// test for no version being set.
-	t1, _ := profiles.NewTargetWithEnv("t1=cpu1-os1", "A=B,C=D")
+	t1, _ := profiles.NewTargetWithEnv("cpu1-os1", "A=B,C=D")
 	if err := profiles.AddProfileTarget("b", t1); err != nil {
 		t.Fatal(err)
 	}
@@ -114,9 +103,6 @@ func TestRead(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	p := profiles.LookupProfile("a")
-	if got, want := p.Targets()[0].Tag(), "t1"; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
 	if got, want := p.Targets()[0].OS(), "os1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -165,7 +151,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 	defer os.RemoveAll(filepath.Dir(filename))
 
 	var t1 profiles.Target
-	t1.Set("tag=cpu-os@1")
+	t1.Set("cpu-os@1")
 	profiles.AddProfileTarget("__first", t1)
 
 	if err := profiles.Write(ctx, filename); err != nil {
