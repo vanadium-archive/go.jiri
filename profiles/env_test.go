@@ -46,9 +46,9 @@ func TestEnvFromTarget(t *testing.T) {
 	profiles.InstallProfile("a", "root")
 	profiles.InstallProfile("b", "root")
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
-	t1.Set("t1=cpu1-os1@1")
+	t1.Set("cpu1-os1@1")
 	t1.Env.Set("A=B C=D,B=C Z=Z")
-	t2.Set("t1=cpu1-os1@1")
+	t2.Set("cpu1-os1@1")
 	t2.Env.Set("A=Z,B=Z,Z=Z1")
 	profiles.AddProfileTarget("a", *t1)
 	profiles.AddProfileTarget("b", *t2)
@@ -66,7 +66,7 @@ func TestEnvFromTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	ch.Vars = envvar.VarsFromSlice([]string{})
-	t1Target, _ := profiles.NewTarget("t1")
+	t1Target, _ := profiles.NewTarget("cpu1-os1@1")
 	ch.MergeEnvFromProfiles(map[string]profiles.MergePolicy{
 		"A": profiles.AppendFlag,
 		"B": profiles.UseLast,

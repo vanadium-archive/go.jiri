@@ -285,6 +285,10 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 			if len(target.version) == 0 {
 				return fmt.Errorf("missing version for profile %s target: %s", name, target)
 			}
+			// TODO(cnicolaou): enable this in a subsequent CL.
+			//if len(target.tag) > 0 {
+			//	return fmt.Errorf("tags are no longer supported - the following profile and target has one: %s %s", name, target)
+			//}
 			schema.Profiles[i].Targets = append(schema.Profiles[i].Targets,
 				&targetSchema{
 					Tag:             target.tag,
