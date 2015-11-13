@@ -324,6 +324,13 @@ func Unzip(ctx *tool.Context, srcFile, dstDir string) error {
 		if zFile.FileInfo().IsDir() {
 			return ctx.Run().MkdirAll(fileDst, zFile.Mode())
 		}
+
+		// Make sure the parent directory exists.  Note that sometimes files
+		// can appear in a zip file before their directory.
+		if err := ctx.Run().MkdirAll(filepath.Dir(fileDst), zFile.Mode()); err != nil {
+			return err
+		}
+
 		file, err := ctx.Run().OpenFile(fileDst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zFile.Mode())
 		if err != nil {
 			return err
