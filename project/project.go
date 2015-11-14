@@ -1105,6 +1105,46 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 	}
 }
 
+// getRemoteHeadRevisions attempts to get the repo statuses from remote for HEAD
+// projects so we can detect when a local project is already up-to-date.
+func getRemoteHeadRevisions(ctx *tool.Context, remoteProjects Projects) {
+	someAtHead := false
+	for _, rp := range remoteProjects {
+		if rp.Revision == "HEAD" {
+			someAtHead = true
+			break
+		}
+	}
+	if !someAtHead {
+		return
+	}
+	gitHost, gitHostErr := GitHost(ctx)
+	if gitHostErr != nil || !googlesource.IsGoogleSourceHost(gitHost) {
+		return
+	}
+	repoStatuses, err := googlesource.GetRepoStatuses(ctx, gitHost)
+	if err != nil {
+		// Log the error but don't fail.
+		fmt.Fprintf(ctx.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
+		return
+	}
+	for name, rp := range remoteProjects {
+		if rp.Revision != "HEAD" {
+			continue
+		}
+		status, ok := repoStatuses[rp.Name]
+		if !ok {
+			continue
+		}
+		masterRev, ok := status.Branches["master"]
+		if !ok || masterRev == "" {
+			continue
+		}
+		rp.Revision = masterRev
+		remoteProjects[name] = rp
+	}
+}
+
 func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	ctx.TimerPush("update projects")
 	defer ctx.TimerPop()
@@ -1117,30 +1157,7 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 	if err != nil {
 		return err
 	}
-
-	gitHost, gitHostErr := GitHost(ctx)
-	if gitHostErr == nil && googlesource.IsGoogleSourceHost(gitHost) {
-		// Attempt to get the repo statuses from remote so we can detect when a
-		// local project is already up-to-date.
-		if repoStatuses, err := googlesource.GetRepoStatuses(ctx, gitHost); err != nil {
-			// Log the error but don't fail.
-			fmt.Fprintf(ctx.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
-		} else {
-			for name, rp := range remoteProjects {
-				status, ok := repoStatuses[rp.Name]
-				if !ok {
-					continue
-				}
-				masterRev, ok := status.Branches["master"]
-				if !ok || masterRev == "" {
-					continue
-				}
-				rp.Revision = masterRev
-				remoteProjects[name] = rp
-			}
-		}
-	}
-
+	getRemoteHeadRevisions(ctx, remoteProjects)
 	ops, err := computeOperations(localProjects, remoteProjects, gc)
 	if err != nil {
 		return err
