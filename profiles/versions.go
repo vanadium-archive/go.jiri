@@ -104,14 +104,14 @@ func (vi *VersionInfo) Supported() []string {
 	return r
 }
 
-// IsNewerThanDefault returns true if the supplied version is newer than the
-// default.
-func (vi *VersionInfo) IsNewerThanDefault(version string) bool {
+// IsTargetNewerThanDefault returns true if the supplied version is newer than
+// the default.
+func (vi *VersionInfo) IsTargetNewerThanDefault(version string) bool {
 	return vi.defaultVersion < version
 }
 
-// IsOlderThanDefault returns true if the supplied version is older than the
-// default.
-func (vi *VersionInfo) IsOlderThanDefault(version string) bool {
+// IsTargetOlderThanDefault returns true if the supplied version is older than
+// the default.
+func (vi *VersionInfo) IsTargetOlderThanDefault(version string) bool {
 	return vi.defaultVersion > version
 }
