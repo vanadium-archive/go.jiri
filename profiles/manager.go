@@ -10,11 +10,10 @@
 // SDKs. Profiles thus refer to uncompiled source code that needs to be compiled
 // for a specific "target". Targets represent compiled code and consist of:
 //
-// 1. A 'tag' that can be used a short hand for refering to a target
-// 2. An 'architecture' that refers to the CPU to be generate code for
-// 3. An 'operating system' that refers to the operating system to generate
+// 1. An 'architecture' that refers to the CPU to be generate code for
+// 2. An 'operating system' that refers to the operating system to generate
 //    code for.
-// 4. An 'environment' which is a set of environment variables to use when
+// 3. An 'environment' which is a set of environment variables to use when
 //    compiling and using the profile.
 //
 // Targets provide the essential support for cross compilation.
@@ -27,9 +26,8 @@
 // Profiles may be installed, updated or removed. When doing so, the name of
 // the profile is required, but the other components of the target are optional
 // and will default to the values of the system that the commands are run on
-// (so-called native builds). Once a profile is installed it may be referred to
-// by its tag for subsequent updates and removals. These operations are
-// defined by the profiles.Manager interface.
+// (so-called native builds). These operations are defined by the
+// profiles.Manager interface.
 //
 // The manifest tracks the installed profiles and their configurations.
 // Other command line tools and packages are expected read information about

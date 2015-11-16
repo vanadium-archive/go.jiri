@@ -148,10 +148,10 @@ func ExampleManager() {
 
 	// Output:
 	// Profile: myNewProfile: installed
-	// [=arm-linux@1]
+	// [arm-linux@1]
 	//
 	// Profile: myNewProfile: installed
-	// [=arm-linux@1]
+	// [arm-linux@1]
 	//
 	// Profile: myNewProfile: uninstalled
 	//

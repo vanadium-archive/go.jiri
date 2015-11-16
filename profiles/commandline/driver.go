@@ -469,7 +469,7 @@ func runUpdate(env *cmdline.Env, args []string) error {
 		}
 		vi := mgr.VersionInfo()
 		for _, target := range profile.Targets() {
-			if vi.IsNewerThanDefault(target.Version()) {
+			if vi.IsTargetOlderThanDefault(target.Version()) {
 				if verboseFlag {
 					fmt.Fprintf(ctx.Stdout(), "Updating %s %s from %q to %s\n", n, target, target.Version(), vi)
 				}
@@ -484,6 +484,7 @@ func runUpdate(env *cmdline.Env, args []string) error {
 					fmt.Fprintf(ctx.Stdout(), "%s %s at %q is up to date(%s)\n", n, target, target.Version(), vi)
 				}
 			}
+
 		}
 	}
 	return profiles.Write(ctx, manifestFlag)
@@ -495,7 +496,7 @@ func runGC(ctx *tool.Context, args []string) error {
 		vi := mgr.VersionInfo()
 		profile := profiles.LookupProfile(n)
 		for _, target := range profile.Targets() {
-			if vi.IsOlderThanDefault(target.Version()) {
+			if vi.IsTargetOlderThanDefault(target.Version()) {
 				err := mgr.Uninstall(ctx, rootPath, *target)
 				logResult(ctx, "gc", mgr, *target, err)
 				if err != nil {

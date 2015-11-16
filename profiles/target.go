@@ -16,17 +16,15 @@ import (
 )
 
 // Target represents specification for the environment that the profile is
-// to be built for. Target may be named (via its tag), see the Match
-// method for a definition of how Targets are compared.
-// Targets include a version string to allow for upgrades and for
-// the simultaneous existence of incompatible versions.
+// to be built for. Targets include a version string to allow for upgrades and
+// for the simultaneous existence of incompatible versions.
 //
 // Target and Environment implement flag.Getter so that they may be used
 // with the flag package. Two flags are required, one to specify the target
-// in <tag>=<arch>-<os>@<version> format and a second to specify environment
+// in <arch>-<os>@<version> format and a second to specify environment
 // variables either as comma separated values or as repeated arguments.
 type Target struct {
-	tag, arch, opsys, version string
+	arch, opsys, version string
 	// The environment as specified on the command line
 	commandLineEnv Environment
 	// The environment as modified by a profile implementation
@@ -34,11 +32,6 @@ type Target struct {
 	InstallationDir string // where this target is installed.
 	UpdateTime      time.Time
 	isSet           bool
-}
-
-// Tag returns the tag, if any, for this target.
-func (pt *Target) Tag() string {
-	return pt.tag
 }
 
 // Arch returns the archiecture of this target.
@@ -78,7 +71,7 @@ func (pt *Target) UseCommandLineEnv() {
 }
 
 // TargetSpecificDirname returns a directory name that is specific
-// to that target taking account the tag, architecture, operating system and
+// to that target taking account the architecture, operating system and
 // command line environment variables, if relevant, into account (e.g
 // GOARM={5,6,7}).
 func (pt *Target) TargetSpecificDirname() string {
@@ -111,17 +104,12 @@ func NewTargetWithEnv(target, env string) (Target, error) {
 
 // Match returns true if pt and pt2 meet the following criteria in the
 // order they are listed:
-// - if both targets have a non-zero length Tag field that is
-//   identical
 // - if the Arch and OS fields are exactly the same
 // - if pt has a non-zero length Version field, then it must be
 //   the same as that in pt2
 // Match is used by the various methods and functions in this package
 // when looking up Targets unless otherwise specified.
 func (pt Target) Match(pt2 *Target) bool {
-	if len(pt.tag) > 0 && len(pt2.tag) > 0 {
-		return pt.tag == pt2.tag
-	}
 	if pt.arch != pt2.arch || pt.opsys != pt2.opsys {
 		return false
 	}
@@ -132,15 +120,14 @@ func (pt Target) Match(pt2 *Target) bool {
 }
 
 // Less returns true if pt2 is considered less than pt. The ordering
-// takes into account only the tag, architecture, operating system and version of
+// takes into account only the architecture, operating system and version of
 // the target. The architecture and operating system are ordered
 // lexicographically in ascending order, then the version is ordered but in
 // descending lexicographic order except that the empty string is considered
-// the 'highest' value, finally the tag is used to order in ascending order.
-// Thus, (targets in [<tag>=]<arch>-<os>[@<version>] format), are all true:
+// the 'highest' value.
+// Thus, (targets in <arch>-<os>[@<version>] format), are all true:
 // b-c < c-c
 // b-c@3 < b-c@2
-// a-b@3 < foo=a-b@3
 //
 func (pt *Target) Less(pt2 *Target) bool {
 	switch {
@@ -154,8 +141,6 @@ func (pt *Target) Less(pt2 *Target) bool {
 		return false
 	case pt.version != pt2.version:
 		return pt.version > pt2.version
-	case pt.tag != pt2.tag:
-		return pt.tag < pt2.tag
 	default:
 		return false
 	}
@@ -169,7 +154,7 @@ func (pt Target) CrossCompiling() bool {
 
 // Usage returns the usage string for Target.
 func (pt *Target) Usage() string {
-	return "specifies a profile target in the following form: <arch>-<os>[@<version>]|<tag>[@version]|<tag>=<arch>-<val>[@<version>]"
+	return "specifies a profile target in the following form: <arch>-<os>[@<version>]|<arch>-<val>[@<version>]"
 }
 
 // Set implements flag.Value.
@@ -179,25 +164,10 @@ func (t *Target) Set(val string) error {
 		t.version = val[index+1:]
 		val = val[:index]
 	}
-	index = strings.IndexByte(val, '=')
-	tag := ""
-	if index > -1 {
-		tag = val[0:index]
-		val = val[index+1:]
-	} else {
-		if strings.IndexByte(val, '-') < 0 {
-			t.tag = val
-			t.arch = ""
-			t.opsys = ""
-			t.isSet = true
-			return nil
-		}
-	}
 	parts := strings.Split(val, "-")
 	if len(parts) != 2 || (len(parts[0]) == 0 || len(parts[1]) == 0) {
-		return fmt.Errorf("%q doesn't look like [tag=]<arch>-<os>", val)
+		return fmt.Errorf("%q doesn't look like <arch>-<os>[@<version>]", val)
 	}
-	t.tag = tag
 	t.arch = parts[0]
 	t.opsys = parts[1]
 	t.isSet = true
@@ -211,7 +181,6 @@ func (t Target) Get() interface{} {
 		arch, isSet := goarch()
 		return Target{
 			isSet:   isSet,
-			tag:     "",
 			arch:    arch,
 			opsys:   runtime.GOOS,
 			version: t.version,
@@ -264,7 +233,7 @@ func (pt Target) IsSet() bool {
 // String implements flag.Getter.
 func (pt Target) String() string {
 	v := pt.Get().(Target)
-	return fmt.Sprintf("%v=%v-%v@%s", v.tag, v.arch, v.opsys, v.version)
+	return fmt.Sprintf("%v-%v@%s", v.arch, v.opsys, v.version)
 }
 
 // OrderderTargets is a list of *Targets ordered by architecture,
@@ -293,7 +262,7 @@ func (tl OrderedTargets) Sort() {
 // DebugString returns a pretty-printed representation of pt.
 func (pt Target) DebugString() string {
 	v := pt.Get().(Target)
-	return fmt.Sprintf("%v=%v-%v@%s dir:%s --env=%s envvars:%v", v.tag, v.arch, v.opsys, v.version, pt.InstallationDir, strings.Join(pt.commandLineEnv.Vars, ","), pt.Env.Vars)
+	return fmt.Sprintf("%v-%v@%s dir:%s --env=%s envvars:%v", v.arch, v.opsys, v.version, pt.InstallationDir, strings.Join(pt.commandLineEnv.Vars, ","), pt.Env.Vars)
 }
 
 // Set implements flag.Getter.
@@ -350,8 +319,9 @@ func RemoveTarget(targets OrderedTargets, target *Target) OrderedTargets {
 }
 
 // FindTarget returns the first target that matches the requested target from
-// the slice of Targets; note that the requested target need only include a
-// tag name. It returns nil if the requested target does not exist.
+// the slice of Targets. If target has not been explicitly set and there is
+// only a single target available in targets then that one target is considered
+// as matching.
 func FindTarget(targets OrderedTargets, target *Target) *Target {
 	if len(targets) == 1 && !target.IsSet() {
 		tmp := *targets[0]
@@ -375,18 +345,4 @@ func FindTargetWithDefault(targets OrderedTargets, target *Target) *Target {
 		return &tmp
 	}
 	return FindTarget(targets, target)
-}
-
-// FindTargetByTag searches targets to see if any have the same
-// tag as the target parameter, and if so, return that target.
-func FindTargetByTag(targets OrderedTargets, target *Target) *Target {
-	if len(target.tag) == 0 {
-		return nil
-	}
-	for _, t := range targets {
-		if target.tag == t.tag {
-			return t
-		}
-	}
-	return nil
 }

@@ -41,8 +41,11 @@ type Profile struct {
 }
 
 func (p *Profile) Targets() OrderedTargets {
-	r := make(OrderedTargets, len(p.targets))
-	copy(r, p.targets)
+	r := make(OrderedTargets, len(p.targets), len(p.targets))
+	for i, t := range p.targets {
+		tmp := *t
+		r[i] = &tmp
+	}
 	return r
 }
 
@@ -60,7 +63,9 @@ type profileSchema struct {
 }
 
 type targetSchema struct {
-	XMLName         xml.Name    `xml:"target"`
+	XMLName xml.Name `xml:"target"`
+	// TODO(cnicolaou): remove this after this CL is checked in and no-one
+	// is using Tags.
 	Tag             string      `xml:"tag,attr"`
 	Arch            string      `xml:"arch,attr"`
 	OS              string      `xml:"os,attr"`
@@ -103,7 +108,7 @@ func LookupProfile(name string) *Profile {
 }
 
 // LookupProfileTarget returns the target information stored for the name
-// profile. Typically, the target parameter will contain just the Tag field.
+// profile.
 func LookupProfileTarget(name string, target Target) *Target {
 	mgr := db.profile(name)
 	if mgr == nil {
@@ -163,8 +168,10 @@ func (pdb *profileDB) addProfileTarget(name string, target *Target) error {
 	defer pdb.Unlock()
 	target.UpdateTime = time.Now()
 	if pi, present := pdb.db[name]; present {
-		if existing := FindTargetByTag(pi.targets, target); existing != nil {
-			return fmt.Errorf("tag %q is already used by profile: %v, existing target: %v", target.tag, name, existing)
+		for _, t := range pi.Targets() {
+			if target.Match(t) {
+				return fmt.Errorf("%s is already used by profile %s %s", target, name, pi.Targets())
+			}
 		}
 		pi.targets = InsertTarget(pi.targets, target)
 		return nil
@@ -257,7 +264,6 @@ func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 		}
 		for _, target := range profile.Targets {
 			pdb.db[name].targets = append(pdb.db[name].targets, &Target{
-				tag:             target.Tag,
 				arch:            target.Arch,
 				opsys:           target.OS,
 				Env:             target.Env,
@@ -290,13 +296,9 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 			if len(target.version) == 0 {
 				return fmt.Errorf("missing version for profile %s target: %s", name, target)
 			}
-			// TODO(cnicolaou): enable this in a subsequent CL.
-			//if len(target.tag) > 0 {
-			//	return fmt.Errorf("tags are no longer supported - the following profile and target has one: %s %s", name, target)
-			//}
 			schema.Profiles[i].Targets = append(schema.Profiles[i].Targets,
 				&targetSchema{
-					Tag:             target.tag,
+					Tag:             "",
 					Arch:            target.arch,
 					OS:              target.opsys,
 					Env:             target.Env,

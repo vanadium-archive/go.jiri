@@ -19,28 +19,26 @@ func ExampleProfileTarget() {
 	var target profiles.Target
 	flags := flag.NewFlagSet("test", flag.ContinueOnError)
 	profiles.RegisterTargetAndEnvFlags(flags, &target)
-	flags.Parse([]string{"--target=name=arm-linux", "--env=A=B,C=D", "--env=E=F"})
+	flags.Parse([]string{"--target=arm-linux", "--env=A=B,C=D", "--env=E=F"})
 	fmt.Println(target.String())
 	fmt.Println(target.DebugString())
 	// Output:
-	// name=arm-linux@
-	// name=arm-linux@ dir: --env=A=B,C=D,E=F envvars:[]
+	// arm-linux@
+	// arm-linux@ dir: --env=A=B,C=D,E=F envvars:[]
 }
 
 func TestProfileTargetArgs(t *testing.T) {
 	for i, c := range []struct {
-		arg, tag, arch, os string
-		err                bool
+		arg, arch, os, version string
+		err                    bool
 	}{
-		{"a-b", "", "a", "b", false},
-		{"t=a-b", "t", "a", "b", false},
-		{"a", "a", "", "", false},
+		{"a-b", "a", "b", "", false},
+		{"a-b@3", "a", "b", "3", false},
 		{"", "", "", "", true},
+		{"a", "", "", "", true},
 		{"a-", "", "", "", true},
 		{"-a", "", "", "", true},
-		{"t=a", "", "", "", true},
-		{"t=a-", "", "", "", true},
-		{"t=-a", "", "", "", true},
+		{"a-", "", "", "", true},
 	} {
 		target := &profiles.Target{}
 		if err := target.Set(c.arg); err != nil {
@@ -48,9 +46,6 @@ func TestProfileTargetArgs(t *testing.T) {
 				t.Errorf("%d: %v", i, err)
 			}
 			continue
-		}
-		if got, want := target.Tag(), c.tag; got != want {
-			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
 		if got, want := target.Arch(), c.arch; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
@@ -112,9 +107,6 @@ func TestTargetEquality(t *testing.T) {
 		equal        bool
 	}{
 		{s{""}, s{""}, true},
-		{s{"--t=tag"}, s{"--t=tag"}, true},
-		{s{"--t=tag"}, s{"--t=tag2"}, false},
-		{s{"--t=tag=a-b"}, s{"--t=tag=c-d"}, true}, // tag trumps all else.
 		{s{"--t=a-b"}, s{"--t=a-b"}, true},
 		{s{"--t=a-b@foo"}, s{"--t=a-b@foo"}, true},
 		{s{"--t=a-b@foo"}, s{"--t=a-b"}, false},
@@ -149,17 +141,17 @@ func TestTargetEquality(t *testing.T) {
 
 func TestTargetVersion(t *testing.T) {
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
-	t1.Set("tag=cpu,os")
-	t2.Set("tag=cpu,os")
+	t1.Set("cpu,os")
+	t2.Set("cpu,os")
 	if got, want := t1.Match(t2), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	t2.Set("tag=cpu,os@var")
+	t2.Set("cpu,os@var")
 	if got, want := t1.Match(t2), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	t2.Set("tag=cpu,os")
-	t1.Set("tag=cpu,os@baz")
+	t2.Set("cpu,os")
+	t1.Set("cpu,os@baz")
 	if got, want := t1.Match(t2), false; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -167,19 +159,19 @@ func TestTargetVersion(t *testing.T) {
 
 func TestDefaults(t *testing.T) {
 	t1 := &profiles.Target{}
-	native := fmt.Sprintf("=%s-%s@", runtime.GOARCH, runtime.GOOS)
+	native := fmt.Sprintf("%s-%s@", runtime.GOARCH, runtime.GOOS)
 	if got, want := t1.String(), native; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	t1.Set("tag=cpu-os")
-	if got, want := t1.String(), "tag=cpu-os@"; got != want {
+	t1.Set("cpu-os")
+	if got, want := t1.String(), "cpu-os@"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
 func TestFindTarget(t *testing.T) {
 	t1 := &profiles.Target{}
-	t1.Set("bar=a-o")
+	t1.Set("a-o")
 	ts := []*profiles.Target{t1}
 	prev := os.Getenv("GOARCH")
 	if len(prev) > 0 {
@@ -192,14 +184,14 @@ func TestFindTarget(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	t2 := &profiles.Target{}
-	t2.Set("baz=a-o1")
+	t2.Set("a-o1")
 	ts = append(ts, t2)
 	if got := profiles.FindTarget(ts, &def); got != nil {
 		t.Errorf("got %v, want nil", got)
 	}
 
 	w := &profiles.Target{}
-	w.Set("bar")
+	w.Set("a-o")
 	if got, want := profiles.FindTarget(ts, w), t1; !got.Match(want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -209,9 +201,9 @@ func TestFindTarget(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	w.Set("baz=a-o")
-	if got, want := profiles.FindTarget(ts, w), t2; !got.Match(want) {
-		t.Errorf("got %v, want %v", got, want)
+	w.Set("c-d")
+	if got := profiles.FindTarget(ts, w); got != nil {
+		t.Errorf("got %v, want nil", got)
 	}
 }
 
@@ -245,7 +237,7 @@ func TestOrderedTargets(t *testing.T) {
 	}
 
 	ol := profiles.OrderedTargets{}
-	data := []string{"a-b@2", "x-y", "a-b@12", "a-b@3", "foo=a-b@3", "a-b@0", "x-y@3", "tag=x-y@2"}
+	data := []string{"a-b@2", "x-y", "a-b@12", "a-b@3", "a-b@0", "x-y@3", "x-y@2"}
 	for _, s := range data {
 		target, err := profiles.NewTarget(s)
 		if err != nil {
@@ -262,10 +254,10 @@ func TestOrderedTargets(t *testing.T) {
 			t.Errorf("%v is not less than %v", ol[i], ol[j])
 		}
 	}
-	if got, want := ol[0].String(), "=a-b@3"; got != want {
+	if got, want := ol[0].String(), "a-b@3"; got != want {
 		t.Fatalf("got %v, want %v", got, want)
 	}
-	if got, want := ol[len(ol)-1].String(), "tag=x-y@2"; got != want {
+	if got, want := ol[len(ol)-1].String(), "x-y@2"; got != want {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 	t2, _ := profiles.NewTarget("a-b@12")
