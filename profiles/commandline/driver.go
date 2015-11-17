@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -534,10 +535,10 @@ func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
 }
 
 func runRmAll(ctx *tool.Context) error {
-	if err := ctx.Run().Remove(manifestFlag); err != nil {
+	if err := ctx.Run().Remove(manifestFlag); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if err := ctx.Run().RemoveAll(rootPath.Expand()); err != nil {
+	if err := ctx.Run().RemoveAll(rootPath.Expand()); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
