@@ -32,7 +32,10 @@ func TestConfigHelper(t *testing.T) {
 	}
 	ch.Vars = envvar.VarsFromOS()
 	ch.Delete("CGO_CFLAGS")
-	native, _ := profiles.NewTarget("native")
+	native, err := profiles.NewTarget("amd64-darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ch.MergeEnvFromProfiles(profiles.JiriMergePolicies(), native, "go", "syncbase")
 	if got, want := ch.Get("CGO_CFLAGS"), "-IX -IY -IA -IB"; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -66,7 +69,10 @@ func TestEnvFromTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	ch.Vars = envvar.VarsFromSlice([]string{})
-	t1Target, _ := profiles.NewTarget("cpu1-os1@1")
+	t1Target, err := profiles.NewTarget("cpu1-os1@1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ch.MergeEnvFromProfiles(map[string]profiles.MergePolicy{
 		"A": profiles.AppendFlag,
 		"B": profiles.UseLast,

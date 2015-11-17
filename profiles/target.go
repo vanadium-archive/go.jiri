@@ -323,10 +323,6 @@ func RemoveTarget(targets OrderedTargets, target *Target) OrderedTargets {
 // only a single target available in targets then that one target is considered
 // as matching.
 func FindTarget(targets OrderedTargets, target *Target) *Target {
-	if len(targets) == 1 && !target.IsSet() {
-		tmp := *targets[0]
-		return &tmp
-	}
 	for _, t := range targets {
 		if target.Match(t) {
 			tmp := *t
