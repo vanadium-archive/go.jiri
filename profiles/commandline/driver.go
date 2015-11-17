@@ -647,7 +647,7 @@ func runUninstall(env *cmdline.Env, args []string) error {
 		return err
 	}
 	if allFlag && targetFlag.IsSet() {
-		return fmt.Errorf("don't specify a target (%v) in conjunction with --all-targets", targetFlag)
+		fmt.Fprintf(ctx.Stdout(), "ignore target (%v) when used in conjunction with --all-targets\n", targetFlag)
 	}
 	if allFlag {
 		for _, name := range args {
