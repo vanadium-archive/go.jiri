@@ -1,3 +1,4 @@
+pkg runutil, func IsFNLHost() bool
 pkg runutil, func LookPath(string, map[string]string) (string, error)
 pkg runutil, func NewRun(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Run
 pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Sequence
@@ -6,6 +7,8 @@ pkg runutil, method (*Run) Chdir(string) error
 pkg runutil, method (*Run) Chmod(string, os.FileMode) error
 pkg runutil, method (*Run) Command(string, ...string) error
 pkg runutil, method (*Run) CommandWithOpts(Opts, string, ...string) error
+pkg runutil, method (*Run) Copy(*os.File, io.Reader) (int64, error)
+pkg runutil, method (*Run) Create(string) (*os.File, error)
 pkg runutil, method (*Run) DirectoryExists(string) bool
 pkg runutil, method (*Run) FileExists(string) bool
 pkg runutil, method (*Run) Function(func() error, string, ...interface{}) error
@@ -13,6 +16,7 @@ pkg runutil, method (*Run) FunctionWithOpts(Opts, func() error, string, ...inter
 pkg runutil, method (*Run) IsDir(string) (bool, error)
 pkg runutil, method (*Run) MkdirAll(string, os.FileMode) error
 pkg runutil, method (*Run) Open(string) (*os.File, error)
+pkg runutil, method (*Run) OpenFile(string, int, os.FileMode) (*os.File, error)
 pkg runutil, method (*Run) Output([]string)
 pkg runutil, method (*Run) OutputWithOpts(Opts, []string)
 pkg runutil, method (*Run) ReadDir(string) ([]os.FileInfo, error)
@@ -23,6 +27,7 @@ pkg runutil, method (*Run) Rename(string, string) error
 pkg runutil, method (*Run) Stat(string) (os.FileInfo, error)
 pkg runutil, method (*Run) Symlink(string, string) error
 pkg runutil, method (*Run) TempDir(string, string) (string, error)
+pkg runutil, method (*Run) TempFile(string, string) (*os.File, error)
 pkg runutil, method (*Run) TimedCommand(time.Duration, string, ...string) error
 pkg runutil, method (*Run) TimedCommandWithOpts(time.Duration, Opts, string, ...string) error
 pkg runutil, method (*Run) WriteFile(string, []byte, os.FileMode) error
@@ -36,6 +41,7 @@ pkg runutil, method (*Sequence) Error() error
 pkg runutil, method (*Sequence) FileExists(string) (bool, error)
 pkg runutil, method (*Sequence) GetOpts() Opts
 pkg runutil, method (*Sequence) IsDir(string) (bool, error)
+pkg runutil, method (*Sequence) Last(string, ...string) error
 pkg runutil, method (*Sequence) MkdirAll(string, os.FileMode) *Sequence
 pkg runutil, method (*Sequence) Open(string) (*os.File, error)
 pkg runutil, method (*Sequence) Opts(Opts) *Sequence

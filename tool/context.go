@@ -89,12 +89,10 @@ func initOpts(defaultOpts, opts *ContextOpts) {
 func NewContext(opts ContextOpts) *Context {
 	initOpts(newContextOpts(), &opts)
 	run := runutil.NewRun(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
-	seq := runutil.NewSequence(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
 	start := runutil.NewStart(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
 	return &Context{
 		opts:  opts,
 		run:   run,
-		seq:   seq,
 		start: start,
 	}
 }
@@ -197,9 +195,10 @@ func (ctx Context) Run() *runutil.Run {
 	return ctx.run
 }
 
-// Seq returns the sequence instance of the context.
-func (ctx Context) Seq() *runutil.Sequence {
-	return ctx.seq
+// NewSeq returns a new instance of Sequence initialized using the options
+// stored in the context.
+func (ctx Context) NewSeq() *runutil.Sequence {
+	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Color, *ctx.opts.DryRun, *ctx.opts.Verbose)
 }
 
 // Start returns the start instance of the context.
