@@ -519,12 +519,16 @@ func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
 		}
 		for _, target := range profile.Targets() {
 			if len(target.Version()) == 0 {
-				prior := target
+				prior := *target
 				version, err := mgr.VersionInfo().Select(target.Version())
 				if err != nil {
 					return err
 				}
 				target.SetVersion(version)
+				profiles.RemoveProfileTarget(name, prior)
+				if err := profiles.AddProfileTarget(name, *target); err != nil {
+					return err
+				}
 				if verboseFlag {
 					fmt.Fprintf(ctx.Stdout(), "%s %s had no version, now set to: %s\n", name, prior, target)
 				}
