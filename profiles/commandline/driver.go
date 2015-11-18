@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -539,11 +538,18 @@ func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
 }
 
 func runRmAll(ctx *tool.Context) error {
-	if err := ctx.Run().Remove(manifestFlag); err != nil && !os.IsNotExist(err) {
-		return err
+	s := ctx.NewSeq()
+	if exists, err := s.FileExists(manifestFlag); err != nil || exists {
+		if err := s.Remove(manifestFlag).Done(); err != nil {
+			return err
+		}
 	}
-	if err := ctx.Run().RemoveAll(rootPath.Expand()); err != nil && !os.IsNotExist(err) {
-		return err
+	rp := rootPath.Expand()
+	if exists, err := s.DirectoryExists(rp); err != nil || exists {
+		if err := s.Run("chmod", "-R", "u+w", rp).
+			RemoveAll(rp).Done(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
