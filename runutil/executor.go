@@ -204,13 +204,11 @@ func (e *executor) terminateProcessGroup(command *exec.Cmd) {
 	}
 	fmt.Fprintf(e.opts.Stderr, "Waiting for command to exit: %q\n", command.Args)
 	// Give the process some time to shut down cleanly.
-	for i := 0; i < 10; i++ {
-		select {
-		case <-time.After(time.Second):
-			if err := syscall.Kill(pid, 0); err != nil {
-				return
-			}
+	for i := 0; i < 50; i++ {
+		if err := syscall.Kill(pid, 0); err != nil {
+			return
 		}
+		time.Sleep(200 * time.Millisecond)
 	}
 	// If it still exists, send SIGKILL to it.
 	if err := syscall.Kill(pid, 0); err == nil {

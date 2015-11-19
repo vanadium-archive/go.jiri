@@ -24,16 +24,17 @@ import (
 // methods and the result of that first error is returned by the
 // Done method or any of the other 'terminating methods' (see below).
 //
-// When not in verbose mode (set either via NewSequence or an Opt) output
-// from commands will be suppressed unless they return an error. When
-// verbose mode is set, all output is written to the supplied stdout
-// and stderr.
+// Unless directed to specific stdout and stderr io.Writers using Capture(), the
+// stdout and stderr output from the command is discarded, except in verbose
+// mode or upon error: when in verbose mode (set either via NewSequence or an
+// Opt) or when the command fails, all the command's output (stdout and stderr)
+// is written to the stdout io.Writer configured either via NewSequence or an
+// Opt.  In addition, in verbose mode, command execution logging is written to
+// the stdout and stderr io.Writers configured via NewSequence.
 //
 // Modifier methods are provided that influence the behaviour of the
-// next invocation of the Run method to set timeouts (Timeout) and to
-// capture output (Capture), an additional modifier method (Opts) is
-// provided the set the options for the remaining methods and is generally
-// used to control logging.
+// next invocation of the Run method to set timeouts (Timeout), to
+// capture output (Capture), an set options  (Opts).
 // For example, the following will result in a timeout error.
 //
 // err := s.Timed(time.Second).Run("sleep","10").Done()
@@ -71,9 +72,9 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 	return &Sequence{r: NewRun(env, stdin, stdout, stderr, color, dryRun, verbose)}
 }
 
-// Capture arranges for the next call to Run to write its stdout and stderr
-// output to the supplied io.Writers. This will be cleared and not used for
-// any calls to Run beyond the next one.
+// Capture arranges for the next call to Run or Last to write its stdout and
+// stderr output to the supplied io.Writers. This will be cleared and not used
+// for any calls to Run or Last beyond the next one.
 func (s *Sequence) Capture(stdout, stderr io.Writer) *Sequence {
 	if s.err != nil {
 		return s
@@ -82,8 +83,9 @@ func (s *Sequence) Capture(stdout, stderr io.Writer) *Sequence {
 	return s
 }
 
-// Opts arranges for the next call to Run to use the supplied options.
-// They will be cleared and not used for any calls to Run beyond the next one.
+// Opts arranges for the next call to Run or Last to use the supplied options.
+// This will be cleared and not used for any calls to Run or Last beyond the
+// next one.
 func (s *Sequence) Opts(opts Opts) *Sequence {
 	if s.err != nil {
 		return s
@@ -92,9 +94,9 @@ func (s *Sequence) Opts(opts Opts) *Sequence {
 	return s
 }
 
-// Timeout arranges for the next call to Run to be subject to the specified
-// timeout. The timeout will be cleared and not used any calls to Run beyond
-// the next one.
+// Timeout arranges for the next call to Run or Last to be subject to the
+// specified timeout. The timeout will be cleared and not used any calls to Run
+// or Last beyond the next one.
 func (s *Sequence) Timeout(timeout time.Duration) *Sequence {
 	if s.err != nil {
 		return s

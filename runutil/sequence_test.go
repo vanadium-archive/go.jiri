@@ -18,9 +18,14 @@ import (
 	"v.io/jiri/runutil"
 )
 
-func rmLineNumbers(pattern, s string) string {
-	re := regexp.MustCompile("(.*.go):" + pattern + ":(.*)")
+func rmLineNumbers(s string) string {
+	re := regexp.MustCompile("(.*\\.go):\\d+:(.*)")
 	return re.ReplaceAllString(s, "$1:-:$2")
+}
+
+func sanitizeTimestamps(s string) string {
+	re := regexp.MustCompile(`\[(\d\d:\d\d:\d\d.\d\d)\]`)
+	return re.ReplaceAllString(s, "[hh:mm:ss.xx]")
 }
 
 func ExampleSequence() {
@@ -33,11 +38,145 @@ func ExampleSequence() {
 		Run("xxxxxxx").
 		Capture(os.Stdout, nil).Last("echo", "d")
 	// Get rid of the line#s in the error output.
-	fmt.Println(rmLineNumbers("3.", err.Error()))
+	fmt.Println(rmLineNumbers(err.Error()))
 	// Output:
 	// a
 	// b
 	// sequence_test.go:-: Run("xxxxxxx"): exec: "xxxxxxx": executable file not found in $PATH
+}
+
+// TestStdoutStderr exercises the various possible configurations for stdout and
+// stderr (via NewSequence, Opts, or Capture) as well as the verbose flag.
+func TestStdoutStderr(t *testing.T) {
+	// Case 1: we only specify stdout/stderr at constructor time.
+	//
+	// Verbose mode: All the command's output and execution logging goes to
+	// stdout, execution error messages to stderr.
+	//
+	// Non-Verbose mode: No stdout output; execution error messages to
+	// stderr.
+	for _, verbose := range []bool{false, true} {
+		var cnstrStdout, cnstrStderr bytes.Buffer
+		seq := runutil.NewSequence(nil, os.Stdin, &cnstrStdout, &cnstrStderr, false, false, verbose)
+		seq.Run("bash", "-c", "echo a; echo b >&2").
+			Timeout(time.Microsecond).
+			Run("sleep", "10000")
+		want := ""
+		if verbose {
+			want = `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
+[hh:mm:ss.xx] >> OK
+a
+b
+[hh:mm:ss.xx] >> sleep 10000
+[hh:mm:ss.xx] >> TIMED OUT
+`
+		}
+		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+	}
+
+	// Case 2: we specify stdout/stderr at constructor time, and also via
+	// Opts.  The verbose setting from opts takes precedence and controls
+	// the output that goes both to constructor stdout and to opts stdout.
+	//
+	// Verbose mode: The command execution logging goes to constructor
+	// stdout, command execution errors go to constructor stderr, and the
+	// actual command output goes to opts stdout. Nothing goes to opts
+	// stderr.
+	//
+	// Non-Verbose mode: No stdout output; execution error messages to
+	// constructor stderr.
+	for _, verbose := range []bool{false, true} {
+		var cnstrStdout, cnstrStderr, optsStdout, optsStderr bytes.Buffer
+		cstrVerbose := false // irellevant, the opts verbose flag takes precedence.
+		seq := runutil.NewSequence(nil, os.Stdin, &cnstrStdout, &cnstrStderr, false, false, cstrVerbose)
+		opts := runutil.Opts{Stdout: &optsStdout, Stderr: &optsStderr, Verbose: verbose}
+		seq.Opts(opts).
+			Run("bash", "-c", "echo a; echo b >&2").
+			Opts(opts).
+			Timeout(time.Microsecond).
+			Run("sleep", "10000")
+		want := ""
+		if verbose {
+			want = `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
+[hh:mm:ss.xx] >> OK
+[hh:mm:ss.xx] >> sleep 10000
+[hh:mm:ss.xx] >> TIMED OUT
+`
+		}
+		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		want = ""
+		if verbose {
+			want = "a\nb\n"
+		}
+		if got := optsStdout.String(); want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := optsStderr.String(), ""; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+	}
+
+	// Case 3: we specify stdout/stderr at constructor time, also via Opts,
+	// and also via Capture.  The verbose setting from opts takes
+	// precedence.
+	//
+	// Verbose mode: The command execution log goes to constructor stdout,
+	// command execution errors go to constructor stderr, and the
+	// stdout/stderr output from the command goes to capture stdout/stderr
+	// respectively.  Nothing goes to opts stdout/stderr.
+	//
+	// Non-Verbose mode: The stdout/stderr output from the command goes to
+	// capture stdout/stderr respectively.  No command execution log, but
+	// the command execution errors go to constructor stderr.  Nothing goes
+	// to opts stdout/stderr.
+	for _, verbose := range []bool{false, true} {
+		var cnstrStdout, cnstrStderr, optsStdout, optsStderr, captureStdout, captureStderr bytes.Buffer
+		cstrVerbose := false // irellevant, the opts verbose flag takes precedence.
+		seq := runutil.NewSequence(nil, os.Stdin, &cnstrStdout, &cnstrStderr, false, false, cstrVerbose)
+		opts := runutil.Opts{Stdout: &optsStdout, Stderr: &optsStderr, Verbose: verbose}
+		seq.Opts(opts).
+			Capture(&captureStdout, &captureStderr).
+			Run("bash", "-c", "echo a; echo b >&2").
+			Opts(opts).
+			Timeout(time.Microsecond).
+			Run("sleep", "10000")
+		want := ""
+		if verbose {
+			want = `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
+[hh:mm:ss.xx] >> OK
+[hh:mm:ss.xx] >> sleep 10000
+[hh:mm:ss.xx] >> TIMED OUT
+`
+		}
+		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := optsStdout.String(), ""; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := optsStderr.String(), ""; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := captureStdout.String(), "a\n"; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		if got, want := captureStderr.String(), "b\n"; want != got {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+	}
 }
 
 func TestSequence(t *testing.T) {
@@ -77,7 +216,7 @@ func TestSequence(t *testing.T) {
 	if err == nil {
 		t.Fatalf("should have experience an error")
 	}
-	if got, want := rmLineNumbers("7.", err.Error()), "sequence_test.go:-: Run(\"./bound-to-fail\", \"fail\"): fork/exec ./bound-to-fail: no such file or directory"; got != want {
+	if got, want := rmLineNumbers(err.Error()), "sequence_test.go:-: Run(\"./bound-to-fail\", \"fail\"): fork/exec ./bound-to-fail: no such file or directory"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	err = seq.
@@ -90,7 +229,7 @@ func TestSequence(t *testing.T) {
 	}
 	out.Reset()
 	err = seq.Timeout(time.Second).Run("sleep", "10").Done()
-	if got, want := rmLineNumbers("9.", err.Error()), "sequence_test.go:-: Run(\"sleep\", \"10\"): command timed out"; got != want {
+	if got, want := rmLineNumbers(err.Error()), "sequence_test.go:-: Run(\"sleep\", \"10\"): command timed out"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
