@@ -48,6 +48,11 @@ func ExampleSequence() {
 // TestStdoutStderr exercises the various possible configurations for stdout and
 // stderr (via NewSequence, Opts, or Capture) as well as the verbose flag.
 func TestStdoutStderr(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Case 1: we only specify stdout/stderr at constructor time.
 	//
 	// Verbose mode: All the command's output and execution logging goes to
@@ -61,14 +66,16 @@ func TestStdoutStderr(t *testing.T) {
 		seq.Run("bash", "-c", "echo a; echo b >&2").
 			Timeout(time.Microsecond).
 			Run("sleep", "10000")
-		want := ""
+		want := "Current Directory: " + cwd + "\n"
 		if verbose {
 			want = `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
 [hh:mm:ss.xx] >> OK
 a
 b
+Current Directory: ` + cwd + `
 [hh:mm:ss.xx] >> sleep 10000
 [hh:mm:ss.xx] >> TIMED OUT
+Current Directory: ` + cwd + `
 `
 		}
 		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
@@ -114,9 +121,9 @@ b
 		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"; want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
-		want = ""
+		want = "Current Directory: " + cwd + "\n"
 		if verbose {
-			want = "a\nb\n"
+			want = "a\nb\nCurrent Directory: " + cwd + "\nCurrent Directory: " + cwd + "\n"
 		}
 		if got := optsStdout.String(); want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
@@ -164,7 +171,7 @@ b
 		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"; want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
-		if got, want := optsStdout.String(), ""; want != got {
+		if got, want := optsStdout.String(), "Current Directory: "+cwd+"\n"; want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
 		if got, want := optsStderr.String(), ""; want != got {
