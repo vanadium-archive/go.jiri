@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -17,23 +17,28 @@ import (
 // TestStartCommandOK tests start.Command() returns immediately without waiting
 // for the command to complete.
 func TestStartCommandOK(t *testing.T) {
-	var out bytes.Buffer
-	start := NewStart(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
-	bin, err := buildTestProgram(NewRun(nil, os.Stdin, &out, ioutil.Discard, false, false, true), "slow_hello2")
+	start := NewStart(nil, os.Stdin, ioutil.Discard, ioutil.Discard, false, false, true)
+	bin, err := buildTestProgram(NewRun(nil, os.Stdin, ioutil.Discard, ioutil.Discard, false, false, true), "slow_hello2")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
 	}
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if _, err := start.Command(bin); err != nil {
-		t.Fatalf(`Command("go run ./testdata/slow_hello2.go") failed: %v`, err)
+	cmd, err := start.Command(bin)
+	if err != nil {
+		t.Fatalf(`Command("go run ./testdata/slow_hello2.go") failed to start: %v`, err)
 	}
-	// Note that the output shouldn't have "hello!!" because start.Command won't
-	// wait for the command to finish.
-	output := removeTimestamps(t, &out)
-	if strings.Index(output, "hello!!") != -1 {
-		t.Fatalf("output shouldn't contain 'hello!!':\n%v", output)
+	pid := cmd.Process.Pid
+	// Wait a sec and check that the child process is still around.
+	time.Sleep(time.Second)
+	if err := syscall.Kill(pid, 0); err != nil {
+		t.Fatalf(`Command("go run ./testdata/slow_hello2.go") already exited`)
+	}
+	// We're satisfied.  Go ahead and kill the child to avoid leaving it
+	// running after the test completes.
+	if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
+		t.Fatalf(`Command("go run ./testdata/slow_hello2.go") couldn't be killed`)
 	}
 }
 
@@ -42,10 +47,13 @@ func TestStartCommandWithOptsOK(t *testing.T) {
 	start := NewStart(nil, os.Stdin, &runOut, ioutil.Discard, false, false, true)
 	opts := start.Opts()
 	opts.Stdout = &cmdOut
-	if _, err := start.CommandWithOpts(opts, "go", "run", "./testdata/ok_hello.go"); err != nil {
+	cmd, err := start.CommandWithOpts(opts, "go", "run", "./testdata/ok_hello.go")
+	if err != nil {
+		t.Fatalf(`Command("go run ./testdata/ok_hello.go") failed to start: %v`, err)
+	}
+	if err := cmd.Wait(); err != nil {
 		t.Fatalf(`Command("go run ./testdata/ok_hello.go") failed: %v`, err)
 	}
-	time.Sleep(time.Second * 3)
 	if got, want := removeTimestamps(t, &cmdOut), "hello\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
