@@ -303,7 +303,7 @@ func TestSequenceOutputOnError(t *testing.T) {
 	err = seq.Run("sh", "-c", "echo AA").
 		Run("sh", "-c", "echo BB; exit 1").
 		Last("sh", "-c", "echo CC")
-	if got, want := strings.Count(out.String(), "\n"), 6; got != want {
+	if got, want := strings.Count(out.String(), "\n"), 8; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	if got, want := strings.Count(out.String(), "AA"), 2; got != want {
@@ -360,7 +360,11 @@ func TestSequenceTermination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(data), "aha\n"; got != want {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), "aha\nCurrent Directory: "+cwd+"\n"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }

@@ -166,6 +166,9 @@ func (s *Sequence) initAndDefer() func() {
 		}
 		opts := s.GetOpts()
 		stdout := opts.Stdout
+		if stdout == nil {
+			return func() {}
+		}
 		opts.Stdout = f
 		opts.Stderr = f
 		s.setOpts(opts)
@@ -175,9 +178,11 @@ func (s *Sequence) initAndDefer() func() {
 			if opts.Verbose || s.err != nil {
 				// TODO(cnicolaou): probably best to stream this out rather
 				// than buffer the whole file into memory.
-				data, err := ioutil.ReadFile(filename)
-				if err == nil {
+				if data, err := ioutil.ReadFile(filename); err == nil {
 					fmt.Fprint(stdout, string(data))
+					if wd, err := os.Getwd(); err == nil {
+						fmt.Fprintf(stdout, "Current Directory: %v\n", wd)
+					}
 				}
 			}
 			os.Remove(filename)
