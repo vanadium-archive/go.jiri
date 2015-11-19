@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"v.io/jiri/profiles"
+	"v.io/jiri/project"
 	"v.io/jiri/tool"
 )
 
@@ -121,7 +122,7 @@ func TestInstallProfile(t *testing.T) {
 	}
 }
 
-func TestBackwardsCompatibility(t *testing.T) {
+func TestReadingV0(t *testing.T) {
 	profiles.Clear()
 
 	getProfiles := func() []*profiles.Profile {
@@ -162,7 +163,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := profiles.SchemaVersion(), profiles.V3; got != want {
+	if got, want := profiles.SchemaVersion(), profiles.V4; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	nprofiles := getProfiles()
@@ -177,6 +178,57 @@ func TestBackwardsCompatibility(t *testing.T) {
 	for i, v := range nprofiles[1:] {
 		if got, want := v.Name, oprofiles[i].Name; got != want {
 			t.Errorf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func handleRelativePath(root profiles.RelativePath, s string) string {
+	// Handle the transition from absolute to relative paths.
+	if filepath.IsAbs(s) {
+		return s
+	}
+	return root.RootJoin(s).Expand()
+}
+
+func TestReadingV3AndV4(t *testing.T) {
+	ctx := tool.NewDefaultContext()
+	root, err := project.JiriRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, c := range []struct {
+		filename, prefix, variable string
+		version                    profiles.Version
+	}{
+		{"v3.xml", "", "", profiles.V3},
+		{"v4.xml", root, "${JIRI_ROOT}", profiles.V4},
+	} {
+		ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, filepath.Join("testdata", c.filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := profiles.SchemaVersion(), c.version; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+		target, err := profiles.NewTarget("cpu1-os1@1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := profiles.LookupProfile("a")
+		// We need to expand the variable here for a V4 profile if we want
+		// to get the full absolute path.
+		if got, want := p.Root, c.variable+"/an/absolute/root"; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+		lt := profiles.LookupProfileTarget("a", target)
+		if got, want := lt.InstallationDir, c.variable+"/an/absolute/dir"; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+		// The merged environment variables are expanded appropriately
+		// internally by MergeEnvFromProfiles.
+		ch.MergeEnvFromProfiles(profiles.JiriMergePolicies(), target, "a")
+		if got, want := ch.Get("ABS"), "-I"+c.prefix+"/an/absolute/path"; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
 	}
 }

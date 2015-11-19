@@ -1,0 +1,13 @@
+<profiles version="4">
+  <profile name="a" root="${JIRI_ROOT}/an/absolute/root">
+    <target arch="cpu1" os="os1" installation-directory="${JIRI_ROOT}/an/absolute/dir" version="1">
+      <envvars>
+        <var>ABS=-I${JIRI_ROOT}/an/absolute/path</var>
+      </envvars>
+      <command-line>
+        <var>A=B</var>
+        <var>C=D</var>
+      </command-line>
+    </target>
+  </profile>
+</profiles>

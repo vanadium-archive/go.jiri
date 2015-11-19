@@ -1,0 +1,13 @@
+<profiles version="3">
+  <profile name="a" root="/an/absolute/root">
+    <target arch="cpu1" os="os1" installation-directory="/an/absolute/dir" version="1">
+      <envvars>
+        <var>ABS=-I/an/absolute/path</var>
+      </envvars>
+      <command-line>
+        <var>A=B</var>
+        <var>C=D</var>
+      </command-line>
+    </target>
+  </profile>
+</profiles>

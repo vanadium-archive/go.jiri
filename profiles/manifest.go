@@ -83,7 +83,7 @@ type profileDB struct {
 }
 
 func newDB() *profileDB {
-	return &profileDB{db: make(map[string]*Profile), version: 0}
+	return &profileDB{db: make(map[string]*Profile), version: V4}
 }
 
 var (
@@ -283,7 +283,7 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 	defer pdb.Unlock()
 
 	var schema profilesSchema
-	schema.Version = V3
+	schema.Version = V4
 	for i, name := range pdb.profilesUnlocked() {
 		profile := pdb.db[name]
 		schema.Profiles = append(schema.Profiles, &profileSchema{

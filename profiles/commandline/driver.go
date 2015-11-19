@@ -126,6 +126,7 @@ var (
 	specificVersionsFlag bool
 	cleanupFlag          bool
 	rmAllFlag            bool
+	rewriteManifestFlag  bool
 )
 
 func Main(name string) {
@@ -183,8 +184,8 @@ func Init(defaultManifestFilename string) {
 	// uninstall accept --all-targets but with different defaults.
 	cmdUninstall.Flags.BoolVar(&allFlag, "all-targets", false, "apply to all targets for the specified profile(s)")
 
-	// list accepts --show-manifest, --available, --dir, --default, --versions
-	cmdList.Flags.BoolVar(&showManifestFlag, "show-manifest", false, "print out the manifest file")
+	// list accepts --show-profiles-manifest, --available, --dir, --default, --versions
+	cmdList.Flags.BoolVar(&showManifestFlag, "show-profiles-manifest", false, "print out the manifest file")
 	cmdList.Flags.BoolVar(&availableFlag, "available", false, "print the list of available profiles")
 	cmdList.Flags.StringVar(&infoFlag, "info", "", infoUsage())
 
@@ -196,7 +197,8 @@ func Init(defaultManifestFilename string) {
 	// cleanup accepts the following flags:
 	cmdCleanup.Flags.BoolVar(&cleanupFlag, "gc", false, "uninstall profile targets that are older than the current default")
 	cmdCleanup.Flags.BoolVar(&specificVersionsFlag, "ensure-specific-versions-are-set", false, "ensure that profile targets have a specific version set")
-	cmdCleanup.Flags.BoolVar(&rmAllFlag, "rm-all", false, "remove profile manifest and all profile generated output files.")
+	cmdCleanup.Flags.BoolVar(&rmAllFlag, "rm-all", false, "remove profiles manifest and all profile generated output files.")
+	cmdCleanup.Flags.BoolVar(&rewriteManifestFlag, "rewrite-profiles-manifest", false, "rewrite the profiles manifest file to use the latest schema version")
 }
 
 func runList(env *cmdline.Env, args []string) error {
@@ -591,6 +593,9 @@ func runCleanup(env *cmdline.Env, args []string) error {
 		}
 		// Don't write out the profiles manifest file again.
 		return nil
+	}
+	if rewriteManifestFlag {
+		dirty = true
 	}
 	if !dirty {
 		return fmt.Errorf("at least one option must be specified")
