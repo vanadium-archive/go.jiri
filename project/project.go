@@ -898,12 +898,10 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		return cmdline.ErrExitCode(2)
 	}
 
-	// Delete old "v23" tool, and the old jiri-xprofile command.
-	// TODO(nlacasse): Once everybody has had a chance to update, remove this
-	// code.
+	// Delete any old subcommands.
 	v23SubCmds := []string{
-		"jiri-xprofile",
-		"v23",
+		"jiri-profile",
+		"jiri-env",
 	}
 	for _, subCmd := range v23SubCmds {
 		subCmdPath := filepath.Join(binDir, subCmd)
