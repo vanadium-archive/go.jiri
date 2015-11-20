@@ -98,7 +98,6 @@ func GoEnvironmentFromOS() []string {
 // environment that is mutated by its various methods.
 type ConfigHelper struct {
 	*envvar.Vars
-	legacyMode   bool
 	profilesMode bool
 	root         string
 	ctx          *tool.Context
@@ -141,13 +140,9 @@ func NewConfigHelper(ctx *tool.Context, profilesMode ProfilesMode, filename stri
 	if profilesMode == SkipProfiles {
 		return ch, nil
 	}
-	ch.legacyMode = (SchemaVersion() == Original) || (len(os.Getenv("JIRI_PROFILE")) > 0)
-	if ch.legacyMode {
-		vars, err := util.JiriLegacyEnvironment(ch.ctx)
-		if err != nil {
-			return nil, err
-		}
-		ch.Vars = vars
+	if len(os.Getenv("JIRI_PROFILE")) > 0 {
+		return nil, fmt.Errorf(`old style profiles are no longer supported. Please
+do not set JIRI_PROFILE.`)
 	}
 	return ch, nil
 }
@@ -157,17 +152,9 @@ func (ch *ConfigHelper) Root() string {
 	return ch.root
 }
 
-// LegacyProfiles returns true if the old-style profiles are being used.
-func (ch *ConfigHelper) LegacyProfiles() bool {
-	return ch.legacyMode
-}
-
 // MergeEnv merges the embedded environment with the environment
 // variables provided by the vars parameter according to the policies parameter.
 func (ch *ConfigHelper) MergeEnv(policies map[string]MergePolicy, vars ...[]string) {
-	if ch.legacyMode {
-		return
-	}
 	MergeEnv(policies, ch.Vars, vars...)
 }
 
@@ -177,9 +164,6 @@ func (ch *ConfigHelper) MergeEnv(policies map[string]MergePolicy, vars ...[]stri
 // the environment variables maintained by the jiri tool itself. It will also
 // expand all instances of ${JIRI_ROOT} in the returned environment.
 func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, target Target, profileNames ...string) {
-	if ch.legacyMode {
-		return
-	}
 	envs := [][]string{}
 	for _, profile := range profileNames {
 		var e []string
@@ -208,7 +192,7 @@ func (ch *ConfigHelper) SkippingProfiles() bool {
 // the specified target installed taking account if running using profiles
 // at all or if using old-style profiles.
 func (ch *ConfigHelper) ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
-	if ch.profilesMode || ch.legacyMode {
+	if ProfilesMode(ch.profilesMode) == SkipProfiles {
 		return nil
 	}
 	for _, n := range profileNames {
@@ -239,21 +223,15 @@ func (ch *ConfigHelper) JiriProfile() []string {
 // GoPath computes and returns the GOPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) GoPath() string {
-	if !ch.legacyMode {
-		path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.GoWorkspaces(), "")
-		return "GOPATH=" + envvar.JoinTokens(path, ":")
-	}
-	return ""
+	path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+	return "GOPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // VDLPath computes and returns the VDLPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) VDLPath() string {
-	if !ch.legacyMode {
-		path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
-		return "VDLPATH=" + envvar.JoinTokens(path, ":")
-	}
-	return ""
+	path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+	return "VDLPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // pathHelper is a utility function for determining paths for project workspaces.
