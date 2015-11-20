@@ -506,21 +506,22 @@ func (g *Git) Remove(fileNames ...string) error {
 	return g.run(args...)
 }
 
-// RemoveUntrackedFiles removes untracked files and directories.
-func (g *Git) RemoveUntrackedFiles() error {
-	return g.run("clean", "-d", "-f")
-}
-
-// RepoName gets the name of the current repository.
-func (g *Git) RepoName() (string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "config", "--get", "remote.origin.url")
+// RemoteUrl gets the url of the remote with the given name.
+func (g *Git) RemoteUrl(name string) (string, error) {
+	configKey := fmt.Sprintf("remote.%s.url", name)
+	out, err := g.runOutputWithOpts(g.disableDryRun(), "config", "--get", configKey)
 	if err != nil {
 		return "", err
 	}
 	if got, want := len(out), 1; got != want {
-		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+		return "", fmt.Errorf("RemoteUrl: unexpected length of remotes %v: got %v, want %v", out, got, want)
 	}
 	return out[0], nil
+}
+
+// RemoveUntrackedFiles removes untracked files and directories.
+func (g *Git) RemoveUntrackedFiles() error {
+	return g.run("clean", "-d", "-f")
 }
 
 // Reset resets the current branch to the target, discarding any
@@ -536,6 +537,11 @@ func (g *Git) Reset(target string, opts ...ResetOpt) error {
 	}
 	args = append(args, fmt.Sprintf("--%v", mode), target, "--")
 	return g.run(args...)
+}
+
+// SetRemoteUrl sets the url of the remote with given name to the given url.
+func (g *Git) SetRemoteUrl(name, url string) error {
+	return g.run("remote", "set-url", name, url)
 }
 
 // Stash attempts to stash any unsaved changes. It returns true if

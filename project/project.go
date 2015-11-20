@@ -447,7 +447,7 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 					return nil, err
 				}
 
-				// Fetch the latest from remote.
+				// Fetch the latest from origin.
 				if err := ctx.Git().FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
 					return nil, err
 				}
@@ -485,6 +485,20 @@ func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
 	return p, t, e
 }
 
+// getManifestRemote returns the remote url of the origin from the manifest
+// repo.
+// TODO(nlacasse,toddw): Once the manifest project is specified in the
+// manifest, we should get the remote directly from the manifest, and not from
+// the filesystem.
+func getManifestRemote(ctx *tool.Context, manifestPath string) (string, error) {
+	var remote string
+	return remote, ctx.NewSeq().Pushd(manifestPath).Call(
+		func() (e error) {
+			remote, e = ctx.Git().RemoteUrl("origin")
+			return
+		}, "get manifest origin").Done()
+}
+
 // readManifest implements the ReadManifest logic and provides an
 // optional flag that can be used to fetch the latest manifest updates
 // from the manifest repository.
@@ -496,9 +510,14 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
+		manifestRemote, err := getManifestRemote(ctx, manifestPath)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
 		project := Project{
 			Path:         manifestPath,
 			Protocol:     "git",
+			Remote:       manifestRemote,
 			Revision:     "HEAD",
 			RemoteBranch: "master",
 		}
@@ -940,6 +959,12 @@ func resetProject(ctx *tool.Context, project Project) error {
 	fn := func() error {
 		switch project.Protocol {
 		case "git":
+			if project.Remote == "" {
+				return fmt.Errorf("project %v does not have a remote", project.Name)
+			}
+			if err := ctx.Git().SetRemoteUrl("origin", project.Remote); err != nil {
+				return err
+			}
 			if err := ctx.Git().Fetch("origin"); err != nil {
 				return err
 			}
