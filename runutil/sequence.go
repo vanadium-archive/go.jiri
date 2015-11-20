@@ -424,6 +424,28 @@ func (s *Sequence) Open(name string) (*os.File, error) {
 	return f, s.Done()
 }
 
+// OpenFile is a wrapper around os.OpenFile that handles options such as
+// "verbose" or "dry run". OpenFile is a terminating function.
+func (s *Sequence) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	if s.err != nil {
+		return nil, s.Done()
+	}
+	f, err := s.r.OpenFile(name, flag, perm)
+	s.setError(err, fmt.Sprintf("OpenFile(%s, %s, %s)", name, flag, perm))
+	return f, s.Done()
+}
+
+// Create is a wrapper around os.Create that handles options such as "verbose"
+// or "dry run". Create is a terminating function.
+func (s *Sequence) Create(name string) (*os.File, error) {
+	if s.err != nil {
+		return nil, s.Done()
+	}
+	f, err := s.r.Create(name)
+	s.setError(err, fmt.Sprintf("Create(%s)", name))
+	return f, s.Done()
+}
+
 // ReadDir is a wrapper around ioutil.ReadDir that handles options
 // such as "verbose" or "dry run". ReadDir is a terminating function.
 func (s *Sequence) ReadDir(dirname string) ([]os.FileInfo, error) {
@@ -455,6 +477,17 @@ func (s *Sequence) WriteFile(filename string, data []byte, perm os.FileMode) *Se
 	err := s.r.WriteFile(filename, data, perm)
 	s.setError(err, fmt.Sprintf("WriteFile(%s, %10s,  %s)", filename, data, perm))
 	return s
+}
+
+// Copy is a wrapper around io.Copy that handles options such as "verbose" or
+// "dry run". Copy is a terminating function.
+func (s *Sequence) Copy(dst *os.File, src io.Reader) (int64, error) {
+	if s.err != nil {
+		return 0, s.Done()
+	}
+	n, err := s.r.Copy(dst, src)
+	s.setError(err, fmt.Sprintf("Copy(%s, %s)", dst, src))
+	return n, s.Done()
 }
 
 // Stat is a wrapper around os.Stat that handles options such as

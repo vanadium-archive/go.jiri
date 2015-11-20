@@ -16,7 +16,6 @@ import (
 	"runtime"
 	"strings"
 
-	"v.io/jiri/collect"
 	"v.io/jiri/project"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
@@ -99,55 +98,36 @@ func InitProfilesFromFlag(flag string, appendJiriProfile AppendJiriProfileMode) 
 func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
 		completionLogPath := filepath.Join(dir, ".complete")
-		if dir != "" && ctx.Run().DirectoryExists(dir) {
-			// If the dir exists but the completionLogPath doesn't, then it means
-			// the previous action didn't finish.
-			// Remove the dir so we can perform the action again.
-			if !ctx.Run().FileExists(completionLogPath) {
-				ctx.Run().RemoveAll(dir)
-			} else {
-				if ctx.Verbose() {
-					fmt.Fprintf(ctx.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
+		s := ctx.NewSeq()
+		if dir != "" {
+			if exists, _ := s.DirectoryExists(dir); exists {
+				// If the dir exists but the completionLogPath doesn't, then it
+				// means the previous action didn't finish.
+				// Remove the dir so we can perform the action again.
+				if exists, _ := s.FileExists(completionLogPath); !exists {
+					s.RemoveAll(dir).Done()
+				} else {
+					if ctx.Verbose() {
+						fmt.Fprintf(ctx.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
+					}
+					return nil
 				}
-				return nil
 			}
 		}
 		if err := installFn(); err != nil {
 			if dir != "" {
-				ctx.Run().RemoveAll(dir)
+				s.RemoveAll(dir).Done()
 			}
 			return err
 		}
-		if err := ctx.Run().WriteFile(completionLogPath, []byte("completed"), DefaultFilePerm); err != nil {
-			return err
-		}
-		return nil
+		return s.WriteFile(completionLogPath, []byte("completed"), DefaultFilePerm).Done()
 	}
-	return ctx.Run().Function(atomicFn, message)
-}
-
-// RunCommand runs the specified command with the specified args and environment
-// whilst logging the output to ctx.Stdout() on error or if tracing is requested
-// via the -v flag.
-func RunCommand(ctx *tool.Context, env map[string]string, bin string, args ...string) error {
-	var out bytes.Buffer
-	opts := ctx.Run().Opts()
-	opts.Stdout = &out
-	opts.Stderr = &out
-	opts.Env = env
-	err := ctx.Run().CommandWithOpts(opts, bin, args...)
-	if err != nil || tool.VerboseFlag {
-		fmt.Fprintf(ctx.Stdout(), "%s", out.String())
-	}
-	return err
+	return ctx.NewSeq().Call(atomicFn, message).Done()
 }
 
 func brewList(ctx *tool.Context) (map[string]bool, error) {
 	var out bytes.Buffer
-	opts := ctx.Run().Opts()
-	opts.Stdout = &out
-	opts.Stderr = &out
-	err := ctx.Run().CommandWithOpts(opts, "brew", "list")
+	err := ctx.NewSeq().Capture(&out, &out).Last("brew", "list")
 	if err != nil || tool.VerboseFlag {
 		fmt.Fprintf(ctx.Stdout(), "%s", out.String())
 	}
@@ -163,6 +143,7 @@ func brewList(ctx *tool.Context) (map[string]bool, error) {
 // and installs them using the OS-specific package manager.
 func InstallPackages(ctx *tool.Context, pkgs []string) error {
 	installDepsFn := func() error {
+		s := ctx.NewSeq()
 		switch runtime.GOOS {
 		case "linux":
 			if runutil.IsFNLHost() {
@@ -172,14 +153,14 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 			}
 			installPkgs := []string{}
 			for _, pkg := range pkgs {
-				if err := RunCommand(ctx, nil, "dpkg", "-L", pkg); err != nil {
+				if err := s.Last("dpkg", "-L", pkg); err != nil {
 					installPkgs = append(installPkgs, pkg)
 				}
 			}
 			if len(installPkgs) > 0 {
 				args := append([]string{"apt-get", "install", "-y"}, installPkgs...)
 				fmt.Fprintf(ctx.Stdout(), "Running: sudo %s: ", strings.Join(args, " "))
-				if err := RunCommand(ctx, nil, "sudo", args...); err != nil {
+				if err := s.Last("sudo", args...); err != nil {
 					fmt.Fprintf(ctx.Stdout(), "%v\n", err)
 					return err
 				}
@@ -199,7 +180,7 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 			if len(installPkgs) > 0 {
 				args := append([]string{"install"}, installPkgs...)
 				fmt.Fprintf(ctx.Stdout(), "Running: brew %s: ", strings.Join(args, " "))
-				if err := RunCommand(ctx, nil, "brew", args...); err != nil {
+				if err := s.Last("brew", args...); err != nil {
 					fmt.Fprintf(ctx.Stdout(), "%v\n", err)
 					return err
 				}
@@ -208,7 +189,7 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 		}
 		return nil
 	}
-	return ctx.Run().Function(installDepsFn, "Install dependencies")
+	return ctx.NewSeq().Call(installDepsFn, "Install dependencies").Done()
 }
 
 // ensureAction ensures that the requested profile and target
@@ -223,9 +204,8 @@ func ensureAction(ctx *tool.Context, action Action, profile string, root Relativ
 	default:
 		return fmt.Errorf("unrecognised action %v", action)
 	}
-
 	if t := LookupProfileTarget(profile, target); t != nil {
-		if ctx.Run().Opts().Verbose {
+		if ctx.Verbose() {
 			fmt.Fprintf(ctx.Stdout(), "%v %v is already %sed as %v\n", profile, target, verb, t)
 		}
 		return nil
@@ -239,7 +219,7 @@ func ensureAction(ctx *tool.Context, action Action, profile string, root Relativ
 		return err
 	}
 	target.SetVersion(version)
-	if ctx.Run().Opts().Verbose || ctx.Run().Opts().DryRun {
+	if ctx.Verbose() || ctx.DryRun() {
 		fmt.Fprintf(ctx.Stdout(), "%s %s %s\n", verb, profile, target.DebugString())
 	}
 	if action == Install {
@@ -264,7 +244,8 @@ func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, root Re
 // TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
 // so it does not pollute the profile package namespace.
 func Fetch(ctx *tool.Context, dst, url string) error {
-	ctx.Run().Output([]string{"fetching " + url})
+	s := ctx.NewSeq()
+	s.Output([]string{"fetching " + url})
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -273,34 +254,12 @@ func Fetch(ctx *tool.Context, dst, url string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("got non-200 status code while getting %v: %v", url, resp.StatusCode)
 	}
-	file, err := ctx.Run().Create(dst)
+	file, err := s.Create(dst)
 	if err != nil {
 		return err
 	}
-	_, err = ctx.Run().Copy(file, resp.Body)
+	_, err = s.Copy(file, resp.Body)
 	return err
-}
-
-// GitCloneRepo clones a repo at a specific revision in outDir.
-// TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
-// so it does not pollute the profile package namespace.
-func GitCloneRepo(ctx *tool.Context, remote, revision, outDir string, outDirPerm os.FileMode) (e error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-
-	if err := ctx.Run().MkdirAll(outDir, outDirPerm); err != nil {
-		return err
-	}
-	if err := ctx.Git().Clone(remote, outDir); err != nil {
-		return err
-	}
-	if err := ctx.Run().Chdir(outDir); err != nil {
-		return err
-	}
-	return ctx.Git().Reset(revision)
 }
 
 // Unzip unzips the file in srcFile and puts resulting files in directory dstDir.
@@ -320,32 +279,31 @@ func Unzip(ctx *tool.Context, srcFile, dstDir string) error {
 		}
 		defer rc.Close()
 
+		s := ctx.NewSeq()
 		fileDst := filepath.Join(dstDir, zFile.Name)
 		if zFile.FileInfo().IsDir() {
-			return ctx.Run().MkdirAll(fileDst, zFile.Mode())
+			return s.MkdirAll(fileDst, zFile.Mode()).Done()
 		}
 
 		// Make sure the parent directory exists.  Note that sometimes files
 		// can appear in a zip file before their directory.
-		if err := ctx.Run().MkdirAll(filepath.Dir(fileDst), zFile.Mode()); err != nil {
+		if err := s.MkdirAll(filepath.Dir(fileDst), zFile.Mode()).Done(); err != nil {
 			return err
 		}
 
-		file, err := ctx.Run().OpenFile(fileDst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zFile.Mode())
+		file, err := s.OpenFile(fileDst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zFile.Mode())
 		if err != nil {
 			return err
 		}
 		defer file.Close()
-		_, err = ctx.Run().Copy(file, rc)
+		_, err = s.Copy(file, rc)
 		return err
 	}
-
-	ctx.Run().Output([]string{"unzipping " + srcFile})
+	s := ctx.NewSeq()
+	s.Output([]string{"unzipping " + srcFile})
 	for _, zFile := range r.File {
-		ctx.Run().Output([]string{"extracting " + zFile.Name})
-		if err := unzipFn(zFile); err != nil {
-			return err
-		}
+		s.Output([]string{"extracting " + zFile.Name})
+		s.Call(func() error { return unzipFn(zFile) }, "unzipFn(%s)", zFile.Name)
 	}
-	return nil
+	return s.Done()
 }
