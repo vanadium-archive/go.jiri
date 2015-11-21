@@ -24,21 +24,20 @@ import (
 // methods and the result of that first error is returned by the
 // Done method or any of the other 'terminating methods' (see below).
 //
-// Unless directed to specific stdout and stderr io.Writers using Capture(), the
-// stdout and stderr output from the command is discarded, except in verbose
-// mode or upon error: when in verbose mode (set either via NewSequence or an
-// Opt) or when the command fails, all the command's output (stdout and stderr)
-// is written to the stdout io.Writer configured either via NewSequence or an
-// Opt.  In addition, in verbose mode, command execution logging is written to
-// the stdout and stderr io.Writers configured via NewSequence.
+// Unless directed to specific stdout and stderr io.Writers using Capture(),
+// the stdout and stderr output from the command is discarded, unless an error
+// is encountered, in which case the output from the command that failed (both
+// stdout and stderr) is written to the stderr io.Writer specified via
+// NewSequence. In addition, in verbose mode, command execution logging
+// is written to the stdout an stderr io.Writers configured via NewSequence.
 //
 // Modifier methods are provided that influence the behaviour of the
-// next invocation of the Run method to set timeouts (Timeout), to
-// capture output (Capture), an set options  (Opts).
+// next invocation of the Run method to set timeouts (Timed), to
+// capture output (Capture), input (Read) and to set the environment (Env).
 // For example, the following will result in a timeout error.
 //
-// err := s.Timed(time.Second).Run("sleep","10").Done()
-// err := s.Timed(time.Second).Last("sleep","10")
+// err := s.Timeout(time.Second).Run("sleep","10").Done()
+// err := s.Timeout(time.Second).Last("sleep","10")
 //
 // A sequence of commands must be terminated with a call to a 'terminating'
 // method. The simplest are the Done or Last methods used in the examples above,
@@ -47,7 +46,7 @@ import (
 // would be:
 //
 // o.Stdout, _ = os.Create("foo")
-// data, err := s.Opts(o).Run("echo","b").ReadFile("foo")
+// data, err := s.Capture(o, nil).Run("echo","b").ReadFile("foo")
 // // data == "b"
 //
 // Note that terminating functions, even those that take an action, may
@@ -55,26 +54,38 @@ import (
 //
 // In addtion to Run which will always run a command as a subprocess,
 // the Call method will invoke a function. Note that Capture and Timeout
-// do not affect such calls, but Opts can be used to control logging.
+// do not affect such calls.
 type Sequence struct {
-	r              *Run
-	err            error
-	caller         string
-	stdout, stderr io.Writer
-	opts           *Opts
-	dirs           []string
-	timeout        time.Duration
+	r                            *Run
+	err                          error
+	caller                       string
+	stdout, stderr               io.Writer
+	stdin                        io.Reader
+	reading                      bool
+	env                          map[string]string
+	opts                         *Opts
+	defaultStdin                 io.Reader
+	defaultStdout, defaultStderr io.Writer
+	dirs                         []string
+	timeout                      time.Duration
 }
 
 // NewSequence creates an instance of Sequence with default values for its
 // environment, stdin, stderr, stdout and other supported options.
 func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) *Sequence {
-	return &Sequence{r: NewRun(env, stdin, stdout, stderr, color, dryRun, verbose)}
+	return &Sequence{
+		r:             NewRun(env, stdin, stdout, stderr, color, dryRun, verbose),
+		defaultStdin:  stdin,
+		defaultStdout: stdout,
+		defaultStderr: stderr,
+	}
 }
 
 // Capture arranges for the next call to Run or Last to write its stdout and
 // stderr output to the supplied io.Writers. This will be cleared and not used
-// for any calls to Run or Last beyond the next one.
+// for any calls to Run or Last beyond the next one. Specifying nil for
+// a writer will result in using the the corresponding io.Writer supplied
+// to NewSequence. ioutil.Discard should be used to discard output.
 func (s *Sequence) Capture(stdout, stderr io.Writer) *Sequence {
 	if s.err != nil {
 		return s
@@ -83,20 +94,43 @@ func (s *Sequence) Capture(stdout, stderr io.Writer) *Sequence {
 	return s
 }
 
-// Opts arranges for the next call to Run or Last to use the supplied options.
-// This will be cleared and not used for any calls to Run or Last beyond the
-// next one.
-func (s *Sequence) Opts(opts Opts) *Sequence {
+// Read arranges for the next call to Run or Last to read from the supplied
+// io.Reader. This will be cleared and not used for any calls to Run or Last
+// beyond the next one. Specifying nil will result in reading from os.DevNull.
+func (s *Sequence) Read(stdin io.Reader) *Sequence {
 	if s.err != nil {
 		return s
 	}
-	s.opts = &opts
+	s.reading = true
+	s.stdin = stdin
 	return s
+}
+
+// Env arranges for the next call to Run, Call or Last to use the supplied
+// environment variables. This will be cleared and not used for any calls
+// to Run, Call or Last beyond the next one.
+func (s *Sequence) Env(env map[string]string) *Sequence {
+	if s.err != nil {
+		return s
+	}
+	s.env = env
+	return s
+}
+
+// internal getOpts that doesn't override stdin, stdout, stderr
+func (s *Sequence) getOpts() Opts {
+	var opts Opts
+	if s.opts != nil {
+		opts = *s.opts
+	} else {
+		opts = s.r.Opts()
+	}
+	return opts
 }
 
 // Timeout arranges for the next call to Run or Last to be subject to the
 // specified timeout. The timeout will be cleared and not used any calls to Run
-// or Last beyond the next one.
+// or Last beyond the next one. It has no effect for calls to Call.
 func (s *Sequence) Timeout(timeout time.Duration) *Sequence {
 	if s.err != nil {
 		return s
@@ -105,11 +139,8 @@ func (s *Sequence) Timeout(timeout time.Duration) *Sequence {
 	return s
 }
 
-func (s *Sequence) GetOpts() Opts {
-	if s.opts != nil {
-		return *s.opts
-	}
-	return s.r.Opts()
+func (s *Sequence) setOpts(opts Opts) {
+	s.opts = &opts
 }
 
 func (s *Sequence) Error() error {
@@ -117,10 +148,6 @@ func (s *Sequence) Error() error {
 		return fmt.Errorf("%s: %v", s.caller, s.err)
 	}
 	return s.err
-}
-
-func (s *Sequence) setOpts(opts Opts) {
-	s.opts = &opts
 }
 
 func fmtError(depth int, err error, detail string) string {
@@ -137,7 +164,8 @@ func (s *Sequence) setError(err error, detail string) {
 }
 
 func (s *Sequence) reset() {
-	s.stdout, s.stderr, s.opts = nil, nil, nil
+	s.stdin, s.stdout, s.stderr, s.env, s.opts = nil, nil, nil, nil, nil
+	s.reading = false
 	s.timeout = 0
 }
 
@@ -158,52 +186,72 @@ func (s *Sequence) done(p1, p2 *io.PipeWriter, stdinCh, stderrCh chan error) err
 	return nil
 }
 
+func useIfNotNil(a, b io.Writer) io.Writer {
+	if a != nil {
+		return a
+	}
+	return b
+}
+
+func writeOutput(from string, to io.Writer) {
+	if fi, err := os.Open(from); err == nil {
+		io.Copy(to, fi)
+		fi.Close()
+	}
+	if wd, err := os.Getwd(); err == nil {
+		fmt.Fprintf(to, "Current Directory: %v\n", wd)
+	}
+}
+
 func (s *Sequence) initAndDefer() func() {
 	if s.stdout == nil && s.stderr == nil {
-		f, err := ioutil.TempFile("", "seq")
+		fout, err := ioutil.TempFile("", "seq")
 		if err != nil {
 			return func() {}
 		}
-		opts := s.GetOpts()
-		stdout := opts.Stdout
-		if stdout == nil {
-			return func() {}
+		opts := s.getOpts()
+		opts.Stdout = fout
+		opts.Stderr = fout
+		opts.Env = s.env
+		if s.reading {
+			opts.Stdin = s.stdin
 		}
-		opts.Stdout = f
-		opts.Stderr = f
 		s.setOpts(opts)
 		return func() {
-			filename := f.Name()
-			f.Close()
-			if opts.Verbose || s.err != nil {
-				// TODO(cnicolaou): probably best to stream this out rather
-				// than buffer the whole file into memory.
-				if data, err := ioutil.ReadFile(filename); err == nil {
-					fmt.Fprint(stdout, string(data))
-					if wd, err := os.Getwd(); err == nil {
-						fmt.Fprintf(stdout, "Current Directory: %v\n", wd)
-					}
-				}
+			filename := fout.Name()
+			fout.Close()
+			defer func() { os.Remove(filename); s.opts = nil }()
+			if s.err != nil {
+				writeOutput(filename, useIfNotNil(s.defaultStderr, os.Stderr))
 			}
-			os.Remove(filename)
-			s.opts = nil
+			if opts.Verbose && s.defaultStderr != s.defaultStdout {
+				writeOutput(filename, useIfNotNil(s.defaultStdout, os.Stdout))
+			}
 		}
 	}
-	opts := s.GetOpts()
+	opts := s.getOpts()
 	rStdin, wStdin := io.Pipe()
 	rStderr, wStderr := io.Pipe()
 	opts.Stdout = wStdin
 	opts.Stderr = wStderr
-	s.setOpts(opts)
+	opts.Env = s.env
+	if s.reading {
+		opts.Stdin = s.stdin
+	}
 	var stdinCh, stderrCh chan error
 	if s.stdout != nil {
 		stdinCh = make(chan error)
 		go copy(s.stdout, rStdin, stdinCh)
+	} else {
+		opts.Stdout = s.defaultStdout
 	}
 	if s.stderr != nil {
 		stderrCh = make(chan error)
 		go copy(s.stderr, rStderr, stderrCh)
+	} else {
+		opts.Stderr = s.defaultStderr
 	}
+	s.setOpts(opts)
 	return func() {
 		if err := s.done(wStdin, wStderr, stdinCh, stderrCh); err != nil && s.err == nil {
 			s.err = err
@@ -276,7 +324,7 @@ func (s *Sequence) Run(path string, args ...string) *Sequence {
 		return s
 	}
 	defer s.initAndDefer()()
-	s.setError(s.r.command(s.timeout, s.GetOpts(), path, args...), fmt.Sprintf("Run(%q%s)", path, fmtStringArgs(args...)))
+	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Run(%q%s)", path, fmtStringArgs(args...)))
 	return s
 }
 
@@ -288,7 +336,7 @@ func (s *Sequence) Last(path string, args ...string) error {
 		return s.Done()
 	}
 	defer s.initAndDefer()()
-	s.setError(s.r.command(s.timeout, s.GetOpts(), path, args...), fmt.Sprintf("Last(%q%s)", path, fmtStringArgs(args...)))
+	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Last(%q%s)", path, fmtStringArgs(args...)))
 	return s.Done()
 }
 
@@ -299,7 +347,7 @@ func (s *Sequence) Call(fn func() error, format string, args ...interface{}) *Se
 		return s
 	}
 	defer s.initAndDefer()()
-	s.setError(s.r.FunctionWithOpts(s.GetOpts(), fn, format, args...), fmt.Sprintf("Call(%s,%s%s)", fn, format, fmtArgs(args)))
+	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf("Call(%s,%s%s)", fn, format, fmtArgs(args)))
 	return s
 }
 
@@ -381,7 +429,7 @@ func (s *Sequence) Output(output []string) *Sequence {
 	if s.err != nil {
 		return s
 	}
-	s.r.OutputWithOpts(s.GetOpts(), output)
+	s.r.OutputWithOpts(s.getOpts(), output)
 	return s
 }
 
