@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"v.io/jiri/tool"
+	"v.io/jiri/jiri"
 )
 
 const (
@@ -25,8 +25,8 @@ const (
 // uses DataDirPath, and the default tool name is "jiri", so nothing actually
 // breaks.  We should revisit the whole data directory thing, and in particular
 // see if we can get rid of tools having to know their own names.
-func DataDirPath(ctx *tool.Context, toolName string) (string, error) {
-	_, projects, tools, _, err := readManifest(ctx, false)
+func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
+	_, projects, tools, _, err := readManifest(jirix, false)
 	if err != nil {
 		return "", err
 	}
@@ -121,8 +121,8 @@ func ResolveManifestPath(name string) (string, error) {
 	return path, nil
 }
 
-func getHost(ctx *tool.Context, name string) (string, error) {
-	hosts, _, _, _, err := readManifest(ctx, false)
+func getHost(jirix *jiri.X, name string) (string, error) {
+	hosts, _, _, _, err := readManifest(jirix, false)
 	if err != nil {
 		return "", err
 	}
@@ -134,13 +134,13 @@ func getHost(ctx *tool.Context, name string) (string, error) {
 }
 
 // GerritHost returns the URL that hosts the Gerrit code review system.
-func GerritHost(ctx *tool.Context) (string, error) {
-	return getHost(ctx, "gerrit")
+func GerritHost(jirix *jiri.X) (string, error) {
+	return getHost(jirix, "gerrit")
 }
 
 // GitHost returns the URL that hosts the git repositories.
-func GitHost(ctx *tool.Context) (string, error) {
-	return getHost(ctx, "git")
+func GitHost(jirix *jiri.X) (string, error) {
+	return getHost(jirix, "git")
 }
 
 // JiriRoot returns the root of the jiri universe.

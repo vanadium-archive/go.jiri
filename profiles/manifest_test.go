@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
@@ -55,21 +56,21 @@ func TestWrite(t *testing.T) {
 	profiles.Clear()
 	filename := tmpFile()
 	defer os.RemoveAll(filepath.Dir(filename))
-	ctx := tool.NewDefaultContext()
+	jirix := &jiri.X{Context: tool.NewDefaultContext()}
 
 	// test for no version being set.
 	t1, _ := profiles.NewTargetWithEnv("cpu1-os1", "A=B,C=D")
 	if err := profiles.AddProfileTarget("b", t1); err != nil {
 		t.Fatal(err)
 	}
-	if err := profiles.Write(ctx, filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
+	if err := profiles.Write(jirix, filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
 		t.Fatalf("was expecing a missing version error, but got %v", err)
 	}
 	profiles.RemoveProfileTarget("b", t1)
 
 	addProfileAndTargets(t, "b")
 	addProfileAndTargets(t, "a")
-	if err := profiles.Write(ctx, filename); err != nil {
+	if err := profiles.Write(jirix, filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,8 +83,8 @@ func TestWrite(t *testing.T) {
 
 func TestRead(t *testing.T) {
 	profiles.Clear()
-	ctx := tool.NewDefaultContext()
-	if err := profiles.Read(ctx, "./testdata/m1.xml"); err != nil {
+	jirix := &jiri.X{Context: tool.NewDefaultContext()}
+	if err := profiles.Read(jirix, "./testdata/m1.xml"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -135,8 +136,8 @@ func TestReadingV0(t *testing.T) {
 		return db
 	}
 
-	ctx := tool.NewDefaultContext()
-	if err := profiles.Read(ctx, "./testdata/legacy.xml"); err != nil {
+	jirix := &jiri.X{Context: tool.NewDefaultContext()}
+	if err := profiles.Read(jirix, "./testdata/legacy.xml"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -155,11 +156,11 @@ func TestReadingV0(t *testing.T) {
 	t1.Set("cpu-os@1")
 	profiles.AddProfileTarget("__first", t1)
 
-	if err := profiles.Write(ctx, filename); err != nil {
+	if err := profiles.Write(jirix, filename); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := profiles.Read(ctx, filename); err != nil {
+	if err := profiles.Read(jirix, filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -191,11 +192,11 @@ func handleRelativePath(root profiles.RelativePath, s string) string {
 }
 
 func TestReadingV3AndV4(t *testing.T) {
-	ctx := tool.NewDefaultContext()
 	root, err := project.JiriRoot()
 	if err != nil {
 		t.Fatal(err)
 	}
+	jirix := &jiri.X{Context: tool.NewDefaultContext(), Root: root}
 	for i, c := range []struct {
 		filename, prefix, variable string
 		version                    profiles.Version
@@ -203,7 +204,7 @@ func TestReadingV3AndV4(t *testing.T) {
 		{"v3.xml", "", "", profiles.V3},
 		{"v4.xml", root, "${JIRI_ROOT}", profiles.V4},
 	} {
-		ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, filepath.Join("testdata", c.filename))
+		ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, filepath.Join("testdata", c.filename))
 		if err != nil {
 			t.Fatal(err)
 		}

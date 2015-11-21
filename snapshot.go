@@ -15,8 +15,8 @@ import (
 
 	"v.io/jiri/collect"
 	"v.io/jiri/gitutil"
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 )
 
@@ -47,7 +47,7 @@ snapshots the are revisioned in the manifest repository.
 
 // cmdSnapshotCreate represents the "jiri snapshot create" command.
 var cmdSnapshotCreate = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runSnapshotCreate),
+	Runner: jiri.RunnerFunc(runSnapshotCreate),
 	Name:   "create",
 	Short:  "Create a new project snapshot",
 	Long: `
@@ -83,13 +83,12 @@ is not an API. It is an implementation and can change without notice.
 	ArgsLong: "<label> is the snapshot label.",
 }
 
-func runSnapshotCreate(env *cmdline.Env, args []string) error {
+func runSnapshotCreate(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
-		return env.UsageErrorf("unexpected number of arguments")
+		return jirix.UsageErrorf("unexpected number of arguments")
 	}
 	label := args[0]
-	ctx := tool.NewContextFromEnv(env)
-	if err := checkSnapshotDir(ctx); err != nil {
+	if err := checkSnapshotDir(jirix); err != nil {
 		return err
 	}
 	snapshotDir, err := getSnapshotDir()
@@ -101,14 +100,14 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 	// state and push the changes to the remote repository (if
 	// applicable), or fail with no effect.
 	createFn := func() error {
-		revision, err := ctx.Git().CurrentRevision()
+		revision, err := jirix.Git().CurrentRevision()
 		if err != nil {
 			return err
 		}
-		if err := createSnapshot(ctx, snapshotDir, snapshotFile, label); err != nil {
+		if err := createSnapshot(jirix, snapshotDir, snapshotFile, label); err != nil {
 			// Clean up on all errors.
-			ctx.Git().Reset(revision)
-			ctx.Git().RemoveUntrackedFiles()
+			jirix.Git().Reset(revision)
+			jirix.Git().RemoveUntrackedFiles()
 			return err
 		}
 		return nil
@@ -120,7 +119,7 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 		Protocol: "git",
 		Revision: "HEAD",
 	}
-	if err := project.ApplyToLocalMaster(ctx, project.Projects{p.Name: p}, createFn); err != nil {
+	if err := project.ApplyToLocalMaster(jirix, project.Projects{p.Name: p}, createFn); err != nil {
 		return err
 	}
 	return nil
@@ -128,53 +127,53 @@ func runSnapshotCreate(env *cmdline.Env, args []string) error {
 
 // checkSnapshotDir makes sure that he local snapshot directory exists
 // and is initialized properly.
-func checkSnapshotDir(ctx *tool.Context) (e error) {
+func checkSnapshotDir(jirix *jiri.X) (e error) {
 	snapshotDir, err := getSnapshotDir()
 	if err != nil {
 		return err
 	}
-	if _, err := ctx.Run().Stat(snapshotDir); err != nil {
+	if _, err := jirix.Run().Stat(snapshotDir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
 		if remoteFlag {
-			if err := ctx.Run().MkdirAll(snapshotDir, 0755); err != nil {
+			if err := jirix.Run().MkdirAll(snapshotDir, 0755); err != nil {
 				return err
 			}
 			return nil
 		}
 		createFn := func() (err error) {
-			if err := ctx.Run().MkdirAll(snapshotDir, 0755); err != nil {
+			if err := jirix.Run().MkdirAll(snapshotDir, 0755); err != nil {
 				return err
 			}
-			if err := ctx.Git().Init(snapshotDir); err != nil {
+			if err := jirix.Git().Init(snapshotDir); err != nil {
 				return err
 			}
 			cwd, err := os.Getwd()
 			if err != nil {
 				return err
 			}
-			defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-			if err := ctx.Run().Chdir(snapshotDir); err != nil {
+			defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
+			if err := jirix.Run().Chdir(snapshotDir); err != nil {
 				return err
 			}
-			if err := ctx.Git().Commit(); err != nil {
+			if err := jirix.Git().Commit(); err != nil {
 				return err
 			}
 			return nil
 		}
 		if err := createFn(); err != nil {
-			ctx.Run().RemoveAll(snapshotDir)
+			jirix.Run().RemoveAll(snapshotDir)
 			return err
 		}
 	}
 	return nil
 }
 
-func createSnapshot(ctx *tool.Context, snapshotDir, snapshotFile, label string) error {
+func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) error {
 	// Create a snapshot that encodes the current state of master
 	// branches for all local projects.
-	if err := project.CreateSnapshot(ctx, snapshotFile); err != nil {
+	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
 
@@ -182,19 +181,19 @@ func createSnapshot(ctx *tool.Context, snapshotDir, snapshotFile, label string) 
 	// latest snapshot.
 	symlink := filepath.Join(snapshotDir, label)
 	newSymlink := symlink + ".new"
-	if err := ctx.Run().RemoveAll(newSymlink); err != nil {
+	if err := jirix.Run().RemoveAll(newSymlink); err != nil {
 		return err
 	}
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	if err := ctx.Run().Symlink(relativeSnapshotPath, newSymlink); err != nil {
+	if err := jirix.Run().Symlink(relativeSnapshotPath, newSymlink); err != nil {
 		return err
 	}
-	if err := ctx.Run().Rename(newSymlink, symlink); err != nil {
+	if err := jirix.Run().Rename(newSymlink, symlink); err != nil {
 		return err
 	}
 
 	// Revision the changes.
-	if err := revisionChanges(ctx, snapshotDir, snapshotFile, label); err != nil {
+	if err := revisionChanges(jirix, snapshotDir, snapshotFile, label); err != nil {
 		return err
 	}
 	return nil
@@ -220,28 +219,28 @@ func getSnapshotDir() (string, error) {
 // revisionChanges commits changes identified by the given manifest
 // file and label to the manifest repository and (if applicable)
 // pushes these changes to the remote repository.
-func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string) (e error) {
+func revisionChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	if err := ctx.Run().Chdir(snapshotDir); err != nil {
+	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
+	if err := jirix.Run().Chdir(snapshotDir); err != nil {
 		return err
 	}
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	if err := ctx.Git().Add(relativeSnapshotPath); err != nil {
+	if err := jirix.Git().Add(relativeSnapshotPath); err != nil {
 		return err
 	}
-	if err := ctx.Git().Add(label); err != nil {
+	if err := jirix.Git().Add(label); err != nil {
 		return err
 	}
 	name := strings.TrimPrefix(snapshotFile, snapshotDir)
-	if err := ctx.Git().CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
+	if err := jirix.Git().CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
 		return err
 	}
 	if remoteFlag {
-		if err := ctx.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
+		if err := jirix.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
 			return err
 		}
 	}
@@ -250,7 +249,7 @@ func revisionChanges(ctx *tool.Context, snapshotDir, snapshotFile, label string)
 
 // cmdSnapshotList represents the "jiri snapshot list" command.
 var cmdSnapshotList = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runSnapshotList),
+	Runner: jiri.RunnerFunc(runSnapshotList),
 	Name:   "list",
 	Short:  "List existing project snapshots",
 	Long: `
@@ -262,9 +261,8 @@ command lists snapshots for all known labels.
 	ArgsLong: "<label ...> is a list of snapshot labels.",
 }
 
-func runSnapshotList(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	if err := checkSnapshotDir(ctx); err != nil {
+func runSnapshotList(jirix *jiri.X, args []string) error {
+	if err := checkSnapshotDir(jirix); err != nil {
 		return err
 	}
 
@@ -300,12 +298,12 @@ func runSnapshotList(env *cmdline.Env, args []string) error {
 	failed := false
 	for _, label := range args {
 		labelDir := filepath.Join(snapshotDir, "labels", label)
-		if _, err := ctx.Run().Stat(labelDir); err != nil {
+		if _, err := jirix.Run().Stat(labelDir); err != nil {
 			if !os.IsNotExist(err) {
 				return err
 			}
 			failed = true
-			fmt.Fprintf(env.Stderr, "snapshot label %q not found", label)
+			fmt.Fprintf(jirix.Stderr(), "snapshot label %q not found", label)
 		}
 	}
 	if failed {
@@ -322,9 +320,9 @@ func runSnapshotList(env *cmdline.Env, args []string) error {
 		if err != nil {
 			return fmt.Errorf("ReadDir(%v) failed: %v", labelDir, err)
 		}
-		fmt.Fprintf(env.Stdout, "snapshots of label %q:\n", label)
+		fmt.Fprintf(jirix.Stdout(), "snapshots of label %q:\n", label)
 		for _, fileInfo := range fileInfoList {
-			fmt.Fprintf(env.Stdout, "  %v\n", fileInfo.Name())
+			fmt.Fprintf(jirix.Stdout(), "  %v\n", fileInfo.Name())
 		}
 	}
 	return nil

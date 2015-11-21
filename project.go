@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 	"v.io/jiri/util"
@@ -48,7 +49,7 @@ var cmdProject = &cmdline.Command{
 
 // cmdProjectClean represents the "jiri project clean" command.
 var cmdProjectClean = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runProjectClean),
+	Runner:   jiri.RunnerFunc(runProjectClean),
 	Name:     "clean",
 	Short:    "Restore jiri projects to their pristine state",
 	Long:     "Restore jiri projects back to their master branches and get rid of all the local branches and changes.",
@@ -56,9 +57,8 @@ var cmdProjectClean = &cmdline.Command{
 	ArgsLong: "<project ...> is a list of projects to clean up.",
 }
 
-func runProjectClean(env *cmdline.Env, args []string) (e error) {
-	ctx := tool.NewContextFromEnv(env)
-	localProjects, err := project.LocalProjects(ctx, project.FullScan)
+func runProjectClean(jirix *jiri.X, args []string) (e error) {
+	localProjects, err := project.LocalProjects(jirix, project.FullScan)
 	if err != nil {
 		return err
 	}
@@ -68,13 +68,13 @@ func runProjectClean(env *cmdline.Env, args []string) (e error) {
 			if p, ok := localProjects[arg]; ok {
 				projects[p.Name] = p
 			} else {
-				fmt.Fprintf(ctx.Stderr(), "Local project %q not found.\n", p.Name)
+				fmt.Fprintf(jirix.Stderr(), "Local project %q not found.\n", p.Name)
 			}
 		}
 	} else {
 		projects = localProjects
 	}
-	if err := project.CleanupProjects(ctx, projects, cleanupBranchesFlag); err != nil {
+	if err := project.CleanupProjects(jirix, projects, cleanupBranchesFlag); err != nil {
 		return err
 	}
 	return nil
@@ -82,16 +82,15 @@ func runProjectClean(env *cmdline.Env, args []string) (e error) {
 
 // cmdProjectList represents the "jiri project list" command.
 var cmdProjectList = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runProjectList),
+	Runner: jiri.RunnerFunc(runProjectList),
 	Name:   "list",
 	Short:  "List existing jiri projects and branches",
 	Long:   "Inspect the local filesystem and list the existing projects and branches.",
 }
 
 // runProjectList generates a listing of local projects.
-func runProjectList(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	states, err := project.GetProjectStates(ctx, noPristineFlag)
+func runProjectList(jirix *jiri.X, _ []string) error {
+	states, err := project.GetProjectStates(jirix, noPristineFlag)
 	if err != nil {
 		return err
 	}
@@ -109,7 +108,7 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 				continue
 			}
 		}
-		fmt.Fprintf(ctx.Stdout(), "project=%q path=%q\n", path.Base(name), state.Project.Path)
+		fmt.Fprintf(jirix.Stdout(), "project=%q path=%q\n", path.Base(name), state.Project.Path)
 		if branchesFlag {
 			for _, branch := range state.Branches {
 				s := "  "
@@ -120,7 +119,7 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 				if branch.HasGerritMessage {
 					s += " (exported to gerrit)"
 				}
-				fmt.Fprintf(ctx.Stdout(), "%v\n", s)
+				fmt.Fprintf(jirix.Stdout(), "%v\n", s)
 			}
 		}
 	}
@@ -129,7 +128,7 @@ func runProjectList(env *cmdline.Env, _ []string) error {
 
 // cmdProjectShellPrompt represents the "jiri project shell-prompt" command.
 var cmdProjectShellPrompt = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runProjectShellPrompt),
+	Runner: jiri.RunnerFunc(runProjectShellPrompt),
 	Name:   "shell-prompt",
 	Short:  "Print a succinct status of projects suitable for shell prompts",
 	Long: `
@@ -140,10 +139,8 @@ indication of each project's status:
 `,
 }
 
-func runProjectShellPrompt(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-
-	states, err := project.GetProjectStates(ctx, checkDirtyFlag)
+func runProjectShellPrompt(jirix *jiri.X, args []string) error {
+	states, err := project.GetProjectStates(jirix, checkDirtyFlag)
 	if err != nil {
 		return err
 	}
@@ -154,7 +151,7 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 	sort.Strings(names)
 
 	// Get the name of the current project.
-	currentProjectName, err := project.CurrentProjectName(ctx)
+	currentProjectName, err := project.CurrentProjectName(jirix)
 	if err != nil {
 		return err
 	}
@@ -194,7 +191,7 @@ func runProjectShellPrompt(env *cmdline.Env, args []string) error {
 
 // cmdProjectPoll represents the "jiri project poll" command.
 var cmdProjectPoll = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runProjectPoll),
+	Runner: jiri.RunnerFunc(runProjectPoll),
 	Name:   "poll",
 	Short:  "Poll existing jiri projects",
 	Long: `
@@ -208,11 +205,10 @@ tests are specified, all projects are polled by default.
 
 // runProjectPoll generates a description of changes that exist
 // remotely but do not exist locally.
-func runProjectPoll(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
+func runProjectPoll(jirix *jiri.X, args []string) error {
 	projectSet := map[string]struct{}{}
 	if len(args) > 0 {
-		config, err := util.LoadConfig(ctx)
+		config, err := util.LoadConfig(jirix)
 		if err != nil {
 			return err
 		}
@@ -232,7 +228,7 @@ func runProjectPoll(env *cmdline.Env, args []string) error {
 			set.String.Union(projectSet, set.String.FromSlice(projects))
 		}
 	}
-	update, err := project.PollProjects(ctx, projectSet)
+	update, err := project.PollProjects(jirix, projectSet)
 	if err != nil {
 		return err
 	}
@@ -250,7 +246,7 @@ func runProjectPoll(env *cmdline.Env, args []string) error {
 		if err != nil {
 			return fmt.Errorf("MarshalIndent() failed: %v", err)
 		}
-		fmt.Fprintf(env.Stdout, "%s\n", bytes)
+		fmt.Fprintf(jirix.Stdout(), "%s\n", bytes)
 	}
 	return nil
 }

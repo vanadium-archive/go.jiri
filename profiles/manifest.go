@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"v.io/jiri/tool"
+	"v.io/jiri/jiri"
 )
 
 const (
@@ -145,14 +145,14 @@ func UpdateProfileTarget(name string, target Target) error {
 
 // Read reads the specified manifest file to obtain the current set of
 // installed profiles.
-func Read(ctx *tool.Context, filename string) error {
-	return db.read(ctx, filename)
+func Read(jirix *jiri.X, filename string) error {
+	return db.read(jirix, filename)
 }
 
 // Write writes the current set of installed profiles to the specified manifest
 // file.
-func Write(ctx *tool.Context, filename string) error {
-	return db.write(ctx, filename)
+func Write(jirix *jiri.X, filename string) error {
+	return db.write(jirix, filename)
 }
 
 func (pdb *profileDB) installProfile(name, root string) {
@@ -237,15 +237,15 @@ func (pdb *profileDB) profile(name string) *Profile {
 	return pdb.db[name]
 }
 
-func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
+func (pdb *profileDB) read(jirix *jiri.X, filename string) error {
 	pdb.Lock()
 	defer pdb.Unlock()
 	pdb.db = make(map[string]*Profile)
 
-	data, err := ctx.Run().ReadFile(filename)
+	data, err := jirix.Run().ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(ctx.Stderr(), "WARNING: %v doesn't exist\n", filename)
+			fmt.Fprintf(jirix.Stderr(), "WARNING: %v doesn't exist\n", filename)
 			return nil
 		}
 		return err
@@ -278,7 +278,7 @@ func (pdb *profileDB) read(ctx *tool.Context, filename string) error {
 	return nil
 }
 
-func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
+func (pdb *profileDB) write(jirix *jiri.X, filename string) error {
 	pdb.Lock()
 	defer pdb.Unlock()
 
@@ -318,17 +318,17 @@ func (pdb *profileDB) write(ctx *tool.Context, filename string) error {
 	oldName := filename + ".prev"
 	newName := filename + fmt.Sprintf(".%d", time.Now().UnixNano())
 
-	if err := ctx.Run().WriteFile(newName, data, defaultFileMode); err != nil {
+	if err := jirix.Run().WriteFile(newName, data, defaultFileMode); err != nil {
 		return err
 	}
 
-	if ctx.Run().FileExists(filename) {
-		if err := ctx.Run().Rename(filename, oldName); err != nil {
+	if jirix.Run().FileExists(filename) {
+		if err := jirix.Run().Rename(filename, oldName); err != nil {
 			return err
 		}
 	}
 
-	if err := ctx.Run().Rename(newName, filename); err != nil {
+	if err := jirix.Run().Rename(newName, filename); err != nil {
 		return err
 	}
 

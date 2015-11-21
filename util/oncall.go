@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"v.io/jiri/tool"
+	"v.io/jiri/jiri"
 )
 
 type OncallRotation struct {
@@ -25,8 +25,8 @@ type OncallShift struct {
 }
 
 // LoadOncallRotation parses the default oncall schedule file.
-func LoadOncallRotation(ctx *tool.Context) (*OncallRotation, error) {
-	oncallRotationsFile, err := OncallRotationPath(ctx)
+func LoadOncallRotation(jirix *jiri.X) (*OncallRotation, error) {
+	oncallRotationsFile, err := OncallRotationPath(jirix)
 	if err != nil {
 		return nil, err
 	}
@@ -43,9 +43,9 @@ func LoadOncallRotation(ctx *tool.Context) (*OncallRotation, error) {
 
 // Oncall finds the oncall shift at the given time from the
 // oncall configuration file by comparing timestamps.
-func Oncall(ctx *tool.Context, targetTime time.Time) (*OncallShift, error) {
+func Oncall(jirix *jiri.X, targetTime time.Time) (*OncallShift, error) {
 	// Parse oncall configuration file.
-	rotation, err := LoadOncallRotation(ctx)
+	rotation, err := LoadOncallRotation(jirix)
 	if err != nil {
 		return nil, err
 	}

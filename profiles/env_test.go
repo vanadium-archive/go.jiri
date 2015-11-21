@@ -13,6 +13,7 @@ import (
 	"sort"
 	"testing"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
@@ -21,12 +22,12 @@ import (
 )
 
 func TestConfigHelper(t *testing.T) {
-	ctx := tool.NewDefaultContext()
 	root, err := project.JiriRoot()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, filepath.Join(root, "release/go/src/v.io/jiri/profiles/testdata/m2.xml"))
+	jirix := &jiri.X{Context: tool.NewDefaultContext(), Root: root}
+	ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, filepath.Join(root, "release/go/src/v.io/jiri/profiles/testdata/m2.xml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,8 +45,11 @@ func TestConfigHelper(t *testing.T) {
 
 func TestEnvFromTarget(t *testing.T) {
 	profiles.Clear()
-	root, _ := project.JiriRoot()
-	ctx := tool.NewDefaultContext()
+	root, err := project.JiriRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	jirix := &jiri.X{Context: tool.NewDefaultContext(), Root: root}
 	profiles.InstallProfile("a", "root")
 	profiles.InstallProfile("b", "root")
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
@@ -60,11 +64,11 @@ func TestEnvFromTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	filename := filepath.Join(root, "release", "go", "src", "v.io", "jiri", "profiles", tmpdir, "manifest")
-	if err := profiles.Write(ctx, filename); err != nil {
+	if err := profiles.Write(jirix, filename); err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpdir)
-	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, filename)
+	ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,31 +149,29 @@ func TestMergeEnv(t *testing.T) {
 
 func testSetPathHelper(t *testing.T, name string) {
 	profiles.Clear()
-	ctx := tool.NewDefaultContext()
-
 	// Setup a fake JIRI_ROOT.
-	root, err := project.NewFakeJiriRoot(ctx)
+	root, err := project.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer func() {
-		if err := root.Cleanup(ctx); err != nil {
+		if err := root.Cleanup(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}()
 
 	// Create a test project and identify it as a Go workspace.
-	if err := root.CreateRemoteProject(ctx, "test"); err != nil {
+	if err := root.CreateRemoteProject("test"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.AddProject(ctx, project.Project{
+	if err := root.AddProject(project.Project{
 		Name:   "test",
 		Path:   "test",
 		Remote: root.Projects["test"],
 	}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.UpdateUniverse(ctx, false); err != nil {
+	if err := root.UpdateUniverse(false); err != nil {
 		t.Fatalf("%v", err)
 	}
 	var config *util.Config
@@ -186,11 +188,11 @@ func testSetPathHelper(t *testing.T, name string) {
 	}
 	defer os.Setenv("JIRI_ROOT", oldRoot)
 
-	if err := profiles.Write(ctx, filepath.Join(root.Dir, "profiles-manifest")); err != nil {
+	if err := profiles.Write(root.X, filepath.Join(root.Dir, "profiles-manifest")); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := util.SaveConfig(ctx, config); err != nil {
+	if err := util.SaveConfig(root.X, config); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -200,7 +202,7 @@ func testSetPathHelper(t *testing.T, name string) {
 		t.Fatalf("%v", err)
 	}
 
-	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, filepath.Join(jiriRoot, "profiles-manifest"))
+	ch, err := profiles.NewConfigHelper(root.X, profiles.UseProfiles, filepath.Join(jiriRoot, "profiles-manifest"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +215,7 @@ func testSetPathHelper(t *testing.T, name string) {
 	case "VDLPATH":
 		// Make a fake src directory.
 		want = filepath.Join(jiriRoot, "test", "src")
-		if err := ctx.Run().MkdirAll(want, 0755); err != nil {
+		if err := root.X.Run().MkdirAll(want, 0755); err != nil {
 			t.Fatalf("%v", err)
 		}
 		want = "VDLPATH=" + want

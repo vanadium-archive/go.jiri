@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
 	"v.io/jiri/util"
 	"v.io/x/lib/envvar"
 )
@@ -100,7 +100,7 @@ type ConfigHelper struct {
 	*envvar.Vars
 	profilesMode bool
 	root         string
-	ctx          *tool.Context
+	jirix        *jiri.X
 	config       *util.Config
 	projects     project.Projects
 	tools        project.Tools
@@ -110,26 +110,26 @@ type ConfigHelper struct {
 // length then that file will be read as a profiles manifest file, if not, the
 // existing, if any, in-memory profiles information will be used. If SkipProfiles
 // is specified for profilesMode, then no profiles are used.
-func NewConfigHelper(ctx *tool.Context, profilesMode ProfilesMode, filename string) (*ConfigHelper, error) {
+func NewConfigHelper(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*ConfigHelper, error) {
 	root, err := project.JiriRoot()
 	if err != nil {
 		return nil, err
 	}
-	config, err := util.LoadConfig(ctx)
+	config, err := util.LoadConfig(jirix)
 	if err != nil {
 		return nil, err
 	}
-	projects, tools, err := project.ReadManifest(ctx)
+	projects, tools, err := project.ReadManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
 	if profilesMode == UseProfiles && len(filename) > 0 {
-		if err := Read(ctx, filename); err != nil {
+		if err := Read(jirix, filename); err != nil {
 			return nil, err
 		}
 	}
 	ch := &ConfigHelper{
-		ctx:          ctx,
+		jirix:        jirix,
 		root:         root,
 		config:       config,
 		projects:     projects,
@@ -223,19 +223,19 @@ func (ch *ConfigHelper) JiriProfile() []string {
 // GoPath computes and returns the GOPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) GoPath() string {
-	path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+	path := pathHelper(ch.jirix, ch.root, ch.projects, ch.config.GoWorkspaces(), "")
 	return "GOPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // VDLPath computes and returns the VDLPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) VDLPath() string {
-	path := pathHelper(ch.ctx, ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+	path := pathHelper(ch.jirix, ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
 	return "VDLPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // pathHelper is a utility function for determining paths for project workspaces.
-func pathHelper(ctx *tool.Context, root string, projects project.Projects, workspaces []string, suffix string) []string {
+func pathHelper(jirix *jiri.X, root string, projects project.Projects, workspaces []string, suffix string) []string {
 	path := []string{}
 	for _, workspace := range workspaces {
 		absWorkspace := filepath.Join(root, workspace, suffix)
@@ -250,7 +250,7 @@ func pathHelper(ctx *tool.Context, root string, projects project.Projects, works
 			// account for Go workspaces that span multiple jiri projects,
 			// such as: $JIRI_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := ctx.Run().Stat(filepath.Join(absWorkspace)); err == nil {
+				if _, err := jirix.Run().Stat(filepath.Join(absWorkspace)); err == nil {
 					path = append(path, absWorkspace)
 					break
 				}

@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
 )
 
 var (
@@ -112,14 +111,12 @@ func TestConfigAPI(t *testing.T) {
 }
 
 func TestConfigSerialization(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-
-	root, err := project.NewFakeJiriRoot(ctx)
+	root, err := project.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer func() {
-		if err := root.Cleanup(ctx); err != nil {
+		if err := root.Cleanup(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}()
@@ -141,10 +138,10 @@ func TestConfigSerialization(t *testing.T) {
 		VDLWorkspacesOpt(vdlWorkspaces),
 	)
 
-	if err := SaveConfig(ctx, config); err != nil {
+	if err := SaveConfig(root.X, config); err != nil {
 		t.Fatalf("%v", err)
 	}
-	gotConfig, err := LoadConfig(ctx)
+	gotConfig, err := LoadConfig(root.X)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

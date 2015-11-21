@@ -14,6 +14,7 @@ import (
 	"v.io/jiri/collect"
 	"v.io/jiri/gerrit"
 	"v.io/jiri/gitutil"
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
@@ -75,28 +76,28 @@ func init() {
 	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
 }
 
-func getCommitMessageFileName(ctx *tool.Context, branch string) (string, error) {
-	topLevel, err := ctx.Git().TopLevel()
+func getCommitMessageFileName(jirix *jiri.X, branch string) (string, error) {
+	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(topLevel, project.MetadataDirName(), branch, commitMessageFileName), nil
 }
 
-func getDependencyPathFileName(ctx *tool.Context, branch string) (string, error) {
-	topLevel, err := ctx.Git().TopLevel()
+func getDependencyPathFileName(jirix *jiri.X, branch string) (string, error) {
+	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(topLevel, project.MetadataDirName(), branch, dependencyPathFileName), nil
 }
 
-func getDependentCLs(ctx *tool.Context, branch string) ([]string, error) {
-	file, err := getDependencyPathFileName(ctx, branch)
+func getDependentCLs(jirix *jiri.X, branch string) ([]string, error) {
+	file, err := getDependencyPathFileName(jirix, branch)
 	if err != nil {
 		return nil, err
 	}
-	data, err := ctx.Run().ReadFile(file)
+	data, err := jirix.Run().ReadFile(file)
 	var branches []string
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -124,7 +125,7 @@ var cmdCL = &cmdline.Command{
 // TODO(jsimsa): Replace this with a "submit" command that talks to
 // Gerrit to submit the CL and then (optionally) removes it locally.
 var cmdCLCleanup = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runCLCleanup),
+	Runner: jiri.RunnerFunc(runCLCleanup),
 	Name:   "cleanup",
 	Short:  "Clean up changelists that have been merged",
 	Long: `
@@ -137,34 +138,34 @@ stops. Otherwise, it deletes the given branches.
 	ArgsLong: "<branches> is a list of branches to cleanup.",
 }
 
-func cleanupCL(ctx *tool.Context, branches []string) (e error) {
-	originalBranch, err := ctx.Git().CurrentBranchName()
+func cleanupCL(jirix *jiri.X, branches []string) (e error) {
+	originalBranch, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
-	stashed, err := ctx.Git().Stash()
+	stashed, err := jirix.Git().Stash()
 	if err != nil {
 		return err
 	}
 	if stashed {
-		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
+		defer collect.Error(func() error { return jirix.Git().StashPop() }, &e)
 	}
-	if err := ctx.Git().CheckoutBranch(remoteBranchFlag); err != nil {
+	if err := jirix.Git().CheckoutBranch(remoteBranchFlag); err != nil {
 		return err
 	}
 	checkoutOriginalBranch := true
 	defer collect.Error(func() error {
 		if checkoutOriginalBranch {
-			return ctx.Git().CheckoutBranch(originalBranch)
+			return jirix.Git().CheckoutBranch(originalBranch)
 		}
 		return nil
 	}, &e)
-	if err := ctx.Git().FetchRefspec("origin", remoteBranchFlag); err != nil {
+	if err := jirix.Git().FetchRefspec("origin", remoteBranchFlag); err != nil {
 		return err
 	}
 	for _, branch := range branches {
-		cleanupFn := func() error { return cleanupBranch(ctx, branch) }
-		if err := ctx.Run().Function(cleanupFn, "Cleaning up branch %q", branch); err != nil {
+		cleanupFn := func() error { return cleanupBranch(jirix, branch) }
+		if err := jirix.Run().Function(cleanupFn, "Cleaning up branch %q", branch); err != nil {
 			return err
 		}
 		if branch == originalBranch {
@@ -174,16 +175,16 @@ func cleanupCL(ctx *tool.Context, branches []string) (e error) {
 	return nil
 }
 
-func cleanupBranch(ctx *tool.Context, branch string) error {
-	if err := ctx.Git().CheckoutBranch(branch); err != nil {
+func cleanupBranch(jirix *jiri.X, branch string) error {
+	if err := jirix.Git().CheckoutBranch(branch); err != nil {
 		return err
 	}
 	if !forceFlag {
 		trackingBranch := "origin/" + remoteBranchFlag
-		if err := ctx.Git().Merge(trackingBranch); err != nil {
+		if err := jirix.Git().Merge(trackingBranch); err != nil {
 			return err
 		}
-		files, err := ctx.Git().ModifiedFiles(trackingBranch, branch)
+		files, err := jirix.Git().ModifiedFiles(trackingBranch, branch)
 		if err != nil {
 			return err
 		}
@@ -191,29 +192,29 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 			return fmt.Errorf("unmerged changes in\n%s", strings.Join(files, "\n"))
 		}
 	}
-	if err := ctx.Git().CheckoutBranch(remoteBranchFlag); err != nil {
+	if err := jirix.Git().CheckoutBranch(remoteBranchFlag); err != nil {
 		return err
 	}
-	if err := ctx.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
+	if err := jirix.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 		return err
 	}
 	reviewBranch := branch + "-REVIEW"
-	if ctx.Git().BranchExists(reviewBranch) {
-		if err := ctx.Git().DeleteBranch(reviewBranch, gitutil.ForceOpt(true)); err != nil {
+	if jirix.Git().BranchExists(reviewBranch) {
+		if err := jirix.Git().DeleteBranch(reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	// Delete branch metadata.
-	topLevel, err := ctx.Git().TopLevel()
+	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
 	metadataDir := filepath.Join(topLevel, project.MetadataDirName())
-	if err := ctx.Run().RemoveAll(filepath.Join(metadataDir, branch)); err != nil {
+	if err := jirix.Run().RemoveAll(filepath.Join(metadataDir, branch)); err != nil {
 		return err
 	}
 	// Remove the branch from all dependency paths.
-	fileInfos, err := ctx.Run().ReadDir(metadataDir)
+	fileInfos, err := jirix.Run().ReadDir(metadataDir)
 	if err != nil {
 		return err
 	}
@@ -221,11 +222,11 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 		if !fileInfo.IsDir() {
 			continue
 		}
-		file, err := getDependencyPathFileName(ctx, fileInfo.Name())
+		file, err := getDependencyPathFileName(jirix, fileInfo.Name())
 		if err != nil {
 			return err
 		}
-		data, err := ctx.Run().ReadFile(file)
+		data, err := jirix.Run().ReadFile(file)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return err
@@ -236,7 +237,7 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 		for i, tmpBranch := range branches {
 			if branch == tmpBranch {
 				data := []byte(strings.Join(append(branches[:i], branches[i+1:]...), "\n"))
-				if err := ctx.Run().WriteFile(file, data, os.FileMode(0644)); err != nil {
+				if err := jirix.Run().WriteFile(file, data, os.FileMode(0644)); err != nil {
 					return err
 				}
 				break
@@ -246,17 +247,16 @@ func cleanupBranch(ctx *tool.Context, branch string) error {
 	return nil
 }
 
-func runCLCleanup(env *cmdline.Env, args []string) error {
+func runCLCleanup(jirix *jiri.X, args []string) error {
 	if len(args) == 0 {
-		return env.UsageErrorf("cleanup requires at least one argument")
+		return jirix.UsageErrorf("cleanup requires at least one argument")
 	}
-	ctx := tool.NewContextFromEnv(env)
-	return cleanupCL(ctx, args)
+	return cleanupCL(jirix, args)
 }
 
 // cmdCLMail represents the "jiri cl mail" command.
 var cmdCLMail = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runCLMail),
+	Runner: jiri.RunnerFunc(runCLMail),
 	Name:   "mail",
 	Short:  "Mail a changelist for review",
 	Long: `
@@ -331,26 +331,24 @@ var defaultMessageHeader = `
 `
 
 // runCLMail is a wrapper that sets up and runs a review instance.
-func runCLMail(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env)
-
+func runCLMail(jirix *jiri.X, _ []string) error {
 	// Sanity checks for the <presubmitFlag> flag.
 	if !checkPresubmitFlag() {
-		return env.UsageErrorf("invalid value for the -presubmit flag. Valid values: %s.",
+		return jirix.UsageErrorf("invalid value for the -presubmit flag. Valid values: %s.",
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
 
 	host := hostFlag
 	if host == "" {
 		var err error
-		if host, err = project.GerritHost(ctx); err != nil {
+		if host, err = project.GerritHost(jirix); err != nil {
 			return err
 		}
 	}
 
 	// Create and run the review.
 
-	review, err := newReview(ctx, gerrit.CLOpts{
+	review, err := newReview(jirix, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
 		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
@@ -394,21 +392,21 @@ func parseEmails(value string) []string {
 // checkDependents makes sure that all CLs in the sequence of
 // dependent CLs leading to (but not including) the current branch
 // have been exported to Gerrit.
-func checkDependents(ctx *tool.Context) (e error) {
-	originalBranch, err := ctx.Git().CurrentBranchName()
+func checkDependents(jirix *jiri.X) (e error) {
+	originalBranch, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
-	branches, err := getDependentCLs(ctx, originalBranch)
+	branches, err := getDependentCLs(jirix, originalBranch)
 	if err != nil {
 		return err
 	}
 	for i := 1; i < len(branches); i++ {
-		file, err := getCommitMessageFileName(ctx, branches[i])
+		file, err := getCommitMessageFileName(jirix, branches[i])
 		if err != nil {
 			return err
 		}
-		if _, err := ctx.Run().Stat(file); err != nil {
+		if _, err := jirix.Run().Stat(file); err != nil {
 			if !os.IsNotExist(err) {
 				return err
 			}
@@ -426,15 +424,15 @@ $ git checkout %v
 }
 
 type review struct {
-	ctx          *tool.Context
+	jirix        *jiri.X
 	reviewBranch string
 	gerrit.CLOpts
 }
 
-func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
+func newReview(jirix *jiri.X, opts gerrit.CLOpts) (*review, error) {
 	// Sync all CLs in the sequence of dependent CLs ending in the
 	// current branch.
-	if err := syncCL(ctx); err != nil {
+	if err := syncCL(jirix); err != nil {
 		return nil, err
 	}
 
@@ -444,11 +442,11 @@ func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
 	//
 	// NOTE: The alternative here is to prompt the user for multiple
 	// commit messages, which seems less user friendly.
-	if err := checkDependents(ctx); err != nil {
+	if err := checkDependents(jirix); err != nil {
 		return nil, err
 	}
 
-	branch, err := ctx.Git().CurrentBranchName()
+	branch, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +461,7 @@ func newReview(ctx *tool.Context, opts gerrit.CLOpts) (*review, error) {
 		opts.RemoteBranch = "master" // use master as the default
 	}
 	return &review{
-		ctx:          ctx,
+		jirix:        jirix,
 		reviewBranch: branch + "-REVIEW",
 		CLOpts:       opts,
 	}, nil
@@ -481,11 +479,11 @@ func checkPresubmitFlag() bool {
 // confirmFlagChanges asks users to confirm if any of the
 // presubmit and autosubmit flags changes.
 func (review *review) confirmFlagChanges() (bool, error) {
-	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
+	file, err := getCommitMessageFileName(review.jirix, review.CLOpts.Branch)
 	if err != nil {
 		return false, err
 	}
-	bytes, err := review.ctx.Run().ReadFile(file)
+	bytes, err := review.jirix.Run().ReadFile(file)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return true, nil
@@ -525,16 +523,16 @@ func (review *review) confirmFlagChanges() (bool, error) {
 
 // cleanup cleans up after the review.
 func (review *review) cleanup(stashed bool) error {
-	if err := review.ctx.Git().CheckoutBranch(review.CLOpts.Branch); err != nil {
+	if err := review.jirix.Git().CheckoutBranch(review.CLOpts.Branch); err != nil {
 		return err
 	}
-	if review.ctx.Git().BranchExists(review.reviewBranch) {
-		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
+	if review.jirix.Git().BranchExists(review.reviewBranch) {
+		if err := review.jirix.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	if stashed {
-		if err := review.ctx.Git().StashPop(); err != nil {
+		if err := review.jirix.Git().StashPop(); err != nil {
 			return err
 		}
 	}
@@ -550,35 +548,35 @@ func (review *review) cleanup(stashed bool) error {
 // the commit message for the last commit.
 func (review *review) createReviewBranch(message string) (e error) {
 	// Create the review branch.
-	if err := review.ctx.Git().FetchRefspec("origin", review.CLOpts.RemoteBranch); err != nil {
+	if err := review.jirix.Git().FetchRefspec("origin", review.CLOpts.RemoteBranch); err != nil {
 		return err
 	}
-	if review.ctx.Git().BranchExists(review.reviewBranch) {
-		if err := review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
+	if review.jirix.Git().BranchExists(review.reviewBranch) {
+		if err := review.jirix.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	upstream := "origin/" + review.CLOpts.RemoteBranch
-	if err := review.ctx.Git().CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
+	if err := review.jirix.Git().CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
 		return err
 	}
-	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch); err != nil {
+	if err := review.jirix.Git().CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
 	// Register a cleanup handler in case of subsequent errors.
 	cleanup := true
 	defer collect.Error(func() error {
 		if !cleanup {
-			return review.ctx.Git().CheckoutBranch(review.CLOpts.Branch)
+			return review.jirix.Git().CheckoutBranch(review.CLOpts.Branch)
 		}
-		review.ctx.Git().CheckoutBranch(review.CLOpts.Branch, gitutil.ForceOpt(true))
-		review.ctx.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true))
+		review.jirix.Git().CheckoutBranch(review.CLOpts.Branch, gitutil.ForceOpt(true))
+		review.jirix.Git().DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true))
 		return nil
 	}, &e)
 
 	// Report an error if the CL is empty.
-	if !review.ctx.DryRun() {
-		hasDiff, err := review.ctx.Git().BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
+	if !review.jirix.DryRun() {
+		hasDiff, err := review.jirix.Git().BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
 		if err != nil {
 			return err
 		}
@@ -599,7 +597,7 @@ func (review *review) createReviewBranch(message string) (e error) {
 	// Iterate over all dependent CLs leading to (and including) the
 	// current branch, creating one commit in the review branch per CL
 	// by squashing all commits of each individual CL.
-	branches, err := getDependentCLs(review.ctx, review.CLOpts.Branch)
+	branches, err := getDependentCLs(review.jirix, review.CLOpts.Branch)
 	if err != nil {
 		return err
 	}
@@ -627,7 +625,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		// here is based on:
 		//
 		// http://stackoverflow.com/questions/173919/is-there-a-theirs-version-of-git-merge-s-ours
-		if err := review.ctx.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("ours")); err != nil {
+		if err := review.jirix.Git().Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("ours")); err != nil {
 			return changeConflictError{
 				localBranch:  branches[i],
 				remoteBranch: review.CLOpts.RemoteBranch,
@@ -641,7 +639,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		// this was not the case, consecutive invocations of "jiri cl mail"
 		// could fail if some, but not all, of the dependent CLs submitted
 		// to Gerrit have changed.
-		output, err := review.ctx.Git().Log(branches[i], branches[i]+"^", "%ad%n%cd")
+		output, err := review.jirix.Git().Log(branches[i], branches[i]+"^", "%ad%n%cd")
 		if err != nil {
 			return err
 		}
@@ -651,37 +649,37 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		authorDate := tool.AuthorDateOpt(output[0][0])
 		committerDate := tool.CommitterDateOpt(output[0][1])
 		if i < len(branches)-1 {
-			file, err := getCommitMessageFileName(review.ctx, branches[i])
+			file, err := getCommitMessageFileName(review.jirix, branches[i])
 			if err != nil {
 				return err
 			}
-			message, err := review.ctx.Run().ReadFile(file)
+			message, err := review.jirix.Run().ReadFile(file)
 			if err != nil {
 				return err
 			}
-			if err := review.ctx.Git(authorDate, committerDate).CommitWithMessage(string(message)); err != nil {
+			if err := review.jirix.Git(authorDate, committerDate).CommitWithMessage(string(message)); err != nil {
 				return err
 			}
 		} else {
-			committer := review.ctx.Git(authorDate, committerDate).NewCommitter(review.CLOpts.Edit)
+			committer := review.jirix.Git(authorDate, committerDate).NewCommitter(review.CLOpts.Edit)
 			if err := committer.Commit(message); err != nil {
 				return err
 			}
 		}
 		tmpBranch := review.reviewBranch + "-" + branches[i] + "-TMP"
-		if err := review.ctx.Git().CreateBranch(tmpBranch); err != nil {
+		if err := review.jirix.Git().CreateBranch(tmpBranch); err != nil {
 			return err
 		}
 		defer collect.Error(func() error {
-			return review.ctx.Git().DeleteBranch(tmpBranch, gitutil.ForceOpt(true))
+			return review.jirix.Git().DeleteBranch(tmpBranch, gitutil.ForceOpt(true))
 		}, &e)
-		if err := review.ctx.Git().Reset(branches[i]); err != nil {
+		if err := review.jirix.Git().Reset(branches[i]); err != nil {
 			return err
 		}
-		if err := review.ctx.Git().Reset(tmpBranch, gitutil.ModeOpt("soft")); err != nil {
+		if err := review.jirix.Git().Reset(tmpBranch, gitutil.ModeOpt("soft")); err != nil {
 			return err
 		}
-		if err := review.ctx.Git(authorDate, committerDate).CommitAmend(); err != nil {
+		if err := review.jirix.Git(authorDate, committerDate).CommitAmend(); err != nil {
 			return err
 		}
 	}
@@ -691,7 +689,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 // defaultCommitMessage creates the default commit message from the
 // list of commits on the branch.
 func (review *review) defaultCommitMessage() (string, error) {
-	commitMessages, err := review.ctx.Git().CommitMessages(review.CLOpts.Branch, review.reviewBranch)
+	commitMessages, err := review.jirix.Git().CommitMessages(review.CLOpts.Branch, review.reviewBranch)
 	if err != nil {
 		return "", err
 	}
@@ -706,7 +704,7 @@ func (review *review) defaultCommitMessage() (string, error) {
 // ensureChangeID makes sure that the last commit contains a Change-Id, and
 // returns an error if it does not.
 func (review *review) ensureChangeID() error {
-	latestCommitMessage, err := review.ctx.Git().LatestCommitMessage()
+	latestCommitMessage, err := review.jirix.Git().LatestCommitMessage()
 	if err != nil {
 		return err
 	}
@@ -746,7 +744,7 @@ func (review *review) processLabels(message string) string {
 // and then mails it to Gerrit.
 func (review *review) run() (e error) {
 	if uncommittedFlag {
-		changes, err := review.ctx.Git().FilesWithUncommittedChanges()
+		changes, err := review.jirix.Git().FilesWithUncommittedChanges()
 		if err != nil {
 			return err
 		}
@@ -757,7 +755,7 @@ func (review *review) run() (e error) {
 	if review.CLOpts.Branch == remoteBranchFlag {
 		return fmt.Errorf("cannot do a review from the %q branch.", remoteBranchFlag)
 	}
-	stashed, err := review.ctx.Git().Stash()
+	stashed, err := review.jirix.Git().Stash()
 	if err != nil {
 		return err
 	}
@@ -765,23 +763,23 @@ func (review *review) run() (e error) {
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
-	defer collect.Error(func() error { return review.ctx.Run().Chdir(wd) }, &e)
-	topLevel, err := review.ctx.Git().TopLevel()
+	defer collect.Error(func() error { return review.jirix.Run().Chdir(wd) }, &e)
+	topLevel, err := review.jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
-	if err := review.ctx.Run().Chdir(topLevel); err != nil {
+	if err := review.jirix.Run().Chdir(topLevel); err != nil {
 		return err
 	}
 	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
-	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
+	file, err := getCommitMessageFileName(review.jirix, review.CLOpts.Branch)
 	if err != nil {
 		return err
 	}
 	message := messageFlag
 	if message == "" {
 		// Message was not passed in flag.  Attempt to read it from file.
-		data, err := review.ctx.Run().ReadFile(file)
+		data, err := review.jirix.Run().ReadFile(file)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return err
@@ -820,12 +818,12 @@ func (review *review) run() (e error) {
 
 // send mails the current branch out for review.
 func (review *review) send() error {
-	if !review.ctx.DryRun() {
+	if !review.jirix.DryRun() {
 		if err := review.ensureChangeID(); err != nil {
 			return err
 		}
 	}
-	if err := gerrit.Push(review.ctx.Run(), review.CLOpts); err != nil {
+	if err := gerrit.Push(review.jirix.Run(), review.CLOpts); err != nil {
 		return gerritError(err.Error())
 	}
 	return nil
@@ -833,11 +831,11 @@ func (review *review) send() error {
 
 // getChangeID reads the commit message and extracts the change-Id.
 func (review *review) getChangeID() (string, error) {
-	file, err := getCommitMessageFileName(review.ctx, review.CLOpts.Branch)
+	file, err := getCommitMessageFileName(review.jirix, review.CLOpts.Branch)
 	if err != nil {
 		return "", err
 	}
-	bytes, err := review.ctx.Run().ReadFile(file)
+	bytes, err := review.jirix.Run().ReadFile(file)
 	if err != nil {
 		return "", err
 	}
@@ -855,7 +853,7 @@ func (review *review) setTopic() error {
 	if err != nil {
 		return err
 	}
-	if err := review.ctx.Gerrit(review.CLOpts.Host).SetTopic(changeID, review.CLOpts); err != nil {
+	if err := review.jirix.Gerrit(review.CLOpts.Host).SetTopic(changeID, review.CLOpts); err != nil {
 		return err
 	}
 	return nil
@@ -863,10 +861,10 @@ func (review *review) setTopic() error {
 
 // updateReviewMessage writes the commit message to the given file.
 func (review *review) updateReviewMessage(file string) error {
-	if err := review.ctx.Git().CheckoutBranch(review.reviewBranch); err != nil {
+	if err := review.jirix.Git().CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
-	newMessage, err := review.ctx.Git().LatestCommitMessage()
+	newMessage, err := review.jirix.Git().LatestCommitMessage()
 	if err != nil {
 		return err
 	}
@@ -875,25 +873,25 @@ func (review *review) updateReviewMessage(file string) error {
 	//
 	// This behavior is consistent with how Change-ID is added for the
 	// initial commit so we don't confuse users.
-	if _, err := review.ctx.Run().Stat(file); err != nil {
+	if _, err := review.jirix.Run().Stat(file); err != nil {
 		if os.IsNotExist(err) {
 			newMessage = review.processLabels(newMessage)
-			if err := review.ctx.Git().CommitAmendWithMessage(newMessage); err != nil {
+			if err := review.jirix.Git().CommitAmendWithMessage(newMessage); err != nil {
 				return err
 			}
 		} else {
 			return err
 		}
 	}
-	topLevel, err := review.ctx.Git().TopLevel()
+	topLevel, err := review.jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
 	newMetadataDir := filepath.Join(topLevel, project.MetadataDirName(), review.CLOpts.Branch)
-	if err := review.ctx.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
+	if err := review.jirix.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := review.ctx.Run().WriteFile(file, []byte(newMessage), 0644); err != nil {
+	if err := review.jirix.Run().WriteFile(file, []byte(newMessage), 0644); err != nil {
 		return err
 	}
 	return nil
@@ -901,7 +899,7 @@ func (review *review) updateReviewMessage(file string) error {
 
 // cmdCLNew represents the "jiri cl new" command.
 var cmdCLNew = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runCLNew),
+	Runner: jiri.RunnerFunc(runCLNew),
 	Name:   "new",
 	Short:  "Create a new local branch for a changelist",
 	Long: fmt.Sprintf(`
@@ -916,27 +914,26 @@ by the "jiri cl sync" and "jiri cl mail" commands.
 	ArgsLong: "<name> is the changelist name.",
 }
 
-func runCLNew(env *cmdline.Env, args []string) error {
+func runCLNew(jirix *jiri.X, args []string) error {
 	if got, want := len(args), 1; got != want {
-		return env.UsageErrorf("unexpected number of arguments: got %v, want %v", got, want)
+		return jirix.UsageErrorf("unexpected number of arguments: got %v, want %v", got, want)
 	}
-	ctx := tool.NewContextFromEnv(env)
-	return newCL(ctx, args)
+	return newCL(jirix, args)
 }
 
-func newCL(ctx *tool.Context, args []string) error {
-	topLevel, err := ctx.Git().TopLevel()
+func newCL(jirix *jiri.X, args []string) error {
+	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
-	originalBranch, err := ctx.Git().CurrentBranchName()
+	originalBranch, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
 
 	// Create a new branch using the current branch.
 	newBranch := args[0]
-	if err := ctx.Git().CreateAndCheckoutBranch(newBranch); err != nil {
+	if err := jirix.Git().CreateAndCheckoutBranch(newBranch); err != nil {
 		return err
 	}
 
@@ -944,28 +941,28 @@ func newCL(ctx *tool.Context, args []string) error {
 	cleanup := true
 	defer func() {
 		if cleanup {
-			ctx.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
-			ctx.Git().DeleteBranch(newBranch, gitutil.ForceOpt(true))
+			jirix.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
+			jirix.Git().DeleteBranch(newBranch, gitutil.ForceOpt(true))
 		}
 	}()
 
 	// Record the dependent CLs for the new branch. The dependent CLs
 	// are recorded in a <dependencyPathFileName> file as a
 	// newline-separated list of branch names.
-	branches, err := getDependentCLs(ctx, originalBranch)
+	branches, err := getDependentCLs(jirix, originalBranch)
 	if err != nil {
 		return err
 	}
 	branches = append(branches, originalBranch)
 	newMetadataDir := filepath.Join(topLevel, project.MetadataDirName(), newBranch)
-	if err := ctx.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
+	if err := jirix.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
-	file, err := getDependencyPathFileName(ctx, newBranch)
+	file, err := getDependencyPathFileName(jirix, newBranch)
 	if err != nil {
 		return err
 	}
-	if err := ctx.Run().WriteFile(file, []byte(strings.Join(branches, "\n")), os.FileMode(0644)); err != nil {
+	if err := jirix.Run().WriteFile(file, []byte(strings.Join(branches, "\n")), os.FileMode(0644)); err != nil {
 		return err
 	}
 
@@ -975,7 +972,7 @@ func newCL(ctx *tool.Context, args []string) error {
 
 // cmdCLSync represents the "jiri cl sync" command.
 var cmdCLSync = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runCLSync),
+	Runner: jiri.RunnerFunc(runCLSync),
 	Name:   "sync",
 	Short:  "Bring a changelist up to date",
 	Long: fmt.Sprintf(`
@@ -995,23 +992,22 @@ before the command can be retried.
 `, project.MetadataDirName()),
 }
 
-func runCLSync(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	return syncCL(ctx)
+func runCLSync(jirix *jiri.X, _ []string) error {
+	return syncCL(jirix)
 }
 
-func syncCL(ctx *tool.Context) (e error) {
-	stashed, err := ctx.Git().Stash()
+func syncCL(jirix *jiri.X) (e error) {
+	stashed, err := jirix.Git().Stash()
 	if err != nil {
 		return err
 	}
 	if stashed {
-		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
+		defer collect.Error(func() error { return jirix.Git().StashPop() }, &e)
 	}
 
 	// Register a cleanup handler in case of subsequent errors.
 	forceOriginalBranch := true
-	originalBranch, err := ctx.Git().CurrentBranchName()
+	originalBranch, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
@@ -1022,43 +1018,43 @@ func syncCL(ctx *tool.Context) (e error) {
 
 	defer func() {
 		if forceOriginalBranch {
-			ctx.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
+			jirix.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
 		}
-		ctx.Run().Chdir(originalWd)
+		jirix.Run().Chdir(originalWd)
 	}()
 
 	// Switch to an existing directory in master so we can run commands.
-	topLevel, err := ctx.Git().TopLevel()
+	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
-	if err := ctx.Run().Chdir(topLevel); err != nil {
+	if err := jirix.Run().Chdir(topLevel); err != nil {
 		return err
 	}
 
 	// Identify the dependents CLs leading to (and including) the
 	// current branch.
-	branches, err := getDependentCLs(ctx, originalBranch)
+	branches, err := getDependentCLs(jirix, originalBranch)
 	if err != nil {
 		return err
 	}
 	branches = append(branches, originalBranch)
 
 	// Sync from upstream.
-	if err := ctx.Git().CheckoutBranch(branches[0]); err != nil {
+	if err := jirix.Git().CheckoutBranch(branches[0]); err != nil {
 		return err
 	}
-	if err := ctx.Git().Pull("origin", branches[0]); err != nil {
+	if err := jirix.Git().Pull("origin", branches[0]); err != nil {
 		return err
 	}
 
 	// Bring all CLs in the sequence of dependent CLs leading to the
 	// current branch up to date with the <remoteBranchFlag> branch.
 	for i := 1; i < len(branches); i++ {
-		if err := ctx.Git().CheckoutBranch(branches[i]); err != nil {
+		if err := jirix.Git().CheckoutBranch(branches[i]); err != nil {
 			return err
 		}
-		if err := ctx.Git().Merge(branches[i-1]); err != nil {
+		if err := jirix.Git().Merge(branches[i-1]); err != nil {
 			return fmt.Errorf(`Failed to automatically merge branch %v into branch %v: %v
 The following steps are needed before the operation can be retried:
 $ git checkout %v

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"v.io/jiri/tool"
+	"v.io/jiri/jiri"
 	"v.io/x/lib/set"
 )
 
@@ -282,16 +282,16 @@ func (p testGroupSchemas) Less(i, j int) bool { return p[i].Name < p[j].Name }
 
 // LoadConfig returns the configuration stored in the tools
 // configuration file.
-func LoadConfig(ctx *tool.Context) (*Config, error) {
-	configPath, err := ConfigFilePath(ctx)
+func LoadConfig(jirix *jiri.X) (*Config, error) {
+	configPath, err := ConfigFilePath(jirix)
 	if err != nil {
 		return nil, err
 	}
-	return loadConfig(ctx, configPath)
+	return loadConfig(jirix, configPath)
 }
 
-func loadConfig(ctx *tool.Context, path string) (*Config, error) {
-	configBytes, err := ctx.Run().ReadFile(path)
+func loadConfig(jirix *jiri.X, path string) (*Config, error) {
+	configBytes, err := jirix.Run().ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -340,15 +340,15 @@ func loadConfig(ctx *tool.Context, path string) (*Config, error) {
 
 // SaveConfig writes the given configuration to the tools
 // configuration file.
-func SaveConfig(ctx *tool.Context, config *Config) error {
-	configPath, err := ConfigFilePath(ctx)
+func SaveConfig(jirix *jiri.X, config *Config) error {
+	configPath, err := ConfigFilePath(jirix)
 	if err != nil {
 		return err
 	}
-	return saveConfig(ctx, config, configPath)
+	return saveConfig(jirix, config, configPath)
 }
 
-func saveConfig(ctx *tool.Context, config *Config, path string) error {
+func saveConfig(jirix *jiri.X, config *Config, path string) error {
 	var data configSchema
 	data.APICheckProjects = set.String.ToSlice(config.apiCheckProjects)
 	sort.Strings(data.APICheckProjects)
@@ -398,10 +398,10 @@ func saveConfig(ctx *tool.Context, config *Config, path string) error {
 	if err != nil {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", data, err)
 	}
-	if err := ctx.Run().MkdirAll(filepath.Dir(path), os.FileMode(0755)); err != nil {
+	if err := jirix.Run().MkdirAll(filepath.Dir(path), os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ctx.Run().WriteFile(path, bytes, os.FileMode(0644)); err != nil {
+	if err := jirix.Run().WriteFile(path, bytes, os.FileMode(0644)); err != nil {
 		return err
 	}
 	return nil

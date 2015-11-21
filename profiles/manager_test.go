@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/tool"
 )
@@ -81,13 +82,13 @@ func (p *myNewProfile) String() string {
 func (p *myNewProfile) AddFlags(*flag.FlagSet, profiles.Action) {
 }
 
-func (p *myNewProfile) Install(ctx *tool.Context, root profiles.RelativePath, target profiles.Target) error {
+func (p *myNewProfile) Install(jirix *jiri.X, root profiles.RelativePath, target profiles.Target) error {
 	p.status = "installed"
 	profiles.AddProfileTarget(p.name, target)
 	return nil
 }
 
-func (p *myNewProfile) Uninstall(ctx *tool.Context, root profiles.RelativePath, target profiles.Target) error {
+func (p *myNewProfile) Uninstall(jirix *jiri.X, root profiles.RelativePath, target profiles.Target) error {
 	profiles.RemoveProfileTarget(p.name, target)
 	if profiles.LookupProfile(p.name) == nil {
 		p.status = "uninstalled"
@@ -113,9 +114,9 @@ func ExampleManager() {
 		panic("manager not found for: " + myProfile)
 	}
 
-	ctx := tool.NewDefaultContext()
+	jirix := &jiri.X{Context: tool.NewDefaultContext()}
 	// Install myNewProfile for target.
-	if err := mgr.Install(ctx, rootPath, target); err != nil {
+	if err := mgr.Install(jirix, rootPath, target); err != nil {
 		panic("failed to find manager for: " + myProfile)
 	}
 
@@ -124,7 +125,7 @@ func ExampleManager() {
 	filename := tmpFile()
 	defer os.RemoveAll(filepath.Dir(filename))
 
-	if err := profiles.Write(ctx, filename); err != nil {
+	if err := profiles.Write(jirix, filename); err != nil {
 		panic(err)
 	}
 
@@ -133,7 +134,7 @@ func ExampleManager() {
 	profiles.Clear()
 
 	// Read the profile manifest.
-	profiles.Read(ctx, filename)
+	profiles.Read(jirix, filename)
 
 	mgr = profiles.LookupManager(myProfile)
 	if mgr == nil {
@@ -141,7 +142,7 @@ func ExampleManager() {
 	}
 
 	fmt.Println(mgr.String())
-	mgr.Uninstall(ctx, rootPath, target)
+	mgr.Uninstall(jirix, rootPath, target)
 	fmt.Println(mgr.String())
 	fmt.Println(mgr.VersionInfo().Supported())
 	fmt.Println(mgr.VersionInfo().Default())

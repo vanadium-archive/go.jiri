@@ -16,6 +16,7 @@ import (
 	"strings"
 	"text/template"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
@@ -45,7 +46,7 @@ var CommandLineDriver = &cmdline.Command{
 
 // cmdInstall represents the "profile install" command.
 var cmdInstall = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runInstall),
+	Runner:   jiri.RunnerFunc(runInstall),
 	Name:     "install",
 	Short:    "Install the given profiles",
 	Long:     "Install the given profiles.",
@@ -55,7 +56,7 @@ var cmdInstall = &cmdline.Command{
 
 // cmdList represents the "profile list" command.
 var cmdList = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runList),
+	Runner:   jiri.RunnerFunc(runList),
 	Name:     "list",
 	Short:    "List available or installed profiles",
 	Long:     "List available or installed profiles.",
@@ -65,7 +66,7 @@ var cmdList = &cmdline.Command{
 
 // cmdEnv represents the "profile env" command.
 var cmdEnv = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runEnv),
+	Runner: jiri.RunnerFunc(runEnv),
 	Name:   "env",
 	Short:  "Display profile environment variables",
 	Long: `
@@ -83,7 +84,7 @@ in <name>=<val> format.
 
 // cmdUpdate represents the "profile update" command.
 var cmdUpdate = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runUpdate),
+	Runner:   jiri.RunnerFunc(runUpdate),
 	Name:     "update",
 	Short:    "Install the latest default version of the given profiles",
 	Long:     "Install the latest default version of the given profiles.",
@@ -93,7 +94,7 @@ var cmdUpdate = &cmdline.Command{
 
 // cmdCleanup represents the "profile Cleanup" command.
 var cmdCleanup = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runCleanup),
+	Runner:   jiri.RunnerFunc(runCleanup),
 	Name:     "cleanup",
 	Short:    "Cleanup the locally installed profiles",
 	Long:     "Cleanup the locally installed profiles. This is generally required when recovering from earlier bugs or when preparing for a subsequent change to the profiles implementation.",
@@ -103,7 +104,7 @@ var cmdCleanup = &cmdline.Command{
 
 // cmdUninstall represents the "profile uninstall" command.
 var cmdUninstall = &cmdline.Command{
-	Runner:   cmdline.RunnerFunc(runUninstall),
+	Runner:   jiri.RunnerFunc(runUninstall),
 	Name:     "uninstall",
 	Short:    "Uninstall the given profiles",
 	Long:     "Uninstall the given profiles.",
@@ -201,33 +202,32 @@ func Init(defaultManifestFilename string) {
 	cmdCleanup.Flags.BoolVar(&rewriteManifestFlag, "rewrite-profiles-manifest", false, "rewrite the profiles manifest file to use the latest schema version")
 }
 
-func runList(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
+func runList(jirix *jiri.X, args []string) error {
 	if showManifestFlag {
-		data, err := ctx.Run().ReadFile(manifestFlag)
+		data, err := jirix.Run().ReadFile(manifestFlag)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(ctx.Stdout(), string(data))
+		fmt.Fprintln(jirix.Stdout(), string(data))
 		return nil
 	}
 	if verboseFlag {
-		fmt.Fprintf(ctx.Stdout(), "Manifest: %s\n", manifestFlag)
+		fmt.Fprintf(jirix.Stdout(), "Manifest: %s\n", manifestFlag)
 	}
 	if availableFlag {
 		if verboseFlag {
-			fmt.Fprintf(ctx.Stdout(), "Available Profiles:\n")
+			fmt.Fprintf(jirix.Stdout(), "Available Profiles:\n")
 			for _, name := range profiles.Managers() {
 				mgr := profiles.LookupManager(name)
 				vi := mgr.VersionInfo()
-				fmt.Fprintf(ctx.Stdout(), "%s: versions: %s\n", name, vi)
+				fmt.Fprintf(jirix.Stdout(), "%s: versions: %s\n", name, vi)
 			}
 		} else {
-			fmt.Fprintf(ctx.Stdout(), "%s\n", strings.Join(profiles.Managers(), ", "))
+			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(profiles.Managers(), ", "))
 		}
 	}
-	if err := profiles.Read(ctx, manifestFlag); err != nil {
-		fmt.Fprintf(ctx.Stderr(), "Failed to read manifest: %v", err)
+	if err := profiles.Read(jirix, manifestFlag); err != nil {
+		fmt.Fprintf(jirix.Stderr(), "Failed to read manifest: %v", err)
 		return err
 	}
 	profileNames := args
@@ -241,13 +241,13 @@ func runList(env *cmdline.Env, args []string) error {
 		}
 	}
 	if verboseFlag {
-		fmt.Fprintf(ctx.Stdout(), "Installed Profiles: ")
-		fmt.Fprintf(ctx.Stdout(), "%s\n", strings.Join(profiles.Profiles(), ", "))
+		fmt.Fprintf(jirix.Stdout(), "Installed Profiles: ")
+		fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(profiles.Profiles(), ", "))
 		for _, name := range availableNames {
 			profile := profiles.LookupProfile(name)
-			fmt.Fprintf(ctx.Stdout(), "Profile: %s @ %s\n", profile.Name, profile.Root)
+			fmt.Fprintf(jirix.Stdout(), "Profile: %s @ %s\n", profile.Name, profile.Root)
 			for _, target := range profile.Targets() {
-				fmt.Fprintf(ctx.Stdout(), "\t%s\n", target.DebugString())
+				fmt.Fprintf(jirix.Stdout(), "\t%s\n", target.DebugString())
 			}
 		}
 	} else {
@@ -267,7 +267,7 @@ func runList(env *cmdline.Env, args []string) error {
 					out.WriteString(fmtHeader(name, target))
 					out.WriteString(" ")
 				}
-				r, err := fmtInfo(ctx, mgr, profile, target)
+				r, err := fmtInfo(jirix, mgr, profile, target)
 				if err != nil {
 					return err
 				}
@@ -276,7 +276,7 @@ func runList(env *cmdline.Env, args []string) error {
 					out.WriteString("\n")
 				}
 			}
-			fmt.Fprint(ctx.Stdout(), out.String())
+			fmt.Fprint(jirix.Stdout(), out.String())
 		}
 	}
 	return nil
@@ -322,7 +322,7 @@ func infoUsage() string {
 	Note: if no profiles are specified then the requested field will be displayed for all profiles.`
 }
 
-func fmtOutput(ctx *tool.Context, o string) string {
+func fmtOutput(jirix *jiri.X, o string) string {
 	_, width, err := textutil.TerminalSize()
 	if err != nil {
 		width = 80
@@ -345,7 +345,7 @@ func handleRelativePath(root profiles.RelativePath, s string) string {
 	return root.RootJoin(s).Expand()
 }
 
-func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
+func fmtInfo(jirix *jiri.X, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
 	if len(infoFlag) > 0 {
 		// Populate an instance listInfo
 		info := &listInfo{}
@@ -353,7 +353,7 @@ func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile,
 		if mgr != nil {
 			// Format the description on its own, without any preceeding
 			// text so that the line breaks work correctly.
-			info.Profile.Description = "\n" + fmtOutput(ctx, mgr.Info()) + "\n"
+			info.Profile.Description = "\n" + fmtOutput(jirix, mgr.Info()) + "\n"
 			vi := mgr.VersionInfo()
 			if supported := vi.Supported(); len(supported) > 0 {
 				info.Profile.Versions = supported
@@ -391,12 +391,11 @@ func fmtInfo(ctx *tool.Context, mgr profiles.Manager, profile *profiles.Profile,
 	return "", nil
 }
 
-func runEnv(env *cmdline.Env, args []string) error {
+func runEnv(jirix *jiri.X, args []string) error {
 	if len(profilesFlag) == 0 {
 		return fmt.Errorf("no profiles were specified using --profiles")
 	}
-	ctx := tool.NewContextFromEnv(env)
-	ch, err := profiles.NewConfigHelper(ctx, profiles.UseProfiles, manifestFlag)
+	ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, manifestFlag)
 	if err != nil {
 		return err
 	}
@@ -407,7 +406,7 @@ func runEnv(env *cmdline.Env, args []string) error {
 	ch.MergeEnvFromProfiles(mergePoliciesFlag, targetFlag, profileNames...)
 	out := fmtVars(ch.ToMap(), args)
 	if len(out) > 0 {
-		fmt.Fprintln(ctx.Stdout(), out)
+		fmt.Fprintln(jirix.Stdout(), out)
 	}
 	return nil
 }
@@ -439,7 +438,7 @@ func fmtVars(vars map[string]string, args []string) string {
 	return strings.TrimSuffix(buf.String(), " ")
 }
 
-func initCommand(ctx *tool.Context, args []string) error {
+func initCommand(jirix *jiri.X, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no profiles specified")
 	}
@@ -448,19 +447,18 @@ func initCommand(ctx *tool.Context, args []string) error {
 			return fmt.Errorf("profile %v is not available, use \"list --available\" to see the list of available profiles", n)
 		}
 	}
-	if err := profiles.Read(ctx, manifestFlag); err != nil {
-		fmt.Fprintf(ctx.Stderr(), "Failed to read manifest: %v", err)
+	if err := profiles.Read(jirix, manifestFlag); err != nil {
+		fmt.Fprintf(jirix.Stderr(), "Failed to read manifest: %v", err)
 		return err
 	}
 	return nil
 }
 
-func runUpdate(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
+func runUpdate(jirix *jiri.X, args []string) error {
 	if len(args) == 0 {
 		args = profiles.Managers()
 	}
-	if err := initCommand(ctx, args); err != nil {
+	if err := initCommand(jirix, args); err != nil {
 		return err
 	}
 	for _, n := range args {
@@ -473,34 +471,34 @@ func runUpdate(env *cmdline.Env, args []string) error {
 		for _, target := range profile.Targets() {
 			if vi.IsTargetOlderThanDefault(target.Version()) {
 				if verboseFlag {
-					fmt.Fprintf(ctx.Stdout(), "Updating %s %s from %q to %s\n", n, target, target.Version(), vi)
+					fmt.Fprintf(jirix.Stdout(), "Updating %s %s from %q to %s\n", n, target, target.Version(), vi)
 				}
 				target.SetVersion(vi.Default())
-				err := mgr.Install(ctx, rootPath, *target)
-				logResult(ctx, "Update", mgr, *target, err)
+				err := mgr.Install(jirix, rootPath, *target)
+				logResult(jirix, "Update", mgr, *target, err)
 				if err != nil {
 					return err
 				}
 			} else {
 				if verboseFlag {
-					fmt.Fprintf(ctx.Stdout(), "%s %s at %q is up to date(%s)\n", n, target, target.Version(), vi)
+					fmt.Fprintf(jirix.Stdout(), "%s %s at %q is up to date(%s)\n", n, target, target.Version(), vi)
 				}
 			}
 
 		}
 	}
-	return profiles.Write(ctx, manifestFlag)
+	return profiles.Write(jirix, manifestFlag)
 }
 
-func runGC(ctx *tool.Context, args []string) error {
+func runGC(jirix *jiri.X, args []string) error {
 	for _, n := range args {
 		mgr := profiles.LookupManager(n)
 		vi := mgr.VersionInfo()
 		profile := profiles.LookupProfile(n)
 		for _, target := range profile.Targets() {
 			if vi.IsTargetOlderThanDefault(target.Version()) {
-				err := mgr.Uninstall(ctx, rootPath, *target)
-				logResult(ctx, "gc", mgr, *target, err)
+				err := mgr.Uninstall(jirix, rootPath, *target)
+				logResult(jirix, "gc", mgr, *target, err)
 				if err != nil {
 					return err
 				}
@@ -510,12 +508,12 @@ func runGC(ctx *tool.Context, args []string) error {
 	return nil
 }
 
-func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
+func runEnsureVersionsAreSet(jirix *jiri.X, args []string) error {
 	for _, name := range args {
 		profile := profiles.LookupProfile(name)
 		mgr := profiles.LookupManager(name)
 		if mgr == nil {
-			fmt.Fprintf(ctx.Stderr(), "%s is not linked into this binary", name)
+			fmt.Fprintf(jirix.Stderr(), "%s is not linked into this binary", name)
 			continue
 		}
 		for _, target := range profile.Targets() {
@@ -531,7 +529,7 @@ func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
 					return err
 				}
 				if verboseFlag {
-					fmt.Fprintf(ctx.Stdout(), "%s %s had no version, now set to: %s\n", name, prior, target)
+					fmt.Fprintf(jirix.Stdout(), "%s %s had no version, now set to: %s\n", name, prior, target)
 				}
 			}
 		}
@@ -539,8 +537,8 @@ func runEnsureVersionsAreSet(ctx *tool.Context, args []string) error {
 	return nil
 }
 
-func runRmAll(ctx *tool.Context) error {
-	s := ctx.NewSeq()
+func runRmAll(jirix *jiri.X) error {
+	s := jirix.NewSeq()
 	if exists, err := s.FileExists(manifestFlag); err != nil || exists {
 		if err := s.Remove(manifestFlag).Done(); err != nil {
 			return err
@@ -556,10 +554,9 @@ func runRmAll(ctx *tool.Context) error {
 	return nil
 }
 
-func runCleanup(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	if err := profiles.Read(ctx, manifestFlag); err != nil {
-		fmt.Fprintf(ctx.Stderr(), "Failed to read manifest: %v", err)
+func runCleanup(jirix *jiri.X, args []string) error {
+	if err := profiles.Read(jirix, manifestFlag); err != nil {
+		fmt.Fprintf(jirix.Stderr(), "Failed to read manifest: %v", err)
 		return err
 	}
 	if len(args) == 0 {
@@ -568,27 +565,27 @@ func runCleanup(env *cmdline.Env, args []string) error {
 	dirty := false
 	if specificVersionsFlag {
 		if verboseFlag {
-			fmt.Fprintf(ctx.Stdout(), "Ensuring that all targets have a specific version set for %s\n", args)
+			fmt.Fprintf(jirix.Stdout(), "Ensuring that all targets have a specific version set for %s\n", args)
 		}
-		if err := runEnsureVersionsAreSet(ctx, args); err != nil {
+		if err := runEnsureVersionsAreSet(jirix, args); err != nil {
 			return fmt.Errorf("ensure-specific-versions-are-set: %v", err)
 		}
 		dirty = true
 	}
 	if cleanupFlag {
 		if verboseFlag {
-			fmt.Fprintf(ctx.Stdout(), "Removing targets older than the default version for %s\n", args)
+			fmt.Fprintf(jirix.Stdout(), "Removing targets older than the default version for %s\n", args)
 		}
-		if err := runGC(ctx, args); err != nil {
+		if err := runGC(jirix, args); err != nil {
 			return fmt.Errorf("gc: %v", err)
 		}
 		dirty = true
 	}
 	if rmAllFlag {
 		if verboseFlag {
-			fmt.Fprintf(ctx.Stdout(), "Removing profile manifest and all profile output files\n")
+			fmt.Fprintf(jirix.Stdout(), "Removing profile manifest and all profile output files\n")
 		}
-		if err := runRmAll(ctx); err != nil {
+		if err := runRmAll(jirix); err != nil {
 			return err
 		}
 		// Don't write out the profiles manifest file again.
@@ -600,19 +597,19 @@ func runCleanup(env *cmdline.Env, args []string) error {
 	if !dirty {
 		return fmt.Errorf("at least one option must be specified")
 	}
-	return profiles.Write(ctx, manifestFlag)
+	return profiles.Write(jirix, manifestFlag)
 }
 
-func logResult(ctx *tool.Context, action string, mgr profiles.Manager, target profiles.Target, err error) {
-	fmt.Fprintf(ctx.Stdout(), "%s: %s %s: ", action, mgr.Name(), target)
+func logResult(jirix *jiri.X, action string, mgr profiles.Manager, target profiles.Target, err error) {
+	fmt.Fprintf(jirix.Stdout(), "%s: %s %s: ", action, mgr.Name(), target)
 	if err == nil {
-		fmt.Fprintf(ctx.Stdout(), "success\n")
+		fmt.Fprintf(jirix.Stdout(), "success\n")
 	} else {
-		fmt.Fprintf(ctx.Stdout(), "%v\n", err)
+		fmt.Fprintf(jirix.Stdout(), "%v\n", err)
 	}
 }
 
-func applyCommand(names []string, env *cmdline.Env, ctx *tool.Context, target profiles.Target, fn func(profiles.Manager, *tool.Context, profiles.Target) error) error {
+func applyCommand(names []string, jirix *jiri.X, target profiles.Target, fn func(profiles.Manager, *jiri.X, profiles.Target) error) error {
 	for _, n := range names {
 		mgr := profiles.LookupManager(n)
 		version, err := mgr.VersionInfo().Select(target.Version())
@@ -620,16 +617,15 @@ func applyCommand(names []string, env *cmdline.Env, ctx *tool.Context, target pr
 			return err
 		}
 		target.SetVersion(version)
-		if err := fn(mgr, ctx, target); err != nil {
+		if err := fn(mgr, jirix, target); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func runInstall(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	if err := initCommand(ctx, args); err != nil {
+func runInstall(jirix *jiri.X, args []string) error {
+	if err := initCommand(jirix, args); err != nil {
 		return err
 	}
 	names := []string{}
@@ -641,29 +637,28 @@ func runInstall(env *cmdline.Env, args []string) error {
 	targetFlag.UseCommandLineEnv()
 	for _, name := range args {
 		if p := profiles.LookupProfileTarget(name, targetFlag); p != nil {
-			fmt.Fprintf(ctx.Stdout(), "%v %v is already installed as %v\n", name, targetFlag, p)
+			fmt.Fprintf(jirix.Stdout(), "%v %v is already installed as %v\n", name, targetFlag, p)
 			continue
 		}
 		names = append(names, name)
 	}
-	if err := applyCommand(names, env, ctx, targetFlag,
-		func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
-			err := mgr.Install(ctx, rootPath, target)
-			logResult(ctx, "Install:", mgr, target, err)
+	if err := applyCommand(names, jirix, targetFlag,
+		func(mgr profiles.Manager, jirix *jiri.X, target profiles.Target) error {
+			err := mgr.Install(jirix, rootPath, target)
+			logResult(jirix, "Install:", mgr, target, err)
 			return err
 		}); err != nil {
 		return err
 	}
-	return profiles.Write(ctx, manifestFlag)
+	return profiles.Write(jirix, manifestFlag)
 }
 
-func runUninstall(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-	if err := initCommand(ctx, args); err != nil {
+func runUninstall(jirix *jiri.X, args []string) error {
+	if err := initCommand(jirix, args); err != nil {
 		return err
 	}
 	if allFlag && targetFlag.IsSet() {
-		fmt.Fprintf(ctx.Stdout(), "ignore target (%v) when used in conjunction with --all-targets\n", targetFlag)
+		fmt.Fprintf(jirix.Stdout(), "ignore target (%v) when used in conjunction with --all-targets\n", targetFlag)
 	}
 	if allFlag {
 		for _, name := range args {
@@ -673,20 +668,20 @@ func runUninstall(env *cmdline.Env, args []string) error {
 				continue
 			}
 			for _, target := range profile.Targets() {
-				if err := mgr.Uninstall(ctx, rootPath, *target); err != nil {
-					logResult(ctx, "Uninstall", mgr, *target, err)
+				if err := mgr.Uninstall(jirix, rootPath, *target); err != nil {
+					logResult(jirix, "Uninstall", mgr, *target, err)
 					return err
 				}
-				logResult(ctx, "Uninstall", mgr, *target, nil)
+				logResult(jirix, "Uninstall", mgr, *target, nil)
 			}
 		}
 	} else {
-		applyCommand(args, env, ctx, targetFlag,
-			func(mgr profiles.Manager, ctx *tool.Context, target profiles.Target) error {
-				err := mgr.Uninstall(ctx, rootPath, target)
-				logResult(ctx, "Uninstall", mgr, target, err)
+		applyCommand(args, jirix, targetFlag,
+			func(mgr profiles.Manager, jirix *jiri.X, target profiles.Target) error {
+				err := mgr.Uninstall(jirix, rootPath, target)
+				logResult(jirix, "Uninstall", mgr, target, err)
 				return err
 			})
 	}
-	return profiles.Write(ctx, manifestFlag)
+	return profiles.Write(jirix, manifestFlag)
 }

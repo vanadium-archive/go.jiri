@@ -17,14 +17,14 @@ import (
 // of the JIRI_ROOT environment variable as a path, evaluates any
 // symlinks the path might contain, and returns the result.
 func TestJiriRootSymlink(t *testing.T) {
-	ctx := tool.NewDefaultContext()
+	jirix := tool.NewDefaultContext()
 
 	// Create a temporary directory.
-	tmpDir, err := ctx.Run().TempDir("", "")
+	tmpDir, err := jirix.Run().TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
-	defer ctx.Run().RemoveAll(tmpDir)
+	defer jirix.Run().RemoveAll(tmpDir)
 
 	// Make sure tmpDir is not a symlink itself.
 	tmpDir, err = filepath.EvalSymlinks(tmpDir)
@@ -34,11 +34,11 @@ func TestJiriRootSymlink(t *testing.T) {
 
 	// Create a directory and a symlink to it.
 	root, perm := filepath.Join(tmpDir, "root"), os.FileMode(0700)
-	if err := ctx.Run().MkdirAll(root, perm); err != nil {
+	if err := jirix.Run().MkdirAll(root, perm); err != nil {
 		t.Fatalf("%v", err)
 	}
 	symRoot := filepath.Join(tmpDir, "sym_root")
-	if err := ctx.Run().Symlink(root, symRoot); err != nil {
+	if err := jirix.Run().Symlink(root, symRoot); err != nil {
 		t.Fatalf("%v", err)
 	}
 

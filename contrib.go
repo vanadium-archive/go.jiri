@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"v.io/jiri/collect"
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
@@ -36,7 +37,7 @@ func init() {
 
 // cmdContributors represents the "jiri contributors" command.
 var cmdContributors = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runContributors),
+	Runner: jiri.RunnerFunc(runContributors),
 	Name:   "contributors",
 	Short:  "List project contributors",
 	Long: `
@@ -90,16 +91,16 @@ func canonicalize(aliases *aliasMaps, email, name string) (string, string) {
 	return canonicalEmail, canonicalName
 }
 
-func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
+func loadAliases(jirix *jiri.X) (*aliasMaps, error) {
 	aliasesFile := aliasesFlag
 	if aliasesFile == "" {
-		dataDir, err := project.DataDirPath(ctx, tool.Name)
+		dataDir, err := project.DataDirPath(jirix, tool.Name)
 		if err != nil {
 			return nil, err
 		}
 		aliasesFile = filepath.Join(dataDir, aliasesFileName)
 	}
-	bytes, err := ctx.Run().ReadFile(aliasesFile)
+	bytes, err := jirix.Run().ReadFile(aliasesFile)
 	if err != nil {
 		return nil, err
 	}
@@ -124,10 +125,8 @@ func loadAliases(ctx *tool.Context) (*aliasMaps, error) {
 	return aliases, nil
 }
 
-func runContributors(env *cmdline.Env, args []string) error {
-	ctx := tool.NewContextFromEnv(env)
-
-	projects, err := project.LocalProjects(ctx, project.FastScan)
+func runContributors(jirix *jiri.X, args []string) error {
+	projects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return err
 	}
@@ -140,7 +139,7 @@ func runContributors(env *cmdline.Env, args []string) error {
 		}
 	}
 
-	aliases, err := loadAliases(ctx)
+	aliases, err := loadAliases(jirix)
 	if err != nil {
 		return err
 	}
@@ -150,12 +149,12 @@ func runContributors(env *cmdline.Env, args []string) error {
 		if !ok {
 			continue
 		}
-		if err := ctx.Run().Chdir(project.Path); err != nil {
+		if err := jirix.Run().Chdir(project.Path); err != nil {
 			return err
 		}
 		switch project.Protocol {
 		case "git":
-			lines, err := listCommitters(ctx)
+			lines, err := listCommitters(jirix)
 			if err != nil {
 				return err
 			}
@@ -193,28 +192,28 @@ func runContributors(env *cmdline.Env, args []string) error {
 	for _, name := range names {
 		c := contributors[name]
 		if countFlag {
-			fmt.Fprintf(env.Stdout, "%4d ", c.count)
+			fmt.Fprintf(jirix.Stdout(), "%4d ", c.count)
 		}
-		fmt.Fprintf(env.Stdout, "%v <%v>\n", c.name, c.email)
+		fmt.Fprintf(jirix.Stdout(), "%v <%v>\n", c.name, c.email)
 	}
 	return nil
 }
 
-func listCommitters(ctx *tool.Context) (_ []string, e error) {
-	branch, err := ctx.Git().CurrentBranchName()
+func listCommitters(jirix *jiri.X) (_ []string, e error) {
+	branch, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
-	stashed, err := ctx.Git().Stash()
+	stashed, err := jirix.Git().Stash()
 	if err != nil {
 		return nil, err
 	}
 	if stashed {
-		defer collect.Error(func() error { return ctx.Git().StashPop() }, &e)
+		defer collect.Error(func() error { return jirix.Git().StashPop() }, &e)
 	}
-	if err := ctx.Git().CheckoutBranch("master"); err != nil {
+	if err := jirix.Git().CheckoutBranch("master"); err != nil {
 		return nil, err
 	}
-	defer collect.Error(func() error { return ctx.Git().CheckoutBranch(branch) }, &e)
-	return ctx.Git().Committers()
+	defer collect.Error(func() error { return jirix.Git().CheckoutBranch(branch) }, &e)
+	return jirix.Git().Committers()
 }

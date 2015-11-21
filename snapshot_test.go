@@ -11,14 +11,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
-	"v.io/x/lib/cmdline"
 )
 
-func createLabelDir(t *testing.T, ctx *tool.Context, snapshotDir, name string, snapshots []string) {
+func createLabelDir(t *testing.T, jirix *jiri.X, snapshotDir, name string, snapshots []string) {
 	labelDir, perm := filepath.Join(snapshotDir, "labels", name), os.FileMode(0700)
-	if err := ctx.Run().MkdirAll(labelDir, perm); err != nil {
+	if err := jirix.Run().MkdirAll(labelDir, perm); err != nil {
 		t.Fatalf("MkdirAll(%v, %v) failed: %v", labelDir, perm, err)
 	}
 	for i, snapshot := range snapshots {
@@ -29,7 +29,7 @@ func createLabelDir(t *testing.T, ctx *tool.Context, snapshotDir, name string, s
 		}
 		if i == 0 {
 			symlinkPath := filepath.Join(snapshotDir, name)
-			if err := ctx.Run().Symlink(path, symlinkPath); err != nil {
+			if err := jirix.Run().Symlink(path, symlinkPath); err != nil {
 				t.Fatalf("Symlink(%v, %v) failed: %v", path, symlinkPath, err)
 			}
 		}
@@ -58,15 +58,13 @@ type label struct {
 }
 
 func TestList(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-
 	// Setup a fake JIRI_ROOT.
-	root, err := project.NewFakeJiriRoot(ctx)
+	root, err := project.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer func() {
-		if err := root.Cleanup(ctx); err != nil {
+		if err := root.Cleanup(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}()
@@ -112,17 +110,14 @@ func TestList(t *testing.T) {
 		// Create the snapshots directory and populate it with the
 		// data specified by the test suite.
 		for _, label := range labels {
-			createLabelDir(t, ctx, test.dir, label.name, label.snapshots)
+			createLabelDir(t, root.X, test.dir, label.name, label.snapshots)
 		}
 
 		// Check that running "jiri snapshot list" with no arguments
 		// returns the expected output.
 		var stdout bytes.Buffer
-		env := &cmdline.Env{Stdout: &stdout}
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if err := runSnapshotList(env, nil); err != nil {
+		root.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
+		if err := runSnapshotList(root.X, nil); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want := stdout.String(), generateOutput(labels)
@@ -133,7 +128,7 @@ func TestList(t *testing.T) {
 		// Check that running "jiri snapshot list" with one argument
 		// returns the expected output.
 		stdout.Reset()
-		if err := runSnapshotList(env, []string{"stable"}); err != nil {
+		if err := runSnapshotList(root.X, []string{"stable"}); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want = stdout.String(), generateOutput(labels[1:])
@@ -144,7 +139,7 @@ func TestList(t *testing.T) {
 		// Check that running "jiri snapshot list" with
 		// multiple arguments returns the expected output.
 		stdout.Reset()
-		if err := runSnapshotList(env, []string{"beta", "stable"}); err != nil {
+		if err := runSnapshotList(root.X, []string{"beta", "stable"}); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want = stdout.String(), generateOutput(labels)
@@ -154,12 +149,12 @@ func TestList(t *testing.T) {
 	}
 }
 
-func checkReadme(t *testing.T, ctx *tool.Context, project, message string) {
-	if _, err := ctx.Run().Stat(project); err != nil {
+func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
+	if _, err := jirix.Run().Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(project, "README")
-	data, err := ctx.Run().ReadFile(readmeFile)
+	data, err := jirix.Run().ReadFile(readmeFile)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -176,34 +171,32 @@ func remoteProjectName(i int) string {
 	return "test-remote-project-" + fmt.Sprintf("%d", i+1)
 }
 
-func writeReadme(t *testing.T, ctx *tool.Context, projectDir, message string) {
+func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
-	if err := ctx.Run().WriteFile(path, []byte(message), perm); err != nil {
+	if err := jirix.Run().WriteFile(path, []byte(message), perm); err != nil {
 		t.Fatalf("%v", err)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer ctx.Run().Chdir(cwd)
-	if err := ctx.Run().Chdir(projectDir); err != nil {
+	defer jirix.Run().Chdir(cwd)
+	if err := jirix.Run().Chdir(projectDir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := ctx.Git().CommitFile(path, "creating README"); err != nil {
+	if err := jirix.Git().CommitFile(path, "creating README"); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
 
 func TestCreate(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-
 	// Setup a fake JIRI_ROOT instance.
-	root, err := project.NewFakeJiriRoot(ctx)
+	root, err := project.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer func() {
-		if err := root.Cleanup(ctx); err != nil {
+		if err := root.Cleanup(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}()
@@ -211,10 +204,10 @@ func TestCreate(t *testing.T) {
 	// Setup the initial remote and local projects.
 	numProjects, remoteProjects := 2, []string{}
 	for i := 0; i < numProjects; i++ {
-		if err := root.CreateRemoteProject(ctx, remoteProjectName(i)); err != nil {
+		if err := root.CreateRemoteProject(remoteProjectName(i)); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if err := root.AddProject(ctx, project.Project{
+		if err := root.AddProject(project.Project{
 			Name:   remoteProjectName(i),
 			Path:   localProjectName(i),
 			Remote: root.Projects[remoteProjectName(i)],
@@ -233,24 +226,24 @@ func TestCreate(t *testing.T) {
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
 	for i := 0; i < numProjects; i++ {
-		writeReadme(t, ctx, root.Projects[remoteProjectName(i)], "revision 1")
+		writeReadme(t, root.X, root.Projects[remoteProjectName(i)], "revision 1")
 	}
-	if err := project.UpdateUniverse(ctx, true); err != nil {
+	if err := project.UpdateUniverse(root.X, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Create a local snapshot.
 	var stdout bytes.Buffer
-	env := &cmdline.Env{Stdout: &stdout}
+	root.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
 	remoteFlag = false
-	if err := runSnapshotCreate(env, []string{"test-local"}); err != nil {
+	if err := runSnapshotCreate(root.X, []string{"test-local"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(root.Dir, localProjectName(i))
-		if err := ctx.Run().RemoveAll(localProject); err != nil {
+		if err := root.X.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
@@ -262,28 +255,28 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	snapshotFile := filepath.Join(snapshotDir, "test-local")
-	localCtx := ctx.Clone(tool.ContextOpts{
+	localX := root.X.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,
 	})
-	if err := project.UpdateUniverse(localCtx, true); err != nil {
+	if err := project.UpdateUniverse(localX, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(root.Dir, localProjectName(i))
-		checkReadme(t, ctx, localProject, "revision 1")
+		checkReadme(t, root.X, localProject, "revision 1")
 	}
 
 	// Create a remote snapshot.
 	remoteFlag = true
-	root.EnableRemoteManifestPush(ctx)
-	if err := runSnapshotCreate(env, []string{"test-remote"}); err != nil {
+	root.EnableRemoteManifestPush()
+	if err := runSnapshotCreate(root.X, []string{"test-remote"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(root.Dir, localProjectName(i))
-		if err := ctx.Run().RemoveAll(localProject); err != nil {
+		if err := root.X.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
@@ -291,14 +284,14 @@ func TestCreate(t *testing.T) {
 	// Check that invoking the UpdateUniverse() with the remote snapshot
 	// restores the local repositories.
 	manifest := "snapshot/test-remote"
-	remoteCtx := ctx.Clone(tool.ContextOpts{
+	remoteX := root.X.Clone(tool.ContextOpts{
 		Manifest: &manifest,
 	})
-	if err := project.UpdateUniverse(remoteCtx, true); err != nil {
+	if err := project.UpdateUniverse(remoteX, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(root.Dir, localProjectName(i))
-		checkReadme(t, ctx, localProject, "revision 1")
+		checkReadme(t, root.X, localProject, "revision 1")
 	}
 }

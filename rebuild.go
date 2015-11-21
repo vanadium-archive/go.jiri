@@ -8,14 +8,14 @@ import (
 	"fmt"
 
 	"v.io/jiri/collect"
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 )
 
 // cmdRebuild represents the "jiri rebuild" command.
 var cmdRebuild = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runRebuild),
+	Runner: jiri.RunnerFunc(runRebuild),
 	Name:   "rebuild",
 	Short:  "Rebuild all jiri tools",
 	Long: `
@@ -28,21 +28,20 @@ Run "jiri help manifest" for details on manifests.
 `,
 }
 
-func runRebuild(env *cmdline.Env, args []string) (e error) {
-	ctx := tool.NewContextFromEnv(env)
-	_, tools, err := project.ReadManifest(ctx)
+func runRebuild(jirix *jiri.X, args []string) (e error) {
+	_, tools, err := project.ReadManifest(jirix)
 	if err != nil {
 		return err
 	}
 
 	// Create a temporary directory in which tools will be built.
-	tmpDir, err := ctx.Run().TempDir("", "tmp-jiri-rebuild")
+	tmpDir, err := jirix.Run().TempDir("", "tmp-jiri-rebuild")
 	if err != nil {
 		return fmt.Errorf("TempDir() failed: %v", err)
 	}
 
 	// Make sure we cleanup the temp directory.
-	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
+	defer collect.Error(func() error { return jirix.Run().RemoveAll(tmpDir) }, &e)
 
 	// Paranoid sanity checking.
 	if _, ok := tools[project.JiriName]; !ok {
@@ -50,8 +49,8 @@ func runRebuild(env *cmdline.Env, args []string) (e error) {
 	}
 
 	// Build and install tools.
-	if err := project.BuildTools(ctx, tools, tmpDir); err != nil {
+	if err := project.BuildTools(jirix, tools, tmpDir); err != nil {
 		return err
 	}
-	return project.InstallTools(ctx, tmpDir)
+	return project.InstallTools(jirix, tmpDir)
 }

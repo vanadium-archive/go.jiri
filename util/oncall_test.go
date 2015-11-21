@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
 )
 
-func createOncallFile(t *testing.T, ctx *tool.Context) {
+func createOncallFile(t *testing.T, jirix *jiri.X) {
 	content := `<?xml version="1.0" ?>
 <rotation>
   <shift>
@@ -35,13 +35,13 @@ func createOncallFile(t *testing.T, ctx *tool.Context) {
     <startDate>Nov 19, 2014 12:00:00 PM</startDate>
   </shift>
 </rotation>`
-	oncallRotationsFile, err := OncallRotationPath(ctx)
+	oncallRotationsFile, err := OncallRotationPath(jirix)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	dir := filepath.Dir(oncallRotationsFile)
 	dirMode := os.FileMode(0700)
-	if err := ctx.Run().MkdirAll(dir, dirMode); err != nil {
+	if err := jirix.Run().MkdirAll(dir, dirMode); err != nil {
 		t.Fatalf("MkdirAll(%q, %v) failed: %v", dir, dirMode, err)
 	}
 	fileMode := os.FileMode(0644)
@@ -51,13 +51,12 @@ func createOncallFile(t *testing.T, ctx *tool.Context) {
 }
 
 func TestOncall(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-	root, err := project.NewFakeJiriRoot(ctx)
+	root, err := project.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer func() {
-		if err := root.Cleanup(ctx); err != nil {
+		if err := root.Cleanup(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}()
@@ -71,7 +70,7 @@ func TestOncall(t *testing.T) {
 	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	// Create a oncall.v1.xml file.
-	createOncallFile(t, ctx)
+	createOncallFile(t, root.X)
 	type testCase struct {
 		targetTime    time.Time
 		expectedShift *OncallShift
@@ -107,7 +106,7 @@ func TestOncall(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
-		got, err := Oncall(ctx, test.targetTime)
+		got, err := Oncall(root.X, test.targetTime)
 		if err != nil {
 			t.Fatalf("want no errors, got: %v", err)
 		}

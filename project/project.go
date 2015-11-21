@@ -17,6 +17,7 @@ import (
 	"v.io/jiri/collect"
 	"v.io/jiri/gitutil"
 	"v.io/jiri/googlesource"
+	"v.io/jiri/jiri"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
@@ -183,14 +184,14 @@ var devtoolsBinDir = filepath.Join("devtools", "bin")
 // CreateSnapshot creates a manifest that encodes the current state of
 // master branches of all projects and writes this snapshot out to the
 // given file.
-func CreateSnapshot(ctx *tool.Context, path string) error {
-	ctx.TimerPush("create snapshot")
-	defer ctx.TimerPop()
+func CreateSnapshot(jirix *jiri.X, path string) error {
+	jirix.TimerPush("create snapshot")
+	defer jirix.TimerPop()
 
 	manifest := Manifest{}
 
 	// Add all local projects to manifest.
-	localProjects, err := LocalProjects(ctx, FullScan)
+	localProjects, err := LocalProjects(jirix, FullScan)
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 
 	// Add all hosts, tools, and hooks from the current manifest to the
 	// snapshot manifest.
-	hosts, _, tools, hooks, err := readManifest(ctx, true)
+	hosts, _, tools, hooks, err := readManifest(jirix, true)
 	if err != nil {
 		return err
 	}
@@ -220,7 +221,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 	}
 
 	perm := os.FileMode(0755)
-	if err := ctx.Run().MkdirAll(filepath.Dir(path), perm); err != nil {
+	if err := jirix.Run().MkdirAll(filepath.Dir(path), perm); err != nil {
 		return err
 	}
 	data, err := xml.MarshalIndent(manifest, "", "  ")
@@ -228,7 +229,7 @@ func CreateSnapshot(ctx *tool.Context, path string) error {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
 	}
 	perm = os.FileMode(0644)
-	if err := ctx.Run().WriteFile(path, data, perm); err != nil {
+	if err := jirix.Run().WriteFile(path, data, perm); err != nil {
 		return err
 	}
 	return nil
@@ -238,15 +239,15 @@ const currentManifestFileName = ".current_manifest"
 
 // CurrentManifest returns a manifest that identifies the result of
 // the most recent "jiri update" invocation.
-func CurrentManifest(ctx *tool.Context) (*Manifest, error) {
+func CurrentManifest(jirix *jiri.X) (*Manifest, error) {
 	currentManifestPath, err := ToAbs(currentManifestFileName)
 	if err != nil {
 		return nil, err
 	}
-	bytes, err := ctx.Run().ReadFile(currentManifestPath)
+	bytes, err := jirix.Run().ReadFile(currentManifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(ctx.Stderr(), `WARNING: Could not find %s.
+			fmt.Fprintf(jirix.Stderr(), `WARNING: Could not find %s.
 The contents of this file are stored as metadata in binaries the jiri
 tool builds. To fix this problem, please run "jiri update".
 `, currentManifestPath)
@@ -263,7 +264,7 @@ tool builds. To fix this problem, please run "jiri update".
 
 // writeCurrentManifest writes the given manifest to a file that
 // stores the result of the most recent "jiri update" invocation.
-func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
+func writeCurrentManifest(jirix *jiri.X, manifest *Manifest) error {
 	currentManifestPath, err := ToAbs(currentManifestFileName)
 	if err != nil {
 		return err
@@ -272,7 +273,7 @@ func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
 	if err != nil {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
 	}
-	if err := ctx.Run().WriteFile(currentManifestPath, bytes, os.FileMode(0644)); err != nil {
+	if err := jirix.Run().WriteFile(currentManifestPath, bytes, os.FileMode(0644)); err != nil {
 		return err
 	}
 	return nil
@@ -281,15 +282,15 @@ func writeCurrentManifest(ctx *tool.Context, manifest *Manifest) error {
 // CurrentProjectName gets the name of the current project from the
 // current directory by reading the jiri project metadata located in a
 // directory at the root of the current repository.
-func CurrentProjectName(ctx *tool.Context) (string, error) {
-	topLevel, err := ctx.Git().TopLevel()
+func CurrentProjectName(jirix *jiri.X) (string, error) {
+	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return "", nil
 	}
 	metadataDir := filepath.Join(topLevel, metadataDirName)
-	if _, err := ctx.Run().Stat(metadataDir); err == nil {
+	if _, err := jirix.Run().Stat(metadataDir); err == nil {
 		metadataFile := filepath.Join(metadataDir, metadataFileName)
-		bytes, err := ctx.Run().ReadFile(metadataFile)
+		bytes, err := jirix.Run().ReadFile(metadataFile)
 		if err != nil {
 			return "", err
 		}
@@ -304,20 +305,20 @@ func CurrentProjectName(ctx *tool.Context) (string, error) {
 
 // setProjectRevisions sets the current project revision from the master for
 // each project as found on the filesystem
-func setProjectRevisions(ctx *tool.Context, projects Projects) (_ Projects, e error) {
+func setProjectRevisions(jirix *jiri.X, projects Projects) (_ Projects, e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
 
 	for name, project := range projects {
 		switch project.Protocol {
 		case "git":
-			if err := ctx.Run().Chdir(project.Path); err != nil {
+			if err := jirix.Run().Chdir(project.Path); err != nil {
 				return nil, err
 			}
-			revision, err := ctx.Git().CurrentRevisionOfBranch("master")
+			revision, err := jirix.Git().CurrentRevisionOfBranch("master")
 			if err != nil {
 				return nil, err
 			}
@@ -335,25 +336,25 @@ func setProjectRevisions(ctx *tool.Context, projects Projects) (_ Projects, e er
 // projects in the manifest that exist locally will be returned.  Otherwise, a
 // full scan of the filesystem will take place, and all found projects will be
 // returned.
-func LocalProjects(ctx *tool.Context, scanMode ScanMode) (Projects, error) {
-	ctx.TimerPush("local projects")
-	defer ctx.TimerPop()
+func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
+	jirix.TimerPush("local projects")
+	defer jirix.TimerPop()
 
 	projects := Projects{}
 	if scanMode == FastScan {
 		// Fast path:  Full scan was not requested, and all projects in
 		// manifest exist on local filesystem.  We just use the projects
 		// directly from the manifest.
-		manifestProjects, _, err := ReadManifest(ctx)
+		manifestProjects, _, err := ReadManifest(jirix)
 		if err != nil {
 			return nil, err
 		}
-		projectsExist, err := projectsExistLocally(ctx, manifestProjects)
+		projectsExist, err := projectsExistLocally(jirix, manifestProjects)
 		if err != nil {
 			return nil, err
 		}
 		if projectsExist {
-			return setProjectRevisions(ctx, manifestProjects)
+			return setProjectRevisions(jirix, manifestProjects)
 		}
 	}
 
@@ -367,24 +368,24 @@ func LocalProjects(ctx *tool.Context, scanMode ScanMode) (Projects, error) {
 
 	// Initial call to findLocalProjects -- it will recursively search all the
 	// directories under JiriRoot.
-	ctx.TimerPush("scan fs")
-	err = findLocalProjects(ctx, root, projects)
-	ctx.TimerPop()
+	jirix.TimerPush("scan fs")
+	err = findLocalProjects(jirix, root, projects)
+	jirix.TimerPop()
 	if err != nil {
 		return nil, err
 	}
-	return setProjectRevisions(ctx, projects)
+	return setProjectRevisions(jirix, projects)
 }
 
 // projectsExistLocally returns true iff all the given projects exist on the
 // local filesystem.
 // Note that this may return true even if there are projects on the local
 // filesystem not included in the provided projects argument.
-func projectsExistLocally(ctx *tool.Context, projects Projects) (bool, error) {
-	ctx.TimerPush("match manifest")
-	defer ctx.TimerPop()
+func projectsExistLocally(jirix *jiri.X, projects Projects) (bool, error) {
+	jirix.TimerPush("match manifest")
+	defer jirix.TimerPop()
 	for _, p := range projects {
-		isLocal, err := isLocalProject(ctx, p.Path)
+		isLocal, err := isLocalProject(jirix, p.Path)
 		if err != nil {
 			return false, err
 		}
@@ -398,23 +399,23 @@ func projectsExistLocally(ctx *tool.Context, projects Projects) (bool, error) {
 // PollProjects returns the set of changelists that exist remotely but not
 // locally. Changes are grouped by projects and contain author identification
 // and a description of their content.
-func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, e error) {
-	ctx.TimerPush("poll projects")
-	defer ctx.TimerPop()
+func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e error) {
+	jirix.TimerPush("poll projects")
+	defer jirix.TimerPop()
 
 	// Switch back to current working directory when we're done.
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
 
 	// Gather local & remote project data.
-	localProjects, err := LocalProjects(ctx, FastScan)
+	localProjects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return nil, err
 	}
-	_, remoteProjects, _, _, err := readManifest(ctx, false)
+	_, remoteProjects, _, _, err := readManifest(jirix, false)
 	if err != nil {
 		return nil, err
 	}
@@ -443,17 +444,17 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 			case "git":
 
 				// Enter project directory - this assumes absolute paths.
-				if err := ctx.Run().Chdir(updateOp.destination); err != nil {
+				if err := jirix.Run().Chdir(updateOp.destination); err != nil {
 					return nil, err
 				}
 
 				// Fetch the latest from origin.
-				if err := ctx.Git().FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
+				if err := jirix.Git().FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
 					return nil, err
 				}
 
 				// Collect commits visible from FETCH_HEAD that aren't visible from master.
-				commitsText, err := ctx.Git().Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
+				commitsText, err := jirix.Git().Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
 				if err != nil {
 					return nil, err
 				}
@@ -480,8 +481,8 @@ func PollProjects(ctx *tool.Context, projectSet map[string]struct{}) (_ Update, 
 
 // ReadManifest retrieves and parses the manifest that determines what
 // projects and tools are part of the jiri universe.
-func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
-	_, p, t, _, e := readManifest(ctx, false)
+func ReadManifest(jirix *jiri.X) (Projects, Tools, error) {
+	_, p, t, _, e := readManifest(jirix, false)
 	return p, t, e
 }
 
@@ -490,11 +491,11 @@ func ReadManifest(ctx *tool.Context) (Projects, Tools, error) {
 // TODO(nlacasse,toddw): Once the manifest project is specified in the
 // manifest, we should get the remote directly from the manifest, and not from
 // the filesystem.
-func getManifestRemote(ctx *tool.Context, manifestPath string) (string, error) {
+func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 	var remote string
-	return remote, ctx.NewSeq().Pushd(manifestPath).Call(
+	return remote, jirix.NewSeq().Pushd(manifestPath).Call(
 		func() (e error) {
-			remote, e = ctx.Git().RemoteUrl("origin")
+			remote, e = jirix.Git().RemoteUrl("origin")
 			return
 		}, "get manifest origin").Done()
 }
@@ -502,15 +503,15 @@ func getManifestRemote(ctx *tool.Context, manifestPath string) (string, error) {
 // readManifest implements the ReadManifest logic and provides an
 // optional flag that can be used to fetch the latest manifest updates
 // from the manifest repository.
-func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks, error) {
-	ctx.TimerPush("read manifest")
-	defer ctx.TimerPop()
+func readManifest(jirix *jiri.X, update bool) (Hosts, Projects, Tools, Hooks, error) {
+	jirix.TimerPush("read manifest")
+	defer jirix.TimerPop()
 	if update {
 		manifestPath, err := ToAbs(".manifest")
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		manifestRemote, err := getManifestRemote(ctx, manifestPath)
+		manifestRemote, err := getManifestRemote(jirix, manifestPath)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -521,16 +522,16 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 			Revision:     "HEAD",
 			RemoteBranch: "master",
 		}
-		if err := resetProject(ctx, project); err != nil {
+		if err := resetProject(jirix, project); err != nil {
 			return nil, nil, nil, nil, err
 		}
 	}
-	path, err := ResolveManifestPath(ctx.Manifest())
+	path, err := ResolveManifestPath(jirix.Manifest())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	hosts, projects, tools, hooks, stack := Hosts{}, Projects{}, Tools{}, Hooks{}, map[string]struct{}{}
-	if err := loadManifest(ctx, path, hosts, projects, tools, hooks, stack); err != nil {
+	if err := loadManifest(jirix, path, hosts, projects, tools, hooks, stack); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	return hosts, projects, tools, hooks, nil
@@ -540,74 +541,74 @@ func readManifest(ctx *tool.Context, update bool) (Hosts, Projects, Tools, Hooks
 // remote counterparts identified by the given manifest. Optionally,
 // the 'gc' flag can be used to indicate that local projects that no
 // longer exist remotely should be removed.
-func UpdateUniverse(ctx *tool.Context, gc bool) (e error) {
-	ctx.TimerPush("update universe")
-	defer ctx.TimerPop()
-	_, remoteProjects, remoteTools, remoteHooks, err := readManifest(ctx, true)
+func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
+	jirix.TimerPush("update universe")
+	defer jirix.TimerPop()
+	_, remoteProjects, remoteTools, remoteHooks, err := readManifest(jirix, true)
 	if err != nil {
 		return err
 	}
 	// 1. Update all local projects to match their remote counterparts.
-	if err := updateProjects(ctx, remoteProjects, gc); err != nil {
+	if err := updateProjects(jirix, remoteProjects, gc); err != nil {
 		return err
 	}
 	// 2. Build all tools in a temporary directory.
-	tmpDir, err := ctx.Run().TempDir("", "tmp-jiri-tools-build")
+	tmpDir, err := jirix.Run().TempDir("", "tmp-jiri-tools-build")
 	if err != nil {
 		return fmt.Errorf("TempDir() failed: %v", err)
 	}
-	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
-	if err := buildToolsFromMaster(ctx, remoteTools, tmpDir); err != nil {
+	defer collect.Error(func() error { return jirix.Run().RemoveAll(tmpDir) }, &e)
+	if err := buildToolsFromMaster(jirix, remoteTools, tmpDir); err != nil {
 		return err
 	}
 	// 3. Install the tools into $JIRI_ROOT/devtools/bin.
-	if err := InstallTools(ctx, tmpDir); err != nil {
+	if err := InstallTools(jirix, tmpDir); err != nil {
 		return err
 	}
 	// 4. Run all specified hooks
-	return runHooks(ctx, remoteHooks)
+	return runHooks(jirix, remoteHooks)
 }
 
 // ApplyToLocalMaster applies an operation expressed as the given function to
 // the local master branch of the given projects.
-func ApplyToLocalMaster(ctx *tool.Context, projects Projects, fn func() error) (e error) {
+func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
+	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
 
 	// Loop through all projects, checking out master and stashing any unstaged
 	// changes.
 	for _, project := range projects {
 		p := project
-		if err := ctx.Run().Chdir(p.Path); err != nil {
+		if err := jirix.Run().Chdir(p.Path); err != nil {
 			return err
 		}
 		switch p.Protocol {
 		case "git":
-			branch, err := ctx.Git().CurrentBranchName()
+			branch, err := jirix.Git().CurrentBranchName()
 			if err != nil {
 				return err
 			}
-			stashed, err := ctx.Git().Stash()
+			stashed, err := jirix.Git().Stash()
 			if err != nil {
 				return err
 			}
-			if err := ctx.Git().CheckoutBranch("master"); err != nil {
+			if err := jirix.Git().CheckoutBranch("master"); err != nil {
 				return err
 			}
 			// After running the function, return to this project's directory,
 			// checkout the original branch, and stash pop if necessary.
 			defer collect.Error(func() error {
-				if err := ctx.Run().Chdir(p.Path); err != nil {
+				if err := jirix.Run().Chdir(p.Path); err != nil {
 					return err
 				}
-				if err := ctx.Git().CheckoutBranch(branch); err != nil {
+				if err := jirix.Git().CheckoutBranch(branch); err != nil {
 					return err
 				}
 				if stashed {
-					return ctx.Git().StashPop()
+					return jirix.Git().StashPop()
 				}
 				return nil
 			}, &e)
@@ -620,14 +621,14 @@ func ApplyToLocalMaster(ctx *tool.Context, projects Projects, fn func() error) (
 
 // BuildTools builds the given tools and places the resulting binaries into the
 // given directory.
-func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
-	ctx.TimerPush("build tools")
-	defer ctx.TimerPop()
+func BuildTools(jirix *jiri.X, tools Tools, outputDir string) error {
+	jirix.TimerPush("build tools")
+	defer jirix.TimerPop()
 	if len(tools) == 0 {
 		// Nothing to do here...
 		return nil
 	}
-	projects, err := LocalProjects(ctx, FastScan)
+	projects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return err
 	}
@@ -664,7 +665,7 @@ func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
 		workspaces = append(workspaces, strings.Split(envGoPath, string(filepath.ListSeparator))...)
 	}
 	var stderr bytes.Buffer
-	opts := ctx.Run().Opts()
+	opts := jirix.Run().Opts()
 	// We unset GOARCH and GOOS because jiri update should always build for the
 	// native architecture and OS.  Also, as of go1.5, setting GOBIN is not
 	// compatible with GOARCH or GOOS.
@@ -677,7 +678,7 @@ func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
 	opts.Stdout = ioutil.Discard
 	opts.Stderr = &stderr
 	args := append([]string{"install"}, toolPkgs...)
-	if err := ctx.Run().CommandWithOpts(opts, "go", args...); err != nil {
+	if err := jirix.Run().CommandWithOpts(opts, "go", args...); err != nil {
 		return fmt.Errorf("tool build failed\n%v", stderr.String())
 	}
 	return nil
@@ -687,8 +688,8 @@ func BuildTools(ctx *tool.Context, tools Tools, outputDir string) error {
 // available in the local master branch of the tools repository. Notably, this
 // function does not perform any version control operation on the master
 // branch.
-func buildToolsFromMaster(ctx *tool.Context, tools Tools, outputDir string) error {
-	localProjects, err := LocalProjects(ctx, FastScan)
+func buildToolsFromMaster(jirix *jiri.X, tools Tools, outputDir string) error {
+	localProjects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return err
 	}
@@ -714,16 +715,16 @@ func buildToolsFromMaster(ctx *tool.Context, tools Tools, outputDir string) erro
 	}
 
 	updateFn := func() error {
-		return ApplyToLocalMaster(ctx, toolProjects, func() error {
-			return BuildTools(ctx, toolsToBuild, outputDir)
+		return ApplyToLocalMaster(jirix, toolProjects, func() error {
+			return BuildTools(jirix, toolsToBuild, outputDir)
 		})
 	}
 
 	// Always log the output of updateFn, irrespective of
 	// the value of the verbose flag.
 	opts := runutil.Opts{Verbose: true}
-	if err := ctx.Run().FunctionWithOpts(opts, updateFn, "build tools: %v", strings.Join(toolNames, " ")); err != nil {
-		fmt.Fprintf(ctx.Stderr(), "%v\n", err)
+	if err := jirix.Run().FunctionWithOpts(opts, updateFn, "build tools: %v", strings.Join(toolNames, " ")); err != nil {
+		fmt.Fprintf(jirix.Stderr(), "%v\n", err)
 		failed = true
 	}
 	if failed {
@@ -735,18 +736,18 @@ func buildToolsFromMaster(ctx *tool.Context, tools Tools, outputDir string) erro
 // CleanupProjects restores the given jiri projects back to their master
 // branches and gets rid of all the local changes. If "cleanupBranches" is
 // true, it will also delete all the non-master branches.
-func CleanupProjects(ctx *tool.Context, projects Projects, cleanupBranches bool) (e error) {
+func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(wd) }, &e)
+	defer collect.Error(func() error { return jirix.Run().Chdir(wd) }, &e)
 	for _, project := range projects {
 		localProjectDir := project.Path
-		if err := ctx.Run().Chdir(localProjectDir); err != nil {
+		if err := jirix.Run().Chdir(localProjectDir); err != nil {
 			return err
 		}
-		if err := resetLocalProject(ctx, cleanupBranches, project.RemoteBranch); err != nil {
+		if err := resetLocalProject(jirix, cleanupBranches, project.RemoteBranch); err != nil {
 			return err
 		}
 	}
@@ -755,31 +756,31 @@ func CleanupProjects(ctx *tool.Context, projects Projects, cleanupBranches bool)
 
 // resetLocalProject checks out the master branch, cleans up untracked files
 // and uncommitted changes, and optionally deletes all the other branches.
-func resetLocalProject(ctx *tool.Context, cleanupBranches bool, remoteBranch string) error {
+func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string) error {
 	// Check out master and clean up changes.
-	curBranchName, err := ctx.Git().CurrentBranchName()
+	curBranchName, err := jirix.Git().CurrentBranchName()
 	if err != nil {
 		return err
 	}
 	if curBranchName != "master" {
-		if err := ctx.Git().CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
+		if err := jirix.Git().CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
-	if err := ctx.Git().RemoveUntrackedFiles(); err != nil {
+	if err := jirix.Git().RemoveUntrackedFiles(); err != nil {
 		return err
 	}
 	// Discard any uncommitted changes.
 	if remoteBranch == "" {
 		remoteBranch = "master"
 	}
-	if err := ctx.Git().Reset("origin/" + remoteBranch); err != nil {
+	if err := jirix.Git().Reset("origin/" + remoteBranch); err != nil {
 		return err
 	}
 
 	// Delete all the other branches.
 	// At this point we should be at the master branch.
-	branches, _, err := ctx.Git().GetBranches()
+	branches, _, err := jirix.Git().GetBranches()
 	if err != nil {
 		return err
 	}
@@ -788,7 +789,7 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool, remoteBranch str
 			continue
 		}
 		if cleanupBranches {
-			if err := ctx.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
+			if err := jirix.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 				return nil
 			}
 		}
@@ -798,7 +799,7 @@ func resetLocalProject(ctx *tool.Context, cleanupBranches bool, remoteBranch str
 }
 
 // isLocalProject returns true if there is a project at the given path.
-func isLocalProject(ctx *tool.Context, path string) (bool, error) {
+func isLocalProject(jirix *jiri.X, path string) (bool, error) {
 	absPath, err := ToAbs(path)
 	if err != nil {
 		return false, err
@@ -806,7 +807,7 @@ func isLocalProject(ctx *tool.Context, path string) (bool, error) {
 	// Existence of a metadata directory is how we know we've found a
 	// Jiri-maintained project.
 	metadataDir := filepath.Join(absPath, metadataDirName)
-	_, err = ctx.Run().Stat(metadataDir)
+	_, err = jirix.Run().Stat(metadataDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -818,14 +819,14 @@ func isLocalProject(ctx *tool.Context, path string) (bool, error) {
 
 // projectAtPath returns a Project struct corresponding to the project at the
 // path in the filesystem.
-func projectAtPath(ctx *tool.Context, path string) (Project, error) {
+func projectAtPath(jirix *jiri.X, path string) (Project, error) {
 	var project Project
 	absPath, err := ToAbs(path)
 	if err != nil {
 		return project, err
 	}
 	metadataFile := filepath.Join(absPath, metadataDirName, metadataFileName)
-	bytes, err := ctx.Run().ReadFile(metadataFile)
+	bytes, err := jirix.Run().ReadFile(metadataFile)
 	if err != nil {
 		return project, err
 	}
@@ -842,17 +843,17 @@ func projectAtPath(ctx *tool.Context, path string) (Project, error) {
 
 // findLocalProjects scans the filesystem for all projects.  Note that project
 // directories can be nested recursively.
-func findLocalProjects(ctx *tool.Context, path string, projects Projects) error {
+func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 	absPath, err := ToAbs(path)
 	if err != nil {
 		return err
 	}
-	isLocal, err := isLocalProject(ctx, absPath)
+	isLocal, err := isLocalProject(jirix, absPath)
 	if err != nil {
 		return err
 	}
 	if isLocal {
-		project, err := projectAtPath(ctx, absPath)
+		project, err := projectAtPath(jirix, absPath)
 		if err != nil {
 			return err
 		}
@@ -866,13 +867,13 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) error 
 	}
 
 	// Recurse into all the sub directories.
-	fileInfos, err := ctx.Run().ReadDir(path)
+	fileInfos, err := jirix.Run().ReadDir(path)
 	if err != nil {
 		return err
 	}
 	for _, fileInfo := range fileInfos {
 		if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
-			if err := findLocalProjects(ctx, filepath.Join(path, fileInfo.Name()), projects); err != nil {
+			if err := findLocalProjects(jirix, filepath.Join(path, fileInfo.Name()), projects); err != nil {
 				return err
 			}
 		}
@@ -882,10 +883,10 @@ func findLocalProjects(ctx *tool.Context, path string, projects Projects) error 
 
 // InstallTools installs the tools from the given directory into
 // $JIRI_ROOT/devtools/bin.
-func InstallTools(ctx *tool.Context, dir string) error {
-	ctx.TimerPush("install tools")
-	defer ctx.TimerPop()
-	if ctx.DryRun() {
+func InstallTools(jirix *jiri.X, dir string) error {
+	jirix.TimerPush("install tools")
+	defer jirix.TimerPop()
+	if jirix.DryRun() {
 		// In "dry run" mode, no binaries are built.
 		return nil
 	}
@@ -902,14 +903,14 @@ func InstallTools(ctx *tool.Context, dir string) error {
 		installFn := func() error {
 			src := filepath.Join(dir, fi.Name())
 			dst := filepath.Join(binDir, fi.Name())
-			if err := ctx.Run().Rename(src, dst); err != nil {
+			if err := jirix.Run().Rename(src, dst); err != nil {
 				return err
 			}
 			return nil
 		}
 		opts := runutil.Opts{Verbose: true}
-		if err := ctx.Run().FunctionWithOpts(opts, installFn, "install tool %q", fi.Name()); err != nil {
-			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
+		if err := jirix.Run().FunctionWithOpts(opts, installFn, "install tool %q", fi.Name()); err != nil {
+			fmt.Fprintf(jirix.Stderr(), "%v\n", err)
 			failed = true
 		}
 	}
@@ -924,7 +925,7 @@ func InstallTools(ctx *tool.Context, dir string) error {
 	}
 	for _, subCmd := range v23SubCmds {
 		subCmdPath := filepath.Join(binDir, subCmd)
-		if err := ctx.Run().RemoveAll(subCmdPath); err != nil {
+		if err := jirix.Run().RemoveAll(subCmdPath); err != nil {
 			return err
 		}
 	}
@@ -933,9 +934,9 @@ func InstallTools(ctx *tool.Context, dir string) error {
 }
 
 // runHooks runs the specified hooks
-func runHooks(ctx *tool.Context, hooks Hooks) error {
-	ctx.TimerPush("run hooks")
-	defer ctx.TimerPop()
+func runHooks(jirix *jiri.X, hooks Hooks) error {
+	jirix.TimerPush("run hooks")
+	defer jirix.TimerPop()
 	for _, hook := range hooks {
 		command := hook.Path
 		args := []string{}
@@ -946,7 +947,7 @@ func runHooks(ctx *tool.Context, hooks Hooks) error {
 		for _, arg := range hook.Args {
 			args = append(args, arg.Arg)
 		}
-		if err := ctx.Run().Command(command, args...); err != nil {
+		if err := jirix.Run().Command(command, args...); err != nil {
 			return fmt.Errorf("Hook %v failed: %v command: %v args: %v", hook.Name, err, command, args)
 		}
 	}
@@ -955,24 +956,24 @@ func runHooks(ctx *tool.Context, hooks Hooks) error {
 
 // resetProject advances the local master branch of the given
 // project, which is expected to exist locally at project.Path.
-func resetProject(ctx *tool.Context, project Project) error {
+func resetProject(jirix *jiri.X, project Project) error {
 	fn := func() error {
 		switch project.Protocol {
 		case "git":
 			if project.Remote == "" {
 				return fmt.Errorf("project %v does not have a remote", project.Name)
 			}
-			if err := ctx.Git().SetRemoteUrl("origin", project.Remote); err != nil {
+			if err := jirix.Git().SetRemoteUrl("origin", project.Remote); err != nil {
 				return err
 			}
-			if err := ctx.Git().Fetch("origin"); err != nil {
+			if err := jirix.Git().Fetch("origin"); err != nil {
 				return err
 			}
 
 			// Having a specific revision trumps everything else - once fetched,
 			// always reset to that revision.
 			if project.Revision != "" && project.Revision != "HEAD" {
-				return ctx.Git().Reset(project.Revision)
+				return jirix.Git().Reset(project.Revision)
 			}
 
 			// If no revision, reset to the configured remote branch, or master
@@ -981,18 +982,18 @@ func resetProject(ctx *tool.Context, project Project) error {
 			if remoteBranch == "" {
 				remoteBranch = "master"
 			}
-			return ctx.Git().Reset("origin/" + remoteBranch)
+			return jirix.Git().Reset("origin/" + remoteBranch)
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
 	}
-	return ApplyToLocalMaster(ctx, Projects{project.Name: project}, fn)
+	return ApplyToLocalMaster(jirix, Projects{project.Name: project}, fn)
 }
 
 // loadManifest loads the given manifest, processing all of its
 // imports, projects and tools settings.
-func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects, tools Tools, hooks Hooks, stack map[string]struct{}) error {
-	data, err := ctx.Run().ReadFile(path)
+func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, tools Tools, hooks Hooks, stack map[string]struct{}) error {
+	data, err := jirix.Run().ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -1010,7 +1011,7 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 			return err
 		}
 		stack[manifest.Name] = struct{}{}
-		if err := loadManifest(ctx, path, hosts, projects, tools, hooks, stack); err != nil {
+		if err := loadManifest(jirix, path, hosts, projects, tools, hooks, stack); err != nil {
 			return err
 		}
 		delete(stack, manifest.Name)
@@ -1101,18 +1102,18 @@ func loadManifest(ctx *tool.Context, path string, hosts Hosts, projects Projects
 
 // reportNonMaster checks if the given project is on master branch and
 // if not, reports this fact along with information on how to update it.
-func reportNonMaster(ctx *tool.Context, project Project) (e error) {
+func reportNonMaster(jirix *jiri.X, project Project) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	if err := ctx.Run().Chdir(project.Path); err != nil {
+	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
+	if err := jirix.Run().Chdir(project.Path); err != nil {
 		return err
 	}
 	switch project.Protocol {
 	case "git":
-		current, err := ctx.Git().CurrentBranchName()
+		current, err := jirix.Git().CurrentBranchName()
 		if err != nil {
 			return err
 		}
@@ -1120,7 +1121,7 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 			line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch is %q`, current)
 			line2 := fmt.Sprintf(`to update the %q branch once the master branch is updated, run "git merge master"`, current)
 			opts := runutil.Opts{Verbose: true}
-			ctx.Run().OutputWithOpts(opts, []string{line1, line2})
+			jirix.Run().OutputWithOpts(opts, []string{line1, line2})
 		}
 		return nil
 	default:
@@ -1130,7 +1131,7 @@ func reportNonMaster(ctx *tool.Context, project Project) (e error) {
 
 // getRemoteHeadRevisions attempts to get the repo statuses from remote for HEAD
 // projects so we can detect when a local project is already up-to-date.
-func getRemoteHeadRevisions(ctx *tool.Context, remoteProjects Projects) {
+func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	someAtHead := false
 	for _, rp := range remoteProjects {
 		if rp.Revision == "HEAD" {
@@ -1141,14 +1142,14 @@ func getRemoteHeadRevisions(ctx *tool.Context, remoteProjects Projects) {
 	if !someAtHead {
 		return
 	}
-	gitHost, gitHostErr := GitHost(ctx)
+	gitHost, gitHostErr := GitHost(jirix)
 	if gitHostErr != nil || !googlesource.IsGoogleSourceHost(gitHost) {
 		return
 	}
-	repoStatuses, err := googlesource.GetRepoStatuses(ctx, gitHost)
+	repoStatuses, err := googlesource.GetRepoStatuses(jirix.Context, gitHost)
 	if err != nil {
 		// Log the error but don't fail.
-		fmt.Fprintf(ctx.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
+		fmt.Fprintf(jirix.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
 		return
 	}
 	for name, rp := range remoteProjects {
@@ -1168,45 +1169,45 @@ func getRemoteHeadRevisions(ctx *tool.Context, remoteProjects Projects) {
 	}
 }
 
-func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
-	ctx.TimerPush("update projects")
-	defer ctx.TimerPop()
+func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
+	jirix.TimerPush("update projects")
+	defer jirix.TimerPop()
 
 	scanMode := FastScan
 	if gc {
 		scanMode = FullScan
 	}
-	localProjects, err := LocalProjects(ctx, scanMode)
+	localProjects, err := LocalProjects(jirix, scanMode)
 	if err != nil {
 		return err
 	}
-	getRemoteHeadRevisions(ctx, remoteProjects)
+	getRemoteHeadRevisions(jirix, remoteProjects)
 	ops, err := computeOperations(localProjects, remoteProjects, gc)
 	if err != nil {
 		return err
 	}
 
 	for _, op := range ops {
-		if err := op.Test(ctx); err != nil {
+		if err := op.Test(jirix); err != nil {
 			return err
 		}
 	}
 	failed := false
-	manifest := &Manifest{Label: ctx.Manifest()}
+	manifest := &Manifest{Label: jirix.Manifest()}
 	for _, op := range ops {
-		updateFn := func() error { return op.Run(ctx, manifest) }
+		updateFn := func() error { return op.Run(jirix, manifest) }
 		// Always log the output of updateFn, irrespective of
 		// the value of the verbose flag.
 		opts := runutil.Opts{Verbose: true}
-		if err := ctx.Run().FunctionWithOpts(opts, updateFn, "%v", op); err != nil {
-			fmt.Fprintf(ctx.Stderr(), "%v\n", err)
+		if err := jirix.Run().FunctionWithOpts(opts, updateFn, "%v", op); err != nil {
+			fmt.Fprintf(jirix.Stderr(), "%v\n", err)
 			failed = true
 		}
 	}
 	if failed {
 		return cmdline.ErrExitCode(2)
 	}
-	if err := writeCurrentManifest(ctx, manifest); err != nil {
+	if err := writeCurrentManifest(jirix, manifest); err != nil {
 		return err
 	}
 	return nil
@@ -1214,17 +1215,17 @@ func updateProjects(ctx *tool.Context, remoteProjects Projects, gc bool) error {
 
 // writeMetadata stores the given project metadata in the directory
 // identified by the given path.
-func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
+func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	metadataDir := filepath.Join(dir, metadataDirName)
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-	if err := ctx.Run().MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
+	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
+	if err := jirix.Run().MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ctx.Run().Chdir(metadataDir); err != nil {
+	if err := jirix.Run().Chdir(metadataDir); err != nil {
 		return err
 	}
 	// Replace absolute project paths with relative paths to make it
@@ -1240,10 +1241,10 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 	}
 	metadataFile := filepath.Join(metadataDir, metadataFileName)
 	tmpMetadataFile := metadataFile + ".tmp"
-	if err := ctx.Run().WriteFile(tmpMetadataFile, bytes, os.FileMode(0644)); err != nil {
+	if err := jirix.Run().WriteFile(tmpMetadataFile, bytes, os.FileMode(0644)); err != nil {
 		return err
 	}
-	if err := ctx.Run().Rename(tmpMetadataFile, metadataFile); err != nil {
+	if err := jirix.Run().Rename(tmpMetadataFile, metadataFile); err != nil {
 		return err
 	}
 	return nil
@@ -1256,12 +1257,12 @@ func writeMetadata(ctx *tool.Context, project Project, dir string) (e error) {
 //
 // NOTE: The function assumes that the the given project is on a
 // master branch.
-func addProjectToManifest(ctx *tool.Context, manifest *Manifest, project Project) error {
+func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) error {
 	// If the project uses relative revision, replace it with an absolute one.
 	switch project.Protocol {
 	case "git":
 		if project.Revision == "HEAD" {
-			revision, err := ctx.Git(tool.RootDirOpt(project.Path)).CurrentRevision()
+			revision, err := jirix.Git(tool.RootDirOpt(project.Path)).CurrentRevision()
 			if err != nil {
 				return err
 			}
@@ -1283,11 +1284,11 @@ type operation interface {
 	// Project identifies the project this operation pertains to.
 	Project() Project
 	// Run executes the operation.
-	Run(ctx *tool.Context, manifest *Manifest) error
+	Run(jirix *jiri.X, manifest *Manifest) error
 	// String returns a string representation of the operation.
 	String() string
 	// Test checks whether the operation would fail.
-	Test(ctx *tool.Context) error
+	Test(jirix *jiri.X) error
 }
 
 // commonOperation represents a project operation.
@@ -1311,28 +1312,28 @@ type createOperation struct {
 	commonOperation
 }
 
-func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
-	hosts, _, _, _, err := readManifest(ctx, false)
+func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
+	hosts, _, _, _, err := readManifest(jirix, false)
 	if err != nil {
 		return err
 	}
 
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-	if err := ctx.Run().MkdirAll(path, perm); err != nil {
+	if err := jirix.Run().MkdirAll(path, perm); err != nil {
 		return err
 	}
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
 	// $JIRI_ROOT directory in an inconsistent state.
 	tmpDirPrefix := strings.Replace(op.Project().Name, "/", ".", -1) + "-"
-	tmpDir, err := ctx.Run().TempDir(path, tmpDirPrefix)
+	tmpDir, err := jirix.Run().TempDir(path, tmpDirPrefix)
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return ctx.Run().RemoveAll(tmpDir) }, &e)
+	defer collect.Error(func() error { return jirix.Run().RemoveAll(tmpDir) }, &e)
 	switch op.project.Protocol {
 	case "git":
-		if err := ctx.Git().Clone(op.project.Remote, tmpDir); err != nil {
+		if err := jirix.Git().Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
 
@@ -1348,12 +1349,12 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 				if err != nil {
 					return err
 				}
-				src, err := ctx.Run().ReadFile(filepath.Join(mdir, githook.Path))
+				src, err := jirix.Run().ReadFile(filepath.Join(mdir, githook.Path))
 				if err != nil {
 					return err
 				}
 				dst := filepath.Join(gitHookDir, githook.Name)
-				if err := ctx.Run().WriteFile(dst, src, perm); err != nil {
+				if err := jirix.Run().WriteFile(dst, src, perm); err != nil {
 					return err
 				}
 			}
@@ -1363,11 +1364,11 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		// write to .git/info/exclude
 		excludeString := "/.jiri/\n"
 		excludeDir := filepath.Join(tmpDir, ".git", "info")
-		if err := ctx.Run().MkdirAll(excludeDir, os.FileMode(0750)); err != nil {
+		if err := jirix.Run().MkdirAll(excludeDir, os.FileMode(0750)); err != nil {
 			return err
 		}
 		excludeFile := filepath.Join(excludeDir, "exclude")
-		if err := ctx.Run().WriteFile(excludeFile, []byte(excludeString), perm); err != nil {
+		if err := jirix.Run().WriteFile(excludeFile, []byte(excludeString), perm); err != nil {
 			return err
 		}
 
@@ -1375,38 +1376,38 @@ func (op createOperation) Run(ctx *tool.Context, manifest *Manifest) (e error) {
 		if err != nil {
 			return err
 		}
-		defer collect.Error(func() error { return ctx.Run().Chdir(cwd) }, &e)
-		if err := ctx.Run().Chdir(tmpDir); err != nil {
+		defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
+		if err := jirix.Run().Chdir(tmpDir); err != nil {
 			return err
 		}
-		if err := ctx.Git().Reset(op.project.Revision); err != nil {
+		if err := jirix.Git().Reset(op.project.Revision); err != nil {
 			return err
 		}
 	default:
 		return UnsupportedProtocolErr(op.project.Protocol)
 	}
-	if err := writeMetadata(ctx, op.project, tmpDir); err != nil {
+	if err := writeMetadata(jirix, op.project, tmpDir); err != nil {
 		return err
 	}
-	if err := ctx.Run().Chmod(tmpDir, os.FileMode(0755)); err != nil {
+	if err := jirix.Run().Chmod(tmpDir, os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ctx.Run().Rename(tmpDir, op.destination); err != nil {
+	if err := jirix.Run().Rename(tmpDir, op.destination); err != nil {
 		return err
 	}
-	if err := resetProject(ctx, op.project); err != nil {
+	if err := resetProject(jirix, op.project); err != nil {
 		return err
 	}
-	return addProjectToManifest(ctx, manifest, op.project)
+	return addProjectToManifest(jirix, manifest, op.project)
 }
 
 func (op createOperation) String() string {
 	return fmt.Sprintf("create project %q in %q and advance it to %q", op.project.Name, op.destination, fmtRevision(op.project.Revision))
 }
 
-func (op createOperation) Test(ctx *tool.Context) error {
+func (op createOperation) Test(jirix *jiri.X) error {
 	// Check the local file system.
-	if _, err := ctx.Run().Stat(op.destination); err != nil {
+	if _, err := jirix.Run().Stat(op.destination); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -1424,7 +1425,7 @@ type deleteOperation struct {
 	gc bool
 }
 
-func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
+func (op deleteOperation) Run(jirix *jiri.X, _ *Manifest) error {
 	if op.gc {
 		// Never delete the <JiriProject>.
 		if op.project.Name == JiriProject {
@@ -1434,12 +1435,12 @@ func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 				"development tools and will thus not be deleted",
 			}
 			opts := runutil.Opts{Verbose: true}
-			ctx.Run().OutputWithOpts(opts, lines)
+			jirix.Run().OutputWithOpts(opts, lines)
 			return nil
 		}
 		// Never delete projects with non-master branches, uncommitted
 		// work, or untracked content.
-		git := ctx.Git(tool.RootDirOpt(op.project.Path))
+		git := jirix.Git(tool.RootDirOpt(op.project.Path))
 		branches, _, err := git.GetBranches()
 		if err != nil {
 			return err
@@ -1459,10 +1460,10 @@ func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 				"work, or untracked files and will thus not be deleted",
 			}
 			opts := runutil.Opts{Verbose: true}
-			ctx.Run().OutputWithOpts(opts, lines)
+			jirix.Run().OutputWithOpts(opts, lines)
 			return nil
 		}
-		return ctx.Run().RemoveAll(op.source)
+		return jirix.Run().RemoveAll(op.source)
 	}
 	lines := []string{
 		fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
@@ -1471,7 +1472,7 @@ func (op deleteOperation) Run(ctx *tool.Context, _ *Manifest) error {
 		`or invoke "jiri update -gc" to remove all such local projects`,
 	}
 	opts := runutil.Opts{Verbose: true}
-	ctx.Run().OutputWithOpts(opts, lines)
+	jirix.Run().OutputWithOpts(opts, lines)
 	return nil
 }
 
@@ -1479,8 +1480,8 @@ func (op deleteOperation) String() string {
 	return fmt.Sprintf("delete project %q from %q", op.project.Name, op.source)
 }
 
-func (op deleteOperation) Test(ctx *tool.Context) error {
-	if _, err := ctx.Run().Stat(op.source); err != nil {
+func (op deleteOperation) Test(jirix *jiri.X) error {
+	if _, err := jirix.Run().Stat(op.source); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot delete %q as it does not exist", op.source)
 		}
@@ -1494,38 +1495,38 @@ type moveOperation struct {
 	commonOperation
 }
 
-func (op moveOperation) Run(ctx *tool.Context, manifest *Manifest) error {
+func (op moveOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-	if err := ctx.Run().MkdirAll(path, perm); err != nil {
+	if err := jirix.Run().MkdirAll(path, perm); err != nil {
 		return err
 	}
-	if err := ctx.Run().Rename(op.source, op.destination); err != nil {
+	if err := jirix.Run().Rename(op.source, op.destination); err != nil {
 		return err
 	}
-	if err := reportNonMaster(ctx, op.project); err != nil {
+	if err := reportNonMaster(jirix, op.project); err != nil {
 		return err
 	}
-	if err := resetProject(ctx, op.project); err != nil {
+	if err := resetProject(jirix, op.project); err != nil {
 		return err
 	}
-	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
+	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
 		return err
 	}
-	return addProjectToManifest(ctx, manifest, op.project)
+	return addProjectToManifest(jirix, manifest, op.project)
 }
 
 func (op moveOperation) String() string {
 	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q", op.project.Name, op.source, op.destination, fmtRevision(op.project.Revision))
 }
 
-func (op moveOperation) Test(ctx *tool.Context) error {
-	if _, err := ctx.Run().Stat(op.source); err != nil {
+func (op moveOperation) Test(jirix *jiri.X) error {
+	if _, err := jirix.Run().Stat(op.source); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot move %q to %q as the source does not exist", op.source, op.destination)
 		}
 		return err
 	}
-	if _, err := ctx.Run().Stat(op.destination); err != nil {
+	if _, err := jirix.Run().Stat(op.destination); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
@@ -1540,24 +1541,24 @@ type updateOperation struct {
 	commonOperation
 }
 
-func (op updateOperation) Run(ctx *tool.Context, manifest *Manifest) error {
-	if err := reportNonMaster(ctx, op.project); err != nil {
+func (op updateOperation) Run(jirix *jiri.X, manifest *Manifest) error {
+	if err := reportNonMaster(jirix, op.project); err != nil {
 		return err
 	}
-	if err := resetProject(ctx, op.project); err != nil {
+	if err := resetProject(jirix, op.project); err != nil {
 		return err
 	}
-	if err := writeMetadata(ctx, op.project, op.project.Path); err != nil {
+	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
 		return err
 	}
-	return addProjectToManifest(ctx, manifest, op.project)
+	return addProjectToManifest(jirix, manifest, op.project)
 }
 
 func (op updateOperation) String() string {
 	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, fmtRevision(op.project.Revision))
 }
 
-func (op updateOperation) Test(ctx *tool.Context) error {
+func (op updateOperation) Test(jirix *jiri.X) error {
 	return nil
 }
 
@@ -1567,15 +1568,15 @@ type nullOperation struct {
 	commonOperation
 }
 
-func (op nullOperation) Run(ctx *tool.Context, manifest *Manifest) error {
-	return addProjectToManifest(ctx, manifest, op.project)
+func (op nullOperation) Run(jirix *jiri.X, manifest *Manifest) error {
+	return addProjectToManifest(jirix, manifest, op.project)
 }
 
 func (op nullOperation) String() string {
 	return fmt.Sprintf("project %q located in %q at revision %q is up-to-date", op.project.Name, op.source, fmtRevision(op.project.Revision))
 }
 
-func (op nullOperation) Test(ctx *tool.Context) error {
+func (op nullOperation) Test(jirix *jiri.X) error {
 	return nil
 }
 
@@ -1696,8 +1697,8 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) (operati
 
 // ParseNames identifies the set of projects that a jiri command should
 // be applied to.
-func ParseNames(ctx *tool.Context, args []string, defaultProjects map[string]struct{}) (map[string]Project, error) {
-	projects, _, err := ReadManifest(ctx)
+func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{}) (map[string]Project, error) {
+	projects, _, err := ReadManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
@@ -1712,7 +1713,7 @@ func ParseNames(ctx *tool.Context, args []string, defaultProjects map[string]str
 		} else {
 			// Issue a warning if the target project does not exist in the
 			// project manifest.
-			fmt.Fprintf(ctx.Stderr(), "WARNING: project %q does not exist in the project manifest and will be skipped\n", name)
+			fmt.Fprintf(jirix.Stderr(), "WARNING: project %q does not exist in the project manifest and will be skipped\n", name)
 		}
 	}
 	return result, nil

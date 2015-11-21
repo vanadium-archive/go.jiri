@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/retry"
 	"v.io/jiri/tool"
@@ -28,7 +29,7 @@ func init() {
 
 // cmdUpdate represents the "jiri update" command.
 var cmdUpdate = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runUpdate),
+	Runner: jiri.RunnerFunc(runUpdate),
 	Name:   "update",
 	Short:  "Update all jiri tools and projects",
 	Long: `
@@ -42,9 +43,7 @@ Run "jiri help manifest" for details on manifests.
 `,
 }
 
-func runUpdate(env *cmdline.Env, _ []string) error {
-	ctx := tool.NewContextFromEnv(env)
-
+func runUpdate(jirix *jiri.X, _ []string) error {
 	// Create a snapshot of the current state of all projects and
 	// write it to the $JIRI_ROOT/.update_history folder.
 	root, err := project.JiriRoot()
@@ -52,14 +51,14 @@ func runUpdate(env *cmdline.Env, _ []string) error {
 		return err
 	}
 	snapshotFile := filepath.Join(root, ".update_history", time.Now().Format(time.RFC3339))
-	if err := project.CreateSnapshot(ctx, snapshotFile); err != nil {
+	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
 	updateFn := func() error {
-		return project.UpdateUniverse(ctx, gcFlag)
+		return project.UpdateUniverse(jirix, gcFlag)
 	}
-	return retry.Function(ctx, updateFn, retry.AttemptsOpt(attemptsFlag))
+	return retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag))
 }

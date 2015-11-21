@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
@@ -95,10 +96,10 @@ func InitProfilesFromFlag(flag string, appendJiriProfile AppendJiriProfileMode) 
 // are not successfully logged therein after deleting the entire contents of the
 // dir parameter. Consequently it does not make sense to apply AtomicAction to
 // the same directory in sequence.
-func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string) error {
+func AtomicAction(jirix *jiri.X, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
 		completionLogPath := filepath.Join(dir, ".complete")
-		s := ctx.NewSeq()
+		s := jirix.NewSeq()
 		if dir != "" {
 			if exists, _ := s.DirectoryExists(dir); exists {
 				// If the dir exists but the completionLogPath doesn't, then it
@@ -107,8 +108,8 @@ func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string
 				if exists, _ := s.FileExists(completionLogPath); !exists {
 					s.RemoveAll(dir).Done()
 				} else {
-					if ctx.Verbose() {
-						fmt.Fprintf(ctx.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
+					if jirix.Verbose() {
+						fmt.Fprintf(jirix.Stdout(), "AtomicAction: %s already completed in %s\n", message, dir)
 					}
 					return nil
 				}
@@ -122,14 +123,14 @@ func AtomicAction(ctx *tool.Context, installFn func() error, dir, message string
 		}
 		return s.WriteFile(completionLogPath, []byte("completed"), DefaultFilePerm).Done()
 	}
-	return ctx.NewSeq().Call(atomicFn, message).Done()
+	return jirix.NewSeq().Call(atomicFn, message).Done()
 }
 
-func brewList(ctx *tool.Context) (map[string]bool, error) {
+func brewList(jirix *jiri.X) (map[string]bool, error) {
 	var out bytes.Buffer
-	err := ctx.NewSeq().Capture(&out, &out).Last("brew", "list")
+	err := jirix.NewSeq().Capture(&out, &out).Last("brew", "list")
 	if err != nil || tool.VerboseFlag {
-		fmt.Fprintf(ctx.Stdout(), "%s", out.String())
+		fmt.Fprintf(jirix.Stdout(), "%s", out.String())
 	}
 	scanner := bufio.NewScanner(&out)
 	pkgs := map[string]bool{}
@@ -141,14 +142,14 @@ func brewList(ctx *tool.Context) (map[string]bool, error) {
 
 // InstallPackages identifies the packages that need to be installed
 // and installs them using the OS-specific package manager.
-func InstallPackages(ctx *tool.Context, pkgs []string) error {
+func InstallPackages(jirix *jiri.X, pkgs []string) error {
 	installDepsFn := func() error {
-		s := ctx.NewSeq()
+		s := jirix.NewSeq()
 		switch runtime.GOOS {
 		case "linux":
 			if runutil.IsFNLHost() {
-				fmt.Fprintf(ctx.Stdout(), "skipping installation of %v on FNL host", pkgs)
-				fmt.Fprintf(ctx.Stdout(), "success\n")
+				fmt.Fprintf(jirix.Stdout(), "skipping installation of %v on FNL host", pkgs)
+				fmt.Fprintf(jirix.Stdout(), "success\n")
 				break
 			}
 			installPkgs := []string{}
@@ -159,16 +160,16 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 			}
 			if len(installPkgs) > 0 {
 				args := append([]string{"apt-get", "install", "-y"}, installPkgs...)
-				fmt.Fprintf(ctx.Stdout(), "Running: sudo %s: ", strings.Join(args, " "))
+				fmt.Fprintf(jirix.Stdout(), "Running: sudo %s: ", strings.Join(args, " "))
 				if err := s.Last("sudo", args...); err != nil {
-					fmt.Fprintf(ctx.Stdout(), "%v\n", err)
+					fmt.Fprintf(jirix.Stdout(), "%v\n", err)
 					return err
 				}
-				fmt.Fprintf(ctx.Stdout(), "success\n")
+				fmt.Fprintf(jirix.Stdout(), "success\n")
 			}
 		case "darwin":
 			installPkgs := []string{}
-			installedPkgs, err := brewList(ctx)
+			installedPkgs, err := brewList(jirix)
 			if err != nil {
 				return err
 			}
@@ -179,22 +180,22 @@ func InstallPackages(ctx *tool.Context, pkgs []string) error {
 			}
 			if len(installPkgs) > 0 {
 				args := append([]string{"install"}, installPkgs...)
-				fmt.Fprintf(ctx.Stdout(), "Running: brew %s: ", strings.Join(args, " "))
+				fmt.Fprintf(jirix.Stdout(), "Running: brew %s: ", strings.Join(args, " "))
 				if err := s.Last("brew", args...); err != nil {
-					fmt.Fprintf(ctx.Stdout(), "%v\n", err)
+					fmt.Fprintf(jirix.Stdout(), "%v\n", err)
 					return err
 				}
-				fmt.Fprintf(ctx.Stdout(), "success\n")
+				fmt.Fprintf(jirix.Stdout(), "success\n")
 			}
 		}
 		return nil
 	}
-	return ctx.NewSeq().Call(installDepsFn, "Install dependencies").Done()
+	return jirix.NewSeq().Call(installDepsFn, "Install dependencies").Done()
 }
 
 // ensureAction ensures that the requested profile and target
 // is installed/uninstalled, installing/uninstalling it if only if necessary.
-func ensureAction(ctx *tool.Context, action Action, profile string, root RelativePath, target Target) error {
+func ensureAction(jirix *jiri.X, action Action, profile string, root RelativePath, target Target) error {
 	verb := ""
 	switch action {
 	case Install:
@@ -205,8 +206,8 @@ func ensureAction(ctx *tool.Context, action Action, profile string, root Relativ
 		return fmt.Errorf("unrecognised action %v", action)
 	}
 	if t := LookupProfileTarget(profile, target); t != nil {
-		if ctx.Verbose() {
-			fmt.Fprintf(ctx.Stdout(), "%v %v is already %sed as %v\n", profile, target, verb, t)
+		if jirix.Verbose() {
+			fmt.Fprintf(jirix.Stdout(), "%v %v is already %sed as %v\n", profile, target, verb, t)
 		}
 		return nil
 	}
@@ -219,32 +220,32 @@ func ensureAction(ctx *tool.Context, action Action, profile string, root Relativ
 		return err
 	}
 	target.SetVersion(version)
-	if ctx.Verbose() || ctx.DryRun() {
-		fmt.Fprintf(ctx.Stdout(), "%s %s %s\n", verb, profile, target.DebugString())
+	if jirix.Verbose() || jirix.DryRun() {
+		fmt.Fprintf(jirix.Stdout(), "%s %s %s\n", verb, profile, target.DebugString())
 	}
 	if action == Install {
-		return mgr.Install(ctx, root, target)
+		return mgr.Install(jirix, root, target)
 	}
-	return mgr.Uninstall(ctx, root, target)
+	return mgr.Uninstall(jirix, root, target)
 }
 
 // EnsureProfileTargetIsInstalled ensures that the requested profile and target
 // is installed, installing it if only if necessary.
-func EnsureProfileTargetIsInstalled(ctx *tool.Context, profile string, root RelativePath, target Target) error {
-	return ensureAction(ctx, Install, profile, root, target)
+func EnsureProfileTargetIsInstalled(jirix *jiri.X, profile string, root RelativePath, target Target) error {
+	return ensureAction(jirix, Install, profile, root, target)
 }
 
 // EnsureProfileTargetIsUninstalled ensures that the requested profile and target
 // are no longer installed.
-func EnsureProfileTargetIsUninstalled(ctx *tool.Context, profile string, root RelativePath, target Target) error {
-	return ensureAction(ctx, Uninstall, profile, root, target)
+func EnsureProfileTargetIsUninstalled(jirix *jiri.X, profile string, root RelativePath, target Target) error {
+	return ensureAction(jirix, Uninstall, profile, root, target)
 }
 
 // Fetch downloads the specified url and saves it to dst.
 // TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
 // so it does not pollute the profile package namespace.
-func Fetch(ctx *tool.Context, dst, url string) error {
-	s := ctx.NewSeq()
+func Fetch(jirix *jiri.X, dst, url string) error {
+	s := jirix.NewSeq()
 	s.Output([]string{"fetching " + url})
 	resp, err := http.Get(url)
 	if err != nil {
@@ -265,7 +266,7 @@ func Fetch(ctx *tool.Context, dst, url string) error {
 // Unzip unzips the file in srcFile and puts resulting files in directory dstDir.
 // TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
 // so it does not pollute the profile package namespace.
-func Unzip(ctx *tool.Context, srcFile, dstDir string) error {
+func Unzip(jirix *jiri.X, srcFile, dstDir string) error {
 	r, err := zip.OpenReader(srcFile)
 	if err != nil {
 		return err
@@ -279,7 +280,7 @@ func Unzip(ctx *tool.Context, srcFile, dstDir string) error {
 		}
 		defer rc.Close()
 
-		s := ctx.NewSeq()
+		s := jirix.NewSeq()
 		fileDst := filepath.Join(dstDir, zFile.Name)
 		if zFile.FileInfo().IsDir() {
 			return s.MkdirAll(fileDst, zFile.Mode()).Done()
@@ -299,7 +300,7 @@ func Unzip(ctx *tool.Context, srcFile, dstDir string) error {
 		_, err = s.Copy(file, rc)
 		return err
 	}
-	s := ctx.NewSeq()
+	s := jirix.NewSeq()
 	s.Output([]string{"unzipping " + srcFile})
 	for _, zFile := range r.File {
 		s.Output([]string{"extracting " + zFile.Name})

@@ -10,14 +10,15 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 	"v.io/x/lib/host"
 )
 
 // ConfigFilePath returns the path to the tools configuration file.
-func ConfigFilePath(ctx *tool.Context) (string, error) {
-	dataDir, err := project.DataDirPath(ctx, tool.Name)
+func ConfigFilePath(jirix *jiri.X) (string, error) {
+	dataDir, err := project.DataDirPath(jirix, tool.Name)
 	if err != nil {
 		return "", err
 	}
@@ -25,8 +26,8 @@ func ConfigFilePath(ctx *tool.Context) (string, error) {
 }
 
 // OncallRotationPath returns the path to the oncall rotation file.
-func OncallRotationPath(ctx *tool.Context) (string, error) {
-	dataDir, err := project.DataDirPath(ctx, tool.Name)
+func OncallRotationPath(jirix *jiri.X) (string, error) {
+	dataDir, err := project.DataDirPath(jirix, tool.Name)
 	if err != nil {
 		return "", err
 	}

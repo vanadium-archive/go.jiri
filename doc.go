@@ -18,7 +18,6 @@ The jiri commands are:
    rebuild      Rebuild all jiri tools
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
-   version      Print version
    help         Display help for commands or topics
 
 The jiri additional help topics are:
@@ -338,13 +337,6 @@ The jiri update flags are:
    Garbage collect obsolete repositories.
  -manifest=
    Name of the project manifest.
-
-Jiri version - Print version
-
-Print version of the jiri tool.
-
-Usage:
-   jiri version
 
 Jiri help - Display help for commands or topics
 

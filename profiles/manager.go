@@ -41,7 +41,7 @@ import (
 	"strings"
 	"sync"
 
-	"v.io/jiri/tool"
+	"v.io/jiri/jiri"
 	"v.io/x/lib/envvar"
 )
 
@@ -177,9 +177,9 @@ type Manager interface {
 	// is its name and version.
 	String() string
 	// Install installs the profile for the specified build target.
-	Install(ctx *tool.Context, root RelativePath, target Target) error
+	Install(jirix *jiri.X, root RelativePath, target Target) error
 	// Uninstall uninstalls the profile for the specified build target. When
 	// the last target for any given profile is uninstalled, then the profile
 	// itself (i.e. the source code) will be uninstalled.
-	Uninstall(ctx *tool.Context, root RelativePath, target Target) error
+	Uninstall(jirix *jiri.X, root RelativePath, target Target) error
 }

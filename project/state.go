@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"v.io/jiri/jiri"
 	"v.io/jiri/tool"
 )
 
@@ -24,11 +25,11 @@ type ProjectState struct {
 	Project        Project
 }
 
-func setProjectState(ctx *tool.Context, state *ProjectState, checkDirty bool, ch chan<- error) {
+func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch chan<- error) {
 	var err error
 	switch state.Project.Protocol {
 	case "git":
-		scm := ctx.Git(tool.RootDirOpt(state.Project.Path))
+		scm := jirix.Git(tool.RootDirOpt(state.Project.Path))
 		var branches []string
 		branches, state.CurrentBranch, err = scm.GetBranches()
 		if err != nil {
@@ -38,7 +39,7 @@ func setProjectState(ctx *tool.Context, state *ProjectState, checkDirty bool, ch
 		for _, branch := range branches {
 			file := filepath.Join(state.Project.Path, MetadataDirName(), branch, ".gerrit_commit_message")
 			hasFile := true
-			if _, err := ctx.Run().Stat(file); err != nil {
+			if _, err := jirix.Run().Stat(file); err != nil {
 				if !os.IsNotExist(err) {
 					ch <- err
 					return
@@ -69,8 +70,8 @@ func setProjectState(ctx *tool.Context, state *ProjectState, checkDirty bool, ch
 	ch <- nil
 }
 
-func GetProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*ProjectState, error) {
-	projects, err := LocalProjects(ctx, FastScan)
+func GetProjectStates(jirix *jiri.X, checkDirty bool) (map[string]*ProjectState, error) {
+	projects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +82,8 @@ func GetProjectStates(ctx *tool.Context, checkDirty bool) (map[string]*ProjectSt
 			Project: project,
 		}
 		states[name] = state
-		// ctx is not threadsafe, so we make a clone for each goroutine.
-		go setProjectState(ctx.Clone(tool.ContextOpts{}), state, checkDirty, sem)
+		// jirix is not threadsafe, so we make a clone for each goroutine.
+		go setProjectState(jirix.Clone(tool.ContextOpts{}), state, checkDirty, sem)
 	}
 	for _ = range projects {
 		err := <-sem

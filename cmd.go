@@ -8,7 +8,6 @@
 package main
 
 import (
-	"fmt"
 	"runtime"
 
 	"v.io/jiri/tool"
@@ -40,24 +39,10 @@ Command jiri is a multi-purpose tool for multi-repo development.
 		cmdRebuild,
 		cmdSnapshot,
 		cmdUpdate,
-		cmdVersion,
 	},
 	Topics: []cmdline.Topic{
 		topicManifest,
 	},
-}
-
-// cmdVersion represents the "jiri version" command.
-var cmdVersion = &cmdline.Command{
-	Runner: cmdline.RunnerFunc(runVersion),
-	Name:   "version",
-	Short:  "Print version",
-	Long:   "Print version of the jiri tool.",
-}
-
-func runVersion(env *cmdline.Env, _ []string) error {
-	fmt.Fprintf(env.Stdout, "jiri tool version %v\n", tool.Version)
-	return nil
 }
 
 var topicManifest = cmdline.Topic{
