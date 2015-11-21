@@ -612,12 +612,13 @@ func logResult(jirix *jiri.X, action string, mgr profiles.Manager, target profil
 func applyCommand(names []string, jirix *jiri.X, target profiles.Target, fn func(profiles.Manager, *jiri.X, profiles.Target) error) error {
 	for _, n := range names {
 		mgr := profiles.LookupManager(n)
-		version, err := mgr.VersionInfo().Select(target.Version())
+		profileTarget := target
+		version, err := mgr.VersionInfo().Select(profileTarget.Version())
 		if err != nil {
 			return err
 		}
-		target.SetVersion(version)
-		if err := fn(mgr, jirix, target); err != nil {
+		profileTarget.SetVersion(version)
+		if err := fn(mgr, jirix, profileTarget); err != nil {
 			return err
 		}
 	}
