@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"v.io/jiri/jiri"
-	"v.io/jiri/project"
+	"v.io/jiri/jiritest"
 )
 
 func createOncallFile(t *testing.T, jirix *jiri.X) {
@@ -51,7 +51,7 @@ func createOncallFile(t *testing.T, jirix *jiri.X) {
 }
 
 func TestOncall(t *testing.T) {
-	root, err := project.NewFakeJiriRoot()
+	root, err := jiritest.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -60,14 +60,6 @@ func TestOncall(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := project.JiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	// Create a oncall.v1.xml file.
 	createOncallFile(t, root.X)

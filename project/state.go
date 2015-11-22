@@ -37,7 +37,7 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 			return
 		}
 		for _, branch := range branches {
-			file := filepath.Join(state.Project.Path, MetadataDirName(), branch, ".gerrit_commit_message")
+			file := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, branch, ".gerrit_commit_message")
 			hasFile := true
 			if _, err := jirix.Run().Stat(file); err != nil {
 				if !os.IsNotExist(err) {

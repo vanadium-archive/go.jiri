@@ -36,29 +36,15 @@ func OncallRotationPath(jirix *jiri.X) (string, error) {
 
 // ThirdPartyBinPath returns the path to the given third-party tool
 // taking into account the host and the target Go architecture.
-func ThirdPartyBinPath(name string) (string, error) {
-	root, err := project.JiriRoot()
-	if err != nil {
-		return "", err
-	}
-	bin := filepath.Join(root, "third_party", "go", "bin", name)
+func ThirdPartyBinPath(jirix *jiri.X, name string) (string, error) {
+	bin := filepath.Join(jirix.Root, "third_party", "go", "bin", name)
 	goArch := os.Getenv("GOARCH")
 	machineArch, err := host.Arch()
 	if err != nil {
 		return "", err
 	}
 	if goArch != "" && goArch != machineArch {
-		bin = filepath.Join(root, "third_party", "go", "bin", fmt.Sprintf("%s_%s", runtime.GOOS, goArch), name)
+		bin = filepath.Join(jirix.Root, "third_party", "go", "bin", fmt.Sprintf("%s_%s", runtime.GOOS, goArch), name)
 	}
 	return bin, nil
-}
-
-// ThirdPartyCCodePath returns that path to the directory containing built
-// binaries for the target OS and architecture.
-func ThirdPartyCCodePath(os, arch string) (string, error) {
-	root, err := project.JiriRoot()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, "third_party", "cout", fmt.Sprintf("%s_%s", os, arch)), nil
 }

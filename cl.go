@@ -81,7 +81,7 @@ func getCommitMessageFileName(jirix *jiri.X, branch string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(topLevel, project.MetadataDirName(), branch, commitMessageFileName), nil
+	return filepath.Join(topLevel, jiri.ProjectMetaDir, branch, commitMessageFileName), nil
 }
 
 func getDependencyPathFileName(jirix *jiri.X, branch string) (string, error) {
@@ -89,7 +89,7 @@ func getDependencyPathFileName(jirix *jiri.X, branch string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(topLevel, project.MetadataDirName(), branch, dependencyPathFileName), nil
+	return filepath.Join(topLevel, jiri.ProjectMetaDir, branch, dependencyPathFileName), nil
 }
 
 func getDependentCLs(jirix *jiri.X, branch string) ([]string, error) {
@@ -209,7 +209,7 @@ func cleanupBranch(jirix *jiri.X, branch string) error {
 	if err != nil {
 		return err
 	}
-	metadataDir := filepath.Join(topLevel, project.MetadataDirName())
+	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
 	if err := jirix.Run().RemoveAll(filepath.Join(metadataDir, branch)); err != nil {
 		return err
 	}
@@ -887,7 +887,7 @@ func (review *review) updateReviewMessage(file string) error {
 	if err != nil {
 		return err
 	}
-	newMetadataDir := filepath.Join(topLevel, project.MetadataDirName(), review.CLOpts.Branch)
+	newMetadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir, review.CLOpts.Branch)
 	if err := review.jirix.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
@@ -909,7 +909,7 @@ branch and records the relationship between the current branch and the
 new branch in the %v metadata directory. The information recorded in
 the %v metadata directory tracks dependencies between CLs and is used
 by the "jiri cl sync" and "jiri cl mail" commands.
-`, project.MetadataDirName(), project.MetadataDirName()),
+`, jiri.ProjectMetaDir, jiri.ProjectMetaDir),
 	ArgsName: "<name>",
 	ArgsLong: "<name> is the changelist name.",
 }
@@ -954,7 +954,7 @@ func newCL(jirix *jiri.X, args []string) error {
 		return err
 	}
 	branches = append(branches, originalBranch)
-	newMetadataDir := filepath.Join(topLevel, project.MetadataDirName(), newBranch)
+	newMetadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir, newBranch)
 	if err := jirix.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
@@ -989,7 +989,7 @@ NOTE: It is possible that the command cannot automatically merge
 changes in an ancestor into its dependent. When that occurs, the
 command is aborted and prints instructions that need to be followed
 before the command can be retried.
-`, project.MetadataDirName()),
+`, jiri.ProjectMetaDir),
 }
 
 func runCLSync(jirix *jiri.X, _ []string) error {

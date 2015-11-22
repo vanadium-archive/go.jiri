@@ -18,7 +18,6 @@ import (
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
-	"v.io/jiri/project"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/textutil"
@@ -118,7 +117,6 @@ var (
 	manifestFlag         string
 	showManifestFlag     bool
 	profilesFlag         string
-	rootDir              string
 	availableFlag        bool
 	verboseFlag          bool
 	allFlag              bool
@@ -138,14 +136,8 @@ func Main(name string) {
 func Init(defaultManifestFilename string) {
 	targetFlag = profiles.DefaultTarget()
 	mergePoliciesFlag = profiles.JiriMergePolicies()
-
-	var err error
-	rootDir, err = project.JiriRoot()
-	if err != nil {
-		panic(err)
-	}
-
-	rootPath = profiles.NewRelativePath("JIRI_ROOT", rootDir).Join("profiles")
+	// TODO(toddw): Change logic to derive rootPath from jirix.Root.
+	rootPath = profiles.NewRelativePath("JIRI_ROOT", jiri.FindRoot()).Join("profiles")
 
 	// Every sub-command accepts: --manifest
 	for _, fs := range []*flag.FlagSet{

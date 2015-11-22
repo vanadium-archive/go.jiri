@@ -16,7 +16,7 @@ import (
 	"v.io/jiri/gerrit"
 	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
-	"v.io/jiri/project"
+	"v.io/jiri/jiritest"
 )
 
 // assertCommitCount asserts that the commit count between two
@@ -144,7 +144,7 @@ func createRepo(t *testing.T, jirix *jiri.X, workingDir, prefix string) string {
 	if err := jirix.Git().Init(repoPath); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Run().MkdirAll(filepath.Join(repoPath, project.MetadataDirName()), os.FileMode(0755)); err != nil {
+	if err := jirix.Run().MkdirAll(filepath.Join(repoPath, jiri.ProjectMetaDir), os.FileMode(0755)); err != nil {
 		t.Fatalf("%v", err)
 	}
 	return repoPath
@@ -221,12 +221,12 @@ func submit(t *testing.T, jirix *jiri.X, originPath string, gerritPath string, r
 }
 
 // setupTest creates a setup for testing the review tool.
-func setupTest(t *testing.T, installHook bool) (cwd string, root *project.FakeJiriRoot, repoPath, originPath, gerritPath string) {
+func setupTest(t *testing.T, installHook bool) (cwd string, root *jiritest.FakeJiriRoot, repoPath, originPath, gerritPath string) {
 	var err error
 	if cwd, err = os.Getwd(); err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	if root, err = project.NewFakeJiriRoot(); err != nil {
+	if root, err = jiritest.NewFakeJiriRoot(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	repoPath, originPath, gerritPath = createTestRepos(t, root.X, root.Dir)
@@ -240,7 +240,7 @@ func setupTest(t *testing.T, installHook bool) (cwd string, root *project.FakeJi
 }
 
 // teardownTest cleans up the setup for testing the review tool.
-func teardownTest(t *testing.T, oldWorkDir string, root *project.FakeJiriRoot) {
+func teardownTest(t *testing.T, oldWorkDir string, root *jiritest.FakeJiriRoot) {
 	chdir(t, root.X, oldWorkDir)
 	if err := root.Cleanup(); err != nil {
 		t.Fatalf("%v", err)

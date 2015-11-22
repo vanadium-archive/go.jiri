@@ -196,7 +196,7 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 		return err
 	}
 	for _, project := range localProjects {
-		relPath, err := ToRel(project.Path)
+		relPath, err := toRel(jirix, project.Path)
 		if err != nil {
 			return err
 		}
@@ -240,10 +240,7 @@ const currentManifestFileName = ".current_manifest"
 // CurrentManifest returns a manifest that identifies the result of
 // the most recent "jiri update" invocation.
 func CurrentManifest(jirix *jiri.X) (*Manifest, error) {
-	currentManifestPath, err := ToAbs(currentManifestFileName)
-	if err != nil {
-		return nil, err
-	}
+	currentManifestPath := toAbs(jirix, currentManifestFileName)
 	bytes, err := jirix.Run().ReadFile(currentManifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -265,10 +262,7 @@ tool builds. To fix this problem, please run "jiri update".
 // writeCurrentManifest writes the given manifest to a file that
 // stores the result of the most recent "jiri update" invocation.
 func writeCurrentManifest(jirix *jiri.X, manifest *Manifest) error {
-	currentManifestPath, err := ToAbs(currentManifestFileName)
-	if err != nil {
-		return err
-	}
+	currentManifestPath := toAbs(jirix, currentManifestFileName)
 	bytes, err := xml.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
@@ -287,9 +281,9 @@ func CurrentProjectName(jirix *jiri.X) (string, error) {
 	if err != nil {
 		return "", nil
 	}
-	metadataDir := filepath.Join(topLevel, metadataDirName)
+	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
 	if _, err := jirix.Run().Stat(metadataDir); err == nil {
-		metadataFile := filepath.Join(metadataDir, metadataFileName)
+		metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
 		bytes, err := jirix.Run().ReadFile(metadataFile)
 		if err != nil {
 			return "", err
@@ -340,7 +334,6 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 	jirix.TimerPush("local projects")
 	defer jirix.TimerPop()
 
-	projects := Projects{}
 	if scanMode == FastScan {
 		// Fast path:  Full scan was not requested, and all projects in
 		// manifest exist on local filesystem.  We just use the projects
@@ -359,17 +352,11 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 	}
 
 	// Slow path: Either full scan was not requested, or projects exist in
-	// manifest that were not found locally.   Do a scan of all projects in
-	// JIRI_ROOT.
-	root, err := JiriRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	// Initial call to findLocalProjects -- it will recursively search all the
-	// directories under JiriRoot.
+	// manifest that were not found locally.  Do a recursive scan of all projects
+	// under JIRI_ROOT.
+	projects := Projects{}
 	jirix.TimerPush("scan fs")
-	err = findLocalProjects(jirix, root, projects)
+	err := findLocalProjects(jirix, jirix.Root, projects)
 	jirix.TimerPop()
 	if err != nil {
 		return nil, err
@@ -507,10 +494,7 @@ func readManifest(jirix *jiri.X, update bool) (Hosts, Projects, Tools, Hooks, er
 	jirix.TimerPush("read manifest")
 	defer jirix.TimerPop()
 	if update {
-		manifestPath, err := ToAbs(".manifest")
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
+		manifestPath := toAbs(jirix, ".manifest")
 		manifestRemote, err := getManifestRemote(jirix, manifestPath)
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -526,7 +510,7 @@ func readManifest(jirix *jiri.X, update bool) (Hosts, Projects, Tools, Hooks, er
 			return nil, nil, nil, nil, err
 		}
 	}
-	path, err := ResolveManifestPath(jirix.Manifest())
+	path, err := jirix.ResolveManifestPath(jirix.Manifest())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -800,15 +784,11 @@ func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string)
 
 // isLocalProject returns true if there is a project at the given path.
 func isLocalProject(jirix *jiri.X, path string) (bool, error) {
-	absPath, err := ToAbs(path)
-	if err != nil {
-		return false, err
-	}
+	absPath := toAbs(jirix, path)
 	// Existence of a metadata directory is how we know we've found a
 	// Jiri-maintained project.
-	metadataDir := filepath.Join(absPath, metadataDirName)
-	_, err = jirix.Run().Stat(metadataDir)
-	if err != nil {
+	metadataDir := filepath.Join(absPath, jiri.ProjectMetaDir)
+	if _, err := jirix.Run().Stat(metadataDir); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
@@ -821,11 +801,8 @@ func isLocalProject(jirix *jiri.X, path string) (bool, error) {
 // path in the filesystem.
 func projectAtPath(jirix *jiri.X, path string) (Project, error) {
 	var project Project
-	absPath, err := ToAbs(path)
-	if err != nil {
-		return project, err
-	}
-	metadataFile := filepath.Join(absPath, metadataDirName, metadataFileName)
+	absPath := toAbs(jirix, path)
+	metadataFile := filepath.Join(absPath, jiri.ProjectMetaDir, jiri.ProjectMetaFile)
 	bytes, err := jirix.Run().ReadFile(metadataFile)
 	if err != nil {
 		return project, err
@@ -833,21 +810,14 @@ func projectAtPath(jirix *jiri.X, path string) (Project, error) {
 	if err := xml.Unmarshal(bytes, &project); err != nil {
 		return project, fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
 	}
-	projectPath, err := ToAbs(project.Path)
-	if err != nil {
-		return project, err
-	}
-	project.Path = projectPath
+	project.Path = toAbs(jirix, project.Path)
 	return project, nil
 }
 
 // findLocalProjects scans the filesystem for all projects.  Note that project
 // directories can be nested recursively.
 func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
-	absPath, err := ToAbs(path)
-	if err != nil {
-		return err
-	}
+	absPath := toAbs(jirix, path)
 	isLocal, err := isLocalProject(jirix, absPath)
 	if err != nil {
 		return err
@@ -890,10 +860,7 @@ func InstallTools(jirix *jiri.X, dir string) error {
 		// In "dry run" mode, no binaries are built.
 		return nil
 	}
-	binDir, err := ToAbs(devtoolsBinDir)
-	if err != nil {
-		return err
-	}
+	binDir := toAbs(jirix, devtoolsBinDir)
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
@@ -1006,7 +973,7 @@ func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, to
 		if _, ok := stack[manifest.Name]; ok {
 			return fmt.Errorf("import cycle encountered")
 		}
-		path, err := ResolveManifestPath(manifest.Name)
+		path, err := jirix.ResolveManifestPath(manifest.Name)
 		if err != nil {
 			return err
 		}
@@ -1025,11 +992,7 @@ func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, to
 			continue
 		}
 		// Replace the relative path with an absolute one.
-		absPath, err := ToAbs(project.Path)
-		if err != nil {
-			return err
-		}
-		project.Path = absPath
+		project.Path = toAbs(jirix, project.Path)
 		// Use git as the default protocol.
 		if project.Protocol == "" {
 			project.Protocol = "git"
@@ -1216,7 +1179,7 @@ func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
 // writeMetadata stores the given project metadata in the directory
 // identified by the given path.
 func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
-	metadataDir := filepath.Join(dir, metadataDirName)
+	metadataDir := filepath.Join(dir, jiri.ProjectMetaDir)
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -1230,7 +1193,7 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	}
 	// Replace absolute project paths with relative paths to make it
 	// possible to move the $JIRI_ROOT directory locally.
-	relPath, err := ToRel(project.Path)
+	relPath, err := toRel(jirix, project.Path)
 	if err != nil {
 		return err
 	}
@@ -1239,7 +1202,7 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	if err != nil {
 		return fmt.Errorf("Marhsal() failed: %v", err)
 	}
-	metadataFile := filepath.Join(metadataDir, metadataFileName)
+	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
 	tmpMetadataFile := metadataFile + ".tmp"
 	if err := jirix.Run().WriteFile(tmpMetadataFile, bytes, os.FileMode(0644)); err != nil {
 		return err
@@ -1271,7 +1234,7 @@ func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) er
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
-	relPath, err := ToRel(project.Path)
+	relPath, err := toRel(jirix, project.Path)
 	if err != nil {
 		return err
 	}
@@ -1345,10 +1308,7 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		if found && strings.HasPrefix(op.project.Remote, host.Location) {
 			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
 			for _, githook := range host.GitHooks {
-				mdir, err := ManifestDir()
-				if err != nil {
-					return err
-				}
+				mdir := jirix.ManifestDir()
 				src, err := jirix.Run().ReadFile(filepath.Join(mdir, githook.Path))
 				if err != nil {
 					return err

@@ -99,7 +99,6 @@ func GoEnvironmentFromOS() []string {
 type ConfigHelper struct {
 	*envvar.Vars
 	profilesMode bool
-	root         string
 	jirix        *jiri.X
 	config       *util.Config
 	projects     project.Projects
@@ -111,10 +110,6 @@ type ConfigHelper struct {
 // existing, if any, in-memory profiles information will be used. If SkipProfiles
 // is specified for profilesMode, then no profiles are used.
 func NewConfigHelper(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*ConfigHelper, error) {
-	root, err := project.JiriRoot()
-	if err != nil {
-		return nil, err
-	}
 	config, err := util.LoadConfig(jirix)
 	if err != nil {
 		return nil, err
@@ -130,7 +125,6 @@ func NewConfigHelper(jirix *jiri.X, profilesMode ProfilesMode, filename string) 
 	}
 	ch := &ConfigHelper{
 		jirix:        jirix,
-		root:         root,
 		config:       config,
 		projects:     projects,
 		tools:        tools,
@@ -149,7 +143,7 @@ do not set JIRI_PROFILE.`)
 
 // Root returns the root of the jiri universe.
 func (ch *ConfigHelper) Root() string {
-	return ch.root
+	return ch.jirix.Root
 }
 
 // MergeEnv merges the embedded environment with the environment
@@ -178,7 +172,7 @@ func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, ta
 		envs = append(envs, e)
 	}
 	MergeEnv(policies, ch.Vars, envs...)
-	rp := NewRelativePath("JIRI_ROOT", ch.root)
+	rp := NewRelativePath("JIRI_ROOT", ch.jirix.Root)
 	rp.ExpandEnv(ch.Vars)
 }
 
@@ -223,22 +217,22 @@ func (ch *ConfigHelper) JiriProfile() []string {
 // GoPath computes and returns the GOPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) GoPath() string {
-	path := pathHelper(ch.jirix, ch.root, ch.projects, ch.config.GoWorkspaces(), "")
+	path := pathHelper(ch.jirix, ch.projects, ch.config.GoWorkspaces(), "")
 	return "GOPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // VDLPath computes and returns the VDLPATH environment variable based on the
 // current jiri configuration.
 func (ch *ConfigHelper) VDLPath() string {
-	path := pathHelper(ch.jirix, ch.root, ch.projects, ch.config.VDLWorkspaces(), "src")
+	path := pathHelper(ch.jirix, ch.projects, ch.config.VDLWorkspaces(), "src")
 	return "VDLPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // pathHelper is a utility function for determining paths for project workspaces.
-func pathHelper(jirix *jiri.X, root string, projects project.Projects, workspaces []string, suffix string) []string {
+func pathHelper(jirix *jiri.X, projects project.Projects, workspaces []string, suffix string) []string {
 	path := []string{}
 	for _, workspace := range workspaces {
-		absWorkspace := filepath.Join(root, workspace, suffix)
+		absWorkspace := filepath.Join(jirix.Root, workspace, suffix)
 		// Only append an entry to the path if the workspace is rooted
 		// under a jiri project that exists locally or vice versa.
 		for _, project := range projects {

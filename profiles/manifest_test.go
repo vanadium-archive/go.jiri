@@ -16,8 +16,8 @@ import (
 	"testing"
 
 	"v.io/jiri/jiri"
+	"v.io/jiri/jiritest"
 	"v.io/jiri/profiles"
-	"v.io/jiri/project"
 	"v.io/jiri/tool"
 )
 
@@ -192,17 +192,13 @@ func handleRelativePath(root profiles.RelativePath, s string) string {
 }
 
 func TestReadingV3AndV4(t *testing.T) {
-	root, err := project.JiriRoot()
-	if err != nil {
-		t.Fatal(err)
-	}
-	jirix := &jiri.X{Context: tool.NewDefaultContext(), Root: root}
+	jirix := jiritest.NewX_DeprecatedEnv(t, nil)
 	for i, c := range []struct {
 		filename, prefix, variable string
 		version                    profiles.Version
 	}{
 		{"v3.xml", "", "", profiles.V3},
-		{"v4.xml", root, "${JIRI_ROOT}", profiles.V4},
+		{"v4.xml", jirix.Root, "${JIRI_ROOT}", profiles.V4},
 	} {
 		ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, filepath.Join("testdata", c.filename))
 		if err != nil {

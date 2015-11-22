@@ -2,29 +2,28 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package util
+package jiri
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"v.io/jiri/project"
 	"v.io/jiri/tool"
 )
 
-// TestJiriRootSymlink checks that JiriRoot interprets the value
-// of the JIRI_ROOT environment variable as a path, evaluates any
-// symlinks the path might contain, and returns the result.
-func TestJiriRootSymlink(t *testing.T) {
-	jirix := tool.NewDefaultContext()
+// TestFindRootEnvSymlink checks that FindRoot interprets the value of the
+// JIRI_ROOT environment variable as a path, evaluates any symlinks the path
+// might contain, and returns the result.
+func TestFindRootEnvSymlink(t *testing.T) {
+	ctx := tool.NewDefaultContext()
 
 	// Create a temporary directory.
-	tmpDir, err := jirix.Run().TempDir("", "")
+	tmpDir, err := ctx.NewSeq().TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
-	defer jirix.Run().RemoveAll(tmpDir)
+	defer func() { ctx.NewSeq().RemoveAll(tmpDir).Done() }()
 
 	// Make sure tmpDir is not a symlink itself.
 	tmpDir, err = filepath.EvalSymlinks(tmpDir)
@@ -34,26 +33,20 @@ func TestJiriRootSymlink(t *testing.T) {
 
 	// Create a directory and a symlink to it.
 	root, perm := filepath.Join(tmpDir, "root"), os.FileMode(0700)
-	if err := jirix.Run().MkdirAll(root, perm); err != nil {
-		t.Fatalf("%v", err)
-	}
 	symRoot := filepath.Join(tmpDir, "sym_root")
-	if err := jirix.Run().Symlink(root, symRoot); err != nil {
+	seq := ctx.NewSeq().MkdirAll(root, perm).Symlink(root, symRoot)
+	if err := seq.Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	// Set the JIRI_ROOT to the symlink created above and check
-	// that JiriRoot() evaluates the symlink.
+	// Set the JIRI_ROOT to the symlink created above and check that FindRoot()
+	// evaluates the symlink.
 	oldRoot := os.Getenv("JIRI_ROOT")
 	if err := os.Setenv("JIRI_ROOT", symRoot); err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer os.Setenv("JIRI_ROOT", oldRoot)
-	got, err := project.JiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	if want := root; got != want {
+	if got, want := FindRoot(), root; got != want {
 		t.Fatalf("unexpected output: got %v, want %v", got, want)
 	}
 }

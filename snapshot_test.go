@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"v.io/jiri/jiri"
+	"v.io/jiri/jiritest"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 )
@@ -59,7 +60,7 @@ type label struct {
 
 func TestList(t *testing.T) {
 	// Setup a fake JIRI_ROOT.
-	root, err := project.NewFakeJiriRoot()
+	root, err := jiritest.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -68,20 +69,9 @@ func TestList(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := project.JiriRoot()
-	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
 
-	remoteSnapshotDir, err := project.RemoteSnapshotDir()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	localSnapshotDir, err := project.LocalSnapshotDir()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	remoteSnapshotDir := root.X.RemoteSnapshotDir()
+	localSnapshotDir := root.X.LocalSnapshotDir()
 
 	// Create a test suite.
 	tests := []config{
@@ -191,7 +181,7 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 
 func TestCreate(t *testing.T) {
 	// Setup a fake JIRI_ROOT instance.
-	root, err := project.NewFakeJiriRoot()
+	root, err := jiritest.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -215,13 +205,6 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}
-
-	// Point the JIRI_ROOT environment variable to the fake.
-	oldRoot, err := project.JiriRoot()
-	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
@@ -250,10 +233,7 @@ func TestCreate(t *testing.T) {
 
 	// Check that invoking the UpdateUniverse() with the local
 	// snapshot restores the local repositories.
-	snapshotDir, err := project.LocalSnapshotDir()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
+	snapshotDir := root.X.LocalSnapshotDir()
 	snapshotFile := filepath.Join(snapshotDir, "test-local")
 	localX := root.X.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,

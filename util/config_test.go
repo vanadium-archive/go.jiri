@@ -5,11 +5,10 @@
 package util
 
 import (
-	"os"
 	"reflect"
 	"testing"
 
-	"v.io/jiri/project"
+	"v.io/jiri/jiritest"
 )
 
 var (
@@ -111,7 +110,7 @@ func TestConfigAPI(t *testing.T) {
 }
 
 func TestConfigSerialization(t *testing.T) {
-	root, err := project.NewFakeJiriRoot()
+	root, err := jiritest.NewFakeJiriRoot()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -120,11 +119,6 @@ func TestConfigSerialization(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 	}()
-	oldRoot, err := project.JiriRoot()
-	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
 
 	config := NewConfig(
 		APICheckProjectsOpt(apiCheckProjects),

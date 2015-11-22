@@ -4,7 +4,7 @@
 
 // TODO(jsimsa): Switch this test to using FakeJiriRoot.
 
-package project
+package project_test
 
 import (
 	"bytes"
@@ -19,7 +19,8 @@ import (
 	"testing"
 
 	"v.io/jiri/jiri"
-	"v.io/jiri/jiri/jiritest"
+	"v.io/jiri/jiritest"
+	"v.io/jiri/project"
 )
 
 func addRemote(t *testing.T, jirix *jiri.X, localProject, name, remoteProject string) {
@@ -73,7 +74,7 @@ func createLocalManifestCopy(t *testing.T, jirix *jiri.X, dir, manifestDir strin
 	if err != nil {
 		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
 	}
-	manifest := Manifest{}
+	manifest := project.Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
@@ -91,8 +92,8 @@ func createLocalManifestCopy(t *testing.T, jirix *jiri.X, dir, manifestDir strin
 
 func createLocalManifestStub(t *testing.T, jirix *jiri.X, dir string) {
 	// Create a manifest stub.
-	manifest := Manifest{}
-	manifest.Imports = append(manifest.Imports, Import{Name: "default"})
+	manifest := project.Manifest{}
+	manifest.Imports = append(manifest.Imports, project.Import{Name: "default"})
 
 	// Store the manifest locally.
 	data, err := xml.Marshal(manifest)
@@ -110,9 +111,9 @@ func createRemoteManifest(t *testing.T, jirix *jiri.X, dir string, remotes []str
 	if err := jirix.Run().MkdirAll(manifestDir, perm); err != nil {
 		t.Fatalf("%v", err)
 	}
-	manifest := Manifest{}
+	manifest := project.Manifest{}
 	for i, remote := range remotes {
-		project := Project{
+		project := project.Project{
 			Name:     remote,
 			Path:     localProjectName(i),
 			Protocol: "git",
@@ -120,12 +121,12 @@ func createRemoteManifest(t *testing.T, jirix *jiri.X, dir string, remotes []str
 		}
 		manifest.Projects = append(manifest.Projects, project)
 	}
-	manifest.Hosts = []Host{
-		Host{
+	manifest.Hosts = []project.Host{
+		{
 			Name:     "gerrit",
 			Location: "git://example.com/gerrit",
 		},
-		Host{
+		{
 			Name:     "git",
 			Location: "git://example.com/git",
 		},
@@ -133,7 +134,7 @@ func createRemoteManifest(t *testing.T, jirix *jiri.X, dir string, remotes []str
 	commitManifest(t, jirix, &manifest, dir)
 }
 
-func commitManifest(t *testing.T, jirix *jiri.X, manifest *Manifest, manifestDir string) {
+func commitManifest(t *testing.T, jirix *jiri.X, manifest *project.Manifest, manifestDir string) {
 	data, err := xml.Marshal(*manifest)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -155,28 +156,28 @@ func commitManifest(t *testing.T, jirix *jiri.X, manifest *Manifest, manifestDir
 	}
 }
 
-func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, project string) {
+func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, name string) {
 	manifestFile := filepath.Join(manifestDir, "v2", "default")
 	data, err := ioutil.ReadFile(manifestFile)
 	if err != nil {
 		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
 	}
-	manifest := Manifest{}
+	manifest := project.Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
-	manifest.Projects = append(manifest.Projects, Project{Exclude: true, Name: project})
+	manifest.Projects = append(manifest.Projects, project.Project{Exclude: true, Name: name})
 	commitManifest(t, jirix, &manifest, manifestDir)
 }
 
 // Identify the current revision for a given project.
-func currentRevision(t *testing.T, jirix *jiri.X, project string) string {
+func currentRevision(t *testing.T, jirix *jiri.X, name string) string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(project); err != nil {
+	if err := jirix.Run().Chdir(name); err != nil {
 		t.Fatalf("%v", err)
 	}
 	revision, err := jirix.Git().CurrentRevision()
@@ -187,19 +188,19 @@ func currentRevision(t *testing.T, jirix *jiri.X, project string) string {
 }
 
 // Fix the revision in the manifest file.
-func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, project, revision string) {
+func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, name, revision string) {
 	manifestFile := filepath.Join(manifestDir, "v2", "default")
 	data, err := ioutil.ReadFile(manifestFile)
 	if err != nil {
 		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
 	}
-	manifest := Manifest{}
+	manifest := project.Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
 	updated := false
 	for i, p := range manifest.Projects {
-		if p.Name == project {
+		if p.Name == name {
 			p.Revision = revision
 			manifest.Projects[i] = p
 			updated = true
@@ -207,33 +208,33 @@ func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, project, re
 		}
 	}
 	if !updated {
-		t.Fatalf("failed to fix revision for project %v", project)
+		t.Fatalf("failed to fix revision for project %v", name)
 	}
 	commitManifest(t, jirix, &manifest, manifestDir)
 }
 
-func holdProjectBack(t *testing.T, jirix *jiri.X, manifestDir, project string) {
-	revision := currentRevision(t, jirix, project)
-	setRevisionForProject(t, jirix, manifestDir, project, revision)
+func holdProjectBack(t *testing.T, jirix *jiri.X, manifestDir, name string) {
+	revision := currentRevision(t, jirix, name)
+	setRevisionForProject(t, jirix, manifestDir, name, revision)
 }
 
 func localProjectName(i int) string {
 	return "test-local-project-" + fmt.Sprintf("%d", i)
 }
 
-func moveProject(t *testing.T, jirix *jiri.X, manifestDir, project, dst string) {
+func moveProject(t *testing.T, jirix *jiri.X, manifestDir, name, dst string) {
 	manifestFile := filepath.Join(manifestDir, "v2", "default")
 	data, err := ioutil.ReadFile(manifestFile)
 	if err != nil {
 		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
 	}
-	manifest := Manifest{}
+	manifest := project.Manifest{}
 	if err := xml.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
 	updated := false
 	for i, p := range manifest.Projects {
-		if p.Name == project {
+		if p.Name == name {
 			p.Path = dst
 			manifest.Projects[i] = p
 			updated = true
@@ -241,7 +242,7 @@ func moveProject(t *testing.T, jirix *jiri.X, manifestDir, project, dst string) 
 		}
 	}
 	if !updated {
-		t.Fatalf("failed to set path for project %v", project)
+		t.Fatalf("failed to set path for project %v", name)
 	}
 	commitManifest(t, jirix, &manifest, manifestDir)
 }
@@ -268,7 +269,7 @@ func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool)
 	}
 	if ignore {
 		ignoreFile := filepath.Join(projectDir, ".gitignore")
-		if err := jirix.Run().WriteFile(ignoreFile, []byte(metadataDirName), os.FileMode(0644)); err != nil {
+		if err := jirix.Run().WriteFile(ignoreFile, []byte(jiri.ProjectMetaDir), os.FileMode(0644)); err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := jirix.Git().Add(ignoreFile); err != nil {
@@ -285,15 +286,15 @@ func writeEmptyMetadata(t *testing.T, jirix *jiri.X, projectDir string) {
 	if err := jirix.Run().Chdir(projectDir); err != nil {
 		t.Fatalf("%v", err)
 	}
-	metadataDir := filepath.Join(projectDir, metadataDirName)
+	metadataDir := filepath.Join(projectDir, jiri.ProjectMetaDir)
 	if err := jirix.Run().MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
 		t.Fatalf("%v", err)
 	}
-	bytes, err := xml.Marshal(Project{})
+	bytes, err := xml.Marshal(project.Project{})
 	if err != nil {
 		t.Fatalf("Marshal() failed: %v", err)
 	}
-	metadataFile := filepath.Join(metadataDir, metadataFileName)
+	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
 	if err := jirix.Run().WriteFile(metadataFile, bytes, os.FileMode(0644)); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -345,7 +346,7 @@ func resetToOriginMaster(t *testing.T, jirix *jiri.X, projectDir string) {
 	}
 }
 
-func checkProjectsMatchPaths(t *testing.T, gotProjects Projects, wantProjectPaths []string) {
+func checkProjectsMatchPaths(t *testing.T, gotProjects project.Projects, wantProjectPaths []string) {
 	gotProjectPaths := []string{}
 	for _, p := range gotProjects {
 		gotProjectPaths = append(gotProjectPaths, p.Path)
@@ -368,17 +369,17 @@ func TestLocalProjects(t *testing.T) {
 	// Create some projects.
 	numProjects, projectPaths := 3, []string{}
 	for i := 0; i < numProjects; i++ {
-		projectName := localProjectName(i)
-		projectPath := setupNewProject(t, jirix, jirix.Root, projectName, true)
-		project := Project{
-			Path:     projectPath,
-			Name:     projectName,
+		name := localProjectName(i)
+		path := setupNewProject(t, jirix, jirix.Root, name, true)
+		p := project.Project{
+			Path:     path,
+			Name:     name,
 			Protocol: "git",
 		}
-		if err := writeMetadata(jirix, project, projectPath); err != nil {
-			t.Fatalf("writeMetadata %v %v) failed: %v\n", project, projectPath, err)
+		if err := project.InternalWriteMetadata(jirix, p, path); err != nil {
+			t.Fatalf("writeMetadata %v %v) failed: %v\n", p, path, err)
 		}
-		projectPaths = append(projectPaths, projectPath)
+		projectPaths = append(projectPaths, path)
 	}
 
 	// Create manifest but only tell it about the first project.
@@ -386,16 +387,16 @@ func TestLocalProjects(t *testing.T) {
 
 	// LocalProjects with scanMode = FastScan should only find the first
 	// project.
-	foundProjects, err := LocalProjects(jirix, FastScan)
+	foundProjects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
-		t.Fatalf("LocalProjects(%v) failed: %v", FastScan, err)
+		t.Fatalf("LocalProjects(%v) failed: %v", project.FastScan, err)
 	}
 	checkProjectsMatchPaths(t, foundProjects, projectPaths[:1])
 
 	// LocalProjects with scanMode = FullScan should find all projects.
-	foundProjects, err = LocalProjects(jirix, FullScan)
+	foundProjects, err = project.LocalProjects(jirix, project.FullScan)
 	if err != nil {
-		t.Fatalf("LocalProjects(%v) failed: %v", FastScan, err)
+		t.Fatalf("LocalProjects(%v) failed: %v", project.FastScan, err)
 	}
 	checkProjectsMatchPaths(t, foundProjects, projectPaths[:])
 
@@ -404,9 +405,9 @@ func TestLocalProjects(t *testing.T) {
 	if err := jirix.Run().RemoveAll(projectPaths[0]); err != nil {
 		t.Fatalf("RemoveAll(%v) failed: %v", projectPaths[0])
 	}
-	foundProjects, err = LocalProjects(jirix, FastScan)
+	foundProjects, err = project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
-		t.Fatalf("LocalProjects(%v) failed: %v", FastScan, err)
+		t.Fatalf("LocalProjects(%v) failed: %v", project.FastScan, err)
 	}
 	checkProjectsMatchPaths(t, foundProjects, projectPaths[1:])
 }
@@ -422,11 +423,8 @@ func TestUpdateUniverse(t *testing.T) {
 	jirix, cleanup := jiritest.NewX(t)
 	defer cleanup()
 
-	localDir := filepath.Join(jirix.Root, "local")
-	remoteDir := filepath.Join(jirix.Root, "remote")
-	if err := os.Setenv("JIRI_ROOT", localDir); err != nil {
-		t.Fatalf("%v", err)
-	}
+	localDir := jirix.Root
+	remoteDir := filepath.Join(jirix.Root, ".remote")
 
 	localManifest := setupNewProject(t, jirix, localDir, ".manifest", false)
 	writeEmptyMetadata(t, jirix, localManifest)
@@ -449,7 +447,7 @@ func TestUpdateUniverse(t *testing.T) {
 	for _, remoteProject := range remoteProjects {
 		writeReadme(t, jirix, remoteProject, "revision 2")
 	}
-	if err := UpdateUniverse(jirix, false); err != nil {
+	if err := project.UpdateUniverse(jirix, false); err != nil {
 		t.Fatalf("%v", err)
 	}
 	checkCreateFn := func(i int, revision string) {
@@ -472,7 +470,7 @@ func TestUpdateUniverse(t *testing.T) {
 	for _, remoteProject := range remoteProjects {
 		writeReadme(t, jirix, remoteProject, "revision 3")
 	}
-	if err := UpdateUniverse(jirix, false); err != nil {
+	if err := project.UpdateUniverse(jirix, false); err != nil {
 		t.Fatalf("%v", err)
 	}
 	checkUpdateFn := func(i int, revision string) {
@@ -494,7 +492,7 @@ func TestUpdateUniverse(t *testing.T) {
 	if err := ioutil.WriteFile(file, want, perm); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", file, err, perm)
 	}
-	if err := UpdateUniverse(jirix, false); err != nil {
+	if err := project.UpdateUniverse(jirix, false); err != nil {
 		t.Fatalf("%v", err)
 	}
 	got, err := ioutil.ReadFile(file)
@@ -510,7 +508,7 @@ func TestUpdateUniverse(t *testing.T) {
 	// copy of the project.
 	destination := filepath.Join("test", localProjectName(2))
 	moveProject(t, jirix, remoteManifest, remoteProjects[2], destination)
-	if err := UpdateUniverse(jirix, false); err != nil {
+	if err := project.UpdateUniverse(jirix, false); err != nil {
 		t.Fatalf("%v", err)
 	}
 	checkMoveFn := func(i int, revision string) {
@@ -527,7 +525,7 @@ func TestUpdateUniverse(t *testing.T) {
 	// Delete a remote project and check that UpdateUniverse()
 	// deletes the local copy of the project.
 	deleteProject(t, jirix, remoteManifest, remoteProjects[3])
-	if err := UpdateUniverse(jirix, true); err != nil {
+	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	checkDeleteFn := func(i int, revision string) {
@@ -556,7 +554,7 @@ func TestUpdateUniverse(t *testing.T) {
 	writeReadme(t, jirix, remoteProjects[4], "non master commit")
 	remoteBranchRevision := currentRevision(t, jirix, remoteProjects[4])
 	setRevisionForProject(t, jirix, remoteManifest, remoteProjects[4], remoteBranchRevision)
-	if err := UpdateUniverse(jirix, true); err != nil {
+	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	localProject := filepath.Join(localDir, localProjectName(4))
@@ -570,7 +568,7 @@ func TestUpdateUniverse(t *testing.T) {
 	// Create a local manifest that imports the remote manifest
 	// and check that UpdateUniverse() has no effect.
 	createLocalManifestStub(t, jirix, localDir)
-	if err := UpdateUniverse(jirix, true); err != nil {
+	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -590,7 +588,7 @@ func TestUpdateUniverse(t *testing.T) {
 	// check that UpdateUniverse() has no effect.
 	createLocalManifestCopy(t, jirix, localDir, remoteManifest)
 	createRemoteManifest(t, jirix, remoteManifest, remoteProjects)
-	if err := UpdateUniverse(jirix, true); err != nil {
+	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
@@ -601,6 +599,6 @@ func TestUpdateUniverse(t *testing.T) {
 // TestUnsupportedProtocolErr checks that calling
 // UnsupportedPrototoclErr.Error() does not result in an infinite loop.
 func TestUnsupportedPrototocolErr(t *testing.T) {
-	err := UnsupportedProtocolErr("foo")
+	err := project.UnsupportedProtocolErr("foo")
 	_ = err.Error()
 }

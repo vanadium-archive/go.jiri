@@ -46,11 +46,7 @@ Run "jiri help manifest" for details on manifests.
 func runUpdate(jirix *jiri.X, _ []string) error {
 	// Create a snapshot of the current state of all projects and
 	// write it to the $JIRI_ROOT/.update_history folder.
-	root, err := project.JiriRoot()
-	if err != nil {
-		return err
-	}
-	snapshotFile := filepath.Join(root, ".update_history", time.Now().Format(time.RFC3339))
+	snapshotFile := filepath.Join(jirix.Root, ".update_history", time.Now().Format(time.RFC3339))
 	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}

@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"v.io/jiri/jiri"
-	"v.io/jiri/project"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 )
@@ -48,7 +47,7 @@ func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
 // RegisterManifestFlag registers the commonly used --profiles-manifest
 // flag with the supplied FlagSet.
 func RegisterManifestFlag(flags *flag.FlagSet, manifest *string, defaultManifest string) {
-	root, _ := project.JiriRoot()
+	root := jiri.FindRoot()
 	flags.StringVar(manifest, "profiles-manifest", filepath.Join(root, defaultManifest), "specify the profiles XML manifest filename.")
 	flags.Lookup("profiles-manifest").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
 }

@@ -88,10 +88,7 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
 	label := args[0]
-	if err := checkSnapshotDir(jirix); err != nil {
-		return err
-	}
-	snapshotDir, err := getSnapshotDir()
+	snapshotDir, err := getSnapshotDir(jirix)
 	if err != nil {
 		return err
 	}
@@ -125,49 +122,48 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 	return nil
 }
 
-// checkSnapshotDir makes sure that he local snapshot directory exists
-// and is initialized properly.
-func checkSnapshotDir(jirix *jiri.X) (e error) {
-	snapshotDir, err := getSnapshotDir()
-	if err != nil {
-		return err
+// getSnapshotDir returns the path to the snapshot directory, respecting the
+// value of the "-remote" command-line flag.  It performs validation that the
+// directory exists and is initialized.
+func getSnapshotDir(jirix *jiri.X) (string, error) {
+	dir := jirix.LocalSnapshotDir()
+	if remoteFlag {
+		dir = jirix.RemoteSnapshotDir()
 	}
-	if _, err := jirix.Run().Stat(snapshotDir); err != nil {
-		if !os.IsNotExist(err) {
+	switch _, err := jirix.Run().Stat(dir); {
+	case err == nil:
+		return dir, nil
+	case !os.IsNotExist(err):
+		return "", err
+	case remoteFlag:
+		if err := jirix.Run().MkdirAll(dir, 0755); err != nil {
+			return "", err
+		}
+		return dir, nil
+	}
+	// Create a new local snapshot directory.
+	createFn := func() (e error) {
+		if err := jirix.Run().MkdirAll(dir, 0755); err != nil {
 			return err
 		}
-		if remoteFlag {
-			if err := jirix.Run().MkdirAll(snapshotDir, 0755); err != nil {
-				return err
-			}
-			return nil
-		}
-		createFn := func() (err error) {
-			if err := jirix.Run().MkdirAll(snapshotDir, 0755); err != nil {
-				return err
-			}
-			if err := jirix.Git().Init(snapshotDir); err != nil {
-				return err
-			}
-			cwd, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-			defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
-			if err := jirix.Run().Chdir(snapshotDir); err != nil {
-				return err
-			}
-			if err := jirix.Git().Commit(); err != nil {
-				return err
-			}
-			return nil
-		}
-		if err := createFn(); err != nil {
-			jirix.Run().RemoveAll(snapshotDir)
+		if err := jirix.Git().Init(dir); err != nil {
 			return err
 		}
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
+		if err := jirix.Run().Chdir(dir); err != nil {
+			return err
+		}
+		return jirix.Git().Commit()
 	}
-	return nil
+	if err := createFn(); err != nil {
+		jirix.Run().RemoveAll(dir)
+		return "", err
+	}
+	return dir, nil
 }
 
 func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) error {
@@ -197,23 +193,6 @@ func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) erro
 		return err
 	}
 	return nil
-}
-
-// getSnapshotDir returns the path to the snapshot directory,
-// respecting the value of the "-remote" command-line flag.
-func getSnapshotDir() (string, error) {
-	if remoteFlag {
-		snapshotDir, err := project.RemoteSnapshotDir()
-		if err != nil {
-			return "", err
-		}
-		return snapshotDir, nil
-	}
-	snapshotDir, err := project.LocalSnapshotDir()
-	if err != nil {
-		return "", err
-	}
-	return snapshotDir, nil
 }
 
 // revisionChanges commits changes identified by the given manifest
@@ -262,11 +241,7 @@ command lists snapshots for all known labels.
 }
 
 func runSnapshotList(jirix *jiri.X, args []string) error {
-	if err := checkSnapshotDir(jirix); err != nil {
-		return err
-	}
-
-	snapshotDir, err := getSnapshotDir()
+	snapshotDir, err := getSnapshotDir(jirix)
 	if err != nil {
 		return err
 	}
