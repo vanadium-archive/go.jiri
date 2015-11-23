@@ -42,13 +42,21 @@ Jiri cl - Manage project changelists
 Manage project changelists.
 
 Usage:
-   jiri cl <command>
+   jiri cl [flags] <command>
 
 The jiri cl commands are:
    cleanup     Clean up changelists that have been merged
    mail        Mail a changelist for review
    new         Create a new local branch for a changelist
    sync        Bring a changelist up to date
+
+The jiri cl flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri cl cleanup - Clean up changelists that have been merged
 
@@ -67,6 +75,13 @@ The jiri cl cleanup flags are:
    Ignore unmerged changes.
  -remote-branch=master
    Name of the remote branch the CL pertains to.
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri cl mail - Mail a changelist for review
 
@@ -108,6 +123,13 @@ The jiri cl mail flags are:
  -verify=true
    Run pre-push git hooks.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri cl new - Create a new local branch for a changelist
 
 Command "new" creates a new local branch for a changelist. In particular, it
@@ -118,9 +140,17 @@ dependencies between CLs and is used by the "jiri cl sync" and "jiri cl mail"
 commands.
 
 Usage:
-   jiri cl new <name>
+   jiri cl new [flags] <name>
 
 <name> is the changelist name.
+
+The jiri cl new flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri cl sync - Bring a changelist up to date
 
@@ -144,6 +174,13 @@ The jiri cl sync flags are:
  -remote-branch=master
    Name of the remote branch the CL pertains to.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri contributors - List project contributors
 
 Lists project contributors. Projects to consider can be specified as an
@@ -161,18 +198,31 @@ The jiri contributors flags are:
  -n=false
    Show number of contributions.
 
+ -color=true
+   Use color to format output.
+ -v=false
+   Print verbose output.
+
 Jiri project - Manage the jiri projects
 
 Manage the jiri projects.
 
 Usage:
-   jiri project <command>
+   jiri project [flags] <command>
 
 The jiri project commands are:
    clean        Restore jiri projects to their pristine state
    list         List existing jiri projects and branches
    shell-prompt Print a succinct status of projects suitable for shell prompts
    poll         Poll existing jiri projects
+
+The jiri project flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri project clean - Restore jiri projects to their pristine state
 
@@ -188,6 +238,13 @@ The jiri project clean flags are:
  -branches=false
    Delete all non-master branches.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri project list - List existing jiri projects and branches
 
 Inspect the local filesystem and list the existing projects and branches.
@@ -201,6 +258,13 @@ The jiri project list flags are:
  -nopristine=false
    If true, omit pristine projects, i.e. projects with a clean master branch and
    no other branches.
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri project shell-prompt - Print a succinct status of projects suitable for shell prompts
 
@@ -220,6 +284,13 @@ The jiri project shell-prompt flags are:
  -show-name=false
    Show the name of the current repo.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri project poll - Poll existing jiri projects
 
 Poll jiri projects that can affect the outcome of the given tests and report
@@ -235,6 +306,13 @@ The jiri project poll flags are:
  -manifest=
    Name of the project manifest.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri rebuild - Rebuild all jiri tools
 
 Rebuilds all jiri tools and installs the resulting binaries into
@@ -245,7 +323,15 @@ in the manifest.
 Run "jiri help manifest" for details on manifests.
 
 Usage:
-   jiri rebuild
+   jiri rebuild [flags]
+
+The jiri rebuild flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri snapshot - Manage project snapshots
 
@@ -267,6 +353,13 @@ The jiri snapshot commands are:
 The jiri snapshot flags are:
  -remote=false
    Manage remote snapshots.
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
 
 Jiri snapshot create - Create a new project snapshot
 
@@ -306,6 +399,15 @@ The jiri snapshot create flags are:
  -time-format=2006-01-02T15:04:05Z07:00
    Time format for snapshot file name.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -remote=false
+   Manage remote snapshots.
+ -v=false
+   Print verbose output.
+
 Jiri snapshot list - List existing project snapshots
 
 The "snapshot list" command lists existing snapshots of the labels specified as
@@ -313,9 +415,19 @@ command-line arguments. If no arguments are provided, the command lists
 snapshots for all known labels.
 
 Usage:
-   jiri snapshot list <label ...>
+   jiri snapshot list [flags] <label ...>
 
 <label ...> is a list of snapshot labels.
+
+The jiri snapshot list flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -remote=false
+   Manage remote snapshots.
+ -v=false
+   Print verbose output.
 
 Jiri update - Update all jiri tools and projects
 
@@ -338,6 +450,13 @@ The jiri update flags are:
  -manifest=
    Name of the project manifest.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri help - Display help for commands or topics
 
 Help with no args displays the usage of the parent command.
@@ -354,9 +473,10 @@ Usage:
 The jiri help flags are:
  -style=compact
    The formatting style for help output:
-      compact - Good for compact cmdline output.
-      full    - Good for cmdline output, shows all global flags.
-      godoc   - Good for godoc processing.
+      compact   - Good for compact cmdline output.
+      full      - Good for cmdline output, shows all global flags.
+      godoc     - Good for godoc processing.
+      shortonly - Only output short description.
    Override the default by setting the CMDLINE_STYLE environment variable.
  -width=<terminal width>
    Format output to this target width in runes, or unlimited if width < 0.
