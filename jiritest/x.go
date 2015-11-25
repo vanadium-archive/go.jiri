@@ -20,13 +20,17 @@ func NewX(t *testing.T) (*jiri.X, func()) {
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
-	oldEnv := os.Getenv(jiri.RootEnv)
+	oldRoot := os.Getenv(jiri.RootEnv)
 	if err := os.Setenv(jiri.RootEnv, root); err != nil {
-		t.Fatalf("Setenv(%v) failed: %v", jiri.RootEnv, err)
+		t.Fatalf("Setenv(%q, %q) failed: %v", jiri.RootEnv, root, err)
 	}
 	cleanup := func() {
-		os.Setenv(jiri.RootEnv, oldEnv)
-		ctx.NewSeq().RemoveAll(root).Done()
+		if err := os.Setenv(jiri.RootEnv, oldRoot); err != nil {
+			t.Fatalf("Setenv(%q, %q) failed: %v", jiri.RootEnv, oldRoot, err)
+		}
+		if err := ctx.NewSeq().RemoveAll(root).Done(); err != nil {
+			t.Fatalf("RemoveAll(%q) failed: %v", root, err)
+		}
 	}
 	return &jiri.X{Context: ctx, Root: root}, cleanup
 }

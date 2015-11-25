@@ -59,19 +59,11 @@ type label struct {
 }
 
 func TestList(t *testing.T) {
-	// Setup a fake JIRI_ROOT.
-	root, err := jiritest.NewFakeJiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer func() {
-		if err := root.Cleanup(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 
-	remoteSnapshotDir := root.X.RemoteSnapshotDir()
-	localSnapshotDir := root.X.LocalSnapshotDir()
+	remoteSnapshotDir := fake.X.RemoteSnapshotDir()
+	localSnapshotDir := fake.X.LocalSnapshotDir()
 
 	// Create a test suite.
 	tests := []config{
@@ -100,14 +92,14 @@ func TestList(t *testing.T) {
 		// Create the snapshots directory and populate it with the
 		// data specified by the test suite.
 		for _, label := range labels {
-			createLabelDir(t, root.X, test.dir, label.name, label.snapshots)
+			createLabelDir(t, fake.X, test.dir, label.name, label.snapshots)
 		}
 
 		// Check that running "jiri snapshot list" with no arguments
 		// returns the expected output.
 		var stdout bytes.Buffer
-		root.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
-		if err := runSnapshotList(root.X, nil); err != nil {
+		fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
+		if err := runSnapshotList(fake.X, nil); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want := stdout.String(), generateOutput(labels)
@@ -118,7 +110,7 @@ func TestList(t *testing.T) {
 		// Check that running "jiri snapshot list" with one argument
 		// returns the expected output.
 		stdout.Reset()
-		if err := runSnapshotList(root.X, []string{"stable"}); err != nil {
+		if err := runSnapshotList(fake.X, []string{"stable"}); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want = stdout.String(), generateOutput(labels[1:])
@@ -129,7 +121,7 @@ func TestList(t *testing.T) {
 		// Check that running "jiri snapshot list" with
 		// multiple arguments returns the expected output.
 		stdout.Reset()
-		if err := runSnapshotList(root.X, []string{"beta", "stable"}); err != nil {
+		if err := runSnapshotList(fake.X, []string{"beta", "stable"}); err != nil {
 			t.Fatalf("%v", err)
 		}
 		got, want = stdout.String(), generateOutput(labels)
@@ -180,27 +172,19 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 }
 
 func TestCreate(t *testing.T) {
-	// Setup a fake JIRI_ROOT instance.
-	root, err := jiritest.NewFakeJiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer func() {
-		if err := root.Cleanup(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 
 	// Setup the initial remote and local projects.
 	numProjects, remoteProjects := 2, []string{}
 	for i := 0; i < numProjects; i++ {
-		if err := root.CreateRemoteProject(remoteProjectName(i)); err != nil {
+		if err := fake.CreateRemoteProject(remoteProjectName(i)); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if err := root.AddProject(project.Project{
+		if err := fake.AddProject(project.Project{
 			Name:   remoteProjectName(i),
 			Path:   localProjectName(i),
-			Remote: root.Projects[remoteProjectName(i)],
+			Remote: fake.Projects[remoteProjectName(i)],
 		}); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -209,54 +193,54 @@ func TestCreate(t *testing.T) {
 	// Create initial commits in the remote projects and use
 	// UpdateUniverse() to mirror them locally.
 	for i := 0; i < numProjects; i++ {
-		writeReadme(t, root.X, root.Projects[remoteProjectName(i)], "revision 1")
+		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], "revision 1")
 	}
-	if err := project.UpdateUniverse(root.X, true); err != nil {
+	if err := project.UpdateUniverse(fake.X, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Create a local snapshot.
 	var stdout bytes.Buffer
-	root.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
+	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
 	remoteFlag = false
-	if err := runSnapshotCreate(root.X, []string{"test-local"}); err != nil {
+	if err := runSnapshotCreate(fake.X, []string{"test-local"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(root.Dir, localProjectName(i))
-		if err := root.X.Run().RemoveAll(localProject); err != nil {
+		localProject := filepath.Join(fake.X.Root, localProjectName(i))
+		if err := fake.X.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
 
 	// Check that invoking the UpdateUniverse() with the local
 	// snapshot restores the local repositories.
-	snapshotDir := root.X.LocalSnapshotDir()
+	snapshotDir := fake.X.LocalSnapshotDir()
 	snapshotFile := filepath.Join(snapshotDir, "test-local")
-	localX := root.X.Clone(tool.ContextOpts{
+	localX := fake.X.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,
 	})
 	if err := project.UpdateUniverse(localX, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(root.Dir, localProjectName(i))
-		checkReadme(t, root.X, localProject, "revision 1")
+		localProject := filepath.Join(fake.X.Root, localProjectName(i))
+		checkReadme(t, fake.X, localProject, "revision 1")
 	}
 
 	// Create a remote snapshot.
 	remoteFlag = true
-	root.EnableRemoteManifestPush()
-	if err := runSnapshotCreate(root.X, []string{"test-remote"}); err != nil {
+	fake.EnableRemoteManifestPush()
+	if err := runSnapshotCreate(fake.X, []string{"test-remote"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(root.Dir, localProjectName(i))
-		if err := root.X.Run().RemoveAll(localProject); err != nil {
+		localProject := filepath.Join(fake.X.Root, localProjectName(i))
+		if err := fake.X.Run().RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
@@ -264,14 +248,14 @@ func TestCreate(t *testing.T) {
 	// Check that invoking the UpdateUniverse() with the remote snapshot
 	// restores the local repositories.
 	manifest := "snapshot/test-remote"
-	remoteX := root.X.Clone(tool.ContextOpts{
+	remoteX := fake.X.Clone(tool.ContextOpts{
 		Manifest: &manifest,
 	})
 	if err := project.UpdateUniverse(remoteX, true); err != nil {
 		t.Fatalf("%v", err)
 	}
 	for i, _ := range remoteProjects {
-		localProject := filepath.Join(root.Dir, localProjectName(i))
-		checkReadme(t, root.X, localProject, "revision 1")
+		localProject := filepath.Join(fake.X.Root, localProjectName(i))
+		checkReadme(t, fake.X, localProject, "revision 1")
 	}
 }

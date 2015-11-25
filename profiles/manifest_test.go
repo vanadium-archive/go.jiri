@@ -15,10 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri/jiri"
 	"v.io/jiri/jiritest"
 	"v.io/jiri/profiles"
-	"v.io/jiri/tool"
 )
 
 func addProfileAndTargets(t *testing.T, name string) {
@@ -54,9 +52,10 @@ func removeDate(s string) string {
 
 func TestWrite(t *testing.T) {
 	profiles.Clear()
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
 	filename := tmpFile()
 	defer os.RemoveAll(filepath.Dir(filename))
-	jirix := &jiri.X{Context: tool.NewDefaultContext()}
 
 	// test for no version being set.
 	t1, _ := profiles.NewTargetWithEnv("cpu1-os1", "A=B,C=D")
@@ -83,7 +82,8 @@ func TestWrite(t *testing.T) {
 
 func TestRead(t *testing.T) {
 	profiles.Clear()
-	jirix := &jiri.X{Context: tool.NewDefaultContext()}
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
 	if err := profiles.Read(jirix, "./testdata/m1.xml"); err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +125,8 @@ func TestInstallProfile(t *testing.T) {
 
 func TestReadingV0(t *testing.T) {
 	profiles.Clear()
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
 
 	getProfiles := func() []*profiles.Profile {
 		db := []*profiles.Profile{}
@@ -136,7 +138,6 @@ func TestReadingV0(t *testing.T) {
 		return db
 	}
 
-	jirix := &jiri.X{Context: tool.NewDefaultContext()}
 	if err := profiles.Read(jirix, "./testdata/legacy.xml"); err != nil {
 		t.Fatal(err)
 	}

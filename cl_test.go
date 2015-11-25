@@ -132,9 +132,9 @@ func commitFiles(t *testing.T, jirix *jiri.X, filenames []string) {
 	}
 }
 
-// createRepo creates a new repository in the given working directory.
-func createRepo(t *testing.T, jirix *jiri.X, workingDir, prefix string) string {
-	repoPath, err := jirix.Run().TempDir(workingDir, "repo-"+prefix)
+// createRepo creates a new repository with the given prefix.
+func createRepo(t *testing.T, jirix *jiri.X, prefix string) string {
+	repoPath, err := jirix.Run().TempDir(jirix.Root, "repo-"+prefix)
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
@@ -173,8 +173,8 @@ func chdir(t *testing.T, jirix *jiri.X, path string) {
 }
 
 // createRepoFromOrigin creates a Git repo tracking origin/master.
-func createRepoFromOrigin(t *testing.T, jirix *jiri.X, workingDir string, subpath string, originPath string) string {
-	repoPath := createRepo(t, jirix, workingDir, subpath)
+func createRepoFromOrigin(t *testing.T, jirix *jiri.X, subpath string, originPath string) string {
+	repoPath := createRepo(t, jirix, subpath)
 	chdir(t, jirix, repoPath)
 	if err := jirix.Git().AddRemote("origin", originPath); err != nil {
 		t.Fatalf("%v", err)
@@ -188,17 +188,17 @@ func createRepoFromOrigin(t *testing.T, jirix *jiri.X, workingDir string, subpat
 // createTestRepos sets up three local repositories: origin, gerrit,
 // and the main test repository which pulls from origin and can push
 // to gerrit.
-func createTestRepos(t *testing.T, jirix *jiri.X, workingDir string) (string, string, string) {
+func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	// Create origin.
-	originPath := createRepo(t, jirix, workingDir, "origin")
+	originPath := createRepo(t, jirix, "origin")
 	chdir(t, jirix, originPath)
 	if err := jirix.Git().CommitWithMessage("initial commit"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	// Create test repo.
-	repoPath := createRepoFromOrigin(t, jirix, workingDir, "test", originPath)
+	repoPath := createRepoFromOrigin(t, jirix, "test", originPath)
 	// Add Gerrit remote.
-	gerritPath := createRepoFromOrigin(t, jirix, workingDir, "gerrit", originPath)
+	gerritPath := createRepoFromOrigin(t, jirix, "gerrit", originPath)
 	// Switch back to test repo.
 	chdir(t, jirix, repoPath)
 	return repoPath, originPath, gerritPath
@@ -221,30 +221,27 @@ func submit(t *testing.T, jirix *jiri.X, originPath string, gerritPath string, r
 }
 
 // setupTest creates a setup for testing the review tool.
-func setupTest(t *testing.T, installHook bool) (cwd string, root *jiritest.FakeJiriRoot, repoPath, originPath, gerritPath string) {
-	var err error
-	if cwd, err = os.Getwd(); err != nil {
+func setupTest(t *testing.T, installHook bool) (fake *jiritest.FakeJiriRoot, repoPath, originPath, gerritPath string, cleanup func()) {
+	oldWD, err := os.Getwd()
+	if err != nil {
 		t.Fatalf("Getwd() failed: %v", err)
 	}
-	if root, err = jiritest.NewFakeJiriRoot(); err != nil {
+	var cleanupFake func()
+	if fake, cleanupFake = jiritest.NewFakeJiriRoot(t); err != nil {
 		t.Fatalf("%v", err)
 	}
-	repoPath, originPath, gerritPath = createTestRepos(t, root.X, root.Dir)
+	repoPath, originPath, gerritPath = createTestRepos(t, fake.X)
 	if installHook == true {
 		for _, path := range []string{repoPath, originPath, gerritPath} {
-			installCommitMsgHook(t, root.X, path)
+			installCommitMsgHook(t, fake.X, path)
 		}
 	}
-	chdir(t, root.X, repoPath)
-	return
-}
-
-// teardownTest cleans up the setup for testing the review tool.
-func teardownTest(t *testing.T, oldWorkDir string, root *jiritest.FakeJiriRoot) {
-	chdir(t, root.X, oldWorkDir)
-	if err := root.Cleanup(); err != nil {
-		t.Fatalf("%v", err)
+	chdir(t, fake.X, repoPath)
+	cleanup = func() {
+		chdir(t, fake.X, oldWD)
+		cleanupFake()
 	}
+	return
 }
 
 func createCLWithFiles(t *testing.T, jirix *jiri.X, branch string, files ...string) {
@@ -257,23 +254,23 @@ func createCLWithFiles(t *testing.T, jirix *jiri.X, branch string, files ...stri
 // TestCleanupClean checks that cleanup succeeds if the branch to be
 // cleaned up has been merged with the master.
 func TestCleanupClean(t *testing.T) {
-	cwd, root, repoPath, originPath, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, repoPath, originPath, _, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	commitFiles(t, root.X, []string{"file1", "file2"})
-	if err := root.X.Git().CheckoutBranch("master"); err != nil {
+	commitFiles(t, fake.X, []string{"file1", "file2"})
+	if err := fake.X.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	chdir(t, root.X, originPath)
-	commitFiles(t, root.X, []string{"file1", "file2"})
-	chdir(t, root.X, repoPath)
-	if err := cleanupCL(root.X, []string{branch}); err != nil {
+	chdir(t, fake.X, originPath)
+	commitFiles(t, fake.X, []string{"file1", "file2"})
+	chdir(t, fake.X, repoPath)
+	if err := cleanupCL(fake.X, []string{branch}); err != nil {
 		t.Fatalf("cleanup() failed: %v", err)
 	}
-	if root.X.Git().BranchExists(branch) {
+	if fake.X.Git().BranchExists(branch) {
 		t.Fatalf("cleanup failed to remove the feature branch")
 	}
 }
@@ -281,38 +278,38 @@ func TestCleanupClean(t *testing.T) {
 // TestCleanupDirty checks that cleanup is a no-op if the branch to be
 // cleaned up has unmerged changes.
 func TestCleanupDirty(t *testing.T) {
-	cwd, root, _, _, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, _, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	files := []string{"file1", "file2"}
-	commitFiles(t, root.X, files)
-	if err := root.X.Git().CheckoutBranch("master"); err != nil {
+	commitFiles(t, fake.X, files)
+	if err := fake.X.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := cleanupCL(root.X, []string{branch}); err == nil {
+	if err := cleanupCL(fake.X, []string{branch}); err == nil {
 		t.Fatalf("cleanup did not fail when it should")
 	}
-	if err := root.X.Git().CheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertFilesCommitted(t, root.X, files)
+	assertFilesCommitted(t, fake.X, files)
 }
 
 // TestCreateReviewBranch checks that the temporary review branch is
 // created correctly.
 func TestCreateReviewBranch(t *testing.T) {
-	cwd, root, _, _, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, _, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	files := []string{"file1", "file2", "file3"}
-	commitFiles(t, root.X, files)
-	review, err := newReview(root.X, gerrit.CLOpts{})
+	commitFiles(t, fake.X, files)
+	review, err := newReview(fake.X, gerrit.CLOpts{})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -324,27 +321,27 @@ func TestCreateReviewBranch(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	// Verify that the branch exists.
-	if !root.X.Git().BranchExists(review.reviewBranch) {
+	if !fake.X.Git().BranchExists(review.reviewBranch) {
 		t.Fatalf("review branch not found")
 	}
-	if err := root.X.Git().CheckoutBranch(review.reviewBranch); err != nil {
+	if err := fake.X.Git().CheckoutBranch(review.reviewBranch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertCommitCount(t, root.X, review.reviewBranch, "master", 1)
-	assertFilesCommitted(t, root.X, files)
+	assertCommitCount(t, fake.X, review.reviewBranch, "master", 1)
+	assertFilesCommitted(t, fake.X, files)
 }
 
 // TestCreateReviewBranchWithEmptyChange checks that running
 // createReviewBranch() on a branch with no changes will result in an
 // EmptyChangeError.
 func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
-	cwd, root, _, _, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, _, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(root.X, gerrit.CLOpts{Remote: branch})
+	review, err := newReview(fake.X, gerrit.CLOpts{Remote: branch})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -360,17 +357,17 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 
 // TestSendReview checks the various options for sending a review.
 func TestSendReview(t *testing.T) {
-	cwd, root, repoPath, _, gerritPath := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	files := []string{"file1"}
-	commitFiles(t, root.X, files)
+	commitFiles(t, fake.X, files)
 	{
 		// Test with draft = false, no reviewiers, and no ccs.
-		review, err := newReview(root.X, gerrit.CLOpts{Remote: gerritPath})
+		review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -378,11 +375,11 @@ func TestSendReview(t *testing.T) {
 			t.Fatalf("failed to send a review: %v", err)
 		}
 		expectedRef := gerrit.Reference(review.CLOpts)
-		assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+		assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = true, no reviewers, and no ccs.
-		review, err := newReview(root.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, gerrit.CLOpts{
 			Draft:  true,
 			Remote: gerritPath,
 		})
@@ -393,11 +390,11 @@ func TestSendReview(t *testing.T) {
 			t.Fatalf("failed to send a review: %v", err)
 		}
 		expectedRef := gerrit.Reference(review.CLOpts)
-		assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+		assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = false, reviewers, and no ccs.
-		review, err := newReview(root.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, gerrit.CLOpts{
 			Remote:    gerritPath,
 			Reviewers: parseEmails("reviewer1,reviewer2@example.org"),
 		})
@@ -408,11 +405,11 @@ func TestSendReview(t *testing.T) {
 			t.Fatalf("failed to send a review: %v", err)
 		}
 		expectedRef := gerrit.Reference(review.CLOpts)
-		assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+		assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 	}
 	{
 		// Test with draft = true, reviewers, and ccs.
-		review, err := newReview(root.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, gerrit.CLOpts{
 			Ccs:       parseEmails("cc1@example.org,cc2"),
 			Draft:     true,
 			Remote:    gerritPath,
@@ -425,7 +422,7 @@ func TestSendReview(t *testing.T) {
 			t.Fatalf("failed to send a review: %v", err)
 		}
 		expectedRef := gerrit.Reference(review.CLOpts)
-		assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+		assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 	}
 }
 
@@ -433,14 +430,14 @@ func TestSendReview(t *testing.T) {
 // not run with a commit hook that adds a Change-Id.
 func TestSendReviewNoChangeID(t *testing.T) {
 	// Pass 'false' to setup so it doesn't install the commit-msg hook.
-	cwd, root, _, _, gerritPath := setupTest(t, false)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, gerritPath, cleanup := setupTest(t, false)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	commitFiles(t, root.X, []string{"file1"})
-	review, err := newReview(root.X, gerrit.CLOpts{Remote: gerritPath})
+	commitFiles(t, fake.X, []string{"file1"})
+	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -455,15 +452,15 @@ func TestSendReviewNoChangeID(t *testing.T) {
 
 // TestEndToEnd checks the end-to-end functionality of the review tool.
 func TestEndToEnd(t *testing.T) {
-	cwd, root, repoPath, _, gerritPath := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	files := []string{"file1", "file2", "file3"}
-	commitFiles(t, root.X, files)
-	review, err := newReview(root.X, gerrit.CLOpts{Remote: gerritPath})
+	commitFiles(t, fake.X, files)
+	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -472,7 +469,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("run() failed: %v", err)
 	}
 	expectedRef := gerrit.Reference(review.CLOpts)
-	assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 }
 
 // TestLabelsInCommitMessage checks the labels are correctly processed
@@ -490,17 +487,17 @@ func TestEndToEnd(t *testing.T) {
 // fact that the reference name is a function of the reviewers and
 // uses different reviewers for different review runs.
 func TestLabelsInCommitMessage(t *testing.T) {
-	cwd, root, repoPath, _, gerritPath := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Test setting -presubmit=none and autosubmit.
 	files := []string{"file1", "file2", "file3"}
-	commitFiles(t, root.X, files)
-	review, err := newReview(root.X, gerrit.CLOpts{
+	commitFiles(t, fake.X, files)
+	review, err := newReview(fake.X, gerrit.CLOpts{
 		Autosubmit: true,
 		Presubmit:  gerrit.PresubmitTestTypeNone,
 		Remote:     gerritPath,
@@ -514,7 +511,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	expectedRef := gerrit.Reference(review.CLOpts)
-	assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 	// The last three lines of the gerrit commit message file should be:
 	// AutoSubmit
 	// PresubmitTest: none
@@ -523,7 +520,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	bytes, err := root.X.Run().ReadFile(file)
+	bytes, err := fake.X.Run().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -543,7 +540,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting -presubmit=all but keep autosubmit=true.
-	review, err = newReview(root.X, gerrit.CLOpts{
+	review, err = newReview(fake.X, gerrit.CLOpts{
 		Autosubmit: true,
 		Remote:     gerritPath,
 		Reviewers:  parseEmails("run2"),
@@ -555,8 +552,8 @@ func TestLabelsInCommitMessage(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	expectedRef = gerrit.Reference(review.CLOpts)
-	assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
-	bytes, err = root.X.Run().ReadFile(file)
+	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
+	bytes, err = fake.X.Run().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -572,7 +569,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting autosubmit=false.
-	review, err = newReview(root.X, gerrit.CLOpts{
+	review, err = newReview(fake.X, gerrit.CLOpts{
 		Remote:    gerritPath,
 		Reviewers: parseEmails("run3"),
 	})
@@ -583,8 +580,8 @@ func TestLabelsInCommitMessage(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	expectedRef = gerrit.Reference(review.CLOpts)
-	assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
-	bytes, err = root.X.Run().ReadFile(file)
+	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
+	bytes, err = fake.X.Run().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -599,42 +596,42 @@ func TestLabelsInCommitMessage(t *testing.T) {
 // TestDirtyBranch checks that the tool correctly handles unstaged and
 // untracked changes in a working branch with stashed changes.
 func TestDirtyBranch(t *testing.T) {
-	cwd, root, _, _, gerritPath := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, gerritPath, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	files := []string{"file1", "file2"}
-	commitFiles(t, root.X, files)
-	assertStashSize(t, root.X, 0)
+	commitFiles(t, fake.X, files)
+	assertStashSize(t, fake.X, 0)
 	stashedFile, stashedFileContent := "stashed-file", "stashed-file content"
-	if err := root.X.Run().WriteFile(stashedFile, []byte(stashedFileContent), 0644); err != nil {
+	if err := fake.X.Run().WriteFile(stashedFile, []byte(stashedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", stashedFile, stashedFileContent, err)
 	}
-	if err := root.X.Git().Add(stashedFile); err != nil {
+	if err := fake.X.Git().Add(stashedFile); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if _, err := root.X.Git().Stash(); err != nil {
+	if _, err := fake.X.Git().Stash(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertStashSize(t, root.X, 1)
+	assertStashSize(t, fake.X, 1)
 	modifiedFile, modifiedFileContent := "file1", "modified-file content"
-	if err := root.X.Run().WriteFile(modifiedFile, []byte(modifiedFileContent), 0644); err != nil {
+	if err := fake.X.Run().WriteFile(modifiedFile, []byte(modifiedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", modifiedFile, modifiedFileContent, err)
 	}
 	stagedFile, stagedFileContent := "file2", "staged-file content"
-	if err := root.X.Run().WriteFile(stagedFile, []byte(stagedFileContent), 0644); err != nil {
+	if err := fake.X.Run().WriteFile(stagedFile, []byte(stagedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", stagedFile, stagedFileContent, err)
 	}
-	if err := root.X.Git().Add(stagedFile); err != nil {
+	if err := fake.X.Git().Add(stagedFile); err != nil {
 		t.Fatalf("%v", err)
 	}
 	untrackedFile, untrackedFileContent := "file3", "untracked-file content"
-	if err := root.X.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
+	if err := fake.X.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
-	review, err := newReview(root.X, gerrit.CLOpts{Remote: gerritPath})
+	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -642,44 +639,44 @@ func TestDirtyBranch(t *testing.T) {
 	if err := review.run(); err == nil {
 		t.Fatalf("run() didn't fail when it should")
 	}
-	assertFilesNotCommitted(t, root.X, []string{stagedFile})
-	assertFilesNotCommitted(t, root.X, []string{untrackedFile})
-	assertFileContent(t, root.X, modifiedFile, modifiedFileContent)
-	assertFileContent(t, root.X, stagedFile, stagedFileContent)
-	assertFileContent(t, root.X, untrackedFile, untrackedFileContent)
+	assertFilesNotCommitted(t, fake.X, []string{stagedFile})
+	assertFilesNotCommitted(t, fake.X, []string{untrackedFile})
+	assertFileContent(t, fake.X, modifiedFile, modifiedFileContent)
+	assertFileContent(t, fake.X, stagedFile, stagedFileContent)
+	assertFileContent(t, fake.X, untrackedFile, untrackedFileContent)
 	// As of git 2.4.3 "git stash pop" fails if there are uncommitted
 	// changes in the index. So we need to commit them first.
-	if err := root.X.Git().Commit(); err != nil {
+	if err := fake.X.Git().Commit(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertStashSize(t, root.X, 1)
-	if err := root.X.Git().StashPop(); err != nil {
+	assertStashSize(t, fake.X, 1)
+	if err := fake.X.Git().StashPop(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertStashSize(t, root.X, 0)
-	assertFilesNotCommitted(t, root.X, []string{stashedFile})
-	assertFileContent(t, root.X, stashedFile, stashedFileContent)
+	assertStashSize(t, fake.X, 0)
+	assertFilesNotCommitted(t, fake.X, []string{stashedFile})
+	assertFileContent(t, fake.X, stashedFile, stashedFileContent)
 }
 
 // TestRunInSubdirectory checks that the command will succeed when run from
 // within a subdirectory of a branch that does not exist on master branch, and
 // will return the user to the subdirectory after completion.
 func TestRunInSubdirectory(t *testing.T) {
-	cwd, root, repoPath, _, gerritPath := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
+	defer cleanup()
 	branch := "my-branch"
-	if err := root.X.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	subdir := "sub/directory"
 	subdirPerms := os.FileMode(0744)
-	if err := root.X.Run().MkdirAll(subdir, subdirPerms); err != nil {
+	if err := fake.X.Run().MkdirAll(subdir, subdirPerms); err != nil {
 		t.Fatalf("MkdirAll(%v, %v) failed: %v", subdir, subdirPerms, err)
 	}
 	files := []string{path.Join(subdir, "file1")}
-	commitFiles(t, root.X, files)
-	chdir(t, root.X, subdir)
-	review, err := newReview(root.X, gerrit.CLOpts{Remote: gerritPath})
+	commitFiles(t, fake.X, files)
+	chdir(t, fake.X, subdir)
+	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -692,7 +689,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EvalSymlinks(%v) failed: %v", path, err)
 	}
-	cwd, err = os.Getwd()
+	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -704,13 +701,13 @@ func TestRunInSubdirectory(t *testing.T) {
 		t.Fatalf("unexpected working directory: got %v, want %v", got, want)
 	}
 	expectedRef := gerrit.Reference(review.CLOpts)
-	assertFilesPushedToRef(t, root.X, repoPath, gerritPath, expectedRef, files)
+	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
 }
 
 // TestProcessLabels checks that the processLabels function works as expected.
 func TestProcessLabels(t *testing.T) {
-	cwd, root, _, _, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, _, cleanup := setupTest(t, true)
+	defer cleanup()
 	testCases := []struct {
 		autosubmit      bool
 		presubmitType   gerrit.PresubmitTestType
@@ -782,7 +779,7 @@ Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
 	for _, test := range testCases {
-		review, err := newReview(root.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, gerrit.CLOpts{
 			Autosubmit: test.autosubmit,
 			Presubmit:  test.presubmitType,
 		})
@@ -797,14 +794,14 @@ Change-Id: I0000000000000000000000000000000000000000`,
 
 // TestCLNew checks the operation of the "jiri cl new" command.
 func TestCLNew(t *testing.T) {
-	cwd, root, _, _, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, _, cleanup := setupTest(t, true)
+	defer cleanup()
 
 	// Create some dependent CLs.
-	if err := newCL(root.X, []string{"feature1"}); err != nil {
+	if err := newCL(fake.X, []string{"feature1"}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := newCL(root.X, []string{"feature2"}); err != nil {
+	if err := newCL(fake.X, []string{"feature2"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -823,11 +820,11 @@ func TestCLNew(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		file, err := getDependencyPathFileName(root.X, testCase.branch)
+		file, err := getDependencyPathFileName(fake.X, testCase.branch)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		data, err := root.X.Run().ReadFile(file)
+		data, err := fake.X.Run().ReadFile(file)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -841,28 +838,28 @@ func TestCLNew(t *testing.T) {
 // where if a CL edits a file and a dependent CL deletes it, jiri cl mail after
 // the deletion failed with unrecoverable merge errors.
 func TestDependentClsWithEditDelete(t *testing.T) {
-	cwd, root, repoPath, originPath, gerritPath := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
-	chdir(t, root.X, originPath)
-	commitFiles(t, root.X, []string{"A", "B"})
+	fake, repoPath, originPath, gerritPath, cleanup := setupTest(t, true)
+	defer cleanup()
+	chdir(t, fake.X, originPath)
+	commitFiles(t, fake.X, []string{"A", "B"})
 
-	chdir(t, root.X, repoPath)
-	if err := syncCL(root.X); err != nil {
+	chdir(t, fake.X, repoPath)
+	if err := syncCL(fake.X); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertFilesExist(t, root.X, []string{"A", "B"})
+	assertFilesExist(t, fake.X, []string{"A", "B"})
 
-	createCLWithFiles(t, root.X, "editme", "C")
-	if err := root.X.Run().WriteFile("B", []byte("Will I dream?"), 0644); err != nil {
+	createCLWithFiles(t, fake.X, "editme", "C")
+	if err := fake.X.Run().WriteFile("B", []byte("Will I dream?"), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.X.Git().Add("B"); err != nil {
+	if err := fake.X.Git().Add("B"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.X.Git().CommitWithMessage("editing stuff"); err != nil {
+	if err := fake.X.Git().CommitWithMessage("editing stuff"); err != nil {
 		t.Fatalf("git commit failed: %v", err)
 	}
-	review, err := newReview(root.X, gerrit.CLOpts{
+	review, err := newReview(fake.X, gerrit.CLOpts{
 		Remote:    gerritPath,
 		Reviewers: parseEmails("run1"), // See hack note about TestLabelsInCommitMessage
 	})
@@ -874,16 +871,16 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 		t.Fatalf("run() failed: %v", err)
 	}
 
-	if err := newCL(root.X, []string{"deleteme"}); err != nil {
+	if err := newCL(fake.X, []string{"deleteme"}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.X.Git().Remove("B", "C"); err != nil {
+	if err := fake.X.Git().Remove("B", "C"); err != nil {
 		t.Fatalf("git rm B C failed: %v", err)
 	}
-	if err := root.X.Git().CommitWithMessage("deleting stuff"); err != nil {
+	if err := fake.X.Git().CommitWithMessage("deleting stuff"); err != nil {
 		t.Fatalf("git commit failed: %v", err)
 	}
-	review, err = newReview(root.X, gerrit.CLOpts{
+	review, err = newReview(fake.X, gerrit.CLOpts{
 		Remote:    gerritPath,
 		Reviewers: parseEmails("run2"),
 	})
@@ -894,35 +891,35 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 		t.Fatalf("run() failed: %v", err)
 	}
 
-	chdir(t, root.X, gerritPath)
+	chdir(t, fake.X, gerritPath)
 	expectedRef := gerrit.Reference(review.CLOpts)
-	if err := root.X.Git().CheckoutBranch(expectedRef); err != nil {
+	if err := fake.X.Git().CheckoutBranch(expectedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertFilesExist(t, root.X, []string{"A"})
-	assertFilesDoNotExist(t, root.X, []string{"B", "C"})
+	assertFilesExist(t, fake.X, []string{"A"})
+	assertFilesDoNotExist(t, fake.X, []string{"B", "C"})
 }
 
 // TestParallelDev checks "jiri cl mail" behavior when parallel development has
 // been submitted upstream.
 func TestParallelDev(t *testing.T) {
-	cwd, root, repoPath, originPath, gerritAPath := setupTest(t, true)
-	gerritBPath := createRepoFromOrigin(t, root.X, root.Dir, "gerritB", originPath)
-	chdir(t, root.X, repoPath)
-	defer teardownTest(t, cwd, root)
+	fake, repoPath, originPath, gerritAPath, cleanup := setupTest(t, true)
+	defer cleanup()
+	gerritBPath := createRepoFromOrigin(t, fake.X, "gerritB", originPath)
+	chdir(t, fake.X, repoPath)
 
 	// Create parallel branches with:
 	// * non-conflicting changes in different files
 	// * conflicting changes in a file
-	createCLWithFiles(t, root.X, "feature1-A", "A")
+	createCLWithFiles(t, fake.X, "feature1-A", "A")
 
-	if err := root.X.Git().CheckoutBranch("master"); err != nil {
+	if err := fake.X.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	createCLWithFiles(t, root.X, "feature1-B", "B")
-	commitFile(t, root.X, "A", "Don't tread on me.")
+	createCLWithFiles(t, fake.X, "feature1-B", "B")
+	commitFile(t, fake.X, "A", "Don't tread on me.")
 
-	reviewB, err := newReview(root.X, gerrit.CLOpts{Remote: gerritBPath})
+	reviewB, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritBPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -932,48 +929,48 @@ func TestParallelDev(t *testing.T) {
 	}
 
 	// Submit B and verify A doesn't revert it.
-	submit(t, root.X, originPath, gerritBPath, reviewB)
+	submit(t, fake.X, originPath, gerritBPath, reviewB)
 
 	// Assert files pushed to origin.
-	chdir(t, root.X, originPath)
-	assertFilesExist(t, root.X, []string{"A", "B"})
-	chdir(t, root.X, repoPath)
+	chdir(t, fake.X, originPath)
+	assertFilesExist(t, fake.X, []string{"A", "B"})
+	chdir(t, fake.X, repoPath)
 
-	if err := root.X.Git().CheckoutBranch("feature1-A"); err != nil {
+	if err := fake.X.Git().CheckoutBranch("feature1-A"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	reviewA, err := newReview(root.X, gerrit.CLOpts{Remote: gerritAPath})
+	reviewA, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritAPath})
 	if err == nil {
 		t.Fatalf("creating a review did not fail when it should")
 	}
 	// Assert state restored after failed review.
-	assertFileContent(t, root.X, "A", "This is file A")
-	assertFilesDoNotExist(t, root.X, []string{"B"})
+	assertFileContent(t, fake.X, "A", "This is file A")
+	assertFilesDoNotExist(t, fake.X, []string{"B"})
 
 	// Manual conflict resolution.
-	if err := root.X.Git().Merge("master", gitutil.ResetOnFailureOpt(false)); err == nil {
+	if err := fake.X.Git().Merge("master", gitutil.ResetOnFailureOpt(false)); err == nil {
 		t.Fatalf("merge applied cleanly when it shouldn't")
 	}
-	assertFilesNotCommitted(t, root.X, []string{"A", "B"})
-	assertFileContent(t, root.X, "B", "This is file B")
+	assertFilesNotCommitted(t, fake.X, []string{"A", "B"})
+	assertFileContent(t, fake.X, "B", "This is file B")
 
-	if err := root.X.Run().WriteFile("A", []byte("This is file A. Don't tread on me."), 0644); err != nil {
+	if err := fake.X.Run().WriteFile("A", []byte("This is file A. Don't tread on me."), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	if err := root.X.Git().Add("A"); err != nil {
+	if err := fake.X.Git().Add("A"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.X.Git().Add("B"); err != nil {
+	if err := fake.X.Git().Add("B"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.X.Git().CommitWithMessage("Conflict resolution"); err != nil {
+	if err := fake.X.Git().CommitWithMessage("Conflict resolution"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Retry review.
-	reviewA, err = newReview(root.X, gerrit.CLOpts{Remote: gerritAPath})
+	reviewA, err = newReview(fake.X, gerrit.CLOpts{Remote: gerritAPath})
 	if err != nil {
 		t.Fatalf("review failed: %v", err)
 	}
@@ -982,46 +979,46 @@ func TestParallelDev(t *testing.T) {
 		t.Fatalf("run() failed: %v", err)
 	}
 
-	chdir(t, root.X, gerritAPath)
+	chdir(t, fake.X, gerritAPath)
 	expectedRef := gerrit.Reference(reviewA.CLOpts)
-	if err := root.X.Git().CheckoutBranch(expectedRef); err != nil {
+	if err := fake.X.Git().CheckoutBranch(expectedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
-	assertFilesExist(t, root.X, []string{"B"})
+	assertFilesExist(t, fake.X, []string{"B"})
 }
 
 // TestCLSync checks the operation of the "jiri cl sync" command.
 func TestCLSync(t *testing.T) {
-	cwd, root, _, _, _ := setupTest(t, true)
-	defer teardownTest(t, cwd, root)
+	fake, _, _, _, cleanup := setupTest(t, true)
+	defer cleanup()
 
 	// Create some dependent CLs.
-	if err := newCL(root.X, []string{"feature1"}); err != nil {
+	if err := newCL(fake.X, []string{"feature1"}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := newCL(root.X, []string{"feature2"}); err != nil {
+	if err := newCL(fake.X, []string{"feature2"}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Add the "test" file to the master.
-	if err := root.X.Git().CheckoutBranch("master"); err != nil {
+	if err := fake.X.Git().CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	commitFiles(t, root.X, []string{"test"})
+	commitFiles(t, fake.X, []string{"test"})
 
 	// Sync the dependent CLs.
-	if err := root.X.Git().CheckoutBranch("feature2"); err != nil {
+	if err := fake.X.Git().CheckoutBranch("feature2"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := syncCL(root.X); err != nil {
+	if err := syncCL(fake.X); err != nil {
 		t.Fatalf("%v", err)
 	}
 
 	// Check that the "test" file exists in the dependent CLs.
 	for _, branch := range []string{"feature1", "feature2"} {
-		if err := root.X.Git().CheckoutBranch(branch); err != nil {
+		if err := fake.X.Git().CheckoutBranch(branch); err != nil {
 			t.Fatalf("%v", err)
 		}
-		assertFilesExist(t, root.X, []string{"test"})
+		assertFilesExist(t, fake.X, []string{"test"})
 	}
 }

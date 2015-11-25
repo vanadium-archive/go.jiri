@@ -110,15 +110,8 @@ func TestConfigAPI(t *testing.T) {
 }
 
 func TestConfigSerialization(t *testing.T) {
-	root, err := jiritest.NewFakeJiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer func() {
-		if err := root.Cleanup(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 
 	config := NewConfig(
 		APICheckProjectsOpt(apiCheckProjects),
@@ -132,10 +125,10 @@ func TestConfigSerialization(t *testing.T) {
 		VDLWorkspacesOpt(vdlWorkspaces),
 	)
 
-	if err := SaveConfig(root.X, config); err != nil {
+	if err := SaveConfig(fake.X, config); err != nil {
 		t.Fatalf("%v", err)
 	}
-	gotConfig, err := LoadConfig(root.X)
+	gotConfig, err := LoadConfig(fake.X)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

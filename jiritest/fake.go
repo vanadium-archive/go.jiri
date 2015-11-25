@@ -9,22 +9,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"testing"
 
-	"v.io/jiri/collect"
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 )
 
 // FakeJiriRoot sets up a fake JIRI_ROOT under a tmp directory.
-//
-// TODO(toddw): Simplify usage, and consolidate with jiritest.NewX.
 type FakeJiriRoot struct {
 	X        *jiri.X
-	Dir      string
 	Projects map[string]string
 	remote   string
-	oldRoot  string
 }
 
 const (
@@ -35,159 +31,123 @@ const (
 	toolsProject    = "tools"
 )
 
-// NewFakeJiriRoot is the FakeJiriRoot factory.
-func NewFakeJiriRoot() (*FakeJiriRoot, error) {
-	// Create a fake JIRI_ROOT.
-	ctx := tool.NewDefaultContext()
-	rootDir, err := ctx.NewSeq().TempDir("", "")
-	if err != nil {
-		return nil, err
-	}
-	oldRoot := os.Getenv(jiri.RootEnv)
-	if err := os.Setenv(jiri.RootEnv, rootDir); err != nil {
-		return nil, err
-	}
-	jirix := &jiri.X{Context: ctx, Root: rootDir}
-	root := &FakeJiriRoot{
+// NewFakeJiriRoot returns a new FakeJiriRoot and a cleanup closure.  The
+// closure must be run to cleanup temporary directories and restore the original
+// environment; typically it is run as a defer function.
+func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
+	jirix, cleanup := NewX(t)
+	fake := &FakeJiriRoot{
 		X:        jirix,
-		Dir:      rootDir,
 		Projects: map[string]string{},
-		oldRoot:  oldRoot,
 	}
 
 	// Create fake remote manifest and tools projects.
 	remoteDir, err := jirix.Run().TempDir("", "")
 	if err != nil {
-		return nil, err
+		t.Fatalf("TempDir() failed: %v", err)
 	}
-	doCleanup := true
-	defer func() {
-		if doCleanup {
-			root.Cleanup()
-		}
-	}()
-	root.remote = remoteDir
-	if err := root.CreateRemoteProject(manifestProject); err != nil {
-		return nil, err
+	fake.remote = remoteDir
+	if err := fake.CreateRemoteProject(manifestProject); err != nil {
+		t.Fatal(err)
 	}
-	if err := root.CreateRemoteProject(toolsProject); err != nil {
-		return nil, err
+	if err := fake.CreateRemoteProject(toolsProject); err != nil {
+		t.Fatal(err)
 	}
 
 	// Create a fake manifest.
 	manifestDir := filepath.Join(remoteDir, manifestProject, manifestVersion)
 	if err := jirix.Run().MkdirAll(manifestDir, os.FileMode(0700)); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	if err := root.WriteRemoteManifest(&project.Manifest{}); err != nil {
-		return nil, err
+	if err := fake.WriteRemoteManifest(&project.Manifest{}); err != nil {
+		t.Fatal(err)
 	}
-	if err := jirix.Git().Clone(root.Projects[manifestProject], filepath.Join(root.Dir, manifestProject)); err != nil {
-		return nil, err
+	if err := jirix.Git().Clone(fake.Projects[manifestProject], filepath.Join(jirix.Root, manifestProject)); err != nil {
+		t.Fatal(err)
 	}
 
 	// Add the "tools" project and a fake "jiri" tool to the
 	// manifests. This is necessary to make sure that the commonly
 	// invoked DataDirPath() function, which uses the "jiri" tool
 	// configuration for its default, works.
-	if err := root.AddProject(project.Project{
+	if err := fake.AddProject(project.Project{
 		Name:   toolsProject,
 		Path:   toolsProject,
-		Remote: root.Projects[toolsProject],
+		Remote: fake.Projects[toolsProject],
 	}); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	if err := root.AddTool(project.Tool{
+	if err := fake.AddTool(project.Tool{
 		Name:    "jiri",
 		Data:    defaultDataDir,
 		Project: toolsProject,
 	}); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
 	// Add "gerrit" and "git" hosts to the manifest, as required by the "jiri"
 	// tool.
-	if err := root.AddHost(project.Host{
+	if err := fake.AddHost(project.Host{
 		Name:     "gerrit",
 		Location: "git://example.com/gerrit",
 	}); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
-	if err := root.AddHost(project.Host{
+	if err := fake.AddHost(project.Host{
 		Name:     "git",
 		Location: "git://example.com/git",
 	}); err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
 	// Update the contents of the fake JIRI_ROOT instance based on
 	// the information recorded in the remote manifest.
-	if err := root.UpdateUniverse(false); err != nil {
-		return nil, err
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
 	}
 
-	doCleanup = false
-	return root, nil
-}
-
-// Cleanup cleans up the given Vanadium root fake.
-func (root FakeJiriRoot) Cleanup() error {
-	var errs []error
-	collect.Errors(func() error {
-		if root.Dir == "" {
-			return nil
+	return fake, func() {
+		cleanup()
+		if err := fake.X.NewSeq().RemoveAll(fake.remote).Done(); err != nil {
+			t.Fatalf("RemoveAll(%q) failed: %v", fake.remote, err)
 		}
-		return root.X.Run().RemoveAll(root.Dir)
-	}, &errs)
-	collect.Errors(func() error {
-		return root.X.Run().RemoveAll(root.remote)
-	}, &errs)
-	collect.Errors(func() error {
-		if root.oldRoot == "" {
-			return nil
-		}
-		return os.Setenv(jiri.RootEnv, root.oldRoot)
-	}, &errs)
-	if len(errs) != 0 {
-		return fmt.Errorf("Cleanup() failed: %v", errs)
 	}
-	return nil
 }
 
 // AddHost adds the given host to a remote manifest.
-func (root FakeJiriRoot) AddHost(host project.Host) error {
-	manifest, err := root.ReadRemoteManifest()
+func (fake FakeJiriRoot) AddHost(host project.Host) error {
+	manifest, err := fake.ReadRemoteManifest()
 	if err != nil {
 		return err
 	}
 	manifest.Hosts = append(manifest.Hosts, host)
-	if err := root.WriteRemoteManifest(manifest); err != nil {
+	if err := fake.WriteRemoteManifest(manifest); err != nil {
 		return err
 	}
 	return nil
 }
 
 // AddProject adds the given project to a remote manifest.
-func (root FakeJiriRoot) AddProject(project project.Project) error {
-	manifest, err := root.ReadRemoteManifest()
+func (fake FakeJiriRoot) AddProject(project project.Project) error {
+	manifest, err := fake.ReadRemoteManifest()
 	if err != nil {
 		return err
 	}
 	manifest.Projects = append(manifest.Projects, project)
-	if err := root.WriteRemoteManifest(manifest); err != nil {
+	if err := fake.WriteRemoteManifest(manifest); err != nil {
 		return err
 	}
 	return nil
 }
 
 // AddTool adds the given tool to a remote manifest.
-func (root FakeJiriRoot) AddTool(tool project.Tool) error {
-	manifest, err := root.ReadRemoteManifest()
+func (fake FakeJiriRoot) AddTool(tool project.Tool) error {
+	manifest, err := fake.ReadRemoteManifest()
 	if err != nil {
 		return err
 	}
 	manifest.Tools = append(manifest.Tools, tool)
-	if err := root.WriteRemoteManifest(manifest); err != nil {
+	if err := fake.WriteRemoteManifest(manifest); err != nil {
 		return err
 	}
 	return nil
@@ -195,9 +155,9 @@ func (root FakeJiriRoot) AddTool(tool project.Tool) error {
 
 // DisableRemoteManifestPush disables pushes to the remote manifest
 // repository.
-func (root FakeJiriRoot) DisableRemoteManifestPush() error {
-	dir := tool.RootDirOpt(filepath.Join(root.remote, manifestProject))
-	if err := root.X.Git(dir).CheckoutBranch("master"); err != nil {
+func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
+	dir := tool.RootDirOpt(filepath.Join(fake.remote, manifestProject))
+	if err := fake.X.Git(dir).CheckoutBranch("master"); err != nil {
 		return err
 	}
 	return nil
@@ -205,32 +165,32 @@ func (root FakeJiriRoot) DisableRemoteManifestPush() error {
 
 // EnableRemoteManifestPush enables pushes to the remote manifest
 // repository.
-func (root FakeJiriRoot) EnableRemoteManifestPush() error {
-	dir := tool.RootDirOpt(filepath.Join(root.remote, manifestProject))
-	if !root.X.Git(dir).BranchExists("non-master") {
-		if err := root.X.Git(dir).CreateBranch("non-master"); err != nil {
+func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
+	dir := tool.RootDirOpt(filepath.Join(fake.remote, manifestProject))
+	if !fake.X.Git(dir).BranchExists("non-master") {
+		if err := fake.X.Git(dir).CreateBranch("non-master"); err != nil {
 			return err
 		}
 	}
-	if err := root.X.Git(dir).CheckoutBranch("non-master"); err != nil {
+	if err := fake.X.Git(dir).CheckoutBranch("non-master"); err != nil {
 		return err
 	}
 	return nil
 }
 
 // CreateRemoteProject creates a new remote project.
-func (root FakeJiriRoot) CreateRemoteProject(name string) error {
-	projectDir := filepath.Join(root.remote, name)
-	if err := root.X.Run().MkdirAll(projectDir, os.FileMode(0700)); err != nil {
+func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
+	projectDir := filepath.Join(fake.remote, name)
+	if err := fake.X.Run().MkdirAll(projectDir, os.FileMode(0700)); err != nil {
 		return err
 	}
-	if err := root.X.Git().Init(projectDir); err != nil {
+	if err := fake.X.Git().Init(projectDir); err != nil {
 		return err
 	}
-	if err := root.X.Git(tool.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
+	if err := fake.X.Git(tool.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
 		return err
 	}
-	root.Projects[name] = projectDir
+	fake.Projects[name] = projectDir
 	return nil
 }
 
@@ -243,19 +203,19 @@ func getManifest(jirix *jiri.X) string {
 }
 
 // ReadLocalManifest read a manifest from the local manifest project.
-func (root FakeJiriRoot) ReadLocalManifest() (*project.Manifest, error) {
-	path := filepath.Join(root.Dir, manifestProject, manifestVersion, getManifest(root.X))
-	return root.readManifest(path)
+func (fake FakeJiriRoot) ReadLocalManifest() (*project.Manifest, error) {
+	path := filepath.Join(fake.X.Root, manifestProject, manifestVersion, getManifest(fake.X))
+	return fake.readManifest(path)
 }
 
 // ReadRemoteManifest read a manifest from the remote manifest project.
-func (root FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
-	path := filepath.Join(root.remote, manifestProject, manifestVersion, getManifest(root.X))
-	return root.readManifest(path)
+func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
+	path := filepath.Join(fake.remote, manifestProject, manifestVersion, getManifest(fake.X))
+	return fake.readManifest(path)
 }
 
-func (root FakeJiriRoot) readManifest(path string) (*project.Manifest, error) {
-	bytes, err := root.X.Run().ReadFile(path)
+func (fake FakeJiriRoot) readManifest(path string) (*project.Manifest, error) {
+	bytes, err := fake.X.Run().ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -266,15 +226,15 @@ func (root FakeJiriRoot) readManifest(path string) (*project.Manifest, error) {
 	return &manifest, nil
 }
 
-// UpdateUniverse synchronizes the content of the Vanadium root based
+// UpdateUniverse synchronizes the content of the Vanadium fake based
 // on the content of the remote manifest.
-func (root FakeJiriRoot) UpdateUniverse(gc bool) error {
+func (fake FakeJiriRoot) UpdateUniverse(gc bool) error {
 	oldRoot := os.Getenv("JIRI_ROOT")
-	if err := os.Setenv("JIRI_ROOT", root.Dir); err != nil {
+	if err := os.Setenv("JIRI_ROOT", fake.X.Root); err != nil {
 		return fmt.Errorf("Setenv() failed: %v", err)
 	}
 	defer os.Setenv("JIRI_ROOT", oldRoot)
-	if err := project.UpdateUniverse(root.X, gc); err != nil {
+	if err := project.UpdateUniverse(fake.X, gc); err != nil {
 		return err
 	}
 	return nil
@@ -282,32 +242,32 @@ func (root FakeJiriRoot) UpdateUniverse(gc bool) error {
 
 // WriteLocalManifest writes the given manifest to the local
 // manifest project.
-func (root FakeJiriRoot) WriteLocalManifest(manifest *project.Manifest) error {
-	dir := filepath.Join(root.Dir, manifestProject)
-	path := filepath.Join(dir, manifestVersion, getManifest(root.X))
-	return root.writeManifest(manifest, dir, path)
+func (fake FakeJiriRoot) WriteLocalManifest(manifest *project.Manifest) error {
+	dir := filepath.Join(fake.X.Root, manifestProject)
+	path := filepath.Join(dir, manifestVersion, getManifest(fake.X))
+	return fake.writeManifest(manifest, dir, path)
 }
 
 // WriteRemoteManifest writes the given manifest to the remote
 // manifest project.
-func (root FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
-	dir := filepath.Join(root.remote, manifestProject)
-	path := filepath.Join(dir, manifestVersion, getManifest(root.X))
-	return root.writeManifest(manifest, dir, path)
+func (fake FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
+	dir := filepath.Join(fake.remote, manifestProject)
+	path := filepath.Join(dir, manifestVersion, getManifest(fake.X))
+	return fake.writeManifest(manifest, dir, path)
 }
 
-func (root FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path string) error {
+func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path string) error {
 	bytes, err := xml.Marshal(manifest)
 	if err != nil {
 		return fmt.Errorf("Marshal(%v) failed: %v", manifest, err)
 	}
-	if err := root.X.Run().WriteFile(path, bytes, os.FileMode(0600)); err != nil {
+	if err := fake.X.Run().WriteFile(path, bytes, os.FileMode(0600)); err != nil {
 		return err
 	}
-	if err := root.X.Git(tool.RootDirOpt(dir)).Add(path); err != nil {
+	if err := fake.X.Git(tool.RootDirOpt(dir)).Add(path); err != nil {
 		return err
 	}
-	if err := root.X.Git(tool.RootDirOpt(dir)).Commit(); err != nil {
+	if err := fake.X.Git(tool.RootDirOpt(dir)).Commit(); err != nil {
 		return err
 	}
 	return nil

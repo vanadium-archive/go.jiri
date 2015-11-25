@@ -51,18 +51,11 @@ func createOncallFile(t *testing.T, jirix *jiri.X) {
 }
 
 func TestOncall(t *testing.T) {
-	root, err := jiritest.NewFakeJiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer func() {
-		if err := root.Cleanup(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 
 	// Create a oncall.v1.xml file.
-	createOncallFile(t, root.X)
+	createOncallFile(t, fake.X)
 	type testCase struct {
 		targetTime    time.Time
 		expectedShift *OncallShift
@@ -98,7 +91,7 @@ func TestOncall(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
-		got, err := Oncall(root.X, test.targetTime)
+		got, err := Oncall(fake.X, test.targetTime)
 		if err != nil {
 			t.Fatalf("want no errors, got: %v", err)
 		}

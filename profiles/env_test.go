@@ -140,29 +140,21 @@ func TestMergeEnv(t *testing.T) {
 
 func testSetPathHelper(t *testing.T, name string) {
 	profiles.Clear()
-	// Setup a fake JIRI_ROOT.
-	root, err := jiritest.NewFakeJiriRoot()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer func() {
-		if err := root.Cleanup(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 
 	// Create a test project and identify it as a Go workspace.
-	if err := root.CreateRemoteProject("test"); err != nil {
+	if err := fake.CreateRemoteProject("test"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.AddProject(project.Project{
+	if err := fake.AddProject(project.Project{
 		Name:   "test",
 		Path:   "test",
-		Remote: root.Projects["test"],
+		Remote: fake.Projects["test"],
 	}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := root.UpdateUniverse(false); err != nil {
+	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatalf("%v", err)
 	}
 	var config *util.Config
@@ -173,15 +165,15 @@ func testSetPathHelper(t *testing.T, name string) {
 		config = util.NewConfig(util.VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
 	}
 
-	if err := profiles.Write(root.X, filepath.Join(root.Dir, "profiles-manifest")); err != nil {
+	if err := profiles.Write(fake.X, filepath.Join(fake.X.Root, "profiles-manifest")); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := util.SaveConfig(root.X, config); err != nil {
+	if err := util.SaveConfig(fake.X, config); err != nil {
 		t.Fatalf("%v", err)
 	}
 
-	ch, err := profiles.NewConfigHelper(root.X, profiles.UseProfiles, filepath.Join(root.Dir, "profiles-manifest"))
+	ch, err := profiles.NewConfigHelper(fake.X, profiles.UseProfiles, filepath.Join(fake.X.Root, "profiles-manifest"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,12 +181,12 @@ func testSetPathHelper(t *testing.T, name string) {
 	var got, want string
 	switch name {
 	case "GOPATH":
-		want = "GOPATH=" + filepath.Join(root.Dir, "test")
+		want = "GOPATH=" + filepath.Join(fake.X.Root, "test")
 		got = ch.GoPath()
 	case "VDLPATH":
 		// Make a fake src directory.
-		want = filepath.Join(root.Dir, "test", "src")
-		if err := root.X.Run().MkdirAll(want, 0755); err != nil {
+		want = filepath.Join(fake.X.Root, "test", "src")
+		if err := fake.X.Run().MkdirAll(want, 0755); err != nil {
 			t.Fatalf("%v", err)
 		}
 		want = "VDLPATH=" + want
