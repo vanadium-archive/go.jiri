@@ -189,11 +189,11 @@ func InstallPackages(jirix *jiri.X, pkgs []string) error {
 		}
 		return nil
 	}
-	return jirix.NewSeq().Call(installDepsFn, "Install dependencies").Done()
+	return jirix.NewSeq().Call(installDepsFn, "Install dependencies: "+strings.Join(pkgs, ",")).Done()
 }
 
 // ensureAction ensures that the requested profile and target
-// is installed/uninstalled, installing/uninstalling it if only if necessary.
+// is installed/uninstalled, installing/uninstalling it if and only if necessary.
 func ensureAction(jirix *jiri.X, action Action, profile string, root RelativePath, target Target) error {
 	verb := ""
 	switch action {
@@ -203,6 +203,9 @@ func ensureAction(jirix *jiri.X, action Action, profile string, root RelativePat
 		verb = "uninstall"
 	default:
 		return fmt.Errorf("unrecognised action %v", action)
+	}
+	if jirix.Verbose() || jirix.DryRun() {
+		fmt.Fprintf(jirix.Stdout(), "%s %v %s\n", verb, action, target)
 	}
 	if t := LookupProfileTarget(profile, target); t != nil {
 		if jirix.Verbose() {
