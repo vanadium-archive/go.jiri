@@ -103,20 +103,19 @@ func NewRelativePath(name, value string) RelativePath {
 	return RelativePath{name: name, value: value}
 }
 
-// Join returns a copy of RelativePath with the specified components
-// appended to it using filepath.Join.
+// Join returns a copy of RelativePath with the specified components appended
+// to the path using filepath.Join.
 func (rp RelativePath) Join(components ...string) RelativePath {
 	nrp := rp
 	nrp.path = filepath.Join(append([]string{nrp.path}, components...)...)
 	return nrp
 }
 
-// RootJoin creates a new RelativePath that has the same variable
-// and associated value as its receiver and then appends components to it
-// using filepath.Join.
+// RootJoin returns a copy of RelativePath with the specified components
+// appended to the root using filepath.Join.
 func (rp RelativePath) RootJoin(components ...string) RelativePath {
-	nrp := RelativePath{name: rp.name, value: rp.value}
-	nrp.path = filepath.Join(append([]string{nrp.path}, components...)...)
+	nrp := rp
+	nrp.path = filepath.Join(components...)
 	return nrp
 }
 
@@ -127,7 +126,7 @@ func (rp RelativePath) Expand() string {
 
 // String returns the RelativePath with the root variable name as the
 // root - i.e. ${name}[/<any append components>].
-func (rp *RelativePath) String() string {
+func (rp RelativePath) String() string {
 	root := "${" + rp.name + "}"
 	if len(rp.path) == 0 {
 		return root
