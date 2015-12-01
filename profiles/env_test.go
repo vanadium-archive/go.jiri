@@ -7,8 +7,6 @@ package profiles_test
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -21,8 +19,9 @@ import (
 )
 
 func TestConfigHelper(t *testing.T) {
-	jirix := jiritest.NewX_DeprecatedEnv(t, nil)
-	ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, filepath.Join(jirix.Root, "release/go/src/v.io/jiri/profiles/testdata/m2.xml"))
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+	ch, err := profiles.NewConfigHelper(fake.X, profiles.UseProfiles, filepath.Join("testdata", "m2.xml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +39,8 @@ func TestConfigHelper(t *testing.T) {
 
 func TestEnvFromTarget(t *testing.T) {
 	profiles.Clear()
-	jirix := jiritest.NewX_DeprecatedEnv(t, nil)
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 	profiles.InstallProfile("a", "root")
 	profiles.InstallProfile("b", "root")
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
@@ -50,16 +50,11 @@ func TestEnvFromTarget(t *testing.T) {
 	t2.Env.Set("A=Z,B=Z,Z=Z1")
 	profiles.AddProfileTarget("a", *t1)
 	profiles.AddProfileTarget("b", *t2)
-	tmpdir, err := ioutil.TempDir(".", "pdb")
-	if err != nil {
+	filename := filepath.Join(fake.X.Root, "profile-manifest")
+	if err := profiles.Write(fake.X, filename); err != nil {
 		t.Fatal(err)
 	}
-	filename := filepath.Join(jirix.Root, "release", "go", "src", "v.io", "jiri", "profiles", tmpdir, "manifest")
-	if err := profiles.Write(jirix, filename); err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
-	ch, err := profiles.NewConfigHelper(jirix, profiles.UseProfiles, filename)
+	ch, err := profiles.NewConfigHelper(fake.X, profiles.UseProfiles, filename)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package util
+package util_test
 
 import (
 	"io/ioutil"
@@ -14,6 +14,7 @@ import (
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/jiritest"
+	"v.io/jiri/util"
 )
 
 func createOncallFile(t *testing.T, jirix *jiri.X) {
@@ -35,7 +36,7 @@ func createOncallFile(t *testing.T, jirix *jiri.X) {
     <startDate>Nov 19, 2014 12:00:00 PM</startDate>
   </shift>
 </rotation>`
-	oncallRotationsFile, err := OncallRotationPath(jirix)
+	oncallRotationsFile, err := util.OncallRotationPath(jirix)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -56,34 +57,33 @@ func TestOncall(t *testing.T) {
 
 	// Create a oncall.v1.xml file.
 	createOncallFile(t, fake.X)
-	type testCase struct {
+	testCases := []struct {
 		targetTime    time.Time
-		expectedShift *OncallShift
-	}
-	testCases := []testCase{
-		testCase{
-			targetTime:    time.Date(2013, time.November, 5, 12, 0, 0, 0, time.Local),
-			expectedShift: nil,
+		expectedShift *util.OncallShift
+	}{
+		{
+			time.Date(2013, time.November, 5, 12, 0, 0, 0, time.Local),
+			nil,
 		},
-		testCase{
-			targetTime: time.Date(2014, time.November, 5, 12, 0, 0, 0, time.Local),
-			expectedShift: &OncallShift{
+		{
+			time.Date(2014, time.November, 5, 12, 0, 0, 0, time.Local),
+			&util.OncallShift{
 				Primary:   "spetrovic",
 				Secondary: "suharshs",
 				Date:      "Nov 5, 2014 12:00:00 PM",
 			},
 		},
-		testCase{
-			targetTime: time.Date(2014, time.November, 5, 14, 0, 0, 0, time.Local),
-			expectedShift: &OncallShift{
+		{
+			time.Date(2014, time.November, 5, 14, 0, 0, 0, time.Local),
+			&util.OncallShift{
 				Primary:   "spetrovic",
 				Secondary: "suharshs",
 				Date:      "Nov 5, 2014 12:00:00 PM",
 			},
 		},
-		testCase{
-			targetTime: time.Date(2014, time.November, 20, 14, 0, 0, 0, time.Local),
-			expectedShift: &OncallShift{
+		{
+			time.Date(2014, time.November, 20, 14, 0, 0, 0, time.Local),
+			&util.OncallShift{
 				Primary:   "jsimsa",
 				Secondary: "toddw",
 				Date:      "Nov 19, 2014 12:00:00 PM",
@@ -91,7 +91,7 @@ func TestOncall(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
-		got, err := Oncall(fake.X, test.targetTime)
+		got, err := util.Oncall(fake.X, test.targetTime)
 		if err != nil {
 			t.Fatalf("want no errors, got: %v", err)
 		}

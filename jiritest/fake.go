@@ -14,6 +14,7 @@ import (
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
+	"v.io/jiri/util"
 )
 
 // FakeJiriRoot sets up a fake JIRI_ROOT under a tmp directory.
@@ -103,6 +104,11 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	// Update the contents of the fake JIRI_ROOT instance based on
 	// the information recorded in the remote manifest.
 	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create an empty config file, needed by many utilities.
+	if err := util.SaveConfig(jirix, util.NewConfig()); err != nil {
 		t.Fatal(err)
 	}
 

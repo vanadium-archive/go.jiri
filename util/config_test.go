@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package util
+package util_test
 
 import (
 	"reflect"
 	"testing"
 
 	"v.io/jiri/jiritest"
+	"v.io/jiri/util"
 )
 
 var (
@@ -21,15 +22,15 @@ var (
 		"projectD": struct{}{},
 	}
 	goWorkspaces      = []string{"test-go-workspace"}
-	jenkinsMatrixJobs = map[string]JenkinsMatrixJobInfo{
-		"test-job-A": JenkinsMatrixJobInfo{
+	jenkinsMatrixJobs = map[string]util.JenkinsMatrixJobInfo{
+		"test-job-A": {
 			HasArch:  false,
 			HasOS:    true,
 			HasParts: true,
 			ShowOS:   false,
 			Name:     "test-job-A",
 		},
-		"test-job-B": JenkinsMatrixJobInfo{
+		"test-job-B": {
 			HasArch:  true,
 			HasOS:    false,
 			HasParts: false,
@@ -54,7 +55,7 @@ var (
 	vdlWorkspaces = []string{"test-vdl-workspace"}
 )
 
-func testConfigAPI(t *testing.T, c *Config) {
+func testConfigAPI(t *testing.T, c *util.Config) {
 	if got, want := c.APICheckProjects(), apiCheckProjects; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected results: got %v, want %v", got, want)
 	}
@@ -94,16 +95,16 @@ func testConfigAPI(t *testing.T, c *Config) {
 }
 
 func TestConfigAPI(t *testing.T) {
-	config := NewConfig(
-		APICheckProjectsOpt(apiCheckProjects),
-		CopyrightCheckProjectsOpt(copyrightCheckProjects),
-		GoWorkspacesOpt(goWorkspaces),
-		JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
-		ProjectTestsOpt(projectTests),
-		TestDependenciesOpt(testDependencies),
-		TestGroupsOpt(testGroups),
-		TestPartsOpt(testParts),
-		VDLWorkspacesOpt(vdlWorkspaces),
+	config := util.NewConfig(
+		util.APICheckProjectsOpt(apiCheckProjects),
+		util.CopyrightCheckProjectsOpt(copyrightCheckProjects),
+		util.GoWorkspacesOpt(goWorkspaces),
+		util.JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
+		util.ProjectTestsOpt(projectTests),
+		util.TestDependenciesOpt(testDependencies),
+		util.TestGroupsOpt(testGroups),
+		util.TestPartsOpt(testParts),
+		util.VDLWorkspacesOpt(vdlWorkspaces),
 	)
 
 	testConfigAPI(t, config)
@@ -113,22 +114,22 @@ func TestConfigSerialization(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
-	config := NewConfig(
-		APICheckProjectsOpt(apiCheckProjects),
-		CopyrightCheckProjectsOpt(copyrightCheckProjects),
-		GoWorkspacesOpt(goWorkspaces),
-		JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
-		ProjectTestsOpt(projectTests),
-		TestDependenciesOpt(testDependencies),
-		TestGroupsOpt(testGroups),
-		TestPartsOpt(testParts),
-		VDLWorkspacesOpt(vdlWorkspaces),
+	config := util.NewConfig(
+		util.APICheckProjectsOpt(apiCheckProjects),
+		util.CopyrightCheckProjectsOpt(copyrightCheckProjects),
+		util.GoWorkspacesOpt(goWorkspaces),
+		util.JenkinsMatrixJobsOpt(jenkinsMatrixJobs),
+		util.ProjectTestsOpt(projectTests),
+		util.TestDependenciesOpt(testDependencies),
+		util.TestGroupsOpt(testGroups),
+		util.TestPartsOpt(testParts),
+		util.VDLWorkspacesOpt(vdlWorkspaces),
 	)
 
-	if err := SaveConfig(fake.X, config); err != nil {
+	if err := util.SaveConfig(fake.X, config); err != nil {
 		t.Fatalf("%v", err)
 	}
-	gotConfig, err := LoadConfig(fake.X)
+	gotConfig, err := util.LoadConfig(fake.X)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
