@@ -172,8 +172,7 @@ func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, ta
 		envs = append(envs, e)
 	}
 	MergeEnv(policies, ch.Vars, envs...)
-	rp := NewRelativePath("JIRI_ROOT", ch.jirix.Root)
-	rp.ExpandEnv(ch.Vars)
+	jiri.ExpandEnv(ch.jirix, ch.Vars)
 }
 
 // SkippingProfiles returns true if no profiles are being used.

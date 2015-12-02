@@ -21,20 +21,18 @@ pkg profiles, const V2 Version
 pkg profiles, const V3 Version
 pkg profiles, const V4 Version
 pkg profiles, func AddProfileTarget(string, Target) error
-pkg profiles, func AtomicAction(*tool.Context, func() error, string, string) error
+pkg profiles, func AtomicAction(*jiri.X, func() error, string, string) error
 pkg profiles, func DefaultTarget() Target
-pkg profiles, func EnsureProfileTargetIsInstalled(*tool.Context, string, RelativePath, Target) error
-pkg profiles, func EnsureProfileTargetIsUninstalled(*tool.Context, string, RelativePath, Target) error
+pkg profiles, func EnsureProfileTargetIsInstalled(*jiri.X, string, jiri.RelPath, Target) error
+pkg profiles, func EnsureProfileTargetIsUninstalled(*jiri.X, string, jiri.RelPath, Target) error
 pkg profiles, func EnvFromProfile(Target, string) []string
-pkg profiles, func Fetch(*tool.Context, string, string) error
+pkg profiles, func Fetch(*jiri.X, string, string) error
 pkg profiles, func FindTarget(OrderedTargets, *Target) *Target
-pkg profiles, func FindTargetByTag(OrderedTargets, *Target) *Target
 pkg profiles, func FindTargetWithDefault(OrderedTargets, *Target) *Target
-pkg profiles, func GitCloneRepo(*tool.Context, string, string, string, os.FileMode) error
 pkg profiles, func GoEnvironmentFromOS() []string
 pkg profiles, func InitProfilesFromFlag(string, AppendJiriProfileMode) []string
 pkg profiles, func InsertTarget(OrderedTargets, *Target) OrderedTargets
-pkg profiles, func InstallPackages(*tool.Context, []string) error
+pkg profiles, func InstallPackages(*jiri.X, []string) error
 pkg profiles, func InstallProfile(string, string)
 pkg profiles, func JiriMergePolicies() MergePolicies
 pkg profiles, func LookupManager(string) Manager
@@ -43,14 +41,13 @@ pkg profiles, func LookupProfileTarget(string, Target) *Target
 pkg profiles, func Managers() []string
 pkg profiles, func MergeEnv(map[string]MergePolicy, *envvar.Vars, ...[]string)
 pkg profiles, func NativeTarget() Target
-pkg profiles, func NewConfigHelper(*tool.Context, ProfilesMode, string) (*ConfigHelper, error)
-pkg profiles, func NewRelativePath(string, string) RelativePath
+pkg profiles, func NewConfigHelper(*jiri.X, ProfilesMode, string) (*ConfigHelper, error)
 pkg profiles, func NewTarget(string) (Target, error)
 pkg profiles, func NewTargetWithEnv(string, string) (Target, error)
 pkg profiles, func NewVersionInfo(string, map[string]interface{}, string) *VersionInfo
 pkg profiles, func ProfileMergePolicies() MergePolicies
 pkg profiles, func Profiles() []string
-pkg profiles, func Read(*tool.Context, string) error
+pkg profiles, func Read(*jiri.X, string) error
 pkg profiles, func Register(string, Manager)
 pkg profiles, func RegisterManifestFlag(*flag.FlagSet, *string, string)
 pkg profiles, func RegisterMergePoliciesFlag(*flag.FlagSet, *MergePolicies)
@@ -60,17 +57,15 @@ pkg profiles, func RegisterTargetAndEnvFlags(*flag.FlagSet, *Target)
 pkg profiles, func RegisterTargetFlag(*flag.FlagSet, *Target)
 pkg profiles, func RemoveProfileTarget(string, Target) bool
 pkg profiles, func RemoveTarget(OrderedTargets, *Target) OrderedTargets
-pkg profiles, func RunCommand(*tool.Context, map[string]string, string, ...string) error
 pkg profiles, func SchemaVersion() Version
 pkg profiles, func UnsetGoEnvMap(map[string]string)
 pkg profiles, func UnsetGoEnvVars(*envvar.Vars)
-pkg profiles, func Unzip(*tool.Context, string, string) error
+pkg profiles, func Unzip(*jiri.X, string, string) error
 pkg profiles, func UpdateProfileTarget(string, Target) error
 pkg profiles, func WithDefaultVersion(Target) Target
-pkg profiles, func Write(*tool.Context, string) error
+pkg profiles, func Write(*jiri.X, string) error
 pkg profiles, method (*ConfigHelper) GoPath() string
 pkg profiles, method (*ConfigHelper) JiriProfile() []string
-pkg profiles, method (*ConfigHelper) LegacyProfiles() bool
 pkg profiles, method (*ConfigHelper) MergeEnv(map[string]MergePolicy, ...[]string)
 pkg profiles, method (*ConfigHelper) MergeEnvFromProfiles(map[string]MergePolicy, Target, ...string)
 pkg profiles, method (*ConfigHelper) PrependToPATH(string)
@@ -88,20 +83,18 @@ pkg profiles, method (*ProfilesMode) Get() interface{}
 pkg profiles, method (*ProfilesMode) IsBoolFlag() bool
 pkg profiles, method (*ProfilesMode) Set(string) error
 pkg profiles, method (*ProfilesMode) String() string
-pkg profiles, method (*RelativePath) String() string
 pkg profiles, method (*Target) Arch() string
 pkg profiles, method (*Target) Less(*Target) bool
 pkg profiles, method (*Target) OS() string
 pkg profiles, method (*Target) Set(string) error
 pkg profiles, method (*Target) SetVersion(string)
-pkg profiles, method (*Target) Tag() string
 pkg profiles, method (*Target) TargetSpecificDirname() string
 pkg profiles, method (*Target) Usage() string
 pkg profiles, method (*Target) UseCommandLineEnv()
 pkg profiles, method (*Target) Version() string
 pkg profiles, method (*VersionInfo) Default() string
-pkg profiles, method (*VersionInfo) IsNewerThanDefault(string) bool
-pkg profiles, method (*VersionInfo) IsOlderThanDefault(string) bool
+pkg profiles, method (*VersionInfo) IsTargetNewerThanDefault(string) bool
+pkg profiles, method (*VersionInfo) IsTargetOlderThanDefault(string) bool
 pkg profiles, method (*VersionInfo) Lookup(string, interface{}) error
 pkg profiles, method (*VersionInfo) Select(string) (string, error)
 pkg profiles, method (*VersionInfo) String() string
@@ -115,11 +108,6 @@ pkg profiles, method (OrderedTargets) Len() int
 pkg profiles, method (OrderedTargets) Less(int, int) bool
 pkg profiles, method (OrderedTargets) Sort()
 pkg profiles, method (OrderedTargets) Swap(int, int)
-pkg profiles, method (RelativePath) Expand() string
-pkg profiles, method (RelativePath) ExpandEnv(*envvar.Vars)
-pkg profiles, method (RelativePath) Join(...string) RelativePath
-pkg profiles, method (RelativePath) RelativePath() string
-pkg profiles, method (RelativePath) RootJoin(...string) RelativePath
 pkg profiles, method (Target) CommandLineEnv() Environment
 pkg profiles, method (Target) CrossCompiling() bool
 pkg profiles, method (Target) DebugString() string
@@ -136,10 +124,10 @@ pkg profiles, type Environment struct, Vars []string
 pkg profiles, type Manager interface { AddFlags, Info, Install, Name, String, Uninstall, VersionInfo }
 pkg profiles, type Manager interface, AddFlags(*flag.FlagSet, Action)
 pkg profiles, type Manager interface, Info() string
-pkg profiles, type Manager interface, Install(*tool.Context, RelativePath, Target) error
+pkg profiles, type Manager interface, Install(*jiri.X, jiri.RelPath, Target) error
 pkg profiles, type Manager interface, Name() string
 pkg profiles, type Manager interface, String() string
-pkg profiles, type Manager interface, Uninstall(*tool.Context, RelativePath, Target) error
+pkg profiles, type Manager interface, Uninstall(*jiri.X, jiri.RelPath, Target) error
 pkg profiles, type Manager interface, VersionInfo() *VersionInfo
 pkg profiles, type MergeAction int
 pkg profiles, type MergePolicies map[string]MergePolicy
@@ -151,7 +139,6 @@ pkg profiles, type Profile struct
 pkg profiles, type Profile struct, Name string
 pkg profiles, type Profile struct, Root string
 pkg profiles, type ProfilesMode bool
-pkg profiles, type RelativePath struct
 pkg profiles, type Target struct
 pkg profiles, type Target struct, Env Environment
 pkg profiles, type Target struct, InstallationDir string

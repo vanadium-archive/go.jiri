@@ -36,13 +36,10 @@ package profiles
 
 import (
 	"flag"
-	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"v.io/jiri/jiri"
-	"v.io/x/lib/envvar"
 )
 
 var (
@@ -87,71 +84,6 @@ func LookupManager(name string) Manager {
 	return registry.managers[name]
 }
 
-// RelativePath represents a relative path whose root is specified
-// by an environment variable, eg. ${JIRI_ROOT}/profiles/go. It provides
-// access to the 'expanded' value of this variable along with any
-// path components appended to it.
-type RelativePath struct {
-	name  string
-	value string
-	path  string
-}
-
-// NewRelativePath creates a new instance of RelativePath with
-// the variable name as its root and value as the value of the variable.
-func NewRelativePath(name, value string) RelativePath {
-	return RelativePath{name: name, value: value}
-}
-
-// Join returns a copy of RelativePath with the specified components appended
-// to the path using filepath.Join.
-func (rp RelativePath) Join(components ...string) RelativePath {
-	nrp := rp
-	nrp.path = filepath.Join(append([]string{nrp.path}, components...)...)
-	return nrp
-}
-
-// RootJoin returns a copy of RelativePath with the specified components
-// appended to the root using filepath.Join.
-func (rp RelativePath) RootJoin(components ...string) RelativePath {
-	nrp := rp
-	nrp.path = filepath.Join(components...)
-	return nrp
-}
-
-// Expand returns the path with the root variable expanded.
-func (rp RelativePath) Expand() string {
-	return filepath.Join(rp.value, rp.path)
-}
-
-// String returns the RelativePath with the root variable name as the
-// root - i.e. ${name}[/<any append components>].
-func (rp RelativePath) String() string {
-	root := "${" + rp.name + "}"
-	if len(rp.path) == 0 {
-		return root
-	}
-	return root + string(filepath.Separator) + rp.path
-}
-
-// RelativePath returns just the relative path component of RelativePath.
-func (rp RelativePath) RelativePath() string {
-	return rp.path
-}
-
-// ExpandEnv expands all instances of the root variable in the supplied
-// environment.
-func (rp RelativePath) ExpandEnv(env *envvar.Vars) {
-	e := env.ToMap()
-	root := "${" + rp.name + "}"
-	for k, v := range e {
-		n := strings.Replace(v, root, rp.value, -1)
-		if n != v {
-			env.Set(k, n)
-		}
-	}
-}
-
 type Action int
 
 const (
@@ -176,9 +108,9 @@ type Manager interface {
 	// is its name and version.
 	String() string
 	// Install installs the profile for the specified build target.
-	Install(jirix *jiri.X, root RelativePath, target Target) error
+	Install(jirix *jiri.X, root jiri.RelPath, target Target) error
 	// Uninstall uninstalls the profile for the specified build target. When
 	// the last target for any given profile is uninstalled, then the profile
 	// itself (i.e. the source code) will be uninstalled.
-	Uninstall(jirix *jiri.X, root RelativePath, target Target) error
+	Uninstall(jirix *jiri.X, root jiri.RelPath, target Target) error
 }

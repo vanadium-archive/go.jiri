@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -111,8 +110,10 @@ var cmdUninstall = &cmdline.Command{
 	ArgsLong: "<profiles> is a list of profiles to uninstall.",
 }
 
+// All installed profile data will be stored under profileRoot.
+var profileRoot = jiri.NewRelPath("profiles")
+
 var (
-	rootPath             profiles.RelativePath
 	targetFlag           profiles.Target
 	manifestFlag         string
 	showManifestFlag     bool
@@ -136,8 +137,6 @@ func Main(name string) {
 func Init(defaultManifestFilename string) {
 	targetFlag = profiles.DefaultTarget()
 	mergePoliciesFlag = profiles.JiriMergePolicies()
-	// TODO(toddw): Change logic to derive rootPath from jirix.Root.
-	rootPath = profiles.NewRelativePath("JIRI_ROOT", jiri.FindRoot()).Join("profiles")
 
 	// Every sub-command accepts: --manifest
 	for _, fs := range []*flag.FlagSet{
@@ -329,14 +328,6 @@ func fmtOutput(jirix *jiri.X, o string) string {
 	return out.String()
 }
 
-func handleRelativePath(root profiles.RelativePath, s string) string {
-	// Handle the transition from absolute to relative paths.
-	if filepath.IsAbs(s) {
-		return s
-	}
-	return root.RootJoin(s).Expand()
-}
-
 func fmtInfo(jirix *jiri.X, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
 	if len(infoFlag) > 0 {
 		// Populate an instance listInfo
@@ -356,7 +347,7 @@ func fmtInfo(jirix *jiri.X, mgr profiles.Manager, profile *profiles.Profile, tar
 		}
 		info.SchemaVersion = profiles.SchemaVersion()
 		if target != nil {
-			info.Target.InstallationDir = handleRelativePath(rootPath, target.InstallationDir)
+			info.Target.InstallationDir = jiri.NewRelPath(target.InstallationDir).Abs(jirix)
 			info.Target.CommandLineEnv = target.CommandLineEnv().Vars
 			info.Target.Env = target.Env.Vars
 			clenv := ""
@@ -366,7 +357,7 @@ func fmtInfo(jirix *jiri.X, mgr profiles.Manager, profile *profiles.Profile, tar
 			info.Target.Command = fmt.Sprintf("jiri v23-profile install --target=%s %s%s", target, clenv, name)
 		}
 		if profile != nil {
-			info.Profile.Root = handleRelativePath(rootPath, profile.Root)
+			info.Profile.Root = profileRoot.Abs(jirix)
 		}
 
 		// Use a template to print out any field in our instance of listInfo.
@@ -466,7 +457,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 					fmt.Fprintf(jirix.Stdout(), "Updating %s %s from %q to %s\n", n, target, target.Version(), vi)
 				}
 				target.SetVersion(vi.Default())
-				err := mgr.Install(jirix, rootPath, *target)
+				err := mgr.Install(jirix, profileRoot, *target)
 				logResult(jirix, "Update", mgr, *target, err)
 				if err != nil {
 					return err
@@ -489,7 +480,7 @@ func runGC(jirix *jiri.X, args []string) error {
 		profile := profiles.LookupProfile(n)
 		for _, target := range profile.Targets() {
 			if vi.IsTargetOlderThanDefault(target.Version()) {
-				err := mgr.Uninstall(jirix, rootPath, *target)
+				err := mgr.Uninstall(jirix, profileRoot, *target)
 				logResult(jirix, "gc", mgr, *target, err)
 				if err != nil {
 					return err
@@ -536,10 +527,10 @@ func runRmAll(jirix *jiri.X) error {
 			return err
 		}
 	}
-	rp := rootPath.Expand()
-	if exists, err := s.DirectoryExists(rp); err != nil || exists {
-		if err := s.Run("chmod", "-R", "u+w", rp).
-			RemoveAll(rp).Done(); err != nil {
+	d := profileRoot.Abs(jirix)
+	if exists, err := s.DirectoryExists(d); err != nil || exists {
+		if err := s.Run("chmod", "-R", "u+w", d).
+			RemoveAll(d).Done(); err != nil {
 			return err
 		}
 	}
@@ -637,7 +628,7 @@ func runInstall(jirix *jiri.X, args []string) error {
 	}
 	if err := applyCommand(names, jirix, targetFlag,
 		func(mgr profiles.Manager, jirix *jiri.X, target profiles.Target) error {
-			err := mgr.Install(jirix, rootPath, target)
+			err := mgr.Install(jirix, profileRoot, target)
 			logResult(jirix, "Install:", mgr, target, err)
 			return err
 		}); err != nil {
@@ -661,7 +652,7 @@ func runUninstall(jirix *jiri.X, args []string) error {
 				continue
 			}
 			for _, target := range profile.Targets() {
-				if err := mgr.Uninstall(jirix, rootPath, *target); err != nil {
+				if err := mgr.Uninstall(jirix, profileRoot, *target); err != nil {
 					logResult(jirix, "Uninstall", mgr, *target, err)
 					return err
 				}
@@ -671,7 +662,7 @@ func runUninstall(jirix *jiri.X, args []string) error {
 	} else {
 		applyCommand(args, jirix, targetFlag,
 			func(mgr profiles.Manager, jirix *jiri.X, target profiles.Target) error {
-				err := mgr.Uninstall(jirix, rootPath, target)
+				err := mgr.Uninstall(jirix, profileRoot, target)
 				logResult(jirix, "Uninstall", mgr, target, err)
 				return err
 			})

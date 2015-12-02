@@ -184,14 +184,6 @@ func TestReadingV0(t *testing.T) {
 	}
 }
 
-func handleRelativePath(root profiles.RelativePath, s string) string {
-	// Handle the transition from absolute to relative paths.
-	if filepath.IsAbs(s) {
-		return s
-	}
-	return root.RootJoin(s).Expand()
-}
-
 func TestReadingV3AndV4(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()

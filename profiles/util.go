@@ -194,7 +194,7 @@ func InstallPackages(jirix *jiri.X, pkgs []string) error {
 
 // ensureAction ensures that the requested profile and target
 // is installed/uninstalled, installing/uninstalling it if and only if necessary.
-func ensureAction(jirix *jiri.X, action Action, profile string, root RelativePath, target Target) error {
+func ensureAction(jirix *jiri.X, action Action, profile string, root jiri.RelPath, target Target) error {
 	verb := ""
 	switch action {
 	case Install:
@@ -233,13 +233,13 @@ func ensureAction(jirix *jiri.X, action Action, profile string, root RelativePat
 
 // EnsureProfileTargetIsInstalled ensures that the requested profile and target
 // is installed, installing it if only if necessary.
-func EnsureProfileTargetIsInstalled(jirix *jiri.X, profile string, root RelativePath, target Target) error {
+func EnsureProfileTargetIsInstalled(jirix *jiri.X, profile string, root jiri.RelPath, target Target) error {
 	return ensureAction(jirix, Install, profile, root, target)
 }
 
 // EnsureProfileTargetIsUninstalled ensures that the requested profile and target
 // are no longer installed.
-func EnsureProfileTargetIsUninstalled(jirix *jiri.X, profile string, root RelativePath, target Target) error {
+func EnsureProfileTargetIsUninstalled(jirix *jiri.X, profile string, root jiri.RelPath, target Target) error {
 	return ensureAction(jirix, Uninstall, profile, root, target)
 }
 

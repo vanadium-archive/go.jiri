@@ -245,7 +245,6 @@ func (pdb *profileDB) read(jirix *jiri.X, filename string) error {
 	data, err := jirix.Run().ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintf(jirix.Stderr(), "creating %v\n", filename)
 			return nil
 		}
 		return err
