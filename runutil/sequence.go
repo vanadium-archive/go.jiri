@@ -263,12 +263,13 @@ func fmtArgs(args ...interface{}) string {
 	if len(args) == 0 {
 		return ""
 	}
-	out := &bytes.Buffer{}
+	var out bytes.Buffer
 	for _, a := range args {
-		if _, ok := a.(string); ok {
-			out.WriteString(fmt.Sprintf(" ,%q", a))
-		} else {
-			out.WriteString(fmt.Sprintf(" ,%s", a))
+		switch at := a.(type) {
+		case string:
+			fmt.Fprintf(&out, ", %q", at)
+		default:
+			fmt.Fprintf(&out, ", %v", a)
 		}
 	}
 	return out.String()
@@ -278,11 +279,9 @@ func fmtStringArgs(args ...string) string {
 	if len(args) == 0 {
 		return ""
 	}
-	out := &bytes.Buffer{}
+	var out bytes.Buffer
 	for _, a := range args {
-		out.WriteString(", \"")
-		out.WriteString(a)
-		out.WriteString("\"")
+		fmt.Fprintf(&out, ", %q", a)
 	}
 	return out.String()
 }
@@ -347,7 +346,7 @@ func (s *Sequence) Call(fn func() error, format string, args ...interface{}) *Se
 		return s
 	}
 	defer s.initAndDefer()()
-	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf("Call(%s,%s%s)", fn, format, fmtArgs(args)))
+	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf("Call(%s%s)", format, fmtArgs(args)))
 	return s
 }
 

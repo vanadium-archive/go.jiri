@@ -235,11 +235,11 @@ func (fake FakeJiriRoot) readManifest(path string) (*project.Manifest, error) {
 // UpdateUniverse synchronizes the content of the Vanadium fake based
 // on the content of the remote manifest.
 func (fake FakeJiriRoot) UpdateUniverse(gc bool) error {
-	oldRoot := os.Getenv("JIRI_ROOT")
-	if err := os.Setenv("JIRI_ROOT", fake.X.Root); err != nil {
+	oldRoot := os.Getenv(jiri.RootEnv)
+	if err := os.Setenv(jiri.RootEnv, fake.X.Root); err != nil {
 		return fmt.Errorf("Setenv() failed: %v", err)
 	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
+	defer os.Setenv(jiri.RootEnv, oldRoot)
 	if err := project.UpdateUniverse(fake.X, gc); err != nil {
 		return err
 	}

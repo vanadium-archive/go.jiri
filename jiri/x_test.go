@@ -41,11 +41,11 @@ func TestFindRootEnvSymlink(t *testing.T) {
 
 	// Set the JIRI_ROOT to the symlink created above and check that FindRoot()
 	// evaluates the symlink.
-	oldRoot := os.Getenv("JIRI_ROOT")
-	if err := os.Setenv("JIRI_ROOT", symRoot); err != nil {
+	oldRoot := os.Getenv(RootEnv)
+	if err := os.Setenv(RootEnv, symRoot); err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer os.Setenv("JIRI_ROOT", oldRoot)
+	defer os.Setenv(RootEnv, oldRoot)
 	if got, want := FindRoot(), root; got != want {
 		t.Fatalf("unexpected output: got %v, want %v", got, want)
 	}

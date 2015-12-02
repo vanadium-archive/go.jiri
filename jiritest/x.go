@@ -34,20 +34,3 @@ func NewX(t *testing.T) (*jiri.X, func()) {
 	}
 	return &jiri.X{Context: ctx, Root: root}, cleanup
 }
-
-// NewX_DeprecatedEnv relies on the deprecated JIRI_ROOT environment variable to
-// set up a new jiri.X.  Tests relying on this function need to be updated to
-// not rely on the environment variable.
-func NewX_DeprecatedEnv(t *testing.T, opts *tool.ContextOpts) *jiri.X {
-	root := os.Getenv(jiri.RootEnv)
-	if root == "" {
-		t.Fatalf("%v isn't set", jiri.RootEnv)
-	}
-	var ctx *tool.Context
-	if opts != nil {
-		ctx = tool.NewContext(*opts)
-	} else {
-		ctx = tool.NewDefaultContext()
-	}
-	return &jiri.X{Context: ctx, Root: root}
-}

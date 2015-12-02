@@ -35,17 +35,22 @@ pkg runutil, method (*Sequence) Call(func() error, string, ...interface{}) *Sequ
 pkg runutil, method (*Sequence) Capture(io.Writer, io.Writer) *Sequence
 pkg runutil, method (*Sequence) Chdir(string) *Sequence
 pkg runutil, method (*Sequence) Chmod(string, os.FileMode) *Sequence
+pkg runutil, method (*Sequence) Copy(*os.File, io.Reader) (int64, error)
+pkg runutil, method (*Sequence) Create(string) (*os.File, error)
 pkg runutil, method (*Sequence) DirectoryExists(string) (bool, error)
 pkg runutil, method (*Sequence) Done() error
+pkg runutil, method (*Sequence) Env(map[string]string) *Sequence
 pkg runutil, method (*Sequence) Error() error
 pkg runutil, method (*Sequence) FileExists(string) (bool, error)
-pkg runutil, method (*Sequence) GetOpts() Opts
 pkg runutil, method (*Sequence) IsDir(string) (bool, error)
 pkg runutil, method (*Sequence) Last(string, ...string) error
 pkg runutil, method (*Sequence) MkdirAll(string, os.FileMode) *Sequence
 pkg runutil, method (*Sequence) Open(string) (*os.File, error)
-pkg runutil, method (*Sequence) Opts(Opts) *Sequence
+pkg runutil, method (*Sequence) OpenFile(string, int, os.FileMode) (*os.File, error)
 pkg runutil, method (*Sequence) Output([]string) *Sequence
+pkg runutil, method (*Sequence) Popd() *Sequence
+pkg runutil, method (*Sequence) Pushd(string) *Sequence
+pkg runutil, method (*Sequence) Read(io.Reader) *Sequence
 pkg runutil, method (*Sequence) ReadDir(string) ([]os.FileInfo, error)
 pkg runutil, method (*Sequence) ReadFile(string) ([]byte, error)
 pkg runutil, method (*Sequence) Remove(string) *Sequence
@@ -56,6 +61,7 @@ pkg runutil, method (*Sequence) Stat(string) (os.FileInfo, error)
 pkg runutil, method (*Sequence) Symlink(string, string) *Sequence
 pkg runutil, method (*Sequence) TempDir(string, string) (string, error)
 pkg runutil, method (*Sequence) Timeout(time.Duration) *Sequence
+pkg runutil, method (*Sequence) WriteFile(string, []byte, os.FileMode) *Sequence
 pkg runutil, method (*Start) Command(string, ...string) (*exec.Cmd, error)
 pkg runutil, method (*Start) CommandWithOpts(Opts, string, ...string) (*exec.Cmd, error)
 pkg runutil, method (Run) Opts() Opts
