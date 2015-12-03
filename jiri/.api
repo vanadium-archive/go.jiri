@@ -7,6 +7,7 @@ pkg jiri, func FindRoot() string
 pkg jiri, func NewRelPath(...string) RelPath
 pkg jiri, func NewX(*cmdline.Env) (*X, error)
 pkg jiri, func RunnerFunc(func(*X, []string) error) cmdline.Runner
+pkg jiri, method (*X) BinDir() string
 pkg jiri, method (*X) Clone(tool.ContextOpts) *X
 pkg jiri, method (*X) LocalManifestFile() string
 pkg jiri, method (*X) LocalSnapshotDir() string
@@ -14,6 +15,8 @@ pkg jiri, method (*X) ManifestDir() string
 pkg jiri, method (*X) ManifestFile(string) string
 pkg jiri, method (*X) RemoteSnapshotDir() string
 pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
+pkg jiri, method (*X) RootMetaDir() string
+pkg jiri, method (*X) UpdateHistoryDir() string
 pkg jiri, method (*X) UsageErrorf(string, ...interface{}) error
 pkg jiri, method (RelPath) Abs(*X) string
 pkg jiri, method (RelPath) Join(...string) RelPath

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Copyright 2015 The Vanadium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+fatal() {
+  echo "ERROR: $@" 1>&2
+  exit 1
+}
+
+# If $JIRI_ROOT is set we always use it, otherwise look for a .jiri_root
+# directory starting with the current working directory, and walking up.
+if [ "${JIRI_ROOT}" == "" ]; then
+  while [ ! -d  "$(pwd)/.jiri_root" ]; do
+    if [ "$(pwd)" == "/" ]; then
+      fatal "could not find .jiri_root directory"
+    fi
+    cd ..
+  done
+  export JIRI_ROOT="$(pwd)"
+fi
+
+# Make sure the jiri binary exists and is executable.
+if [ ! -e "${JIRI_ROOT}/.jiri_root/bin/jiri" ]; then
+  fatal "${JIRI_ROOT}/.jiri_root/bin/jiri does not exist"
+elif [ ! -x "${JIRI_ROOT}/.jiri_root/bin/jiri" ]; then
+  fatal "${JIRI_ROOT}/.jiri_root/bin/jiri is not executable"
+fi
+
+# Execute the jiri binary.
+exec "${JIRI_ROOT}/.jiri_root/bin/jiri" "$@"

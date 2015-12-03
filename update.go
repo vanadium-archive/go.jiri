@@ -34,7 +34,7 @@ var cmdUpdate = &cmdline.Command{
 	Short:  "Update all jiri tools and projects",
 	Long: `
 Updates all projects, builds the latest version of all tools, and installs the
-resulting binaries into $JIRI_ROOT/devtools/bin. The sequence in which the
+resulting binaries into $JIRI_ROOT/.jiri_root/bin. The sequence in which the
 individual updates happen guarantees that we end up with a consistent set of
 tools and source code. The set of projects and tools to update is described in
 the manifest.
@@ -44,9 +44,18 @@ Run "jiri help manifest" for details on manifests.
 }
 
 func runUpdate(jirix *jiri.X, _ []string) error {
-	// Create a snapshot of the current state of all projects and
-	// write it to the $JIRI_ROOT/.update_history folder.
-	snapshotFile := filepath.Join(jirix.Root, ".update_history", time.Now().Format(time.RFC3339))
+	// Create the $JIRI_ROOT/.jiri_root directory if it doesn't already exist.
+	//
+	// TODO(toddw): Remove this logic after the transition to .jiri_root is done.
+	// The bootstrapping logic should create this directory, and jiri should fail
+	// if the directory doesn't exist.
+	if err := jirix.NewSeq().MkdirAll(jirix.RootMetaDir(), 0755).Done(); err != nil {
+		return err
+	}
+
+	// Create a snapshot of the current state of all projects and write it to the
+	// update history directory.
+	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
 	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
@@ -54,7 +63,12 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
 	updateFn := func() error {
-		return project.UpdateUniverse(jirix, gcFlag)
+		if err := project.UpdateUniverse(jirix, gcFlag); err != nil {
+			return err
+		}
+		// We're careful to only attempt the bin dir transition after the update has
+		// succeeded, to avoid messy partial states.
+		return project.TransitionBinDir(jirix)
 	}
 	return retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag))
 }

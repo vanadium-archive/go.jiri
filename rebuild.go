@@ -20,7 +20,7 @@ var cmdRebuild = &cmdline.Command{
 	Short:  "Rebuild all jiri tools",
 	Long: `
 Rebuilds all jiri tools and installs the resulting binaries into
-$JIRI_ROOT/devtools/bin. This is similar to "jiri update", but does not update
+$JIRI_ROOT/.jiri_root/bin. This is similar to "jiri update", but does not update
 any projects before building the tools. The set of tools to rebuild is described
 in the manifest.
 

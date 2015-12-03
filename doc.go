@@ -21,6 +21,7 @@ The jiri commands are:
    help         Display help for commands or topics
 
 The jiri additional help topics are:
+   layout      Description of jiri file system layout
    manifest    Description of manifest files
 
 The jiri flags are:
@@ -316,7 +317,7 @@ The jiri project poll flags are:
 Jiri rebuild - Rebuild all jiri tools
 
 Rebuilds all jiri tools and installs the resulting binaries into
-$JIRI_ROOT/devtools/bin. This is similar to "jiri update", but does not update
+$JIRI_ROOT/.jiri_root/bin. This is similar to "jiri update", but does not update
 any projects before building the tools. The set of tools to rebuild is described
 in the manifest.
 
@@ -432,7 +433,7 @@ The jiri snapshot list flags are:
 Jiri update - Update all jiri tools and projects
 
 Updates all projects, builds the latest version of all tools, and installs the
-resulting binaries into $JIRI_ROOT/devtools/bin. The sequence in which the
+resulting binaries into $JIRI_ROOT/.jiri_root/bin. The sequence in which the
 individual updates happen guarantees that we end up with a consistent set of
 tools and source code. The set of projects and tools to update is described in
 the manifest.
@@ -482,6 +483,67 @@ The jiri help flags are:
    Format output to this target width in runes, or unlimited if width < 0.
    Defaults to the terminal width if available.  Override the default by setting
    the CMDLINE_WIDTH environment variable.
+
+Jiri layout - Description of jiri file system layout
+
+All data managed by the jiri tool is located in the file system under a root
+directory, colloquially called the jiri root directory.  The file system layout
+looks like this:
+
+ [root]                              # root directory (name picked by user)
+ [root]/.jiri_root                   # root metadata directory
+ [root]/.jiri_root/bin               # contains tool binaries (jiri, etc.)
+ [root]/.jiri_root/update_history    # contains history of update snapshots
+ [root]/.manifest                    # contains jiri manifests
+ [root]/[project1]                   # project directory (name picked by user)
+ [root]/[project1]/.jiri             # project metadata directory
+ [root]/[project1]/.jiri/metadata.v2 # project metadata file
+ [root]/[project1]/.jiri/<<cls>>     # project per-cl metadata directories
+ [root]/[project1]/<<files>>         # project files
+ [root]/[project2]...
+
+The [root] and [projectN] directory names are picked by the user.  The <<cls>>
+are named via jiri cl new, and the <<files>> are named as the user adds files
+and directories to their project.  All other names above have special meaning to
+the jiri tool, and cannot be changed; you must ensure your path names don't
+collide with these special names.
+
+There are two ways to run the jiri tool:
+
+1) Shim script (recommended approach).  This is a shell script that looks for
+the [root] directory.  If the JIRI_ROOT environment variable is set, that is
+assumed to be the [root] directory.  Otherwise the script looks for the
+.jiri_root directory, starting in the current working directory and walking up
+the directory chain.  The search is terminated successfully when the .jiri_root
+directory is found; it fails after it reaches the root of the file system.  Thus
+the shim must be invoked from the [root] directory or one of its subdirectories.
+
+Once the [root] is found, the JIRI_ROOT environment variable is set to its
+location, and [root]/.jiri_root/bin/jiri is invoked.  That file contains the
+actual jiri binary.
+
+The point of the shim script is to make it easy to use the jiri tool with
+multiple [root] directories on your file system.  Keep in mind that when "jiri
+update" is run, the jiri tool itself is automatically updated along with all
+projects.  By using the shim script, you only need to remember to invoke the
+jiri tool from within the appropriate [root] directory, and the projects and
+tools under that [root] directory will be updated.
+
+The shim script is located at [root]/release/go/src/v.io/jiri/scripts/jiri
+
+2) Direct binary.  This is the jiri binary, containing all of the actual jiri
+tool logic.  The binary requires the JIRI_ROOT environment variable to point to
+the [root] directory.
+
+Note that if you have multiple [root] directories on your file system, you must
+remember to run the jiri binary corresponding to the setting of your JIRI_ROOT
+environment variable.  Things may fail if you mix things up, since the jiri
+binary is updated with each call to "jiri update", and you may encounter version
+mismatches between the jiri binary and the various metadata files or other
+logic.  This is the reason the shim script is recommended over running the
+binary directly.
+
+The binary is located at [root]/.jiri_root/bin/jiri
 
 Jiri manifest - Description of manifest files
 

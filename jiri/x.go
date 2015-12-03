@@ -107,6 +107,21 @@ func (x *X) UsageErrorf(format string, args ...interface{}) error {
 	return nil
 }
 
+// RootMetaDir returns the path to the root metadata directory.
+func (x *X) RootMetaDir() string {
+	return filepath.Join(x.Root, RootMetaDir)
+}
+
+// BinDir returns the path to the bin directory.
+func (x *X) BinDir() string {
+	return filepath.Join(x.RootMetaDir(), "bin")
+}
+
+// UpdateHistoryDir returns the path to the update history directory.
+func (x *X) UpdateHistoryDir() string {
+	return filepath.Join(x.RootMetaDir(), "update_history")
+}
+
 // LocalManifestFile returns the path to the local manifest file.
 func (x *X) LocalManifestFile() string {
 	return filepath.Join(x.Root, ".local_manifest")

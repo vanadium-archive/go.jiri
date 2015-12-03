@@ -179,8 +179,6 @@ func (e UnsupportedProtocolErr) Error() string {
 // project names to a collections of commits.
 type Update map[string][]CL
 
-var devtoolsBinDir = filepath.Join("devtools", "bin")
-
 // CreateSnapshot creates a manifest that encodes the current state of
 // master branches of all projects and writes this snapshot out to the
 // given file.
@@ -545,7 +543,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	if err := buildToolsFromMaster(jirix, remoteTools, tmpDir); err != nil {
 		return err
 	}
-	// 3. Install the tools into $JIRI_ROOT/devtools/bin.
+	// 3. Install the tools into $JIRI_ROOT/.jiri_root/bin.
 	if err := InstallTools(jirix, tmpDir); err != nil {
 		return err
 	}
@@ -852,7 +850,7 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 }
 
 // InstallTools installs the tools from the given directory into
-// $JIRI_ROOT/devtools/bin.
+// $JIRI_ROOT/.jiri_root/bin.
 func InstallTools(jirix *jiri.X, dir string) error {
 	jirix.TimerPush("install tools")
 	defer jirix.TimerPop()
@@ -860,20 +858,20 @@ func InstallTools(jirix *jiri.X, dir string) error {
 		// In "dry run" mode, no binaries are built.
 		return nil
 	}
-	binDir := toAbs(jirix, devtoolsBinDir)
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
+	}
+	binDir := jirix.BinDir()
+	if err := jirix.NewSeq().MkdirAll(binDir, 0755).Done(); err != nil {
+		return fmt.Errorf("MkdirAll(%v) failed: %v", binDir, err)
 	}
 	failed := false
 	for _, fi := range fis {
 		installFn := func() error {
 			src := filepath.Join(dir, fi.Name())
 			dst := filepath.Join(binDir, fi.Name())
-			if err := jirix.Run().Rename(src, dst); err != nil {
-				return err
-			}
-			return nil
+			return jirix.Run().Rename(src, dst)
 		}
 		opts := runutil.Opts{Verbose: true}
 		if err := jirix.Run().FunctionWithOpts(opts, installFn, "install tool %q", fi.Name()); err != nil {
@@ -884,19 +882,57 @@ func InstallTools(jirix *jiri.X, dir string) error {
 	if failed {
 		return cmdline.ErrExitCode(2)
 	}
+	return nil
+}
 
-	// Delete any old subcommands.
-	v23SubCmds := []string{
-		"jiri-profile",
-		"jiri-env",
-	}
-	for _, subCmd := range v23SubCmds {
-		subCmdPath := filepath.Join(binDir, subCmd)
-		if err := jirix.Run().RemoveAll(subCmdPath); err != nil {
-			return err
+// TransitionBinDir handles the transition from the old location
+// $JIRI_ROOT/devtools/bin to the new $JIRI_ROOT/.jiri_root/bin.  In
+// InstallTools above we've already installed the tools to the new location.
+//
+// For now we want $JIRI_ROOT/devtools/bin symlinked to the new location, so
+// that users won't perceive a difference in behavior.  In addition, we want to
+// save the old binaries to $JIRI_ROOT/.jiri_root/bin.BACKUP the first time this
+// is run.  That way if we screwed something up, the user can recover their old
+// binaries.
+//
+// TODO(toddw): Remove this logic after the transition to .jiri_root is done.
+func TransitionBinDir(jirix *jiri.X) error {
+	oldDir, newDir := filepath.Join(jirix.Root, "devtools", "bin"), jirix.BinDir()
+	switch info, err := jirix.Run().Lstat(oldDir); {
+	case os.IsNotExist(err):
+		// Drop down to create the symlink below.
+	case err != nil:
+		return fmt.Errorf("Failed to stat old bin dir: %v", err)
+	case info.Mode() == os.ModeSymlink:
+		link, err := jirix.NewSeq().Readlink(oldDir)
+		if err != nil {
+			return fmt.Errorf("Failed to read link from old bin dir: %v", err)
+		}
+		if link == newDir {
+			// The old dir is already correctly symlinked to the new dir.
+			return nil
+		}
+		fallthrough
+	default:
+		// The old dir exists, and either it's not a symlink, or it's a symlink that
+		// doesn't point to the new dir.  Move the old dir to the backup location.
+		backupDir := newDir + ".BACKUP"
+		switch _, err := jirix.Run().Stat(backupDir); {
+		case os.IsNotExist(err):
+			if err := jirix.NewSeq().Rename(oldDir, backupDir).Done(); err != nil {
+				return fmt.Errorf("Failed to backup old bin dir %v to %v: %v", oldDir, backupDir, err)
+			}
+			// Drop down to create the symlink below.
+		case err != nil:
+			return fmt.Errorf("Failed to stat backup bin dir: %v", err)
+		default:
+			return fmt.Errorf("Backup bin dir %v already exists", backupDir)
 		}
 	}
-
+	// Create the symlink.
+	if err := jirix.NewSeq().MkdirAll(filepath.Dir(oldDir), 0755).Symlink(newDir, oldDir).Done(); err != nil {
+		return fmt.Errorf("Failed to symlink to new bin dir %v from %v: %v", newDir, oldDir, err)
+	}
 	return nil
 }
 

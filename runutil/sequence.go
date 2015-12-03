@@ -145,6 +145,9 @@ func (s *Sequence) setOpts(opts Opts) {
 
 func (s *Sequence) Error() error {
 	if s.err != nil && len(s.caller) > 0 {
+		// TODO(toddw): Wrapping the error here is bad, since some callers require
+		// the original error to be returned.  E.g. it's common to call os.Stat()
+		// and check against os.IsNotExist, which breaks with wrapped errors.
 		return fmt.Errorf("%s: %v", s.caller, s.err)
 	}
 	return s.err
@@ -546,6 +549,28 @@ func (s *Sequence) Stat(name string) (os.FileInfo, error) {
 	fi, err := s.r.Stat(name)
 	s.setError(err, fmt.Sprintf("Stat(%s)", name))
 	return fi, s.Done()
+}
+
+// Lstat is a wrapper around os.Lstat that handles options such as
+// "verbose" or "dry run". Lstat is a terminating function.
+func (s *Sequence) Lstat(name string) (os.FileInfo, error) {
+	if s.err != nil {
+		return nil, s.Done()
+	}
+	fi, err := s.r.Lstat(name)
+	s.setError(err, fmt.Sprintf("Lstat(%s)", name))
+	return fi, s.Done()
+}
+
+// Readlink is a wrapper around os.Readlink that handles options such as
+// "verbose" or "dry run". Lstat is a terminating function.
+func (s *Sequence) Readlink(name string) (string, error) {
+	if s.err != nil {
+		return "", s.Done()
+	}
+	link, err := s.r.Readlink(name)
+	s.setError(err, fmt.Sprintf("Readlink(%s)", name))
+	return link, s.Done()
 }
 
 // TempDir is a wrapper around ioutil.TempDir that handles options

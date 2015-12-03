@@ -1,0 +1,84 @@
+pkg project, const FastScan ScanMode
+pkg project, const FullScan ScanMode
+pkg project, func ApplyToLocalMaster(*jiri.X, Projects, func() error) error
+pkg project, func BuildTools(*jiri.X, Tools, string) error
+pkg project, func CleanupProjects(*jiri.X, Projects, bool) error
+pkg project, func CreateSnapshot(*jiri.X, string) error
+pkg project, func CurrentManifest(*jiri.X) (*Manifest, error)
+pkg project, func CurrentProjectName(*jiri.X) (string, error)
+pkg project, func DataDirPath(*jiri.X, string) (string, error)
+pkg project, func GerritHost(*jiri.X) (string, error)
+pkg project, func GetProjectStates(*jiri.X, bool) (map[string]*ProjectState, error)
+pkg project, func GitHost(*jiri.X) (string, error)
+pkg project, func InstallTools(*jiri.X, string) error
+pkg project, func LocalProjects(*jiri.X, ScanMode) (Projects, error)
+pkg project, func ParseNames(*jiri.X, []string, map[string]struct{}) (map[string]Project, error)
+pkg project, func PollProjects(*jiri.X, map[string]struct{}) (Update, error)
+pkg project, func ReadManifest(*jiri.X) (Projects, Tools, error)
+pkg project, func TransitionBinDir(*jiri.X) error
+pkg project, func UpdateUniverse(*jiri.X, bool) error
+pkg project, method (UnsupportedProtocolErr) Error() string
+pkg project, type BranchState struct
+pkg project, type BranchState struct, HasGerritMessage bool
+pkg project, type BranchState struct, Name string
+pkg project, type CL struct
+pkg project, type CL struct, Author string
+pkg project, type CL struct, Description string
+pkg project, type CL struct, Email string
+pkg project, type GitHook struct
+pkg project, type GitHook struct, Name string
+pkg project, type GitHook struct, Path string
+pkg project, type Hook struct
+pkg project, type Hook struct, Args []HookArg
+pkg project, type Hook struct, Exclude bool
+pkg project, type Hook struct, Interpreter string
+pkg project, type Hook struct, Name string
+pkg project, type Hook struct, Path string
+pkg project, type Hook struct, Project string
+pkg project, type HookArg struct
+pkg project, type HookArg struct, Arg string
+pkg project, type Hooks map[string]Hook
+pkg project, type Host struct
+pkg project, type Host struct, GitHooks []GitHook
+pkg project, type Host struct, Location string
+pkg project, type Host struct, Name string
+pkg project, type Hosts map[string]Host
+pkg project, type Import struct
+pkg project, type Import struct, Name string
+pkg project, type Imports map[string]Import
+pkg project, type Manifest struct
+pkg project, type Manifest struct, Hooks []Hook
+pkg project, type Manifest struct, Hosts []Host
+pkg project, type Manifest struct, Imports []Import
+pkg project, type Manifest struct, Label string
+pkg project, type Manifest struct, Projects []Project
+pkg project, type Manifest struct, Tools []Tool
+pkg project, type Manifest struct, XMLName struct{}
+pkg project, type Project struct
+pkg project, type Project struct, Exclude bool
+pkg project, type Project struct, Name string
+pkg project, type Project struct, Path string
+pkg project, type Project struct, Protocol string
+pkg project, type Project struct, Remote string
+pkg project, type Project struct, RemoteBranch string
+pkg project, type Project struct, Revision string
+pkg project, type ProjectState struct
+pkg project, type ProjectState struct, Branches []BranchState
+pkg project, type ProjectState struct, CurrentBranch string
+pkg project, type ProjectState struct, HasUncommitted bool
+pkg project, type ProjectState struct, HasUntracked bool
+pkg project, type ProjectState struct, Project Project
+pkg project, type Projects map[string]Project
+pkg project, type ScanMode bool
+pkg project, type Tool struct
+pkg project, type Tool struct, Data string
+pkg project, type Tool struct, Exclude bool
+pkg project, type Tool struct, Name string
+pkg project, type Tool struct, Package string
+pkg project, type Tool struct, Project string
+pkg project, type Tools map[string]Tool
+pkg project, type UnsupportedProtocolErr string
+pkg project, type Update map[string][]CL
+pkg project, var JiriName string
+pkg project, var JiriPackage string
+pkg project, var JiriProject string

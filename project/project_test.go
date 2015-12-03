@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// TODO(jsimsa): Switch this test to using FakeJiriRoot.
-
 package project_test
 
 import (
@@ -601,4 +599,168 @@ func TestUpdateUniverse(t *testing.T) {
 func TestUnsupportedPrototocolErr(t *testing.T) {
 	err := project.UnsupportedProtocolErr("foo")
 	_ = err.Error()
+}
+
+type binDirTest struct {
+	Name     string
+	Setup    func(old, new string) error
+	Teardown func(old, new string) error
+	Error    string
+}
+
+func TestTransitionBinDir(t *testing.T) {
+	tests := []binDirTest{
+		{
+			"No old dir",
+			func(old, new string) error { return nil },
+			nil,
+			"",
+		},
+		{
+			"Empty old dir",
+			func(old, new string) error {
+				return os.MkdirAll(old, 0777)
+			},
+			nil,
+			"",
+		},
+		{
+			"Populated old dir",
+			func(old, new string) error {
+				if err := os.MkdirAll(old, 0777); err != nil {
+					return err
+				}
+				return ioutil.WriteFile(filepath.Join(old, "tool"), []byte("foo"), 0777)
+			},
+			nil,
+			"",
+		},
+		{
+			"Symlinked old dir",
+			func(old, new string) error {
+				if err := os.MkdirAll(filepath.Dir(old), 0777); err != nil {
+					return err
+				}
+				return os.Symlink(new, old)
+			},
+			nil,
+			"",
+		},
+		{
+			"Symlinked old dir pointing nowhere",
+			func(old, new string) error {
+				if err := os.MkdirAll(filepath.Dir(old), 0777); err != nil {
+					return err
+				}
+				return os.Symlink(filepath.Join(new, "noexist"), old)
+			},
+			nil,
+			"",
+		},
+		{
+			"Unreadable old dir parent",
+			func(old, new string) error {
+				if err := os.MkdirAll(old, 0777); err != nil {
+					return err
+				}
+				return os.Chmod(filepath.Dir(old), 0222)
+			},
+			func(old, new string) error {
+				return os.Chmod(filepath.Dir(old), 0777)
+			},
+			"Failed to stat old bin dir",
+		},
+		{
+			"Unwritable old dir",
+			func(old, new string) error {
+				if err := os.MkdirAll(old, 0777); err != nil {
+					return err
+				}
+				return os.Chmod(old, 0444)
+			},
+			func(old, new string) error {
+				return os.Chmod(old, 0777)
+			},
+			"Failed to backup old bin dir",
+		},
+		{
+			"Unreadable backup dir parent",
+			func(old, new string) error {
+				if err := os.MkdirAll(old, 0777); err != nil {
+					return err
+				}
+				return os.Chmod(filepath.Dir(new), 0222)
+			},
+			func(old, new string) error {
+				return os.Chmod(filepath.Dir(new), 0777)
+			},
+			"Failed to stat backup bin dir",
+		},
+		{
+			"Existing backup dir",
+			func(old, new string) error {
+				if err := os.MkdirAll(old, 0777); err != nil {
+					return err
+				}
+				return os.MkdirAll(new+".BACKUP", 0777)
+			},
+			nil,
+			"Backup bin dir",
+		},
+	}
+	for _, test := range tests {
+		jirix, cleanup := jiritest.NewX(t)
+		if err := testTransitionBinDir(jirix, test); err != nil {
+			t.Errorf("%s: %v", test.Name, err)
+		}
+		cleanup()
+	}
+}
+
+func testTransitionBinDir(jirix *jiri.X, test binDirTest) (e error) {
+	oldDir, newDir := filepath.Join(jirix.Root, "devtools", "bin"), jirix.BinDir()
+	// The new bin dir always exists.
+	if err := os.MkdirAll(newDir, 0777); err != nil {
+		return fmt.Errorf("make new dir failed: %v", err)
+	}
+	if err := test.Setup(oldDir, newDir); err != nil {
+		return fmt.Errorf("setup failed: %v", err)
+	}
+	if test.Teardown != nil {
+		defer func() {
+			if err := test.Teardown(oldDir, newDir); err != nil && e == nil {
+				e = fmt.Errorf("teardown failed: %v", err)
+			}
+		}()
+	}
+	oldInfo, _ := os.Stat(oldDir)
+	switch err := project.TransitionBinDir(jirix); {
+	case err != nil && test.Error == "":
+		return fmt.Errorf("got error %q, want success", err)
+	case err != nil && !strings.Contains(fmt.Sprint(err), test.Error):
+		return fmt.Errorf("got error %q, want prefix %q", err, test.Error)
+	case err == nil && test.Error != "":
+		return fmt.Errorf("got no error, want %q", test.Error)
+	case err == nil && test.Error == "":
+		// Make sure the symlink exists and is correctly linked.
+		link, err := os.Readlink(oldDir)
+		if err != nil {
+			return fmt.Errorf("old dir isn't a symlink: %v", err)
+		}
+		if got, want := link, newDir; got != want {
+			return fmt.Errorf("old dir symlink got %v, want %v", got, want)
+		}
+		if oldInfo != nil {
+			// Make sure the oldDir was backed up correctly.
+			backupDir := filepath.Join(jirix.RootMetaDir(), "bin.BACKUP")
+			backupInfo, err := os.Stat(backupDir)
+			if err != nil {
+				return fmt.Errorf("stat backup dir failed: %v", err)
+			}
+			if !os.SameFile(oldInfo, backupInfo) {
+				return fmt.Errorf("old dir wasn't backed up correctly")
+			}
+		}
+	}
+	return nil
 }

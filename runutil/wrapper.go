@@ -166,6 +166,26 @@ func (r *Run) Stat(name string) (fileInfo os.FileInfo, err error) {
 	return
 }
 
+// Lstat is a wrapper around os.Lstat that handles options such as
+// "verbose" or "dry run".
+func (r *Run) Lstat(name string) (fileInfo os.FileInfo, err error) {
+	r.dryRun(func() error {
+		fileInfo, err = os.Lstat(name)
+		return err
+	}, fmt.Sprintf("lstat %q", name))
+	return
+}
+
+// Readlink is a wrapper around os.Readlink that handles options such as
+// "verbose" or "dry run".
+func (r *Run) Readlink(name string) (link string, err error) {
+	r.dryRun(func() error {
+		link, err = os.Readlink(name)
+		return err
+	}, fmt.Sprintf("readlink %q", name))
+	return
+}
+
 // IsDir is a wrapper around os.Stat that handles options such as
 // "verbose" or "dry run".
 func (r *Run) IsDir(name string) (bool, error) {
