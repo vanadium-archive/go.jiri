@@ -1585,7 +1585,7 @@ func (ops operations) Len() int {
 }
 
 // Less defines the order of operations. Operations are ordered first
-// by their type and then by their project name.
+// by their type and then by their project path.
 //
 // The order in which operation types are defined determines the order
 // in which operations are performed. For correctness and also to
@@ -1612,17 +1612,7 @@ func (ops operations) Less(i, j int) bool {
 	if vals[0] != vals[1] {
 		return vals[0] < vals[1]
 	}
-	if vals[0] == 2 && vals[1] == 2 {
-		pathI := ops[i].Project().Path
-		pathJ := ops[j].Project().Path
-		if strings.HasPrefix(pathI, pathJ) {
-			return false
-		}
-		if strings.HasPrefix(pathJ, pathI) {
-			return true
-		}
-	}
-	return ops[i].Project().Name < ops[j].Project().Name
+	return ops[i].Project().Path < ops[j].Project().Path
 }
 
 // Swap swaps two elements of the collection.
