@@ -903,12 +903,12 @@ func TransitionBinDir(jirix *jiri.X) error {
 		// Drop down to create the symlink below.
 	case err != nil:
 		return fmt.Errorf("Failed to stat old bin dir: %v", err)
-	case info.Mode() == os.ModeSymlink:
+	case info.Mode()&os.ModeSymlink != 0:
 		link, err := jirix.NewSeq().Readlink(oldDir)
 		if err != nil {
 			return fmt.Errorf("Failed to read link from old bin dir: %v", err)
 		}
-		if link == newDir {
+		if filepath.Clean(link) == newDir {
 			// The old dir is already correctly symlinked to the new dir.
 			return nil
 		}
