@@ -172,6 +172,15 @@ func (s *Sequence) Error() error {
 	return s.err
 }
 
+// GetOriginalError gets the original error wrapped in the given err.
+// If the given err is not a wrappedError, just return itself.
+func GetOriginalError(err error) error {
+	if we, ok := err.(*wrappedError); ok {
+		return we.oe
+	}
+	return err
+}
+
 // IsExist returns a boolean indicating whether the error is known
 // to report that a file or directory already exists.
 func IsExist(err error) bool {
