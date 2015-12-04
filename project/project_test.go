@@ -602,10 +602,11 @@ func TestUnsupportedPrototocolErr(t *testing.T) {
 }
 
 type binDirTest struct {
-	Name     string
-	Setup    func(old, new string) error
-	Teardown func(old, new string) error
-	Error    string
+	Name        string
+	Setup       func(old, new string) error
+	Teardown    func(old, new string) error
+	Error       string
+	CheckBackup bool
 }
 
 func TestTransitionBinDir(t *testing.T) {
@@ -615,6 +616,7 @@ func TestTransitionBinDir(t *testing.T) {
 			func(old, new string) error { return nil },
 			nil,
 			"",
+			false,
 		},
 		{
 			"Empty old dir",
@@ -623,6 +625,7 @@ func TestTransitionBinDir(t *testing.T) {
 			},
 			nil,
 			"",
+			true,
 		},
 		{
 			"Populated old dir",
@@ -634,6 +637,7 @@ func TestTransitionBinDir(t *testing.T) {
 			},
 			nil,
 			"",
+			true,
 		},
 		{
 			"Symlinked old dir",
@@ -645,17 +649,19 @@ func TestTransitionBinDir(t *testing.T) {
 			},
 			nil,
 			"",
+			false,
 		},
 		{
-			"Symlinked old dir pointing nowhere",
+			"Symlinked old dir pointing elsewhere",
 			func(old, new string) error {
 				if err := os.MkdirAll(filepath.Dir(old), 0777); err != nil {
 					return err
 				}
-				return os.Symlink(filepath.Join(new, "noexist"), old)
+				return os.Symlink(filepath.Dir(new), old)
 			},
 			nil,
 			"",
+			true,
 		},
 		{
 			"Unreadable old dir parent",
@@ -669,6 +675,7 @@ func TestTransitionBinDir(t *testing.T) {
 				return os.Chmod(filepath.Dir(old), 0777)
 			},
 			"Failed to stat old bin dir",
+			false,
 		},
 		{
 			"Unwritable old dir",
@@ -682,6 +689,7 @@ func TestTransitionBinDir(t *testing.T) {
 				return os.Chmod(old, 0777)
 			},
 			"Failed to backup old bin dir",
+			false,
 		},
 		{
 			"Unreadable backup dir parent",
@@ -695,6 +703,7 @@ func TestTransitionBinDir(t *testing.T) {
 				return os.Chmod(filepath.Dir(new), 0777)
 			},
 			"Failed to stat backup bin dir",
+			false,
 		},
 		{
 			"Existing backup dir",
@@ -706,6 +715,7 @@ func TestTransitionBinDir(t *testing.T) {
 			},
 			nil,
 			"Backup bin dir",
+			false,
 		},
 	}
 	for _, test := range tests {
@@ -750,7 +760,7 @@ func testTransitionBinDir(jirix *jiri.X, test binDirTest) (e error) {
 		if got, want := link, newDir; got != want {
 			return fmt.Errorf("old dir symlink got %v, want %v", got, want)
 		}
-		if oldInfo != nil {
+		if test.CheckBackup {
 			// Make sure the oldDir was backed up correctly.
 			backupDir := filepath.Join(jirix.RootMetaDir(), "bin.BACKUP")
 			backupInfo, err := os.Stat(backupDir)
