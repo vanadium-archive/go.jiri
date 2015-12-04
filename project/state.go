@@ -70,18 +70,18 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 	ch <- nil
 }
 
-func GetProjectStates(jirix *jiri.X, checkDirty bool) (map[string]*ProjectState, error) {
+func GetProjectStates(jirix *jiri.X, checkDirty bool) (map[ProjectKey]*ProjectState, error) {
 	projects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return nil, err
 	}
-	states := make(map[string]*ProjectState, len(projects))
+	states := make(map[ProjectKey]*ProjectState, len(projects))
 	sem := make(chan error, len(projects))
-	for name, project := range projects {
+	for key, project := range projects {
 		state := &ProjectState{
 			Project: project,
 		}
-		states[name] = state
+		states[key] = state
 		// jirix is not threadsafe, so we make a clone for each goroutine.
 		go setProjectState(jirix.Clone(tool.ContextOpts{}), state, checkDirty, sem)
 	}
