@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -61,14 +62,13 @@ func runProjectClean(jirix *jiri.X, args []string) (e error) {
 	if err != nil {
 		return err
 	}
-	var projects project.Projects
+	projects := map[string]project.Project{}
 	if len(args) > 0 {
 		for _, arg := range args {
-			p, err := localProjects.FindUnique(arg)
-			if err != nil {
-				fmt.Fprintf(jirix.Stderr(), "Error finding local project %q: %v.\n", p.Name, err)
+			if p, ok := localProjects[arg]; ok {
+				projects[p.Name] = p
 			} else {
-				projects[p.Key()] = p
+				fmt.Fprintf(jirix.Stderr(), "Local project %q not found.\n", p.Name)
 			}
 		}
 	} else {
@@ -94,21 +94,21 @@ func runProjectList(jirix *jiri.X, _ []string) error {
 	if err != nil {
 		return err
 	}
-	var keys project.ProjectKeys
-	for key := range states {
-		keys = append(keys, key)
+	names := []string{}
+	for name := range states {
+		names = append(names, name)
 	}
-	sort.Sort(keys)
+	sort.Strings(names)
 
-	for _, key := range keys {
-		state := states[key]
+	for _, name := range names {
+		state := states[name]
 		if noPristineFlag {
 			pristine := len(state.Branches) == 1 && state.CurrentBranch == "master" && !state.HasUncommitted && !state.HasUntracked
 			if pristine {
 				continue
 			}
 		}
-		fmt.Fprintf(jirix.Stdout(), "project-key=%q path=%q\n", key, state.Project.Path)
+		fmt.Fprintf(jirix.Stdout(), "project=%q path=%q\n", path.Base(name), state.Project.Path)
 		if branchesFlag {
 			for _, branch := range state.Branches {
 				s := "  "
@@ -144,20 +144,20 @@ func runProjectShellPrompt(jirix *jiri.X, args []string) error {
 	if err != nil {
 		return err
 	}
-	var keys project.ProjectKeys
-	for key := range states {
-		keys = append(keys, key)
+	names := []string{}
+	for name := range states {
+		names = append(names, name)
 	}
-	sort.Sort(keys)
+	sort.Strings(names)
 
-	// Get the key of the current project.
-	currentProjectKey, err := project.CurrentProjectKey(jirix)
+	// Get the name of the current project.
+	currentProjectName, err := project.CurrentProjectName(jirix)
 	if err != nil {
 		return err
 	}
 	var statuses []string
-	for _, key := range keys {
-		state := states[key]
+	for _, name := range names {
+		state := states[name]
 		status := ""
 		if checkDirtyFlag {
 			if state.HasUncommitted {
@@ -168,8 +168,8 @@ func runProjectShellPrompt(jirix *jiri.X, args []string) error {
 			}
 		}
 		short := state.CurrentBranch + status
-		long := filepath.Base(states[key].Project.Name) + ":" + short
-		if key == currentProjectKey {
+		long := filepath.Base(name) + ":" + short
+		if name == currentProjectName {
 			if showNameFlag {
 				statuses = append([]string{long}, statuses...)
 			} else {

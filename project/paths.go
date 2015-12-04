@@ -31,12 +31,10 @@ func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("tool %q not found in the manifest", toolName)
 	}
-	// TODO(nlacasse): Tools refer to their project by name, but project name
-	// might not be unique.  We really should stop telling telling tools what their
-	// projects are.
-	project, err := projects.FindUnique(tool.Project)
-	if err != nil {
-		return "", err
+	projectName := tool.Project
+	project, ok := projects[projectName]
+	if !ok {
+		return "", fmt.Errorf("project %q not found in the manifest", projectName)
 	}
 	return filepath.Join(project.Path, tool.Data), nil
 }
@@ -63,6 +61,8 @@ func GitHost(jirix *jiri.X) (string, error) {
 	return getHost(jirix, "git")
 }
 
+// toAbs returns the given path rooted in JIRI_ROOT, if it is not already an
+// absolute path.
 func toAbs(jirix *jiri.X, path string) string {
 	if filepath.IsAbs(path) {
 		return path

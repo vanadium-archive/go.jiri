@@ -126,7 +126,7 @@ func loadAliases(jirix *jiri.X) (*aliasMaps, error) {
 }
 
 func runContributors(jirix *jiri.X, args []string) error {
-	localProjects, err := project.LocalProjects(jirix, project.FastScan)
+	projects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return err
 	}
@@ -134,8 +134,8 @@ func runContributors(jirix *jiri.X, args []string) error {
 	if len(args) != 0 {
 		projectNames = set.String.FromSlice(args)
 	} else {
-		for _, p := range localProjects {
-			projectNames[p.Name] = struct{}{}
+		for name, _ := range projects {
+			projectNames[name] = struct{}{}
 		}
 	}
 
@@ -145,43 +145,41 @@ func runContributors(jirix *jiri.X, args []string) error {
 	}
 	contributors := map[string]*contributor{}
 	for name, _ := range projectNames {
-		projects := localProjects.Find(name)
-		if len(projects) == 0 {
+		project, ok := projects[name]
+		if !ok {
 			continue
 		}
-		for _, project := range projects {
-			if err := jirix.Run().Chdir(project.Path); err != nil {
+		if err := jirix.Run().Chdir(project.Path); err != nil {
+			return err
+		}
+		switch project.Protocol {
+		case "git":
+			lines, err := listCommitters(jirix)
+			if err != nil {
 				return err
 			}
-			switch project.Protocol {
-			case "git":
-				lines, err := listCommitters(jirix)
-				if err != nil {
-					return err
+			for _, line := range lines {
+				matches := contributorRE.FindStringSubmatch(line)
+				if got, want := len(matches), 4; got != want {
+					return fmt.Errorf("unexpected length of %v: got %v, want %v", matches, got, want)
 				}
-				for _, line := range lines {
-					matches := contributorRE.FindStringSubmatch(line)
-					if got, want := len(matches), 4; got != want {
-						return fmt.Errorf("unexpected length of %v: got %v, want %v", matches, got, want)
-					}
-					count, err := strconv.Atoi(strings.TrimSpace(matches[1]))
-					if err != nil {
-						return fmt.Errorf("Atoi(%v) failed: %v", strings.TrimSpace(matches[1]), err)
-					}
-					c := &contributor{
-						count: count,
-						email: strings.TrimSpace(matches[3]),
-						name:  strings.TrimSpace(matches[2]),
-					}
-					if c.email == "jenkins.veyron@gmail.com" || c.email == "jenkins.veyron.rw@gmail.com" {
-						continue
-					}
-					c.email, c.name = canonicalize(aliases, c.email, c.name)
-					if existing, ok := contributors[c.name]; ok {
-						existing.count += c.count
-					} else {
-						contributors[c.name] = c
-					}
+				count, err := strconv.Atoi(strings.TrimSpace(matches[1]))
+				if err != nil {
+					return fmt.Errorf("Atoi(%v) failed: %v", strings.TrimSpace(matches[1]), err)
+				}
+				c := &contributor{
+					count: count,
+					email: strings.TrimSpace(matches[3]),
+					name:  strings.TrimSpace(matches[2]),
+				}
+				if c.email == "jenkins.veyron@gmail.com" || c.email == "jenkins.veyron.rw@gmail.com" {
+					continue
+				}
+				c.email, c.name = canonicalize(aliases, c.email, c.name)
+				if existing, ok := contributors[c.name]; ok {
+					existing.count += c.count
+				} else {
+					contributors[c.name] = c
 				}
 			}
 		}

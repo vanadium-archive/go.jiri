@@ -116,7 +116,7 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 		Protocol: "git",
 		Revision: "HEAD",
 	}
-	if err := project.ApplyToLocalMaster(jirix, project.Projects{p.Key(): p}, createFn); err != nil {
+	if err := project.ApplyToLocalMaster(jirix, project.Projects{p.Name: p}, createFn); err != nil {
 		return err
 	}
 	return nil
