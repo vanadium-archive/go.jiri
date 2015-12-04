@@ -13,6 +13,7 @@ import (
 	"v.io/jiri/jenkins"
 	"v.io/jiri/runutil"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/envvar"
 	"v.io/x/lib/timing"
 )
 
@@ -102,6 +103,7 @@ func NewContext(opts ContextOpts) *Context {
 func NewContextFromEnv(env *cmdline.Env) *Context {
 	opts := ContextOpts{}
 	initOpts(newContextOpts(), &opts)
+	opts.Env = envvar.CopyMap(env.Vars)
 	opts.Stdin = env.Stdin
 	opts.Stdout = env.Stdout
 	opts.Stderr = env.Stderr
