@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -67,6 +68,7 @@ type Sequence struct {
 	defaultStdin                 io.Reader
 	defaultStdout, defaultStderr io.Writer
 	dirs                         []string
+	verbosity                    *bool
 	timeout                      time.Duration
 }
 
@@ -117,6 +119,17 @@ func (s *Sequence) Env(env map[string]string) *Sequence {
 	return s
 }
 
+// Verbosity arranges for the next call to Run, Call or Last to use the specified
+// verbosity. This will be cleared and not used for any calls
+// to Run, Call or Last beyond the next one.
+func (s *Sequence) Verbose(verbosity bool) *Sequence {
+	if s.err != nil {
+		return s
+	}
+	s.verbosity = &verbosity
+	return s
+}
+
 // internal getOpts that doesn't override stdin, stdout, stderr
 func (s *Sequence) getOpts() Opts {
 	var opts Opts
@@ -143,14 +156,47 @@ func (s *Sequence) setOpts(opts Opts) {
 	s.opts = &opts
 }
 
+type wrappedError struct {
+	oe, we error
+}
+
+func (ie *wrappedError) Error() string {
+	return ie.we.Error()
+}
+
+// Error returns the error, if any, stored in the Sequence.
 func (s *Sequence) Error() error {
 	if s.err != nil && len(s.caller) > 0 {
-		// TODO(toddw): Wrapping the error here is bad, since some callers require
-		// the original error to be returned.  E.g. it's common to call os.Stat()
-		// and check against os.IsNotExist, which breaks with wrapped errors.
-		return fmt.Errorf("%s: %v", s.caller, s.err)
+		return &wrappedError{oe: s.err, we: fmt.Errorf("%s: %v", s.caller, s.err)}
 	}
 	return s.err
+}
+
+// IsExist returns a boolean indicating whether the error is known
+// to report that a file or directory already exists.
+func IsExist(err error) bool {
+	if we, ok := err.(*wrappedError); ok {
+		return os.IsExist(we.oe)
+	}
+	return os.IsExist(err)
+}
+
+// IsNotExist returns a boolean indicating whether the error is known
+// to report that a file or directory does not exist.
+func IsNotExist(err error) bool {
+	if we, ok := err.(*wrappedError); ok {
+		return os.IsNotExist(we.oe)
+	}
+	return os.IsNotExist(err)
+}
+
+// IsPermission returns a boolean indicating whether the error is known
+// to report that permission is denied.
+func IsPermission(err error) bool {
+	if we, ok := err.(*wrappedError); ok {
+		return os.IsPermission(we.oe)
+	}
+	return os.IsPermission(err)
 }
 
 func fmtError(depth int, err error, detail string) string {
@@ -167,7 +213,8 @@ func (s *Sequence) setError(err error, detail string) {
 }
 
 func (s *Sequence) reset() {
-	s.stdin, s.stdout, s.stderr, s.env, s.opts = nil, nil, nil, nil, nil
+	s.stdin, s.stdout, s.stderr, s.env = nil, nil, nil, nil
+	s.opts, s.verbosity = nil, nil
 	s.reading = false
 	s.timeout = 0
 }
@@ -206,6 +253,17 @@ func writeOutput(from string, to io.Writer) {
 	}
 }
 
+type lockedWriter struct {
+	sync.Mutex
+	f io.Writer
+}
+
+func (lw *lockedWriter) Write(d []byte) (int, error) {
+	lw.Lock()
+	defer lw.Unlock()
+	return lw.f.Write(d)
+}
+
 func (s *Sequence) initAndDefer() func() {
 	if s.stdout == nil && s.stderr == nil {
 		fout, err := ioutil.TempFile("", "seq")
@@ -218,6 +276,9 @@ func (s *Sequence) initAndDefer() func() {
 		opts.Env = s.env
 		if s.reading {
 			opts.Stdin = s.stdin
+		}
+		if s.verbosity != nil {
+			opts.Verbose = *s.verbosity
 		}
 		s.setOpts(opts)
 		return func() {
@@ -233,30 +294,39 @@ func (s *Sequence) initAndDefer() func() {
 		}
 	}
 	opts := s.getOpts()
-	rStdin, wStdin := io.Pipe()
+	rStdout, wStdout := io.Pipe()
 	rStderr, wStderr := io.Pipe()
-	opts.Stdout = wStdin
+	opts.Stdout = wStdout
 	opts.Stderr = wStderr
 	opts.Env = s.env
 	if s.reading {
 		opts.Stdin = s.stdin
 	}
 	var stdinCh, stderrCh chan error
-	if s.stdout != nil {
+	stdout := s.stdout
+	stderr := s.stderr
+	if stdout != nil {
+		if stdout == stderr {
+			stdout = &lockedWriter{f: stdout}
+			stderr = &lockedWriter{f: stderr}
+		}
 		stdinCh = make(chan error)
-		go copy(s.stdout, rStdin, stdinCh)
+		go copy(stdout, rStdout, stdinCh)
 	} else {
 		opts.Stdout = s.defaultStdout
 	}
-	if s.stderr != nil {
+	if stderr != nil {
 		stderrCh = make(chan error)
-		go copy(s.stderr, rStderr, stderrCh)
+		go copy(stderr, rStderr, stderrCh)
 	} else {
 		opts.Stderr = s.defaultStderr
 	}
+	if s.verbosity != nil {
+		opts.Verbose = *s.verbosity
+	}
 	s.setOpts(opts)
 	return func() {
-		if err := s.done(wStdin, wStderr, stdinCh, stderrCh); err != nil && s.err == nil {
+		if err := s.done(wStdout, wStderr, stdinCh, stderrCh); err != nil && s.err == nil {
 			s.err = err
 		}
 	}
@@ -432,6 +502,15 @@ func (s *Sequence) Output(output []string) *Sequence {
 		return s
 	}
 	s.r.OutputWithOpts(s.getOpts(), output)
+	return s
+}
+
+// Fprintf calls fmt.Fprintf.
+func (s *Sequence) Fprintf(f io.Writer, format string, args ...interface{}) *Sequence {
+	if s.err != nil {
+		return s
+	}
+	fmt.Fprintf(f, format, args...)
 	return s
 }
 
