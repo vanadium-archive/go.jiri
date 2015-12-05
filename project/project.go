@@ -106,15 +106,8 @@ type Import struct {
 	Name string `xml:"name,attr"`
 }
 
-// ProjectKey is a unique string for a project.
-type ProjectKey string
-
-// ProjectKeys is a slice of ProjectKeys implementing the Sort interface.
-type ProjectKeys []ProjectKey
-
-func (pks ProjectKeys) Len() int           { return len(pks) }
-func (pks ProjectKeys) Less(i, j int) bool { return string(pks[i]) < string(pks[j]) }
-func (pks ProjectKeys) Swap(i, j int)      { pks[i], pks[j] = pks[j], pks[i] }
+// Projects maps project names to their detailed description.
+type Projects map[string]Project
 
 // Project represents a jiri project.
 type Project struct {
@@ -141,47 +134,6 @@ type Project struct {
 	// during "jiri update". If not set, "HEAD" is used as the
 	// default.
 	Revision string `xml:"revision,attr"`
-}
-
-// projectKeySeparator is a reserved string used in ProjectKeys.  It cannot
-// occur in Project names or remotes.
-const projectKeySeparator = "="
-
-// Key returns a unique ProjectKey for the project.
-func (p Project) Key() ProjectKey {
-	return ProjectKey(p.Name + projectKeySeparator + p.Remote)
-}
-
-// Projects maps ProjectKeys to Projects.
-type Projects map[ProjectKey]Project
-
-// Find returns all projects in Projects with the given key or name.
-func (ps Projects) Find(name string) Projects {
-	projects := Projects{}
-	for _, p := range ps {
-		if name == p.Name {
-			projects[p.Key()] = p
-		}
-	}
-	return projects
-}
-
-// FindUnique returns the project in Projects with the given key or
-// name, and returns an error if none or multiple matching projects are found.
-func (ps Projects) FindUnique(name string) (Project, error) {
-	var p Project
-	projects := ps.Find(name)
-	if len(projects) == 0 {
-		return p, fmt.Errorf("no projects found with name %q", name)
-	}
-	if len(projects) > 1 {
-		return p, fmt.Errorf("multiple projects found with name %q", name)
-	}
-	// Return the only project in projects.
-	for _, project := range projects {
-		p = project
-	}
-	return p, nil
 }
 
 // Tools maps jiri tool names, to their detailed description.
@@ -319,10 +271,10 @@ func writeCurrentManifest(jirix *jiri.X, manifest *Manifest) error {
 	return nil
 }
 
-// CurrentProjectKey gets the key of the current project from the current
-// directory by reading the jiri project metadata located in a directory at the
-// root of the current repository.
-func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
+// CurrentProjectName gets the name of the current project from the
+// current directory by reading the jiri project metadata located in a
+// directory at the root of the current repository.
+func CurrentProjectName(jirix *jiri.X) (string, error) {
 	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return "", nil
@@ -338,7 +290,7 @@ func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
 		if err := xml.Unmarshal(bytes, &project); err != nil {
 			return "", fmt.Errorf("Unmarshal() failed: %v", err)
 		}
-		return project.Key(), nil
+		return project.Name, nil
 	}
 	return "", nil
 }
@@ -666,9 +618,9 @@ func BuildTools(jirix *jiri.X, tools Tools, outputDir string) error {
 	workspaceSet := map[string]bool{}
 	for _, tool := range tools {
 		toolPkgs = append(toolPkgs, tool.Package)
-		toolProject, err := projects.FindUnique(tool.Project)
-		if err != nil {
-			return err
+		toolProject, ok := projects[tool.Project]
+		if !ok {
+			return fmt.Errorf("project not found for tool %v", tool.Name)
 		}
 		// Identify the Go workspace the tool is in. To this end we use a
 		// heuristic that identifies the maximal suffix of the project path
@@ -735,11 +687,11 @@ func buildToolsFromMaster(jirix *jiri.X, tools Tools, outputDir string) error {
 		if tool.Package == "" {
 			continue
 		}
-		project, err := localProjects.FindUnique(tool.Project)
-		if err != nil {
-			return err
+		project, ok := localProjects[tool.Project]
+		if !ok {
+			fmt.Errorf("unknown project %v for tool %v", tool.Project, tool.Name)
 		}
-		toolProjects[project.Key()] = project
+		toolProjects[tool.Project] = project
 		toolsToBuild[tool.Name] = tool
 		toolNames = append(toolNames, tool.Name)
 	}
@@ -876,10 +828,10 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 		if absPath != project.Path {
 			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, absPath)
 		}
-		if p, ok := projects[project.Key()]; ok {
-			return fmt.Errorf("name conflict: both %v and %v contain project with key %v", p.Path, project.Path, project.Key())
+		if p, ok := projects[project.Name]; ok {
+			return fmt.Errorf("name conflict: both %v and %v contain the project %v", p.Path, project.Path, project.Name)
 		}
-		projects[project.Key()] = project
+		projects[project.Name] = project
 	}
 
 	// Recurse into all the sub directories.
@@ -1038,7 +990,7 @@ func resetProject(jirix *jiri.X, project Project) error {
 			return UnsupportedProtocolErr(project.Protocol)
 		}
 	}
-	return ApplyToLocalMaster(jirix, Projects{project.Key(): project}, fn)
+	return ApplyToLocalMaster(jirix, Projects{project.Name: project}, fn)
 }
 
 // loadManifest loads the given manifest, processing all of its
@@ -1069,13 +1021,10 @@ func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, to
 	}
 	// Process all projects.
 	for _, project := range m.Projects {
-		if strings.Contains(project.Name, projectKeySeparator) {
-			return fmt.Errorf("project name cannot contain %q: %q", projectKeySeparator, project.Name)
-		}
 		if project.Exclude {
 			// Exclude the project in case it was
 			// previously included.
-			delete(projects, project.Key())
+			delete(projects, project.Name)
 			continue
 		}
 		// Replace the relative path with an absolute one.
@@ -1098,7 +1047,7 @@ func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, to
 		if project.RemoteBranch == "" {
 			project.RemoteBranch = "master"
 		}
-		projects[project.Key()] = project
+		projects[project.Name] = project
 	}
 	// Process all tools.
 	for _, tool := range m.Tools {
@@ -1126,9 +1075,10 @@ func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, to
 			delete(hooks, hook.Name)
 			continue
 		}
-		project, err := projects.FindUnique(hook.Project)
-		if err != nil {
-			return fmt.Errorf("error while finding project %q for hook %q: %v", hook.Project, hook.Name, err)
+		project, found := projects[hook.Project]
+		if !found {
+			return fmt.Errorf("hook %v specified project %v which was not found",
+				hook.Name, hook.Project)
 		}
 		// Replace project-relative path with absolute path.
 		hook.Path = filepath.Join(project.Path, hook.Path)
@@ -1615,9 +1565,6 @@ type nullOperation struct {
 }
 
 func (op nullOperation) Run(jirix *jiri.X, manifest *Manifest) error {
-	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
-		return err
-	}
 	return addProjectToManifest(jirix, manifest, op.project)
 }
 
@@ -1680,16 +1627,16 @@ func (ops operations) Swap(i, j int) {
 // projects.
 func computeOperations(localProjects, remoteProjects Projects, gc bool) (operations, error) {
 	result := operations{}
-	allProjects := map[ProjectKey]struct{}{}
-	for _, p := range localProjects {
-		allProjects[p.Key()] = struct{}{}
+	allProjects := map[string]struct{}{}
+	for name, _ := range localProjects {
+		allProjects[name] = struct{}{}
 	}
-	for _, p := range remoteProjects {
-		allProjects[p.Key()] = struct{}{}
+	for name, _ := range remoteProjects {
+		allProjects[name] = struct{}{}
 	}
-	for key, _ := range allProjects {
-		if localProject, ok := localProjects[key]; ok {
-			if remoteProject, ok := remoteProjects[key]; ok {
+	for name, _ := range allProjects {
+		if localProject, ok := localProjects[name]; ok {
+			if remoteProject, ok := remoteProjects[name]; ok {
 				if localProject.Path != remoteProject.Path {
 					// moveOperation also does an update, so we don't need to
 					// check the revision here.
@@ -1720,14 +1667,14 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) (operati
 					source:      localProject.Path,
 				}, gc})
 			}
-		} else if remoteProject, ok := remoteProjects[key]; ok {
+		} else if remoteProject, ok := remoteProjects[name]; ok {
 			result = append(result, createOperation{commonOperation{
 				destination: remoteProject.Path,
 				project:     remoteProject,
 				source:      "",
 			}})
 		} else {
-			return nil, fmt.Errorf("project with key %v does not exist", key)
+			return nil, fmt.Errorf("project %v does not exist", name)
 		}
 	}
 	sort.Sort(result)
@@ -1736,25 +1683,23 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) (operati
 
 // ParseNames identifies the set of projects that a jiri command should
 // be applied to.
-func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{}) (Projects, error) {
-	manifestProjects, _, err := ReadManifest(jirix)
+func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{}) (map[string]Project, error) {
+	projects, _, err := ReadManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
-	result := Projects{}
+	result := map[string]Project{}
 	if len(args) == 0 {
 		// Use the default set of projects.
 		args = set.String.ToSlice(defaultProjects)
 	}
 	for _, name := range args {
-		projects := manifestProjects.Find(name)
-		if len(projects) == 0 {
+		if project, ok := projects[name]; ok {
+			result[name] = project
+		} else {
 			// Issue a warning if the target project does not exist in the
 			// project manifest.
-			fmt.Fprintf(jirix.Stderr(), "project %q does not exist in the project manifest", name)
-		}
-		for _, project := range projects {
-			result[project.Key()] = project
+			fmt.Fprintf(jirix.Stderr(), "WARNING: project %q does not exist in the project manifest and will be skipped\n", name)
 		}
 	}
 	return result, nil
