@@ -24,6 +24,8 @@ import (
 // The first method to encounter an error short circuits any following
 // methods and the result of that first error is returned by the
 // Done method or any of the other 'terminating methods' (see below).
+// Sequence is not thread safe. It also good practice to use a new
+// instance of a Sequence in defer's.
 //
 // Unless directed to specific stdout and stderr io.Writers using Capture(),
 // the stdout and stderr output from the command is discarded, unless an error
@@ -262,15 +264,27 @@ func writeOutput(from string, to io.Writer) {
 	}
 }
 
-type lockedWriter struct {
-	sync.Mutex
-	f io.Writer
+type sharedLockWriter struct {
+	mu *sync.Mutex
+	f  io.Writer
 }
 
-func (lw *lockedWriter) Write(d []byte) (int, error) {
-	lw.Lock()
-	defer lw.Unlock()
+func (lw *sharedLockWriter) Write(d []byte) (int, error) {
+	lw.mu.Lock()
+	defer lw.mu.Unlock()
 	return lw.f.Write(d)
+}
+
+func serializedWriters(a, b io.Writer) (io.Writer, io.Writer) {
+	mu := new(sync.Mutex)
+	var ra, rb io.Writer
+	if a != nil {
+		ra = &sharedLockWriter{mu, a}
+	}
+	if b != nil {
+		rb = &sharedLockWriter{mu, b}
+	}
+	return ra, rb
 }
 
 func (s *Sequence) initAndDefer() func() {
@@ -312,13 +326,8 @@ func (s *Sequence) initAndDefer() func() {
 		opts.Stdin = s.stdin
 	}
 	var stdinCh, stderrCh chan error
-	stdout := s.stdout
-	stderr := s.stderr
+	stdout, stderr := serializedWriters(s.stdout, s.stderr)
 	if stdout != nil {
-		if stdout == stderr {
-			stdout = &lockedWriter{f: stdout}
-			stderr = &lockedWriter{f: stderr}
-		}
 		stdinCh = make(chan error)
 		go copy(stdout, rStdout, stdinCh)
 	} else {

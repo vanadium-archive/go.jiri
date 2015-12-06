@@ -1,4 +1,8 @@
+pkg runutil, func GetOriginalError(error) error
+pkg runutil, func IsExist(error) bool
 pkg runutil, func IsFNLHost() bool
+pkg runutil, func IsNotExist(error) bool
+pkg runutil, func IsPermission(error) bool
 pkg runutil, func LookPath(string, map[string]string) (string, error)
 pkg runutil, func NewRun(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Run
 pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Sequence
@@ -44,6 +48,7 @@ pkg runutil, method (*Sequence) Done() error
 pkg runutil, method (*Sequence) Env(map[string]string) *Sequence
 pkg runutil, method (*Sequence) Error() error
 pkg runutil, method (*Sequence) FileExists(string) (bool, error)
+pkg runutil, method (*Sequence) Fprintf(io.Writer, string, ...interface{}) *Sequence
 pkg runutil, method (*Sequence) IsDir(string) (bool, error)
 pkg runutil, method (*Sequence) Last(string, ...string) error
 pkg runutil, method (*Sequence) Lstat(string) (os.FileInfo, error)
@@ -65,6 +70,7 @@ pkg runutil, method (*Sequence) Stat(string) (os.FileInfo, error)
 pkg runutil, method (*Sequence) Symlink(string, string) *Sequence
 pkg runutil, method (*Sequence) TempDir(string, string) (string, error)
 pkg runutil, method (*Sequence) Timeout(time.Duration) *Sequence
+pkg runutil, method (*Sequence) Verbose(bool) *Sequence
 pkg runutil, method (*Sequence) WriteFile(string, []byte, os.FileMode) *Sequence
 pkg runutil, method (*Start) Command(string, ...string) (*exec.Cmd, error)
 pkg runutil, method (*Start) CommandWithOpts(Opts, string, ...string) (*exec.Cmd, error)
