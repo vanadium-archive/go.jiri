@@ -1565,6 +1565,9 @@ type nullOperation struct {
 }
 
 func (op nullOperation) Run(jirix *jiri.X, manifest *Manifest) error {
+	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
+		return err
+	}
 	return addProjectToManifest(jirix, manifest, op.project)
 }
 
