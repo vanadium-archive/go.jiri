@@ -72,17 +72,18 @@ type Sequence struct {
 	dirs                         []string
 	verbosity                    *bool
 	timeout                      time.Duration
+	serializedWriterLock         sync.Mutex
 }
 
 // NewSequence creates an instance of Sequence with default values for its
 // environment, stdin, stderr, stdout and other supported options.
 func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) *Sequence {
-	return &Sequence{
-		r:             NewRun(env, stdin, stdout, stderr, color, dryRun, verbose),
-		defaultStdin:  stdin,
-		defaultStdout: stdout,
-		defaultStderr: stderr,
+	s := &Sequence{
+		r:            NewRun(env, stdin, stdout, stderr, color, dryRun, verbose),
+		defaultStdin: stdin,
 	}
+	s.defaultStdout, s.defaultStderr = s.serializeWriter(stdout), s.serializeWriter(stderr)
+	return s
 }
 
 // Capture arranges for the next call to Run or Last to write its stdout and
@@ -275,16 +276,11 @@ func (lw *sharedLockWriter) Write(d []byte) (int, error) {
 	return lw.f.Write(d)
 }
 
-func serializedWriters(a, b io.Writer) (io.Writer, io.Writer) {
-	mu := new(sync.Mutex)
-	var ra, rb io.Writer
+func (s *Sequence) serializeWriter(a io.Writer) io.Writer {
 	if a != nil {
-		ra = &sharedLockWriter{mu, a}
+		return &sharedLockWriter{&s.serializedWriterLock, a}
 	}
-	if b != nil {
-		rb = &sharedLockWriter{mu, b}
-	}
-	return ra, rb
+	return nil
 }
 
 func (s *Sequence) initAndDefer() func() {
@@ -294,8 +290,7 @@ func (s *Sequence) initAndDefer() func() {
 			return func() {}
 		}
 		opts := s.getOpts()
-		opts.Stdout = fout
-		opts.Stderr = fout
+		opts.Stdout, opts.Stderr = s.serializeWriter(fout), s.serializeWriter(fout)
 		opts.Env = s.env
 		if s.reading {
 			opts.Stdin = s.stdin
@@ -326,7 +321,7 @@ func (s *Sequence) initAndDefer() func() {
 		opts.Stdin = s.stdin
 	}
 	var stdinCh, stderrCh chan error
-	stdout, stderr := serializedWriters(s.stdout, s.stderr)
+	stdout, stderr := s.serializeWriter(s.stdout), s.serializeWriter(s.stderr)
 	if stdout != nil {
 		stdinCh = make(chan error)
 		go copy(stdout, rStdout, stdinCh)
