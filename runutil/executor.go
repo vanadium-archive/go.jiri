@@ -178,7 +178,7 @@ func (e *executor) timedCommand(timeout time.Duration, opts Opts, command *exec.
 		if opts.Verbose {
 			e.printf(e.opts.Stdout, "TIMED OUT")
 		}
-		return CommandTimedOutErr
+		return commandTimedOutErr
 	case err := <-done:
 		if err != nil {
 			if opts.Verbose {

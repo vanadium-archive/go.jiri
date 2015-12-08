@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	CommandTimedOutErr = fmt.Errorf("command timed out")
+	commandTimedOutErr = fmt.Errorf("command timed out")
 )
 
 type Run struct {

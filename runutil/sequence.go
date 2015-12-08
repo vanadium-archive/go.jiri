@@ -211,6 +211,15 @@ func IsPermission(err error) bool {
 	return os.IsPermission(err)
 }
 
+// IsTimeout returns a boolean indicating whether the error is a result of
+// a timeout.
+func IsTimeout(err error) bool {
+	if we, ok := err.(*wrappedError); ok {
+		return we.oe == commandTimedOutErr
+	}
+	return err == commandTimedOutErr
+}
+
 func fmtError(depth int, err error, detail string) string {
 	_, file, line, _ := runtime.Caller(depth + 1)
 	return fmt.Sprintf("%s:%d: %s", filepath.Base(file), line, detail)

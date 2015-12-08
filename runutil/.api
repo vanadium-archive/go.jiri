@@ -3,6 +3,7 @@ pkg runutil, func IsExist(error) bool
 pkg runutil, func IsFNLHost() bool
 pkg runutil, func IsNotExist(error) bool
 pkg runutil, func IsPermission(error) bool
+pkg runutil, func IsTimeout(error) bool
 pkg runutil, func LookPath(string, map[string]string) (string, error)
 pkg runutil, func NewRun(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Run
 pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Sequence
@@ -88,4 +89,3 @@ pkg runutil, type Opts struct, Verbose bool
 pkg runutil, type Run struct
 pkg runutil, type Sequence struct
 pkg runutil, type Start struct
-pkg runutil, var CommandTimedOutErr error

@@ -113,7 +113,7 @@ func TestTimedCommandFail(t *testing.T) {
 	}
 	if err := run.TimedCommand(timedCommandTimeout, bin); err == nil {
 		t.Fatalf(`TimedCommand("go run ./testdata/slow_hello.go") did not fail when it should`)
-	} else if got, want := err, CommandTimedOutErr; got != want {
+	} else if got, want := IsTimeout(err), true; got != want {
 		t.Fatalf("unexpected error: got %v, want %v", got, want)
 	}
 	if got, want := removeTimestamps(t, &out), fmt.Sprintf(">> %s\nhello\n>> TIMED OUT\n", bin); got != want {
@@ -151,7 +151,7 @@ func TestTimedCommandWithOptsFail(t *testing.T) {
 	opts.Stdout = &cmdOut
 	if err := run.TimedCommandWithOpts(timedCommandTimeout, opts, bin); err == nil {
 		t.Fatalf(`TimedCommandWithOpts("go run ./testdata/slow_hello.go") did not fail when it should`)
-	} else if got, want := err, CommandTimedOutErr; got != want {
+	} else if got, want := IsTimeout(err), true; got != want {
 		t.Fatalf("unexpected error: got %v, want %v", got, want)
 	}
 	if got, want := removeTimestamps(t, &runOut), fmt.Sprintf(">> %s\n>> TIMED OUT\n", bin); got != want {
