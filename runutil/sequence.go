@@ -420,9 +420,10 @@ func (s *Sequence) Last(path string, args ...string) error {
 	if s.err != nil {
 		return s.Done()
 	}
+	defer s.Done()
 	defer s.initAndDefer()()
 	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Last(%q%s)", path, fmtStringArgs(args...)))
-	return s.Done()
+	return s.err
 }
 
 // Call runs the given function. Note that Capture and Timeout have no

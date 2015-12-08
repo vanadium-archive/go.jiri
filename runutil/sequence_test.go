@@ -276,6 +276,14 @@ func TestSequenceOutputOnError(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	out.Reset()
+
+	err = seq.Last("sh", "-c", "echo should see an error; exit 1")
+	if err == nil {
+		t.Errorf("expected an error")
+	}
+	if got, want := out.String(), "should see an error"; !strings.Contains(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }
 
 type timestamped struct {
