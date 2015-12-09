@@ -19,6 +19,7 @@ import (
 	"v.io/jiri/jiri"
 	"v.io/jiri/jiritest"
 	"v.io/jiri/project"
+	"v.io/jiri/runutil"
 )
 
 func addRemote(t *testing.T, jirix *jiri.X, localProject, name, remoteProject string) {
@@ -26,8 +27,8 @@ func addRemote(t *testing.T, jirix *jiri.X, localProject, name, remoteProject st
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(localProject); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(localProject).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().AddRemote(name, remoteProject); err != nil {
@@ -36,7 +37,7 @@ func addRemote(t *testing.T, jirix *jiri.X, localProject, name, remoteProject st
 }
 
 func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
-	if _, err := jirix.Run().Stat(project); err != nil {
+	if _, err := jirix.NewSeq().Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(project, "README")
@@ -51,7 +52,7 @@ func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
 
 // Checks that /.jiri/ is ignored in a local project checkout
 func checkGitIgnore(t *testing.T, jirix *jiri.X, project string) {
-	if _, err := jirix.Run().Stat(project); err != nil {
+	if _, err := jirix.NewSeq().Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	gitInfoExcludeFile := filepath.Join(project, ".git", "info", "exclude")
@@ -106,7 +107,7 @@ func createLocalManifestStub(t *testing.T, jirix *jiri.X, dir string) {
 
 func createRemoteManifest(t *testing.T, jirix *jiri.X, dir string, remotes []string) {
 	manifestDir, perm := filepath.Join(dir, "v2"), os.FileMode(0755)
-	if err := jirix.Run().MkdirAll(manifestDir, perm); err != nil {
+	if err := jirix.NewSeq().MkdirAll(manifestDir, perm).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	manifest := project.Manifest{}
@@ -145,8 +146,8 @@ func commitManifest(t *testing.T, jirix *jiri.X, manifest *project.Manifest, man
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(manifestDir); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(manifestDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().CommitFile(manifestFile, "creating manifest"); err != nil {
@@ -188,8 +189,8 @@ func currentRevision(t *testing.T, jirix *jiri.X, name string) string {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(name); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(name).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	revision, err := jirix.Git().CurrentRevision()
@@ -265,15 +266,16 @@ func remoteProjectName(i int) string {
 
 func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool) string {
 	projectDir, perm := filepath.Join(dir, name), os.FileMode(0755)
-	if err := jirix.Run().MkdirAll(projectDir, perm); err != nil {
+	s := jirix.NewSeq()
+	if err := s.MkdirAll(projectDir, perm).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(projectDir); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := s.Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().Init(projectDir); err != nil {
@@ -281,7 +283,7 @@ func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool)
 	}
 	if ignore {
 		ignoreFile := filepath.Join(projectDir, ".gitignore")
-		if err := jirix.Run().WriteFile(ignoreFile, []byte(jiri.ProjectMetaDir), os.FileMode(0644)); err != nil {
+		if err := s.WriteFile(ignoreFile, []byte(jiri.ProjectMetaDir), os.FileMode(0644)).Done(); err != nil {
 			t.Fatalf("%v", err)
 		}
 		if err := jirix.Git().Add(ignoreFile); err != nil {
@@ -295,11 +297,12 @@ func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool)
 }
 
 func writeEmptyMetadata(t *testing.T, jirix *jiri.X, projectDir string) {
-	if err := jirix.Run().Chdir(projectDir); err != nil {
+	s := jirix.NewSeq()
+	if err := s.Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	metadataDir := filepath.Join(projectDir, jiri.ProjectMetaDir)
-	if err := jirix.Run().MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
+	if err := s.MkdirAll(metadataDir, os.FileMode(0755)).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	bytes, err := xml.Marshal(project.Project{})
@@ -307,7 +310,7 @@ func writeEmptyMetadata(t *testing.T, jirix *jiri.X, projectDir string) {
 		t.Fatalf("Marshal() failed: %v", err)
 	}
 	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
-	if err := jirix.Run().WriteFile(metadataFile, bytes, os.FileMode(0644)); err != nil {
+	if err := s.WriteFile(metadataFile, bytes, os.FileMode(0644)).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -321,8 +324,8 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(projectDir); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().CommitFile(path, "creating README"); err != nil {
@@ -335,8 +338,8 @@ func createAndCheckoutBranch(t *testing.T, jirix *jiri.X, projectDir, branch str
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(projectDir); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().CreateAndCheckoutBranch(branch); err != nil {
@@ -349,8 +352,8 @@ func resetToOriginMaster(t *testing.T, jirix *jiri.X, projectDir string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(projectDir); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().Reset("origin/master"); err != nil {
@@ -414,7 +417,7 @@ func TestLocalProjects(t *testing.T) {
 
 	// Check that deleting a project forces LocalProjects to run a full scan,
 	// even if FastScan is specified.
-	if err := jirix.Run().RemoveAll(projectPaths[0]); err != nil {
+	if err := jirix.NewSeq().RemoveAll(projectPaths[0]).Done(); err != nil {
 		t.Fatalf("RemoveAll(%v) failed: %v", projectPaths[0])
 	}
 	foundProjects, err = project.LocalProjects(jirix, project.FastScan)
@@ -543,10 +546,10 @@ func TestUpdateUniverse(t *testing.T) {
 	checkDeleteFn := func(i int, revision string) {
 		if i == 3 {
 			localProject := filepath.Join(localDir, localProjectName(i))
-			if _, err := jirix.Run().Stat(localProject); err == nil {
+			if _, err := jirix.NewSeq().Stat(localProject); err == nil {
 				t.Fatalf("project %v has not been deleted", localProject)
 			} else {
-				if !os.IsNotExist(err) {
+				if !runutil.IsNotExist(err) {
 					t.Fatalf("%v", err)
 				}
 			}
