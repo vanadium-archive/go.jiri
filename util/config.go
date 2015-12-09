@@ -291,7 +291,7 @@ func LoadConfig(jirix *jiri.X) (*Config, error) {
 }
 
 func loadConfig(jirix *jiri.X, path string) (*Config, error) {
-	configBytes, err := jirix.Run().ReadFile(path)
+	configBytes, err := jirix.NewSeq().ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -398,10 +398,9 @@ func saveConfig(jirix *jiri.X, config *Config, path string) error {
 	if err != nil {
 		return fmt.Errorf("MarshalIndent(%v) failed: %v", data, err)
 	}
-	if err := jirix.Run().MkdirAll(filepath.Dir(path), os.FileMode(0755)); err != nil {
-		return err
-	}
-	if err := jirix.Run().WriteFile(path, bytes, os.FileMode(0644)); err != nil {
+	s := jirix.NewSeq()
+	if err := s.MkdirAll(filepath.Dir(path), os.FileMode(0755)).
+		WriteFile(path, bytes, os.FileMode(0644)).Done(); err != nil {
 		return err
 	}
 	return nil
