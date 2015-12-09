@@ -1,0 +1,43 @@
+pkg tool, func InitializeProjectFlags(*flag.FlagSet)
+pkg tool, func InitializeRunFlags(*flag.FlagSet)
+pkg tool, func NewContext(ContextOpts) *Context
+pkg tool, func NewContextFromEnv(*cmdline.Env) *Context
+pkg tool, func NewDefaultContext() *Context
+pkg tool, method (Context) Clone(ContextOpts) *Context
+pkg tool, method (Context) Color() bool
+pkg tool, method (Context) DryRun() bool
+pkg tool, method (Context) Env() map[string]string
+pkg tool, method (Context) Gerrit(string) *gerrit.Gerrit
+pkg tool, method (Context) Git(...gitOpt) *gitutil.Git
+pkg tool, method (Context) Jenkins(string) (*jenkins.Jenkins, error)
+pkg tool, method (Context) Manifest() string
+pkg tool, method (Context) NewSeq() *runutil.Sequence
+pkg tool, method (Context) Run() *runutil.Run
+pkg tool, method (Context) Start() *runutil.Start
+pkg tool, method (Context) Stderr() io.Writer
+pkg tool, method (Context) Stdin() io.Reader
+pkg tool, method (Context) Stdout() io.Writer
+pkg tool, method (Context) Timer() *timing.Timer
+pkg tool, method (Context) TimerPop()
+pkg tool, method (Context) TimerPush(string)
+pkg tool, method (Context) Verbose() bool
+pkg tool, type AuthorDateOpt string
+pkg tool, type CommitterDateOpt string
+pkg tool, type Context struct
+pkg tool, type ContextOpts struct
+pkg tool, type ContextOpts struct, Color *bool
+pkg tool, type ContextOpts struct, DryRun *bool
+pkg tool, type ContextOpts struct, Env map[string]string
+pkg tool, type ContextOpts struct, Manifest *string
+pkg tool, type ContextOpts struct, Stderr io.Writer
+pkg tool, type ContextOpts struct, Stdin io.Reader
+pkg tool, type ContextOpts struct, Stdout io.Writer
+pkg tool, type ContextOpts struct, Timer *timing.Timer
+pkg tool, type ContextOpts struct, Verbose *bool
+pkg tool, type RootDirOpt string
+pkg tool, var ColorFlag bool
+pkg tool, var DryRunFlag bool
+pkg tool, var ManifestFlag string
+pkg tool, var Name string
+pkg tool, var VerboseFlag bool
+pkg tool, var Version string
