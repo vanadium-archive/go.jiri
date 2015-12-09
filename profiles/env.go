@@ -243,7 +243,7 @@ func pathHelper(jirix *jiri.X, projects project.Projects, workspaces []string, s
 			// account for Go workspaces that span multiple jiri projects,
 			// such as: $JIRI_ROOT/release/go.
 			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := jirix.Run().Stat(filepath.Join(absWorkspace)); err == nil {
+				if _, err := jirix.NewSeq().Stat(filepath.Join(absWorkspace)); err == nil {
 					path = append(path, absWorkspace)
 					break
 				}

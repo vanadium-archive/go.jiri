@@ -181,7 +181,7 @@ func testSetPathHelper(t *testing.T, name string) {
 	case "VDLPATH":
 		// Make a fake src directory.
 		want = filepath.Join(fake.X.Root, "test", "src")
-		if err := fake.X.Run().MkdirAll(want, 0755); err != nil {
+		if err := fake.X.NewSeq().MkdirAll(want, 0755).Done(); err != nil {
 			t.Fatalf("%v", err)
 		}
 		want = "VDLPATH=" + want
