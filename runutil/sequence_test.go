@@ -67,20 +67,27 @@ func TestStdoutStderr(t *testing.T) {
 		seq.Run("bash", "-c", "echo a; echo b >&2").
 			Timeout(time.Microsecond).
 			Run("sleep", "10000")
-		want := ""
+		wantA, wantB := "", ""
 		if verbose {
-			want = `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
-[hh:mm:ss.xx] >> OK
-a
-b
-` + dir + `
+			// stdout, stderr output can be interleaved in arbitrary order.
+			pre := `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
+[hh:mm:ss.xx] >> OK`
+			post := dir + `
 [hh:mm:ss.xx] >> sleep 10000
 [hh:mm:ss.xx] >> TIMED OUT
 ` + dir + `
 `
+			wantA = pre + `
+a
+b
+` + post
+			wantB = pre + `
+b
+a
+` + post
 		}
-		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
-			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		if got := sanitizeTimestamps(cnstrStdout.String()); got != wantA && got != wantB {
+			t.Errorf("verbose: %t, got %v, want either %v or %v", verbose, got, wantA, wantB)
 		}
 		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
