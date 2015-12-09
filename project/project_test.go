@@ -154,6 +154,20 @@ func commitManifest(t *testing.T, jirix *jiri.X, manifest *project.Manifest, man
 	}
 }
 
+func createProject(t *testing.T, jirix *jiri.X, manifestDir, name, remote, path string) {
+	manifestFile := filepath.Join(manifestDir, "v2", "default")
+	data, err := ioutil.ReadFile(manifestFile)
+	if err != nil {
+		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
+	}
+	manifest := project.Manifest{}
+	if err := xml.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
+	}
+	manifest.Projects = append(manifest.Projects, project.Project{Name: name, Remote: remote, Path: path})
+	commitManifest(t, jirix, &manifest, manifestDir)
+}
+
 func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, name string) {
 	manifestFile := filepath.Join(manifestDir, "v2", "default")
 	data, err := ioutil.ReadFile(manifestFile)
@@ -428,7 +442,7 @@ func TestUpdateUniverse(t *testing.T) {
 	writeEmptyMetadata(t, jirix, localManifest)
 	remoteManifest := setupNewProject(t, jirix, remoteDir, "test-remote-manifest", false)
 	addRemote(t, jirix, localManifest, "origin", remoteManifest)
-	numProjects, remoteProjects := 5, []string{}
+	numProjects, remoteProjects := 6, []string{}
 	for i := 0; i < numProjects; i++ {
 		remoteProject := setupNewProject(t, jirix, remoteDir, remoteProjectName(i), true)
 		remoteProjects = append(remoteProjects, remoteProject)
@@ -544,21 +558,30 @@ func TestUpdateUniverse(t *testing.T) {
 		checkDeleteFn(i, "revision 3")
 	}
 
-	// Commit to a non-master branch of a remote project and check that
-	// UpdateUniverse() can update the local project to point to a revision on
-	// that branch.
-	writeReadme(t, jirix, remoteProjects[4], "master commit")
-	createAndCheckoutBranch(t, jirix, remoteProjects[4], "non_master")
-	writeReadme(t, jirix, remoteProjects[4], "non master commit")
-	remoteBranchRevision := currentRevision(t, jirix, remoteProjects[4])
-	setRevisionForProject(t, jirix, remoteManifest, remoteProjects[4], remoteBranchRevision)
+	// Delete a project and create a new one with a different name but the same
+	// path.  Check that UpdateUniverse() does not fail.
+	path := filepath.Join(localDir, localProjectName(4))
+	deleteProject(t, jirix, remoteManifest, remoteProjects[4])
+	createProject(t, jirix, remoteManifest, "new.project", remoteProjects[4], path)
 	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
-	localProject := filepath.Join(localDir, localProjectName(4))
+
+	// Commit to a non-master branch of a remote project and check that
+	// UpdateUniverse() can update the local project to point to a revision on
+	// that branch.
+	writeReadme(t, jirix, remoteProjects[5], "master commit")
+	createAndCheckoutBranch(t, jirix, remoteProjects[5], "non_master")
+	writeReadme(t, jirix, remoteProjects[5], "non master commit")
+	remoteBranchRevision := currentRevision(t, jirix, remoteProjects[5])
+	setRevisionForProject(t, jirix, remoteManifest, remoteProjects[5], remoteBranchRevision)
+	if err := project.UpdateUniverse(jirix, true); err != nil {
+		t.Fatalf("%v", err)
+	}
+	localProject := filepath.Join(localDir, localProjectName(5))
 	localBranchRevision := currentRevision(t, jirix, localProject)
 	if localBranchRevision != remoteBranchRevision {
-		t.Fatalf("project 4 is at revision %v, expected %v\n", localBranchRevision, remoteBranchRevision)
+		t.Fatalf("project 5 is at revision %v, expected %v\n", localBranchRevision, remoteBranchRevision)
 	}
 	// Reset back to origin/master so the next update without a "revision" works.
 	resetToOriginMaster(t, jirix, localProject)
@@ -571,7 +594,7 @@ func TestUpdateUniverse(t *testing.T) {
 	}
 
 	checkRebaseFn := func(i int, revision string) {
-		if i == 4 {
+		if i == 5 {
 			checkReadme(t, jirix, localProject, "non master commit")
 		} else {
 			checkDeleteFn(i, revision)
