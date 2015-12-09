@@ -1186,8 +1186,9 @@ func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
 		return err
 	}
 
+	updates := newFsUpdates()
 	for _, op := range ops {
-		if err := op.Test(jirix); err != nil {
+		if err := op.Test(jirix, updates); err != nil {
 			return err
 		}
 	}
@@ -1279,6 +1280,31 @@ func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) er
 	return nil
 }
 
+// fsUpdates is used to track filesystem updates made by operations.
+// TODO(nlacasse): Currently we only use fsUpdates to track deletions so that
+// jiri can delete and create a project in the same directory in one update.
+// There are lots of other cases that should be covered though, like detecting
+// when two projects would be created in the same directory.
+type fsUpdates struct {
+	deletedDirs map[string]bool
+}
+
+func newFsUpdates() *fsUpdates {
+	return &fsUpdates{
+		deletedDirs: map[string]bool{},
+	}
+}
+
+func (u *fsUpdates) deleteDir(dir string) {
+	dir = filepath.Clean(dir)
+	u.deletedDirs[dir] = true
+}
+
+func (u *fsUpdates) isDeleted(dir string) bool {
+	_, ok := u.deletedDirs[filepath.Clean(dir)]
+	return ok
+}
+
 type operation interface {
 	// Project identifies the project this operation pertains to.
 	Project() Project
@@ -1287,7 +1313,7 @@ type operation interface {
 	// String returns a string representation of the operation.
 	String() string
 	// Test checks whether the operation would fail.
-	Test(jirix *jiri.X) error
+	Test(jirix *jiri.X, updates *fsUpdates) error
 }
 
 // commonOperation represents a project operation.
@@ -1401,13 +1427,13 @@ func (op createOperation) String() string {
 	return fmt.Sprintf("create project %q in %q and advance it to %q", op.project.Name, op.destination, fmtRevision(op.project.Revision))
 }
 
-func (op createOperation) Test(jirix *jiri.X) error {
+func (op createOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
 	// Check the local file system.
 	if _, err := jirix.Run().Stat(op.destination); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-	} else {
+	} else if !updates.isDeleted(op.destination) {
 		return fmt.Errorf("cannot create %q as it already exists", op.destination)
 	}
 	return nil
@@ -1476,13 +1502,14 @@ func (op deleteOperation) String() string {
 	return fmt.Sprintf("delete project %q from %q", op.project.Name, op.source)
 }
 
-func (op deleteOperation) Test(jirix *jiri.X) error {
+func (op deleteOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
 	if _, err := jirix.Run().Stat(op.source); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot delete %q as it does not exist", op.source)
 		}
 		return err
 	}
+	updates.deleteDir(op.source)
 	return nil
 }
 
@@ -1515,7 +1542,7 @@ func (op moveOperation) String() string {
 	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q", op.project.Name, op.source, op.destination, fmtRevision(op.project.Revision))
 }
 
-func (op moveOperation) Test(jirix *jiri.X) error {
+func (op moveOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
 	if _, err := jirix.Run().Stat(op.source); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot move %q to %q as the source does not exist", op.source, op.destination)
@@ -1529,6 +1556,7 @@ func (op moveOperation) Test(jirix *jiri.X) error {
 	} else {
 		return fmt.Errorf("cannot move %q to %q as the destination already exists", op.source, op.destination)
 	}
+	updates.deleteDir(op.source)
 	return nil
 }
 
@@ -1554,7 +1582,7 @@ func (op updateOperation) String() string {
 	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, fmtRevision(op.project.Revision))
 }
 
-func (op updateOperation) Test(jirix *jiri.X) error {
+func (op updateOperation) Test(jirix *jiri.X, _ *fsUpdates) error {
 	return nil
 }
 
@@ -1575,7 +1603,7 @@ func (op nullOperation) String() string {
 	return fmt.Sprintf("project %q located in %q at revision %q is up-to-date", op.project.Name, op.source, fmtRevision(op.project.Revision))
 }
 
-func (op nullOperation) Test(jirix *jiri.X) error {
+func (op nullOperation) Test(jirix *jiri.X, _ *fsUpdates) error {
 	return nil
 }
 
