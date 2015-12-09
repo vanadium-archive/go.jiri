@@ -100,7 +100,7 @@ func loadAliases(jirix *jiri.X) (*aliasMaps, error) {
 		}
 		aliasesFile = filepath.Join(dataDir, aliasesFileName)
 	}
-	bytes, err := jirix.Run().ReadFile(aliasesFile)
+	bytes, err := jirix.NewSeq().ReadFile(aliasesFile)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +149,9 @@ func runContributors(jirix *jiri.X, args []string) error {
 		if len(projects) == 0 {
 			continue
 		}
+
 		for _, project := range projects {
-			if err := jirix.Run().Chdir(project.Path); err != nil {
+			if err := jirix.NewSeq().Chdir(project.Path).Done(); err != nil {
 				return err
 			}
 			switch project.Protocol {

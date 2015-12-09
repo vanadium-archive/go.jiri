@@ -131,20 +131,21 @@ func getSnapshotDir(jirix *jiri.X) (string, error) {
 	if remoteFlag {
 		dir = jirix.RemoteSnapshotDir()
 	}
-	switch _, err := jirix.Run().Stat(dir); {
+	s := jirix.NewSeq()
+	switch _, err := s.Stat(dir); {
 	case err == nil:
 		return dir, nil
 	case !runutil.IsNotExist(err):
 		return "", err
 	case remoteFlag:
-		if err := jirix.Run().MkdirAll(dir, 0755); err != nil {
+		if err := s.MkdirAll(dir, 0755).Done(); err != nil {
 			return "", err
 		}
 		return dir, nil
 	}
 	// Create a new local snapshot directory.
 	createFn := func() (e error) {
-		if err := jirix.Run().MkdirAll(dir, 0755); err != nil {
+		if err := s.MkdirAll(dir, 0755).Done(); err != nil {
 			return err
 		}
 		if err := jirix.Git().Init(dir); err != nil {
@@ -154,14 +155,14 @@ func getSnapshotDir(jirix *jiri.X) (string, error) {
 		if err != nil {
 			return err
 		}
-		defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
-		if err := jirix.Run().Chdir(dir); err != nil {
+		defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
+		if err := s.Chdir(dir).Done(); err != nil {
 			return err
 		}
 		return jirix.Git().Commit()
 	}
 	if err := createFn(); err != nil {
-		jirix.Run().RemoveAll(dir)
+		s.RemoveAll(dir)
 		return "", err
 	}
 	return dir, nil
@@ -174,18 +175,15 @@ func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) erro
 		return err
 	}
 
+	s := jirix.NewSeq()
 	// Update the symlink for this snapshot label to point to the
 	// latest snapshot.
 	symlink := filepath.Join(snapshotDir, label)
 	newSymlink := symlink + ".new"
-	if err := jirix.Run().RemoveAll(newSymlink); err != nil {
-		return err
-	}
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	if err := jirix.Run().Symlink(relativeSnapshotPath, newSymlink); err != nil {
-		return err
-	}
-	if err := jirix.Run().Rename(newSymlink, symlink); err != nil {
+	if err := s.RemoveAll(newSymlink).
+		Symlink(relativeSnapshotPath, newSymlink).
+		Rename(newSymlink, symlink).Done(); err != nil {
 		return err
 	}
 
@@ -204,8 +202,8 @@ func revisionChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string) (e 
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return jirix.Run().Chdir(cwd) }, &e)
-	if err := jirix.Run().Chdir(snapshotDir); err != nil {
+	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
+	if err := jirix.NewSeq().Chdir(snapshotDir).Done(); err != nil {
 		return err
 	}
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
@@ -274,7 +272,7 @@ func runSnapshotList(jirix *jiri.X, args []string) error {
 	failed := false
 	for _, label := range args {
 		labelDir := filepath.Join(snapshotDir, "labels", label)
-		if _, err := jirix.Run().Stat(labelDir); err != nil {
+		if _, err := jirix.NewSeq().Stat(labelDir); err != nil {
 			if !runutil.IsNotExist(err) {
 				return err
 			}
