@@ -1,0 +1,52 @@
+pkg util, const Black Color
+pkg util, const Blue Color
+pkg util, const Cyan Color
+pkg util, const Green Color
+pkg util, const Magenta Color
+pkg util, const Red Color
+pkg util, const White Color
+pkg util, const Yellow Color
+pkg util, func ColorString(string, Color) string
+pkg util, func ConfigFilePath(*jiri.X) (string, error)
+pkg util, func LoadConfig(*jiri.X) (*Config, error)
+pkg util, func LoadOncallRotation(*jiri.X) (*OncallRotation, error)
+pkg util, func NewConfig(...ConfigOpt) *Config
+pkg util, func Oncall(*jiri.X, time.Time) (*OncallShift, error)
+pkg util, func OncallRotationPath(*jiri.X) (string, error)
+pkg util, func SaveConfig(*jiri.X, *Config) error
+pkg util, func ThirdPartyBinPath(*jiri.X, string) (string, error)
+pkg util, method (Config) APICheckProjects() map[string]struct{}
+pkg util, method (Config) CopyrightCheckProjects() map[string]struct{}
+pkg util, method (Config) GoWorkspaces() []string
+pkg util, method (Config) GroupTests([]string) []string
+pkg util, method (Config) JenkinsMatrixJobs() map[string]JenkinsMatrixJobInfo
+pkg util, method (Config) ProjectTests([]string) []string
+pkg util, method (Config) Projects() []string
+pkg util, method (Config) TestDependencies(string) []string
+pkg util, method (Config) TestParts(string) []string
+pkg util, method (Config) VDLWorkspaces() []string
+pkg util, type APICheckProjectsOpt map[string]struct{}
+pkg util, type Color int
+pkg util, type Config struct
+pkg util, type ConfigOpt interface, unexported methods
+pkg util, type CopyrightCheckProjectsOpt map[string]struct{}
+pkg util, type GoWorkspacesOpt []string
+pkg util, type JenkinsMatrixJobInfo struct
+pkg util, type JenkinsMatrixJobInfo struct, HasArch bool
+pkg util, type JenkinsMatrixJobInfo struct, HasOS bool
+pkg util, type JenkinsMatrixJobInfo struct, HasParts bool
+pkg util, type JenkinsMatrixJobInfo struct, Name string
+pkg util, type JenkinsMatrixJobInfo struct, ShowOS bool
+pkg util, type JenkinsMatrixJobsOpt map[string]JenkinsMatrixJobInfo
+pkg util, type OncallRotation struct
+pkg util, type OncallRotation struct, Shifts []OncallShift
+pkg util, type OncallRotation struct, XMLName xml.Name
+pkg util, type OncallShift struct
+pkg util, type OncallShift struct, Date string
+pkg util, type OncallShift struct, Primary string
+pkg util, type OncallShift struct, Secondary string
+pkg util, type ProjectTestsOpt map[string][]string
+pkg util, type TestDependenciesOpt map[string][]string
+pkg util, type TestGroupsOpt map[string][]string
+pkg util, type TestPartsOpt map[string][]string
+pkg util, type VDLWorkspacesOpt []string
