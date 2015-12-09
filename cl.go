@@ -16,6 +16,7 @@ import (
 	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
+	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 )
@@ -97,10 +98,10 @@ func getDependentCLs(jirix *jiri.X, branch string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := jirix.Run().ReadFile(file)
+	data, err := jirix.NewSeq().ReadFile(file)
 	var branches []string
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !runutil.IsNotExist(err) {
 			return nil, err
 		}
 		if branch != remoteBranchFlag {
@@ -163,9 +164,10 @@ func cleanupCL(jirix *jiri.X, branches []string) (e error) {
 	if err := jirix.Git().FetchRefspec("origin", remoteBranchFlag); err != nil {
 		return err
 	}
+	s := jirix.NewSeq()
 	for _, branch := range branches {
 		cleanupFn := func() error { return cleanupBranch(jirix, branch) }
-		if err := jirix.Run().Function(cleanupFn, "Cleaning up branch %q", branch); err != nil {
+		if err := s.Call(cleanupFn, "Cleaning up branch %q", branch).Done(); err != nil {
 			return err
 		}
 		if branch == originalBranch {
@@ -209,12 +211,11 @@ func cleanupBranch(jirix *jiri.X, branch string) error {
 	if err != nil {
 		return err
 	}
-	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
-	if err := jirix.Run().RemoveAll(filepath.Join(metadataDir, branch)); err != nil {
-		return err
-	}
+	s := jirix.NewSeq()
 	// Remove the branch from all dependency paths.
-	fileInfos, err := jirix.Run().ReadDir(metadataDir)
+	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
+	fileInfos, err := s.RemoveAll(filepath.Join(metadataDir, branch)).
+		ReadDir(metadataDir)
 	if err != nil {
 		return err
 	}
@@ -226,9 +227,9 @@ func cleanupBranch(jirix *jiri.X, branch string) error {
 		if err != nil {
 			return err
 		}
-		data, err := jirix.Run().ReadFile(file)
+		data, err := s.ReadFile(file)
 		if err != nil {
-			if !os.IsNotExist(err) {
+			if !runutil.IsNotExist(err) {
 				return err
 			}
 			continue
@@ -237,7 +238,7 @@ func cleanupBranch(jirix *jiri.X, branch string) error {
 		for i, tmpBranch := range branches {
 			if branch == tmpBranch {
 				data := []byte(strings.Join(append(branches[:i], branches[i+1:]...), "\n"))
-				if err := jirix.Run().WriteFile(file, data, os.FileMode(0644)); err != nil {
+				if err := s.WriteFile(file, data, os.FileMode(0644)).Done(); err != nil {
 					return err
 				}
 				break
@@ -406,8 +407,8 @@ func checkDependents(jirix *jiri.X) (e error) {
 		if err != nil {
 			return err
 		}
-		if _, err := jirix.Run().Stat(file); err != nil {
-			if !os.IsNotExist(err) {
+		if _, err := jirix.NewSeq().Stat(file); err != nil {
+			if !runutil.IsNotExist(err) {
 				return err
 			}
 			return fmt.Errorf(`Failed to export the branch %q to Gerrit because its ancestor %q has not been exported to Gerrit yet.
@@ -483,9 +484,9 @@ func (review *review) confirmFlagChanges() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	bytes, err := review.jirix.Run().ReadFile(file)
+	bytes, err := review.jirix.NewSeq().ReadFile(file)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if runutil.IsNotExist(err) {
 			return true, nil
 		}
 		return false, err
@@ -653,7 +654,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 			if err != nil {
 				return err
 			}
-			message, err := review.jirix.Run().ReadFile(file)
+			message, err := review.jirix.NewSeq().ReadFile(file)
 			if err != nil {
 				return err
 			}
@@ -763,12 +764,13 @@ func (review *review) run() (e error) {
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
-	defer collect.Error(func() error { return review.jirix.Run().Chdir(wd) }, &e)
+	defer collect.Error(func() error { return review.jirix.NewSeq().Chdir(wd).Done() }, &e)
 	topLevel, err := review.jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
-	if err := review.jirix.Run().Chdir(topLevel); err != nil {
+	s := review.jirix.NewSeq()
+	if err := s.Chdir(topLevel).Done(); err != nil {
 		return err
 	}
 	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
@@ -779,9 +781,9 @@ func (review *review) run() (e error) {
 	message := messageFlag
 	if message == "" {
 		// Message was not passed in flag.  Attempt to read it from file.
-		data, err := review.jirix.Run().ReadFile(file)
+		data, err := s.ReadFile(file)
 		if err != nil {
-			if !os.IsNotExist(err) {
+			if !runutil.IsNotExist(err) {
 				return err
 			}
 		} else {
@@ -835,7 +837,7 @@ func (review *review) getChangeID() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bytes, err := review.jirix.Run().ReadFile(file)
+	bytes, err := review.jirix.NewSeq().ReadFile(file)
 	if err != nil {
 		return "", err
 	}
@@ -868,13 +870,14 @@ func (review *review) updateReviewMessage(file string) error {
 	if err != nil {
 		return err
 	}
+	s := review.jirix.NewSeq()
 	// For the initial commit where the commit message file doesn't exist,
 	// add/remove labels after users finish editing the commit message.
 	//
 	// This behavior is consistent with how Change-ID is added for the
 	// initial commit so we don't confuse users.
-	if _, err := review.jirix.Run().Stat(file); err != nil {
-		if os.IsNotExist(err) {
+	if _, err := s.Stat(file); err != nil {
+		if runutil.IsNotExist(err) {
 			newMessage = review.processLabels(newMessage)
 			if err := review.jirix.Git().CommitAmendWithMessage(newMessage); err != nil {
 				return err
@@ -888,10 +891,8 @@ func (review *review) updateReviewMessage(file string) error {
 		return err
 	}
 	newMetadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir, review.CLOpts.Branch)
-	if err := review.jirix.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
-		return err
-	}
-	if err := review.jirix.Run().WriteFile(file, []byte(newMessage), 0644); err != nil {
+	if err := s.MkdirAll(newMetadataDir, os.FileMode(0755)).
+		WriteFile(file, []byte(newMessage), 0644).Done(); err != nil {
 		return err
 	}
 	return nil
@@ -946,6 +947,7 @@ func newCL(jirix *jiri.X, args []string) error {
 		}
 	}()
 
+	s := jirix.NewSeq()
 	// Record the dependent CLs for the new branch. The dependent CLs
 	// are recorded in a <dependencyPathFileName> file as a
 	// newline-separated list of branch names.
@@ -955,14 +957,14 @@ func newCL(jirix *jiri.X, args []string) error {
 	}
 	branches = append(branches, originalBranch)
 	newMetadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir, newBranch)
-	if err := jirix.Run().MkdirAll(newMetadataDir, os.FileMode(0755)); err != nil {
+	if err := s.MkdirAll(newMetadataDir, os.FileMode(0755)).Done(); err != nil {
 		return err
 	}
 	file, err := getDependencyPathFileName(jirix, newBranch)
 	if err != nil {
 		return err
 	}
-	if err := jirix.Run().WriteFile(file, []byte(strings.Join(branches, "\n")), os.FileMode(0644)); err != nil {
+	if err := s.WriteFile(file, []byte(strings.Join(branches, "\n")), os.FileMode(0644)).Done(); err != nil {
 		return err
 	}
 
@@ -1020,15 +1022,16 @@ func syncCL(jirix *jiri.X) (e error) {
 		if forceOriginalBranch {
 			jirix.Git().CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
 		}
-		jirix.Run().Chdir(originalWd)
+		jirix.NewSeq().Chdir(originalWd)
 	}()
 
+	s := jirix.NewSeq()
 	// Switch to an existing directory in master so we can run commands.
 	topLevel, err := jirix.Git().TopLevel()
 	if err != nil {
 		return err
 	}
-	if err := jirix.Run().Chdir(topLevel); err != nil {
+	if err := s.Chdir(topLevel).Done(); err != nil {
 		return err
 	}
 

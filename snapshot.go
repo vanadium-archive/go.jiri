@@ -17,6 +17,7 @@ import (
 	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
+	"v.io/jiri/runutil"
 	"v.io/x/lib/cmdline"
 )
 
@@ -133,7 +134,7 @@ func getSnapshotDir(jirix *jiri.X) (string, error) {
 	switch _, err := jirix.Run().Stat(dir); {
 	case err == nil:
 		return dir, nil
-	case !os.IsNotExist(err):
+	case !runutil.IsNotExist(err):
 		return "", err
 	case remoteFlag:
 		if err := jirix.Run().MkdirAll(dir, 0755); err != nil {
@@ -274,7 +275,7 @@ func runSnapshotList(jirix *jiri.X, args []string) error {
 	for _, label := range args {
 		labelDir := filepath.Join(snapshotDir, "labels", label)
 		if _, err := jirix.Run().Stat(labelDir); err != nil {
-			if !os.IsNotExist(err) {
+			if !runutil.IsNotExist(err) {
 				return err
 			}
 			failed = true

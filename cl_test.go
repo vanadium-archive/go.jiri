@@ -17,6 +17,7 @@ import (
 	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/jiritest"
+	"v.io/jiri/runutil"
 )
 
 // assertCommitCount asserts that the commit count between two
@@ -34,7 +35,7 @@ func assertCommitCount(t *testing.T, jirix *jiri.X, branch, baseBranch string, e
 // assertFileContent asserts that the content of the given file
 // matches the expected content.
 func assertFileContent(t *testing.T, jirix *jiri.X, file, want string) {
-	got, err := jirix.Run().ReadFile(file)
+	got, err := jirix.NewSeq().ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -45,9 +46,10 @@ func assertFileContent(t *testing.T, jirix *jiri.X, file, want string) {
 
 // assertFilesExist asserts that the files exist.
 func assertFilesExist(t *testing.T, jirix *jiri.X, files []string) {
+	s := jirix.NewSeq()
 	for _, file := range files {
-		if _, err := jirix.Run().Stat(file); err != nil {
-			if os.IsNotExist(err) {
+		if _, err := s.Stat(file); err != nil {
+			if runutil.IsNotExist(err) {
 				t.Fatalf("expected file %v to exist but it did not", file)
 			}
 			t.Fatalf("%v", err)
@@ -57,8 +59,9 @@ func assertFilesExist(t *testing.T, jirix *jiri.X, files []string) {
 
 // assertFilesDoNotExist asserts that the files do not exist.
 func assertFilesDoNotExist(t *testing.T, jirix *jiri.X, files []string) {
+	s := jirix.NewSeq()
 	for _, file := range files {
-		if _, err := jirix.Run().Stat(file); err != nil && !os.IsNotExist(err) {
+		if _, err := s.Stat(file); err != nil && !runutil.IsNotExist(err) {
 			t.Fatalf("%v", err)
 		} else if err == nil {
 			t.Fatalf("expected file %v to not exist but it did", file)
@@ -114,7 +117,8 @@ func assertStashSize(t *testing.T, jirix *jiri.X, want int) {
 
 // commitFile commits a file with the specified content into a branch
 func commitFile(t *testing.T, jirix *jiri.X, filename string, content string) {
-	if err := jirix.Run().WriteFile(filename, []byte(content), 0644); err != nil {
+	s := jirix.NewSeq()
+	if err := s.WriteFile(filename, []byte(content), 0644).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	commitMessage := "Commit " + filename
@@ -134,7 +138,8 @@ func commitFiles(t *testing.T, jirix *jiri.X, filenames []string) {
 
 // createRepo creates a new repository with the given prefix.
 func createRepo(t *testing.T, jirix *jiri.X, prefix string) string {
-	repoPath, err := jirix.Run().TempDir(jirix.Root, "repo-"+prefix)
+	s := jirix.NewSeq()
+	repoPath, err := s.TempDir(jirix.Root, "repo-"+prefix)
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
@@ -144,7 +149,7 @@ func createRepo(t *testing.T, jirix *jiri.X, prefix string) string {
 	if err := jirix.Git().Init(repoPath); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Run().MkdirAll(filepath.Join(repoPath, jiri.ProjectMetaDir), os.FileMode(0755)); err != nil {
+	if err := s.MkdirAll(filepath.Join(repoPath, jiri.ProjectMetaDir), os.FileMode(0755)).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	return repoPath
@@ -159,14 +164,14 @@ echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
 // installCommitMsgHook links the gerrit commit-msg hook into a different repo.
 func installCommitMsgHook(t *testing.T, jirix *jiri.X, repoPath string) {
 	hookLocation := path.Join(repoPath, ".git/hooks/commit-msg")
-	if err := jirix.Run().WriteFile(hookLocation, []byte(commitMsgHook), 0755); err != nil {
+	if err := jirix.NewSeq().WriteFile(hookLocation, []byte(commitMsgHook), 0755).Done(); err != nil {
 		t.Fatalf("WriteFile(%v) failed: %v", hookLocation, err)
 	}
 }
 
 // chdir changes the runtime working directory and traps any errors.
 func chdir(t *testing.T, jirix *jiri.X, path string) {
-	if err := jirix.Run().Chdir(path); err != nil {
+	if err := jirix.NewSeq().Chdir(path).Done(); err != nil {
 		_, file, line, _ := runtime.Caller(1)
 		t.Fatalf("%s: %d: Chdir(%v) failed: %v", file, line, path, err)
 	}
@@ -489,6 +494,7 @@ func TestEndToEnd(t *testing.T) {
 func TestLabelsInCommitMessage(t *testing.T) {
 	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
+	s := fake.X.NewSeq()
 	branch := "my-branch"
 	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -520,7 +526,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	bytes, err := fake.X.Run().ReadFile(file)
+	bytes, err := s.ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -553,7 +559,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 	expectedRef = gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
-	bytes, err = fake.X.Run().ReadFile(file)
+	bytes, err = s.ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -581,7 +587,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 	expectedRef = gerrit.Reference(review.CLOpts)
 	assertFilesPushedToRef(t, fake.X, repoPath, gerritPath, expectedRef, files)
-	bytes, err = fake.X.Run().ReadFile(file)
+	bytes, err = s.ReadFile(file)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -598,6 +604,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 func TestDirtyBranch(t *testing.T) {
 	fake, _, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
+	s := fake.X.NewSeq()
 	branch := "my-branch"
 	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
@@ -606,7 +613,7 @@ func TestDirtyBranch(t *testing.T) {
 	commitFiles(t, fake.X, files)
 	assertStashSize(t, fake.X, 0)
 	stashedFile, stashedFileContent := "stashed-file", "stashed-file content"
-	if err := fake.X.Run().WriteFile(stashedFile, []byte(stashedFileContent), 0644); err != nil {
+	if err := s.WriteFile(stashedFile, []byte(stashedFileContent), 0644).Done(); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", stashedFile, stashedFileContent, err)
 	}
 	if err := fake.X.Git().Add(stashedFile); err != nil {
@@ -617,18 +624,18 @@ func TestDirtyBranch(t *testing.T) {
 	}
 	assertStashSize(t, fake.X, 1)
 	modifiedFile, modifiedFileContent := "file1", "modified-file content"
-	if err := fake.X.Run().WriteFile(modifiedFile, []byte(modifiedFileContent), 0644); err != nil {
+	if err := s.WriteFile(modifiedFile, []byte(modifiedFileContent), 0644).Done(); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", modifiedFile, modifiedFileContent, err)
 	}
 	stagedFile, stagedFileContent := "file2", "staged-file content"
-	if err := fake.X.Run().WriteFile(stagedFile, []byte(stagedFileContent), 0644); err != nil {
+	if err := s.WriteFile(stagedFile, []byte(stagedFileContent), 0644).Done(); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", stagedFile, stagedFileContent, err)
 	}
 	if err := fake.X.Git().Add(stagedFile); err != nil {
 		t.Fatalf("%v", err)
 	}
 	untrackedFile, untrackedFileContent := "file3", "untracked-file content"
-	if err := fake.X.Run().WriteFile(untrackedFile, []byte(untrackedFileContent), 0644); err != nil {
+	if err := s.WriteFile(untrackedFile, []byte(untrackedFileContent), 0644).Done(); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
 	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
@@ -664,13 +671,14 @@ func TestDirtyBranch(t *testing.T) {
 func TestRunInSubdirectory(t *testing.T) {
 	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
+	s := fake.X.NewSeq()
 	branch := "my-branch"
 	if err := fake.X.Git().CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 	subdir := "sub/directory"
 	subdirPerms := os.FileMode(0744)
-	if err := fake.X.Run().MkdirAll(subdir, subdirPerms); err != nil {
+	if err := s.MkdirAll(subdir, subdirPerms).Done(); err != nil {
 		t.Fatalf("MkdirAll(%v, %v) failed: %v", subdir, subdirPerms, err)
 	}
 	files := []string{path.Join(subdir, "file1")}
