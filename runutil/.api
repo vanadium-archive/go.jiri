@@ -8,6 +8,7 @@ pkg runutil, func LookPath(string, map[string]string) (string, error)
 pkg runutil, func NewRun(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Run
 pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Sequence
 pkg runutil, func NewStart(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Start
+pkg runutil, func TranslateExitCode(error) error
 pkg runutil, method (*Run) Chdir(string) error
 pkg runutil, method (*Run) Chmod(string, os.FileMode) error
 pkg runutil, method (*Run) Command(string, ...string) error
