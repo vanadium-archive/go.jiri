@@ -825,7 +825,7 @@ func (review *review) send() error {
 			return err
 		}
 	}
-	if err := gerrit.Push(review.jirix.Run(), review.CLOpts); err != nil {
+	if err := gerrit.Push(review.jirix.NewSeq(), review.CLOpts); err != nil {
 		return gerritError(err.Error())
 	}
 	return nil

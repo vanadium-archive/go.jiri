@@ -80,20 +80,20 @@ type CLOpts struct {
 // Gerrit records a hostname of a Gerrit instance.
 type Gerrit struct {
 	host string
-	r    *runutil.Run
+	s    *runutil.Sequence
 }
 
 // New is the Gerrit factory.
-func New(r *runutil.Run, host string) *Gerrit {
+func New(s *runutil.Sequence, host string) *Gerrit {
 	return &Gerrit{
 		host: host,
-		r:    r,
+		s:    s,
 	}
 }
 
 // PostReview posts a review to the given Gerrit reference.
 func (g *Gerrit) PostReview(ref string, message string, labels map[string]string) (e error) {
-	cred, err := hostCredentials(g.r, g.host)
+	cred, err := hostCredentials(g.s, g.host)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ type Topic struct {
 
 // SetTopic sets the topic of the given Gerrit reference.
 func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
-	cred, err := hostCredentials(g.r, g.host)
+	cred, err := hostCredentials(g.s, g.host)
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func parsePresubmitTestType(match string) PresubmitTestType {
 // - https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#list-changes
 // - https://gerrit-review.googlesource.com/Documentation/user-search.html
 func (g *Gerrit) Query(query string) (_ []Change, e error) {
-	cred, err := hostCredentials(g.r, g.host)
+	cred, err := hostCredentials(g.s, g.host)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +345,7 @@ func (g *Gerrit) Query(query string) (_ []Change, e error) {
 
 // Submit submits the given changelist through Gerrit.
 func (g *Gerrit) Submit(changeID string) (e error) {
-	cred, err := hostCredentials(g.r, g.host)
+	cred, err := hostCredentials(g.s, g.host)
 	if err != nil {
 		return err
 	}
@@ -427,13 +427,10 @@ func Reference(opts CLOpts) string {
 
 // getRemoteURL returns the URL of the Gerrit project with respect to the
 // project identified by the current working directory.
-func getRemoteURL(run *runutil.Run, clOpts CLOpts) (string, error) {
+func getRemoteURL(seq *runutil.Sequence, clOpts CLOpts) (string, error) {
 	args := []string{"config", "--get", "remote.origin.url"}
 	var stdout, stderr bytes.Buffer
-	opts := run.Opts()
-	opts.Stdout = &stdout
-	opts.Stderr = &stderr
-	if err := run.CommandWithOpts(opts, "git", args...); err != nil {
+	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
 		return "", gitutil.Error(stdout.String(), stderr.String(), args...)
 	}
 	baseUrl := clOpts.Host
@@ -444,11 +441,11 @@ func getRemoteURL(run *runutil.Run, clOpts CLOpts) (string, error) {
 }
 
 // Push pushes the current branch to Gerrit.
-func Push(run *runutil.Run, clOpts CLOpts) error {
+func Push(seq *runutil.Sequence, clOpts CLOpts) error {
 	remote := clOpts.Remote
 	if remote == "" {
 		var err error
-		remote, err = getRemoteURL(run, clOpts)
+		remote, err = getRemoteURL(seq, clOpts)
 		if err != nil {
 			return err
 		}
@@ -464,10 +461,7 @@ func Push(run *runutil.Run, clOpts CLOpts) error {
 		args = append(args, "--no-verify")
 	}
 	var stdout, stderr bytes.Buffer
-	opts := run.Opts()
-	opts.Stdout = &stdout
-	opts.Stderr = &stderr
-	if err := run.CommandWithOpts(opts, "git", args...); err != nil {
+	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
 		return gitutil.Error(stdout.String(), stderr.String(), args...)
 	}
 	for _, line := range strings.Split(stderr.String(), "\n") {
@@ -486,7 +480,7 @@ type credentials struct {
 // hostCredentials returns credentials for the given Gerrit host. The
 // function uses best effort to scan common locations where the
 // credentials could exist.
-func hostCredentials(run *runutil.Run, host string) (_ *credentials, e error) {
+func hostCredentials(seq *runutil.Sequence, host string) (_ *credentials, e error) {
 	// Check the host URL is valid.
 	url, err := url.Parse(host)
 	if err != nil {
@@ -498,7 +492,7 @@ func hostCredentials(run *runutil.Run, host string) (_ *credentials, e error) {
 
 	// Look for the host credentials in the .netrc file.
 	netrcPath := filepath.Join(os.Getenv("HOME"), ".netrc")
-	file, err := run.Open(netrcPath)
+	file, err := seq.Open(netrcPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
@@ -518,12 +512,9 @@ func hostCredentials(run *runutil.Run, host string) (_ *credentials, e error) {
 	// Look for the host credentials in the git cookie file.
 	args := []string{"config", "--get", "http.cookiefile"}
 	var stdout, stderr bytes.Buffer
-	opts := run.Opts()
-	opts.Stdout = &stdout
-	opts.Stderr = &stderr
-	if err := run.CommandWithOpts(opts, "git", args...); err == nil {
+	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err == nil {
 		cookieFilePath := strings.TrimSpace(stdout.String())
-		file, err := run.Open(cookieFilePath)
+		file, err := seq.Open(cookieFilePath)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return nil, err

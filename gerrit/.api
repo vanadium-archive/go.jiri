@@ -1,0 +1,63 @@
+pkg gerrit, const PresubmitTestTypeAll PresubmitTestType
+pkg gerrit, const PresubmitTestTypeNone PresubmitTestType
+pkg gerrit, func New(*runutil.Sequence, string) *Gerrit
+pkg gerrit, func PresubmitTestTypes() []string
+pkg gerrit, func Push(*runutil.Sequence, CLOpts) error
+pkg gerrit, func Reference(CLOpts) string
+pkg gerrit, method (*Gerrit) PostReview(string, string, map[string]string) error
+pkg gerrit, method (*Gerrit) Query(string) ([]Change, error)
+pkg gerrit, method (*Gerrit) SetTopic(string, CLOpts) error
+pkg gerrit, method (*Gerrit) Submit(string) error
+pkg gerrit, method (Change) OwnerEmail() string
+pkg gerrit, method (Change) Reference() string
+pkg gerrit, type CLOpts struct
+pkg gerrit, type CLOpts struct, Autosubmit bool
+pkg gerrit, type CLOpts struct, Branch string
+pkg gerrit, type CLOpts struct, Ccs []string
+pkg gerrit, type CLOpts struct, Draft bool
+pkg gerrit, type CLOpts struct, Edit bool
+pkg gerrit, type CLOpts struct, Host string
+pkg gerrit, type CLOpts struct, Presubmit PresubmitTestType
+pkg gerrit, type CLOpts struct, Remote string
+pkg gerrit, type CLOpts struct, RemoteBranch string
+pkg gerrit, type CLOpts struct, Reviewers []string
+pkg gerrit, type CLOpts struct, Topic string
+pkg gerrit, type CLOpts struct, Verify bool
+pkg gerrit, type Change struct
+pkg gerrit, type Change struct, AutoSubmit bool
+pkg gerrit, type Change struct, Change_id string
+pkg gerrit, type Change struct, Current_revision string
+pkg gerrit, type Change struct, Labels map[string]map[string]interface{}
+pkg gerrit, type Change struct, MultiPart *MultiPartCLInfo
+pkg gerrit, type Change struct, Owner Owner
+pkg gerrit, type Change struct, PresubmitTest PresubmitTestType
+pkg gerrit, type Change struct, Project string
+pkg gerrit, type Change struct, Revisions Revisions
+pkg gerrit, type Change struct, Topic string
+pkg gerrit, type Comment struct
+pkg gerrit, type Comment struct, Line int
+pkg gerrit, type Comment struct, Message string
+pkg gerrit, type Commit struct
+pkg gerrit, type Commit struct, Message string
+pkg gerrit, type Fetch struct
+pkg gerrit, type Fetch struct, embedded Http
+pkg gerrit, type Gerrit struct
+pkg gerrit, type Http struct
+pkg gerrit, type Http struct, Ref string
+pkg gerrit, type MultiPartCLInfo struct
+pkg gerrit, type MultiPartCLInfo struct, Index int
+pkg gerrit, type MultiPartCLInfo struct, Topic string
+pkg gerrit, type MultiPartCLInfo struct, Total int
+pkg gerrit, type Owner struct
+pkg gerrit, type Owner struct, Email string
+pkg gerrit, type PresubmitTestType string
+pkg gerrit, type Review struct
+pkg gerrit, type Review struct, Comments map[string][]Comment
+pkg gerrit, type Review struct, Labels map[string]string
+pkg gerrit, type Review struct, Message string
+pkg gerrit, type Revision struct
+pkg gerrit, type Revision struct, embedded Commit
+pkg gerrit, type Revision struct, embedded Fetch
+pkg gerrit, type Revisions map[string]Revision
+pkg gerrit, type Topic struct
+pkg gerrit, type Topic struct, Topic string

@@ -140,7 +140,7 @@ func (ctx Context) Env() map[string]string {
 
 // Gerrit returns the Gerrit instance of the context.
 func (ctx Context) Gerrit(host string) *gerrit.Gerrit {
-	return gerrit.New(ctx.run, host)
+	return gerrit.New(ctx.NewSeq(), host)
 }
 
 type gitOpt interface {
