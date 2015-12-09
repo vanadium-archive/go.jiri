@@ -168,7 +168,7 @@ func createProject(t *testing.T, jirix *jiri.X, manifestDir, name, remote, path 
 	commitManifest(t, jirix, &manifest, manifestDir)
 }
 
-func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, name string) {
+func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, remote string) {
 	manifestFile := filepath.Join(manifestDir, "v2", "default")
 	data, err := ioutil.ReadFile(manifestFile)
 	if err != nil {
@@ -178,7 +178,7 @@ func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, name string) {
 	if err := xml.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
 	}
-	manifest.Projects = append(manifest.Projects, project.Project{Exclude: true, Name: name})
+	manifest.Projects = append(manifest.Projects, project.Project{Exclude: true, Name: remote, Remote: remote})
 	commitManifest(t, jirix, &manifest, manifestDir)
 }
 
