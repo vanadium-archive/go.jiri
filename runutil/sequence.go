@@ -556,7 +556,11 @@ func (s *Sequence) Output(output []string) *Sequence {
 	if s.err != nil {
 		return s
 	}
-	s.r.OutputWithOpts(s.getOpts(), output)
+	opts := s.getOpts()
+	if s.verbosity != nil {
+		opts.Verbose = *s.verbosity
+	}
+	s.r.OutputWithOpts(opts, output)
 	return s
 }
 

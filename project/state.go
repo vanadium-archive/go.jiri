@@ -5,10 +5,10 @@
 package project
 
 import (
-	"os"
 	"path/filepath"
 
 	"v.io/jiri/jiri"
+	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 )
 
@@ -39,8 +39,8 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 		for _, branch := range branches {
 			file := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, branch, ".gerrit_commit_message")
 			hasFile := true
-			if _, err := jirix.Run().Stat(file); err != nil {
-				if !os.IsNotExist(err) {
+			if _, err := jirix.NewSeq().Stat(file); err != nil {
+				if !runutil.IsNotExist(err) {
 					ch <- err
 					return
 				}
