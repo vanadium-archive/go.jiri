@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"v.io/jiri/jiri"
+	"v.io/jiri/runutil"
 )
 
 const (
@@ -242,9 +243,9 @@ func (pdb *profileDB) read(jirix *jiri.X, filename string) error {
 	defer pdb.Unlock()
 	pdb.db = make(map[string]*Profile)
 
-	data, err := jirix.Run().ReadFile(filename)
+	data, err := jirix.NewSeq().ReadFile(filename)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if runutil.IsNotExist(err) {
 			return nil
 		}
 		return err
@@ -317,17 +318,18 @@ func (pdb *profileDB) write(jirix *jiri.X, filename string) error {
 	oldName := filename + ".prev"
 	newName := filename + fmt.Sprintf(".%d", time.Now().UnixNano())
 
-	if err := jirix.Run().WriteFile(newName, data, defaultFileMode); err != nil {
+	s := jirix.NewSeq()
+	if err := s.WriteFile(newName, data, defaultFileMode).Done(); err != nil {
 		return err
 	}
 
-	if jirix.Run().FileExists(filename) {
-		if err := jirix.Run().Rename(filename, oldName); err != nil {
+	if exists, _ := s.FileExists(filename); exists {
+		if err := s.Rename(filename, oldName).Done(); err != nil {
 			return err
 		}
 	}
 
-	if err := jirix.Run().Rename(newName, filename); err != nil {
+	if err := s.Rename(newName, filename).Done(); err != nil {
 		return err
 	}
 

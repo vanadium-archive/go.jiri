@@ -195,7 +195,7 @@ func Init(defaultManifestFilename string) {
 
 func runList(jirix *jiri.X, args []string) error {
 	if showManifestFlag {
-		data, err := jirix.Run().ReadFile(manifestFlag)
+		data, err := jirix.NewSeq().ReadFile(manifestFlag)
 		if err != nil {
 			return err
 		}
