@@ -1492,16 +1492,6 @@ type deleteOperation struct {
 func (op deleteOperation) Run(jirix *jiri.X, _ *Manifest) error {
 	s := jirix.NewSeq()
 	if op.gc {
-		// Never delete the <JiriProject>.
-		if op.project.Name == JiriProject {
-			lines := []string{
-				fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
-				"however this project is required for correct operation of the jiri",
-				"development tools and will thus not be deleted",
-			}
-			s.Verbose(true).Output(lines)
-			return nil
-		}
 		// Never delete projects with non-master branches, uncommitted
 		// work, or untracked content.
 		git := jirix.Git(tool.RootDirOpt(op.project.Path))
