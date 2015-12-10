@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"v.io/jiri/tool"
+	"v.io/jiri/jiri"
 )
 
 // RepoStatus represents the status of a remote repository on googlesource.
@@ -69,7 +69,7 @@ func parseCookie(s string) (*http.Cookie, error) {
 
 // gitCookies attempts to read and parse cookies from the .gitcookies file in
 // the users home directory.
-func gitCookies(ctx *tool.Context) []*http.Cookie {
+func gitCookies(jirix *jiri.X) []*http.Cookie {
 	cookies := []*http.Cookie{}
 
 	homeDir := os.Getenv("HOME")
@@ -78,7 +78,7 @@ func gitCookies(ctx *tool.Context) []*http.Cookie {
 	}
 
 	cookieFile := filepath.Join(homeDir, ".gitcookies")
-	bytes, err := ctx.Run().ReadFile(cookieFile)
+	bytes, err := jirix.NewSeq().ReadFile(cookieFile)
 	if err != nil {
 		return cookies
 	}
@@ -90,7 +90,7 @@ func gitCookies(ctx *tool.Context) []*http.Cookie {
 		}
 		cookie, err := parseCookie(line)
 		if err != nil {
-			fmt.Fprintf(ctx.Stderr(), "error parsing cookie in .gitcookies: %v\n", err)
+			fmt.Fprintf(jirix.Stderr(), "error parsing cookie in .gitcookies: %v\n", err)
 		} else {
 			cookies = append(cookies, cookie)
 		}
@@ -100,7 +100,7 @@ func gitCookies(ctx *tool.Context) []*http.Cookie {
 
 // GetRepoStatuses returns the RepoStatus of all public projects hosted on the
 // remote host.  Host must be a googlesource host.
-func GetRepoStatuses(ctx *tool.Context, host string) (RepoStatuses, error) {
+func GetRepoStatuses(jirix *jiri.X, host string) (RepoStatuses, error) {
 	u, err := url.Parse(host)
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func GetRepoStatuses(ctx *tool.Context, host string) (RepoStatuses, error) {
 	if err != nil {
 		return nil, fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", "GET", u.String(), nil, err)
 	}
-	for _, c := range gitCookies(ctx) {
+	for _, c := range gitCookies(jirix) {
 		req.AddCookie(c)
 	}
 	resp, err := http.DefaultClient.Do(req)

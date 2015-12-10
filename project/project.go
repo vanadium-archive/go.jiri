@@ -1193,7 +1193,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	if gitHostErr != nil || !googlesource.IsGoogleSourceHost(gitHost) {
 		return
 	}
-	repoStatuses, err := googlesource.GetRepoStatuses(jirix.Context, gitHost)
+	repoStatuses, err := googlesource.GetRepoStatuses(jirix, gitHost)
 	if err != nil {
 		// Log the error but don't fail.
 		fmt.Fprintf(jirix.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
