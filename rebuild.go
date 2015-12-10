@@ -35,13 +35,13 @@ func runRebuild(jirix *jiri.X, args []string) (e error) {
 	}
 
 	// Create a temporary directory in which tools will be built.
-	tmpDir, err := jirix.Run().TempDir("", "tmp-jiri-rebuild")
+	tmpDir, err := jirix.NewSeq().TempDir("", "tmp-jiri-rebuild")
 	if err != nil {
 		return fmt.Errorf("TempDir() failed: %v", err)
 	}
 
 	// Make sure we cleanup the temp directory.
-	defer collect.Error(func() error { return jirix.Run().RemoveAll(tmpDir) }, &e)
+	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpDir).Done() }, &e)
 
 	// Paranoid sanity checking.
 	if _, ok := tools[project.JiriName]; !ok {

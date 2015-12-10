@@ -18,8 +18,9 @@ import (
 )
 
 func createLabelDir(t *testing.T, jirix *jiri.X, snapshotDir, name string, snapshots []string) {
+	s := jirix.NewSeq()
 	labelDir, perm := filepath.Join(snapshotDir, "labels", name), os.FileMode(0700)
-	if err := jirix.Run().MkdirAll(labelDir, perm); err != nil {
+	if err := s.MkdirAll(labelDir, perm).Done(); err != nil {
 		t.Fatalf("MkdirAll(%v, %v) failed: %v", labelDir, perm, err)
 	}
 	for i, snapshot := range snapshots {
@@ -30,7 +31,7 @@ func createLabelDir(t *testing.T, jirix *jiri.X, snapshotDir, name string, snaps
 		}
 		if i == 0 {
 			symlinkPath := filepath.Join(snapshotDir, name)
-			if err := jirix.Run().Symlink(path, symlinkPath); err != nil {
+			if err := s.Symlink(path, symlinkPath).Done(); err != nil {
 				t.Fatalf("Symlink(%v, %v) failed: %v", path, symlinkPath, err)
 			}
 		}
@@ -132,11 +133,12 @@ func TestList(t *testing.T) {
 }
 
 func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
-	if _, err := jirix.Run().Stat(project); err != nil {
+	s := jirix.NewSeq()
+	if _, err := s.Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(project, "README")
-	data, err := jirix.Run().ReadFile(readmeFile)
+	data, err := s.ReadFile(readmeFile)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -154,16 +156,17 @@ func remoteProjectName(i int) string {
 }
 
 func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
+	s := jirix.NewSeq()
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
-	if err := jirix.Run().WriteFile(path, []byte(message), perm); err != nil {
+	if err := s.WriteFile(path, []byte(message), perm).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.Run().Chdir(cwd)
-	if err := jirix.Run().Chdir(projectDir); err != nil {
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := s.Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := jirix.Git().CommitFile(path, "creating README"); err != nil {
@@ -174,6 +177,7 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 func TestCreate(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
+	s := fake.X.NewSeq()
 
 	// Setup the initial remote and local projects.
 	numProjects, remoteProjects := 2, []string{}
@@ -210,7 +214,7 @@ func TestCreate(t *testing.T) {
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		if err := fake.X.Run().RemoveAll(localProject); err != nil {
+		if err := s.RemoveAll(localProject).Done(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
@@ -240,7 +244,7 @@ func TestCreate(t *testing.T) {
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		if err := fake.X.Run().RemoveAll(localProject); err != nil {
+		if err := s.RemoveAll(localProject).Done(); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
