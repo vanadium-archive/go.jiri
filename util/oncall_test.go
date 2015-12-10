@@ -42,7 +42,7 @@ func createOncallFile(t *testing.T, jirix *jiri.X) {
 	}
 	dir := filepath.Dir(oncallRotationsFile)
 	dirMode := os.FileMode(0700)
-	if err := jirix.Run().MkdirAll(dir, dirMode); err != nil {
+	if err := jirix.NewSeq().MkdirAll(dir, dirMode).Done(); err != nil {
 		t.Fatalf("MkdirAll(%q, %v) failed: %v", dir, dirMode, err)
 	}
 	fileMode := os.FileMode(0644)
