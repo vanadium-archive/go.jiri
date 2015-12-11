@@ -192,11 +192,6 @@ func (ctx Context) Manifest() string {
 	return *ctx.opts.Manifest
 }
 
-// Run returns the run instance of the context.
-func (ctx Context) Run() *runutil.Run {
-	return ctx.run
-}
-
 // NewSeq returns a new instance of Sequence initialized using the options
 // stored in the context.
 func (ctx Context) NewSeq() *runutil.Sequence {

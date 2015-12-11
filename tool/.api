@@ -12,7 +12,6 @@ pkg tool, method (Context) Git(...gitOpt) *gitutil.Git
 pkg tool, method (Context) Jenkins(string) (*jenkins.Jenkins, error)
 pkg tool, method (Context) Manifest() string
 pkg tool, method (Context) NewSeq() *runutil.Sequence
-pkg tool, method (Context) Run() *runutil.Run
 pkg tool, method (Context) Start() *runutil.Start
 pkg tool, method (Context) Stderr() io.Writer
 pkg tool, method (Context) Stdin() io.Reader

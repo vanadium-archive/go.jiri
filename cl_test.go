@@ -827,12 +827,13 @@ func TestCLNew(t *testing.T) {
 			data:   []byte("master\nfeature1"),
 		},
 	}
+	s := fake.X.NewSeq()
 	for _, testCase := range testCases {
 		file, err := getDependencyPathFileName(fake.X, testCase.branch)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		data, err := fake.X.Run().ReadFile(file)
+		data, err := s.ReadFile(file)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -858,7 +859,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	assertFilesExist(t, fake.X, []string{"A", "B"})
 
 	createCLWithFiles(t, fake.X, "editme", "C")
-	if err := fake.X.Run().WriteFile("B", []byte("Will I dream?"), 0644); err != nil {
+	if err := fake.X.NewSeq().WriteFile("B", []byte("Will I dream?"), 0644).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := fake.X.Git().Add("B"); err != nil {
@@ -963,7 +964,7 @@ func TestParallelDev(t *testing.T) {
 	assertFilesNotCommitted(t, fake.X, []string{"A", "B"})
 	assertFileContent(t, fake.X, "B", "This is file B")
 
-	if err := fake.X.Run().WriteFile("A", []byte("This is file A. Don't tread on me."), 0644); err != nil {
+	if err := fake.X.NewSeq().WriteFile("A", []byte("This is file A. Don't tread on me."), 0644).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
 

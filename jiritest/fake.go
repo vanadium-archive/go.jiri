@@ -42,8 +42,9 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		Projects: map[string]string{},
 	}
 
+	s := jirix.NewSeq()
 	// Create fake remote manifest and tools projects.
-	remoteDir, err := jirix.Run().TempDir("", "")
+	remoteDir, err := s.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
@@ -57,7 +58,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 
 	// Create a fake manifest.
 	manifestDir := filepath.Join(remoteDir, manifestProject, manifestVersion)
-	if err := jirix.Run().MkdirAll(manifestDir, os.FileMode(0700)); err != nil {
+	if err := s.MkdirAll(manifestDir, os.FileMode(0700)).Done(); err != nil {
 		t.Fatal(err)
 	}
 	if err := fake.WriteRemoteManifest(&project.Manifest{}); err != nil {
@@ -187,7 +188,7 @@ func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
 // CreateRemoteProject creates a new remote project.
 func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	projectDir := filepath.Join(fake.remote, name)
-	if err := fake.X.Run().MkdirAll(projectDir, os.FileMode(0700)); err != nil {
+	if err := fake.X.NewSeq().MkdirAll(projectDir, os.FileMode(0700)).Done(); err != nil {
 		return err
 	}
 	if err := fake.X.Git().Init(projectDir); err != nil {
@@ -221,7 +222,7 @@ func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
 }
 
 func (fake FakeJiriRoot) readManifest(path string) (*project.Manifest, error) {
-	bytes, err := fake.X.Run().ReadFile(path)
+	bytes, err := fake.X.NewSeq().ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +268,7 @@ func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path str
 	if err != nil {
 		return fmt.Errorf("Marshal(%v) failed: %v", manifest, err)
 	}
-	if err := fake.X.Run().WriteFile(path, bytes, os.FileMode(0600)); err != nil {
+	if err := fake.X.NewSeq().WriteFile(path, bytes, os.FileMode(0600)).Done(); err != nil {
 		return err
 	}
 	if err := fake.X.Git(tool.RootDirOpt(dir)).Add(path); err != nil {
