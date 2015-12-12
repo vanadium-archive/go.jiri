@@ -296,10 +296,13 @@ func useIfNotNil(a, b io.Writer) io.Writer {
 	return b
 }
 
-func writeOutput(from string, to io.Writer) {
+func writeOutput(logdir bool, from string, to io.Writer) {
 	if fi, err := os.Open(from); err == nil {
 		io.Copy(to, fi)
 		fi.Close()
+	}
+	if !logdir {
+		return
 	}
 	if wd, err := os.Getwd(); err == nil {
 		fmt.Fprintf(to, "Current Directory: %v\n", wd)
@@ -345,10 +348,10 @@ func (s *Sequence) initAndDefer() func() {
 			fout.Close()
 			defer func() { os.Remove(filename); s.opts = nil }()
 			if s.err != nil {
-				writeOutput(filename, useIfNotNil(s.defaultStderr, os.Stderr))
+				writeOutput(true, filename, useIfNotNil(s.defaultStderr, os.Stderr))
 			}
 			if opts.Verbose && s.defaultStderr != s.defaultStdout {
-				writeOutput(filename, useIfNotNil(s.defaultStdout, os.Stdout))
+				writeOutput(false, filename, useIfNotNil(s.defaultStdout, os.Stdout))
 			}
 		}
 	}

@@ -72,10 +72,8 @@ func TestStdoutStderr(t *testing.T) {
 			// stdout, stderr output can be interleaved in arbitrary order.
 			pre := `[hh:mm:ss.xx] >> bash -c "echo a; echo b >&2"
 [hh:mm:ss.xx] >> OK`
-			post := dir + `
-[hh:mm:ss.xx] >> sleep 10000
+			post := `[hh:mm:ss.xx] >> sleep 10000
 [hh:mm:ss.xx] >> TIMED OUT
-` + dir + `
 `
 			wantA = pre + `
 a
@@ -118,7 +116,6 @@ a
 [hh:mm:ss.xx] >> OK
 [hh:mm:ss.xx] >> sleep 10000
 [hh:mm:ss.xx] >> TIMED OUT
-` + dir + `
 `
 		}
 		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
