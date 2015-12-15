@@ -80,11 +80,11 @@ type CLOpts struct {
 // Gerrit records a hostname of a Gerrit instance.
 type Gerrit struct {
 	host string
-	s    *runutil.Sequence
+	s    runutil.Sequence
 }
 
 // New is the Gerrit factory.
-func New(s *runutil.Sequence, host string) *Gerrit {
+func New(s runutil.Sequence, host string) *Gerrit {
 	return &Gerrit{
 		host: host,
 		s:    s,
@@ -427,7 +427,7 @@ func Reference(opts CLOpts) string {
 
 // getRemoteURL returns the URL of the Gerrit project with respect to the
 // project identified by the current working directory.
-func getRemoteURL(seq *runutil.Sequence, clOpts CLOpts) (string, error) {
+func getRemoteURL(seq runutil.Sequence, clOpts CLOpts) (string, error) {
 	args := []string{"config", "--get", "remote.origin.url"}
 	var stdout, stderr bytes.Buffer
 	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
@@ -441,7 +441,7 @@ func getRemoteURL(seq *runutil.Sequence, clOpts CLOpts) (string, error) {
 }
 
 // Push pushes the current branch to Gerrit.
-func Push(seq *runutil.Sequence, clOpts CLOpts) error {
+func Push(seq runutil.Sequence, clOpts CLOpts) error {
 	remote := clOpts.Remote
 	if remote == "" {
 		var err error
@@ -480,7 +480,7 @@ type credentials struct {
 // hostCredentials returns credentials for the given Gerrit host. The
 // function uses best effort to scan common locations where the
 // credentials could exist.
-func hostCredentials(seq *runutil.Sequence, host string) (_ *credentials, e error) {
+func hostCredentials(seq runutil.Sequence, host string) (_ *credentials, e error) {
 	// Check the host URL is valid.
 	url, err := url.Parse(host)
 	if err != nil {

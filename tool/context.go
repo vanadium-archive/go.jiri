@@ -194,7 +194,7 @@ func (ctx Context) Manifest() string {
 
 // NewSeq returns a new instance of Sequence initialized using the options
 // stored in the context.
-func (ctx Context) NewSeq() *runutil.Sequence {
+func (ctx Context) NewSeq() runutil.Sequence {
 	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Color, *ctx.opts.DryRun, *ctx.opts.Verbose)
 }
 

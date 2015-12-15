@@ -1,8 +1,8 @@
 pkg gerrit, const PresubmitTestTypeAll PresubmitTestType
 pkg gerrit, const PresubmitTestTypeNone PresubmitTestType
-pkg gerrit, func New(*runutil.Sequence, string) *Gerrit
+pkg gerrit, func New(runutil.Sequence, string) *Gerrit
 pkg gerrit, func PresubmitTestTypes() []string
-pkg gerrit, func Push(*runutil.Sequence, CLOpts) error
+pkg gerrit, func Push(runutil.Sequence, CLOpts) error
 pkg gerrit, func Reference(CLOpts) string
 pkg gerrit, method (*Gerrit) PostReview(string, string, map[string]string) error
 pkg gerrit, method (*Gerrit) Query(string) ([]Change, error)

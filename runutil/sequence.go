@@ -73,6 +73,14 @@ import (
 // v.io/x/lib/cmdline package which is often used in conjunction with
 // Sequence.
 type Sequence struct {
+	// NOTE: we use a struct as the return value of all
+	// Sequence methods to ensure that code of the form:
+	// if err := s.WriteFile(); err != nil {...}
+	// does not compile.
+	*sequence
+}
+
+type sequence struct {
 	r                            *Run
 	err                          error
 	caller                       string
@@ -91,10 +99,12 @@ type Sequence struct {
 
 // NewSequence creates an instance of Sequence with default values for its
 // environment, stdin, stderr, stdout and other supported options.
-func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) *Sequence {
-	s := &Sequence{
-		r:            NewRun(env, stdin, stdout, stderr, color, dryRun, verbose),
-		defaultStdin: stdin,
+func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) Sequence {
+	s := Sequence{
+		&sequence{
+			r:            NewRun(env, stdin, stdout, stderr, color, dryRun, verbose),
+			defaultStdin: stdin,
+		},
 	}
 	s.defaultStdout, s.defaultStderr = s.serializeWriter(stdout), s.serializeWriter(stderr)
 	return s
@@ -105,50 +115,50 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 // for any calls to Run or Last beyond the next one. Specifying nil for
 // a writer will result in using the the corresponding io.Writer supplied
 // to NewSequence. ioutil.Discard should be used to discard output.
-func (s *Sequence) Capture(stdout, stderr io.Writer) *Sequence {
+func (s Sequence) Capture(stdout, stderr io.Writer) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.stdout, s.stderr = stdout, stderr
-	return s
+	return Sequence{s.sequence}
 }
 
 // Read arranges for the next call to Run or Last to read from the supplied
 // io.Reader. This will be cleared and not used for any calls to Run or Last
 // beyond the next one. Specifying nil will result in reading from os.DevNull.
-func (s *Sequence) Read(stdin io.Reader) *Sequence {
+func (s Sequence) Read(stdin io.Reader) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.reading = true
 	s.stdin = stdin
-	return s
+	return Sequence{s.sequence}
 }
 
 // Env arranges for the next call to Run, Call or Last to use the supplied
 // environment variables. This will be cleared and not used for any calls
 // to Run, Call or Last beyond the next one.
-func (s *Sequence) Env(env map[string]string) *Sequence {
+func (s Sequence) Env(env map[string]string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.env = env
-	return s
+	return Sequence{s.sequence}
 }
 
 // Verbosity arranges for the next call to Run, Call or Last to use the specified
 // verbosity. This will be cleared and not used for any calls
 // to Run, Call or Last beyond the next one.
-func (s *Sequence) Verbose(verbosity bool) *Sequence {
+func (s Sequence) Verbose(verbosity bool) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.verbosity = &verbosity
-	return s
+	return Sequence{s.sequence}
 }
 
 // internal getOpts that doesn't override stdin, stdout, stderr
-func (s *Sequence) getOpts() Opts {
+func (s Sequence) getOpts() Opts {
 	var opts Opts
 	if s.opts != nil {
 		opts = *s.opts
@@ -161,15 +171,15 @@ func (s *Sequence) getOpts() Opts {
 // Timeout arranges for the next call to Run or Last to be subject to the
 // specified timeout. The timeout will be cleared and not used any calls to Run
 // or Last beyond the next one. It has no effect for calls to Call.
-func (s *Sequence) Timeout(timeout time.Duration) *Sequence {
+func (s Sequence) Timeout(timeout time.Duration) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.timeout = timeout
-	return s
+	return Sequence{s.sequence}
 }
 
-func (s *Sequence) setOpts(opts Opts) {
+func (s Sequence) setOpts(opts Opts) {
 	s.opts = &opts
 }
 
@@ -182,11 +192,11 @@ func (ie *wrappedError) Error() string {
 }
 
 // Error returns the error, if any, stored in the Sequence.
-func (s *Sequence) Error() error {
+func (s Sequence) Error() error {
 	if s.err != nil && len(s.caller) > 0 {
 		return &wrappedError{oe: s.err, we: fmt.Errorf("%s: %v", s.caller, s.err)}
 	}
-	return s.err
+	return Sequence{s.sequence}.err
 }
 
 // TranslateExitCode translates errors from the "os/exec" package that
@@ -257,7 +267,7 @@ func fmtError(depth int, err error, detail string) string {
 	return fmt.Sprintf("%s:%d: %s", filepath.Base(file), line, detail)
 }
 
-func (s *Sequence) setError(err error, detail string) {
+func (s Sequence) setError(err error, detail string) {
 	if err == nil || s.err != nil {
 		return
 	}
@@ -265,14 +275,14 @@ func (s *Sequence) setError(err error, detail string) {
 	s.caller = fmtError(2, err, detail)
 }
 
-func (s *Sequence) reset() {
+func (s Sequence) reset() {
 	s.stdin, s.stdout, s.stderr, s.env = nil, nil, nil, nil
 	s.opts, s.verbosity = nil, nil
 	s.reading = false
 	s.timeout = 0
 }
 
-func (s *Sequence) done(p1, p2 *io.PipeWriter, stdinCh, stderrCh chan error) error {
+func (s Sequence) done(p1, p2 *io.PipeWriter, stdinCh, stderrCh chan error) error {
 	p1.Close()
 	p2.Close()
 	defer s.reset()
@@ -320,14 +330,14 @@ func (lw *sharedLockWriter) Write(d []byte) (int, error) {
 	return lw.f.Write(d)
 }
 
-func (s *Sequence) serializeWriter(a io.Writer) io.Writer {
+func (s Sequence) serializeWriter(a io.Writer) io.Writer {
 	if a != nil {
 		return &sharedLockWriter{&s.serializedWriterLock, a}
 	}
 	return nil
 }
 
-func (s *Sequence) initAndDefer() func() {
+func (s Sequence) initAndDefer() func() {
 	if s.stdout == nil && s.stderr == nil {
 		fout, err := ioutil.TempFile("", "seq")
 		if err != nil {
@@ -419,161 +429,161 @@ func fmtStringArgs(args ...string) string {
 // Pushd pushes the current directory onto a stack and changes directory
 // to the specified one. Calling any terminating function will pop back
 // to the first element in the stack on completion of that function.
-func (s *Sequence) Pushd(dir string) *Sequence {
+func (s Sequence) Pushd(dir string) Sequence {
 	cwd, err := os.Getwd()
 	if err != nil {
 		s.setError(err, "Pushd("+dir+"): os.Getwd")
-		return s
+		return Sequence{s.sequence}
 	}
 	s.dirs = append(s.dirs, cwd)
 	s.setError(s.r.Chdir(dir), "Pushd("+dir+")")
-	return s
+	return Sequence{s.sequence}
 }
 
 // Popd popds the last directory from the directory stack and chdir's to it.
 // Calling any termination function will pop back to the first element in
 // the stack on completion of that function.
-func (s *Sequence) Popd() *Sequence {
+func (s Sequence) Popd() Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	if len(s.dirs) == 0 {
 		s.setError(fmt.Errorf("directory stack is empty"), "Popd()")
-		return s
+		return Sequence{s.sequence}
 	}
 	last := s.dirs[len(s.dirs)-1]
 	s.dirs = s.dirs[:len(s.dirs)-1]
 	s.setError(s.r.Chdir(last), "Popd() -> "+last)
-	return s
+	return Sequence{s.sequence}
 }
 
 // Run runs the given command as a subprocess.
-func (s *Sequence) Run(path string, args ...string) *Sequence {
+func (s Sequence) Run(path string, args ...string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	defer s.initAndDefer()()
 	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Run(%q%s)", path, fmtStringArgs(args...)))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Last runs the given command as a subprocess and returns an error
 // immediately terminating the sequence, it is equivalent to
 // calling s.Run(path, args...).Done().
-func (s *Sequence) Last(path string, args ...string) error {
+func (s Sequence) Last(path string, args ...string) error {
 	if s.err != nil {
 		return s.Done()
 	}
 	defer s.Done()
 	defer s.initAndDefer()()
 	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Last(%q%s)", path, fmtStringArgs(args...)))
-	return s.err
+	return Sequence{s.sequence}.err
 }
 
 // Call runs the given function. Note that Capture and Timeout have no
 // effect on invocations of Call, but Opts can control logging.
-func (s *Sequence) Call(fn func() error, format string, args ...interface{}) *Sequence {
+func (s Sequence) Call(fn func() error, format string, args ...interface{}) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	defer s.initAndDefer()()
 	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf("Call(%s%s)", format, fmtArgs(args)))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Chdir is a wrapper around os.Chdir that handles options such as
 // "verbose" or "dry run".
-func (s *Sequence) Chdir(dir string) *Sequence {
+func (s Sequence) Chdir(dir string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.setError(s.r.Chdir(dir), "Chdir("+dir+")")
-	return s
+	return Sequence{s.sequence}
 }
 
 // Chmod is a wrapper around os.Chmod that handles options such as
 // "verbose" or "dry run".
-func (s *Sequence) Chmod(dir string, mode os.FileMode) *Sequence {
+func (s Sequence) Chmod(dir string, mode os.FileMode) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	if err := s.r.Chmod(dir, mode); err != nil {
 		s.setError(err, fmt.Sprintf("Chmod(%s, %s)", dir, mode))
 	}
-	return s
+	return Sequence{s.sequence}
 }
 
 // MkdirAll is a wrapper around os.MkdirAll that handles options such
 // as "verbose" or "dry run".
-func (s *Sequence) MkdirAll(dir string, mode os.FileMode) *Sequence {
+func (s Sequence) MkdirAll(dir string, mode os.FileMode) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.setError(s.r.MkdirAll(dir, mode), fmt.Sprintf("MkdirAll(%s, %s)", dir, mode))
-	return s
+	return Sequence{s.sequence}
 }
 
 // RemoveAll is a wrapper around os.RemoveAll that handles options
 // such as "verbose" or "dry run".
-func (s *Sequence) RemoveAll(dir string) *Sequence {
+func (s Sequence) RemoveAll(dir string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.setError(s.r.RemoveAll(dir), fmt.Sprintf("RemoveAll(%s)", dir))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Remove is a wrapper around os.Remove that handles options
 // such as "verbose" or "dry run".
-func (s *Sequence) Remove(file string) *Sequence {
+func (s Sequence) Remove(file string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.setError(s.r.Remove(file), fmt.Sprintf("Remove(%s)", file))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Rename is a wrapper around os.Rename that handles options such as
 // "verbose" or "dry run".
-func (s *Sequence) Rename(src, dst string) *Sequence {
+func (s Sequence) Rename(src, dst string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.setError(s.r.Rename(src, dst), fmt.Sprintf("Rename(%s, %s)", src, dst))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Symlink is a wrapper around os.Symlink that handles options such as
 // "verbose" or "dry run".
-func (s *Sequence) Symlink(src, dst string) *Sequence {
+func (s Sequence) Symlink(src, dst string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	s.setError(s.r.Symlink(src, dst), fmt.Sprintf("Symlink(%s, %s)", src, dst))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Output logs the given list of lines using the currently in effect verbosity
 // as specified by Opts, or the default otherwise.
-func (s *Sequence) Output(output []string) *Sequence {
+func (s Sequence) Output(output []string) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	opts := s.getOpts()
 	if s.verbosity != nil {
 		opts.Verbose = *s.verbosity
 	}
 	s.r.OutputWithOpts(opts, output)
-	return s
+	return Sequence{s.sequence}
 }
 
 // Fprintf calls fmt.Fprintf.
-func (s *Sequence) Fprintf(f io.Writer, format string, args ...interface{}) *Sequence {
+func (s Sequence) Fprintf(f io.Writer, format string, args ...interface{}) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	fmt.Fprintf(f, format, args...)
-	return s
+	return Sequence{s.sequence}
 }
 
 // Done returns the error stored in the Sequence and pops back to the first
@@ -581,7 +591,7 @@ func (s *Sequence) Fprintf(f io.Writer, format string, args ...interface{}) *Seq
 // function. There is no need to ensure that Done is called before returning
 // from a function that uses a sequence unless it is necessary to pop the
 // stack.
-func (s *Sequence) Done() error {
+func (s Sequence) Done() error {
 	rerr := s.Error()
 	s.err = nil
 	s.caller = ""
@@ -606,7 +616,7 @@ func (s *Sequence) Done() error {
 
 // Open is a wrapper around os.Open that handles options such as
 // "verbose" or "dry run". Open is a terminating function.
-func (s *Sequence) Open(name string) (*os.File, error) {
+func (s Sequence) Open(name string) (*os.File, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -617,7 +627,7 @@ func (s *Sequence) Open(name string) (*os.File, error) {
 
 // OpenFile is a wrapper around os.OpenFile that handles options such as
 // "verbose" or "dry run". OpenFile is a terminating function.
-func (s *Sequence) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -628,7 +638,7 @@ func (s *Sequence) OpenFile(name string, flag int, perm os.FileMode) (*os.File, 
 
 // Create is a wrapper around os.Create that handles options such as "verbose"
 // or "dry run". Create is a terminating function.
-func (s *Sequence) Create(name string) (*os.File, error) {
+func (s Sequence) Create(name string) (*os.File, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -639,7 +649,7 @@ func (s *Sequence) Create(name string) (*os.File, error) {
 
 // ReadDir is a wrapper around ioutil.ReadDir that handles options
 // such as "verbose" or "dry run". ReadDir is a terminating function.
-func (s *Sequence) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (s Sequence) ReadDir(dirname string) ([]os.FileInfo, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -650,7 +660,7 @@ func (s *Sequence) ReadDir(dirname string) ([]os.FileInfo, error) {
 
 // ReadFile is a wrapper around ioutil.ReadFile that handles options
 // such as "verbose" or "dry run". ReadFile is a terminating function.
-func (s *Sequence) ReadFile(filename string) ([]byte, error) {
+func (s Sequence) ReadFile(filename string) ([]byte, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -661,18 +671,18 @@ func (s *Sequence) ReadFile(filename string) ([]byte, error) {
 
 // WriteFile is a wrapper around ioutil.WriteFile that handles options
 // such as "verbose" or "dry run".
-func (s *Sequence) WriteFile(filename string, data []byte, perm os.FileMode) *Sequence {
+func (s Sequence) WriteFile(filename string, data []byte, perm os.FileMode) Sequence {
 	if s.err != nil {
-		return s
+		return Sequence{s.sequence}
 	}
 	err := s.r.WriteFile(filename, data, perm)
 	s.setError(err, fmt.Sprintf("WriteFile(%s, %10s,  %s)", filename, data, perm))
-	return s
+	return Sequence{s.sequence}
 }
 
 // Copy is a wrapper around io.Copy that handles options such as "verbose" or
 // "dry run". Copy is a terminating function.
-func (s *Sequence) Copy(dst *os.File, src io.Reader) (int64, error) {
+func (s Sequence) Copy(dst *os.File, src io.Reader) (int64, error) {
 	if s.err != nil {
 		return 0, s.Done()
 	}
@@ -683,7 +693,7 @@ func (s *Sequence) Copy(dst *os.File, src io.Reader) (int64, error) {
 
 // Stat is a wrapper around os.Stat that handles options such as
 // "verbose" or "dry run". Stat is a terminating function.
-func (s *Sequence) Stat(name string) (os.FileInfo, error) {
+func (s Sequence) Stat(name string) (os.FileInfo, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -694,7 +704,7 @@ func (s *Sequence) Stat(name string) (os.FileInfo, error) {
 
 // Lstat is a wrapper around os.Lstat that handles options such as
 // "verbose" or "dry run". Lstat is a terminating function.
-func (s *Sequence) Lstat(name string) (os.FileInfo, error) {
+func (s Sequence) Lstat(name string) (os.FileInfo, error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -705,7 +715,7 @@ func (s *Sequence) Lstat(name string) (os.FileInfo, error) {
 
 // Readlink is a wrapper around os.Readlink that handles options such as
 // "verbose" or "dry run". Lstat is a terminating function.
-func (s *Sequence) Readlink(name string) (string, error) {
+func (s Sequence) Readlink(name string) (string, error) {
 	if s.err != nil {
 		return "", s.Done()
 	}
@@ -716,7 +726,7 @@ func (s *Sequence) Readlink(name string) (string, error) {
 
 // TempDir is a wrapper around ioutil.TempDir that handles options
 // such as "verbose" or "dry run". TempDir is a terminating function.
-func (s *Sequence) TempDir(dir, prefix string) (string, error) {
+func (s Sequence) TempDir(dir, prefix string) (string, error) {
 	if s.err != nil {
 		return "", s.Done()
 	}
@@ -727,7 +737,7 @@ func (s *Sequence) TempDir(dir, prefix string) (string, error) {
 
 // IsDir is a wrapper around os.Stat with appropriate logging.
 // IsDir is a terminating function.
-func (s *Sequence) IsDir(dirname string) (bool, error) {
+func (s Sequence) IsDir(dirname string) (bool, error) {
 	if s.err != nil {
 		return false, s.Done()
 	}
@@ -738,7 +748,7 @@ func (s *Sequence) IsDir(dirname string) (bool, error) {
 
 // DirExists tests if a directory exists with appropriate logging.
 // DirExists is a terminating function.
-func (s *Sequence) DirectoryExists(dir string) (bool, error) {
+func (s Sequence) DirectoryExists(dir string) (bool, error) {
 	if s.err != nil {
 		return false, s.Done()
 	}
@@ -751,7 +761,7 @@ func (s *Sequence) DirectoryExists(dir string) (bool, error) {
 
 // FileExists tests if a file exists with appropriate logging.
 // FileExists is a terminating function.
-func (s *Sequence) FileExists(file string) (bool, error) {
+func (s Sequence) FileExists(file string) (bool, error) {
 	if s.err != nil {
 		return false, s.Done()
 	}
