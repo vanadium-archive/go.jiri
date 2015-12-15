@@ -399,22 +399,6 @@ func (s Sequence) initAndDefer() func() {
 	}
 }
 
-func fmtArgs(args ...interface{}) string {
-	if len(args) == 0 {
-		return ""
-	}
-	var out bytes.Buffer
-	for _, a := range args {
-		switch at := a.(type) {
-		case string:
-			fmt.Fprintf(&out, ", %q", at)
-		default:
-			fmt.Fprintf(&out, ", %v", a)
-		}
-	}
-	return out.String()
-}
-
 func fmtStringArgs(args ...string) string {
 	if len(args) == 0 {
 		return ""
@@ -487,7 +471,7 @@ func (s Sequence) Call(fn func() error, format string, args ...interface{}) Sequ
 		return Sequence{s.sequence}
 	}
 	defer s.initAndDefer()()
-	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf("Call(%s%s)", format, fmtArgs(args)))
+	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf(format, args))
 	return Sequence{s.sequence}
 }
 
