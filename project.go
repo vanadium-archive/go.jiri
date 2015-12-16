@@ -108,7 +108,7 @@ func runProjectList(jirix *jiri.X, _ []string) error {
 				continue
 			}
 		}
-		fmt.Fprintf(jirix.Stdout(), "project-key=%q path=%q\n", key, state.Project.Path)
+		fmt.Fprintf(jirix.Stdout(), "name=%q remote=%q path=%q\n", state.Project.Name, state.Project.Remote, state.Project.Path)
 		if branchesFlag {
 			for _, branch := range state.Branches {
 				s := "  "
