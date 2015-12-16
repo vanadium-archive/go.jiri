@@ -167,7 +167,7 @@ func cleanupCL(jirix *jiri.X, branches []string) (e error) {
 	s := jirix.NewSeq()
 	for _, branch := range branches {
 		cleanupFn := func() error { return cleanupBranch(jirix, branch) }
-		if err := s.Call(cleanupFn, "Cleaning up branch %q", branch).Done(); err != nil {
+		if err := s.Call(cleanupFn, "Cleaning up branch: %s", branch).Done(); err != nil {
 			return err
 		}
 		if branch == originalBranch {
