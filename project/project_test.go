@@ -924,6 +924,13 @@ func TestManifestToFromBytes(t *testing.T) {
 				Label: "label",
 				Hooks: []project.Hook{
 					{Name: "hook"},
+					{
+						Name: "hookwithargs",
+						Args: []project.HookArg{
+							{Arg: "foo"},
+							{Arg: "bar"},
+						},
+					},
 				},
 				Hosts: []project.Host{
 					{
@@ -970,6 +977,10 @@ func TestManifestToFromBytes(t *testing.T) {
 			`<manifest label="label">
   <hooks>
     <hook name="hook"/>
+    <hook name="hookwithargs">
+      <arg>foo</arg>
+      <arg>bar</arg>
+    </hook>
   </hooks>
   <hosts>
     <host name="git">

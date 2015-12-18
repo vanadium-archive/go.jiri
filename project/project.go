@@ -249,7 +249,7 @@ type Hook struct {
 }
 
 type HookArg struct {
-	Arg     string   `xml:",chardata,omitempty"`
+	Arg     string   `xml:",chardata"`
 	XMLName struct{} `xml:"arg"`
 }
 
