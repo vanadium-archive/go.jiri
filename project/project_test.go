@@ -6,7 +6,6 @@ package project_test
 
 import (
 	"bytes"
-	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -68,40 +67,39 @@ func checkGitIgnore(t *testing.T, jirix *jiri.X, project string) {
 
 func createLocalManifestCopy(t *testing.T, jirix *jiri.X, dir, manifestDir string) {
 	// Load the remote manifest.
-	manifestFile := filepath.Join(manifestDir, "v2", "default")
-	data, err := ioutil.ReadFile(manifestFile)
+	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
+		t.Fatal(err)
 	}
-	manifest := project.Manifest{}
-	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
-	}
-
 	// Store the manifest locally.
-	data, err = xml.Marshal(manifest)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	manifestFile, perm := filepath.Join(dir, ".local_manifest"), os.FileMode(0644)
-	if err := ioutil.WriteFile(manifestFile, data, perm); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", manifestFile, err, perm)
+	if err := m.ToFile(jirix, filepath.Join(dir, ".local_manifest")); err != nil {
+		t.Fatal(err)
 	}
 }
 
 func createLocalManifestStub(t *testing.T, jirix *jiri.X, dir string) {
 	// Create a manifest stub.
 	manifest := project.Manifest{}
-	manifest.Imports = append(manifest.Imports, project.Import{Name: "default"})
-
+	imp := project.Import{}
+	imp.Name = "default"
+	manifest.Imports = append(manifest.Imports, imp)
 	// Store the manifest locally.
-	data, err := xml.Marshal(manifest)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := manifest.ToFile(jirix, filepath.Join(dir, ".local_manifest")); err != nil {
+		t.Fatal(err)
 	}
-	manifestFile, perm := filepath.Join(dir, ".local_manifest"), os.FileMode(0644)
-	if err := ioutil.WriteFile(manifestFile, data, perm); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", manifestFile, err, perm)
+}
+
+func commitFile(t *testing.T, jirix *jiri.X, dir, file, msg string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer jirix.NewSeq().Chdir(cwd)
+	if err := jirix.NewSeq().Chdir(dir).Done(); err != nil {
+		t.Fatal(err)
+	}
+	if err := jirix.Git().CommitFile(file, msg); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -134,53 +132,36 @@ func createRemoteManifest(t *testing.T, jirix *jiri.X, dir string, remotes []str
 }
 
 func commitManifest(t *testing.T, jirix *jiri.X, manifest *project.Manifest, manifestDir string) {
-	data, err := xml.Marshal(*manifest)
-	if err != nil {
-		t.Fatalf("%v", err)
+	manifestFile := filepath.Join(manifestDir, "v2", "default")
+	if err := manifest.ToFile(jirix, manifestFile); err != nil {
+		t.Fatal(err)
 	}
-	manifestFile, perm := filepath.Join(manifestDir, "v2", "default"), os.FileMode(0644)
-	if err := ioutil.WriteFile(manifestFile, data, perm); err != nil {
-		t.Fatalf("WriteFile(%v, %v) failed: %v", manifestFile, err, perm)
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer jirix.NewSeq().Chdir(cwd)
-	if err := jirix.NewSeq().Chdir(manifestDir).Done(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := jirix.Git().CommitFile(manifestFile, "creating manifest"); err != nil {
-		t.Fatalf("%v", err)
-	}
+	commitFile(t, jirix, manifestDir, manifestFile, "creating manifest")
 }
 
 func createProject(t *testing.T, jirix *jiri.X, manifestDir, name, remote, path string) {
-	manifestFile := filepath.Join(manifestDir, "v2", "default")
-	data, err := ioutil.ReadFile(manifestFile)
+	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
+		t.Fatal(err)
 	}
-	manifest := project.Manifest{}
-	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
-	}
-	manifest.Projects = append(manifest.Projects, project.Project{Name: name, Remote: remote, Path: path})
-	commitManifest(t, jirix, &manifest, manifestDir)
+	m.Projects = append(m.Projects, project.Project{Name: name, Remote: remote, Path: path})
+	commitManifest(t, jirix, m, manifestDir)
 }
 
 func deleteProject(t *testing.T, jirix *jiri.X, manifestDir, remote string) {
-	manifestFile := filepath.Join(manifestDir, "v2", "default")
-	data, err := ioutil.ReadFile(manifestFile)
+	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
+		t.Fatal(err)
 	}
-	manifest := project.Manifest{}
-	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
+	deleteKey := project.MakeProjectKey(remote, remote)
+	var projects []project.Project
+	for _, p := range m.Projects {
+		if p.Key() != deleteKey {
+			projects = append(projects, p)
+		}
 	}
-	manifest.Projects = append(manifest.Projects, project.Project{Exclude: true, Name: remote, Remote: remote})
-	commitManifest(t, jirix, &manifest, manifestDir)
+	m.Projects = projects
+	commitManifest(t, jirix, m, manifestDir)
 }
 
 // Identify the current revision for a given project.
@@ -202,20 +183,15 @@ func currentRevision(t *testing.T, jirix *jiri.X, name string) string {
 
 // Fix the revision in the manifest file.
 func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, name, revision string) {
-	manifestFile := filepath.Join(manifestDir, "v2", "default")
-	data, err := ioutil.ReadFile(manifestFile)
+	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
-	}
-	manifest := project.Manifest{}
-	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
+		t.Fatal(err)
 	}
 	updated := false
-	for i, p := range manifest.Projects {
+	for i, p := range m.Projects {
 		if p.Name == name {
 			p.Revision = revision
-			manifest.Projects[i] = p
+			m.Projects[i] = p
 			updated = true
 			break
 		}
@@ -223,7 +199,7 @@ func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, name, revis
 	if !updated {
 		t.Fatalf("failed to fix revision for project %v", name)
 	}
-	commitManifest(t, jirix, &manifest, manifestDir)
+	commitManifest(t, jirix, m, manifestDir)
 }
 
 func holdProjectBack(t *testing.T, jirix *jiri.X, manifestDir, name string) {
@@ -236,20 +212,15 @@ func localProjectName(i int) string {
 }
 
 func moveProject(t *testing.T, jirix *jiri.X, manifestDir, name, dst string) {
-	manifestFile := filepath.Join(manifestDir, "v2", "default")
-	data, err := ioutil.ReadFile(manifestFile)
+	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", manifestFile, err)
-	}
-	manifest := project.Manifest{}
-	if err := xml.Unmarshal(data, &manifest); err != nil {
-		t.Fatalf("Unmarshal() failed: %v\n%v", err, data)
+		t.Fatal(err)
 	}
 	updated := false
-	for i, p := range manifest.Projects {
+	for i, p := range m.Projects {
 		if p.Name == name {
 			p.Path = dst
-			manifest.Projects[i] = p
+			m.Projects[i] = p
 			updated = true
 			break
 		}
@@ -257,7 +228,7 @@ func moveProject(t *testing.T, jirix *jiri.X, manifestDir, name, dst string) {
 	if !updated {
 		t.Fatalf("failed to set path for project %v", name)
 	}
-	commitManifest(t, jirix, &manifest, manifestDir)
+	commitManifest(t, jirix, m, manifestDir)
 }
 
 func remoteProjectName(i int) string {
@@ -297,21 +268,10 @@ func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool)
 }
 
 func writeEmptyMetadata(t *testing.T, jirix *jiri.X, projectDir string) {
-	s := jirix.NewSeq()
-	if err := s.Chdir(projectDir).Done(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	metadataDir := filepath.Join(projectDir, jiri.ProjectMetaDir)
-	if err := s.MkdirAll(metadataDir, os.FileMode(0755)).Done(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	bytes, err := xml.Marshal(project.Project{})
-	if err != nil {
-		t.Fatalf("Marshal() failed: %v", err)
-	}
-	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
-	if err := s.WriteFile(metadataFile, bytes, os.FileMode(0644)).Done(); err != nil {
-		t.Fatalf("%v", err)
+	metadataFile := filepath.Join(projectDir, jiri.ProjectMetaDir, jiri.ProjectMetaFile)
+	p := project.Project{}
+	if err := p.ToFile(jirix, metadataFile); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -320,17 +280,7 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", path, perm, err)
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer jirix.NewSeq().Chdir(cwd)
-	if err := jirix.NewSeq().Chdir(projectDir).Done(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := jirix.Git().CommitFile(path, "creating README"); err != nil {
-		t.Fatalf("%v", err)
-	}
+	commitFile(t, jirix, projectDir, path, "creating README")
 }
 
 func createAndCheckoutBranch(t *testing.T, jirix *jiri.X, projectDir, branch string) {
@@ -433,7 +383,7 @@ func TestLocalProjects(t *testing.T) {
 // TODO(jsimsa): Add tests for the logic that updates tools.
 func TestUpdateUniverse(t *testing.T) {
 	// Setup an instance of jiri universe, creating the remote repositories for
-	// the manifest and projects under the "remote" directory, which is ignored
+	// the manifest and projects under the ".remote" directory, which is ignored
 	// from the consideration of LocalProjects().
 	jirix, cleanup := jiritest.NewX(t)
 	defer cleanup()
@@ -563,9 +513,8 @@ func TestUpdateUniverse(t *testing.T) {
 
 	// Delete a project and create a new one with a different name but the same
 	// path.  Check that UpdateUniverse() does not fail.
-	path := filepath.Join(localDir, localProjectName(4))
 	deleteProject(t, jirix, remoteManifest, remoteProjects[4])
-	createProject(t, jirix, remoteManifest, "new.project", remoteProjects[4], path)
+	createProject(t, jirix, remoteManifest, "new.project", remoteProjects[4], localProjectName(4))
 	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -617,6 +566,164 @@ func TestUpdateUniverse(t *testing.T) {
 	}
 	for i, _ := range remoteProjects {
 		checkRebaseFn(i, "revision 3")
+	}
+}
+
+func TestFileImportCycle(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+
+	// Set up the cycle .jiri_manifest -> A -> B -> A
+	jiriManifest := project.Manifest{
+		FileImports: []project.FileImport{
+			{File: "A"},
+		},
+	}
+	manifestA := project.Manifest{
+		FileImports: []project.FileImport{
+			{File: "B"},
+		},
+	}
+	manifestB := project.Manifest{
+		FileImports: []project.FileImport{
+			{File: "A"},
+		},
+	}
+	if err := jiriManifest.ToFile(jirix, jirix.JiriManifestFile()); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestA.ToFile(jirix, filepath.Join(jirix.Root, "A")); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestB.ToFile(jirix, filepath.Join(jirix.Root, "B")); err != nil {
+		t.Fatal(err)
+	}
+
+	// The update should complain about the cycle.
+	err := project.UpdateUniverse(jirix, false)
+	if got, want := fmt.Sprint(err), "import cycle detected in local manifest files"; !strings.Contains(got, want) {
+		t.Errorf("got error %v, want substr %v", got, want)
+	}
+}
+
+func TestRemoteImportCycle(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+	remoteDir := filepath.Join(jirix.Root, ".remote")
+
+	// Set up two remote manifest projects, remote1 and remote2.
+	remote1 := setupNewProject(t, jirix, remoteDir, "remote1", true)
+	remote2 := setupNewProject(t, jirix, remoteDir, "remote2", true)
+	fileA, fileB := filepath.Join(remote1, "A"), filepath.Join(remote2, "B")
+
+	// Set up the cycle .jiri_manifest -> remote1+A -> remote2+B -> remote1+A
+	jiriManifest := project.Manifest{
+		Imports: []project.Import{
+			{Manifest: "A", Project: project.Project{
+				Name: "n1", Path: "p1", Remote: remote1,
+			}},
+		},
+	}
+	manifestA := project.Manifest{
+		Imports: []project.Import{
+			{Manifest: "B", Project: project.Project{
+				Name: "n2", Path: "p2", Remote: remote2,
+			}},
+		},
+	}
+	manifestB := project.Manifest{
+		Imports: []project.Import{
+			{Manifest: "A", Project: project.Project{
+				Name: "n3", Path: "p3", Remote: remote1,
+			}},
+		},
+	}
+	if err := jiriManifest.ToFile(jirix, jirix.JiriManifestFile()); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestA.ToFile(jirix, fileA); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestB.ToFile(jirix, fileB); err != nil {
+		t.Fatal(err)
+	}
+	commitFile(t, jirix, remote1, fileA, "commit A")
+	commitFile(t, jirix, remote2, fileB, "commit B")
+
+	// The update should complain about the cycle.
+	err := project.UpdateUniverse(jirix, false)
+	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
+		t.Errorf("got error %v, want substr %v", got, want)
+	}
+}
+
+func TestFileAndRemoteImportCycle(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+	remoteDir := filepath.Join(jirix.Root, ".remote")
+
+	// Set up two remote manifest projects, remote1 and remote2.
+	remote1 := setupNewProject(t, jirix, remoteDir, "remote1", true)
+	remote2 := setupNewProject(t, jirix, remoteDir, "remote2", true)
+	fileA, fileD := filepath.Join(remote1, "A"), filepath.Join(remote1, "D")
+	fileB, fileC := filepath.Join(remote2, "B"), filepath.Join(remote2, "C")
+
+	// Set up the cycle .jiri_manifest -> remote1+A -> remote2+B -> C -> remote1+D -> A
+	jiriManifest := project.Manifest{
+		Imports: []project.Import{
+			{Manifest: "A", Root: "r1", Project: project.Project{
+				Name: "n1", Path: "p1", Remote: remote1,
+			}},
+		},
+	}
+	manifestA := project.Manifest{
+		Imports: []project.Import{
+			{Manifest: "B", Root: "r2", Project: project.Project{
+				Name: "n2", Path: "p2", Remote: remote2,
+			}},
+		},
+	}
+	manifestB := project.Manifest{
+		FileImports: []project.FileImport{
+			{File: "C"},
+		},
+	}
+	manifestC := project.Manifest{
+		Imports: []project.Import{
+			{Manifest: "D", Root: "r3", Project: project.Project{
+				Name: "n3", Path: "p3", Remote: remote1,
+			}},
+		},
+	}
+	manifestD := project.Manifest{
+		FileImports: []project.FileImport{
+			{File: "A"},
+		},
+	}
+	if err := jiriManifest.ToFile(jirix, jirix.JiriManifestFile()); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestA.ToFile(jirix, fileA); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestB.ToFile(jirix, fileB); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestC.ToFile(jirix, fileC); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestD.ToFile(jirix, fileD); err != nil {
+		t.Fatal(err)
+	}
+	commitFile(t, jirix, remote1, fileA, "commit A")
+	commitFile(t, jirix, remote2, fileB, "commit B")
+	commitFile(t, jirix, remote2, fileC, "commit C")
+	commitFile(t, jirix, remote1, fileD, "commit D")
+
+	// The update should complain about the cycle.
+	err := project.UpdateUniverse(jirix, false)
+	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
+		t.Errorf("got error %v, want substr %v", got, want)
 	}
 }
 
@@ -799,4 +906,279 @@ func testTransitionBinDir(jirix *jiri.X, test binDirTest) (e error) {
 		}
 	}
 	return nil
+}
+
+func TestManifestToFromBytes(t *testing.T) {
+	tests := []struct {
+		Manifest project.Manifest
+		XML      string
+	}{
+		{
+			project.Manifest{},
+			`<manifest>
+</manifest>
+`,
+		},
+		{
+			project.Manifest{
+				Label: "label",
+				Hooks: []project.Hook{
+					{Name: "hook"},
+				},
+				Hosts: []project.Host{
+					{
+						Name: "git",
+						GitHooks: []project.GitHook{
+							{Name: "githook"},
+						},
+					},
+				},
+				Imports: []project.Import{
+					{
+						Manifest: "manifest",
+						Project: project.Project{
+							Path:         "manifest",
+							Protocol:     "git",
+							Remote:       "remote",
+							RemoteBranch: "master",
+							Revision:     "HEAD",
+						},
+					},
+					{Project: project.Project{Name: "localimport"}},
+				},
+				FileImports: []project.FileImport{
+					{File: "fileimport"},
+				},
+				Projects: []project.Project{
+					{
+						Name:         "project",
+						Path:         "path",
+						Protocol:     "git",
+						Remote:       "remote",
+						RemoteBranch: "otherbranch",
+						Revision:     "rev",
+					},
+				},
+				Tools: []project.Tool{
+					{
+						Data:    "tooldata",
+						Name:    "tool",
+						Project: "toolproject",
+					},
+				},
+			},
+			`<manifest label="label">
+  <hooks>
+    <hook name="hook"/>
+  </hooks>
+  <hosts>
+    <host name="git">
+      <githooks>
+        <githook name="githook"/>
+      </githooks>
+    </host>
+  </hosts>
+  <imports>
+    <import manifest="manifest" remote="remote"/>
+    <import name="localimport"/>
+    <fileimport file="fileimport"/>
+  </imports>
+  <projects>
+    <project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"/>
+  </projects>
+  <tools>
+    <tool data="tooldata" name="tool" project="toolproject"/>
+  </tools>
+</manifest>
+`,
+		},
+	}
+	for _, test := range tests {
+		gotBytes, err := test.Manifest.ToBytes()
+		if err != nil {
+			t.Errorf("%+v ToBytes failed: %v", test.Manifest, err)
+		}
+		if got, want := string(gotBytes), test.XML; got != want {
+			t.Errorf("%+v ToBytes GOT\n%v\nWANT\n%v", test.Manifest, got, want)
+		}
+		manifest, err := project.ManifestFromBytes([]byte(test.XML))
+		if err != nil {
+			t.Errorf("%+v FromBytes failed: %v", test.Manifest, err)
+		}
+		if got, want := manifest, &test.Manifest; !reflect.DeepEqual(got, want) {
+			t.Errorf("%+v FromBytes got %#v, want %#v", test.Manifest, got, want)
+		}
+	}
+}
+
+func TestProjectToFromFile(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+
+	tests := []struct {
+		Project project.Project
+		XML     string
+	}{
+		{
+			// Default fields are dropped when marshaled, and added when unmarshaled.
+			project.Project{
+				Name:         "project",
+				Path:         "path",
+				Protocol:     "git",
+				Remote:       "remote",
+				RemoteBranch: "master",
+				Revision:     "HEAD",
+			},
+			`<project name="project" path="path" remote="remote"/>`,
+		},
+		{
+			project.Project{
+				Name:         "project",
+				Path:         "path",
+				Protocol:     "git",
+				Remote:       "remote",
+				RemoteBranch: "otherbranch",
+				Revision:     "rev",
+			},
+			`<project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"/>`,
+		},
+	}
+	for index, test := range tests {
+		filename := filepath.Join(jirix.Root, fmt.Sprintf("test-%d", index))
+		if err := test.Project.ToFile(jirix, filename); err != nil {
+			t.Errorf("%+v ToFile failed: %v", test.Project, err)
+		}
+		gotBytes, err := jirix.NewSeq().ReadFile(filename)
+		if err != nil {
+			t.Errorf("%+v ReadFile failed: %v", test.Project, err)
+		}
+		if got, want := string(gotBytes), test.XML; got != want {
+			t.Errorf("%+v ToFile GOT\n%v\nWANT\n%v", test.Project, got, want)
+		}
+		project, err := project.ProjectFromFile(jirix, filename)
+		if err != nil {
+			t.Errorf("%+v FromFile failed: %v", test.Project, err)
+		}
+		if got, want := project, &test.Project; !reflect.DeepEqual(got, want) {
+			t.Errorf("%+v FromFile got %#v, want %#v", test.Project, got, want)
+		}
+	}
+}
+
+func TestProjectFromFileBackwardsCompatible(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+
+	tests := []struct {
+		XML     string
+		Project project.Project
+	}{
+		{
+			`<Project name="project" path="path" remote="remote"/>`,
+			project.Project{
+				Name:         "project",
+				Path:         "path",
+				Protocol:     "git",
+				Remote:       "remote",
+				RemoteBranch: "master",
+				Revision:     "HEAD",
+			},
+		},
+		{
+			`<Project name="project" path="path" remote="remote"></Project>`,
+			project.Project{
+				Name:         "project",
+				Path:         "path",
+				Protocol:     "git",
+				Remote:       "remote",
+				RemoteBranch: "master",
+				Revision:     "HEAD",
+			},
+		},
+		{
+			`<Project exclude="false" name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"></Project>`,
+			project.Project{
+				Name:         "project",
+				Path:         "path",
+				Protocol:     "git",
+				Remote:       "remote",
+				RemoteBranch: "otherbranch",
+				Revision:     "rev",
+			},
+		},
+	}
+	for index, test := range tests {
+		filename := filepath.Join(jirix.Root, fmt.Sprintf("test-%d", index))
+		if err := jirix.NewSeq().WriteFile(filename, []byte(test.XML), 0644).Done(); err != nil {
+			t.Errorf("%+v WriteFile failed: %v", test.Project, err)
+		}
+		project, err := project.ProjectFromFile(jirix, filename)
+		if err != nil {
+			t.Errorf("%+v FromFile failed: %v", test.Project, err)
+		}
+		if got, want := project, &test.Project; !reflect.DeepEqual(got, want) {
+			t.Errorf("%+v FromFile got %#v, want %#v", test.Project, got, want)
+		}
+	}
+}
+
+func TestImportToFile(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+
+	tests := []struct {
+		Import project.Import
+		XML    string
+	}{
+		{
+			project.Import{
+				Project: project.Project{
+					Name: "import",
+				},
+			},
+			`<import name="import"/>`,
+		},
+		{
+			// Default fields are dropped when marshaled, and added when unmarshaled.
+			project.Import{
+				Manifest: "manifest",
+				Project: project.Project{
+					Name:         "import",
+					Path:         "manifest",
+					Protocol:     "git",
+					Remote:       "remote",
+					RemoteBranch: "master",
+					Revision:     "HEAD",
+				},
+			},
+			`<import manifest="manifest" name="import" remote="remote"/>`,
+		},
+		{
+			project.Import{
+				Manifest: "manifest",
+				Project: project.Project{
+					Name:         "import",
+					Path:         "path",
+					Protocol:     "git",
+					Remote:       "remote",
+					RemoteBranch: "otherbranch",
+					Revision:     "rev",
+				},
+			},
+			`<import manifest="manifest" name="import" path="path" remote="remote" remotebranch="otherbranch" revision="rev"/>`,
+		},
+	}
+	for index, test := range tests {
+		filename := filepath.Join(jirix.Root, fmt.Sprintf("test-%d", index))
+		if err := test.Import.ToFile(jirix, filename); err != nil {
+			t.Errorf("%+v ToFile failed: %v", test.Import, err)
+		}
+		gotBytes, err := jirix.NewSeq().ReadFile(filename)
+		if err != nil {
+			t.Errorf("%+v ReadFile failed: %v", test.Import, err)
+		}
+		if got, want := string(gotBytes), test.XML; got != want {
+			t.Errorf("%+v ToFile GOT\n%v\nWANT\n%v", test.Import, got, want)
+		}
+	}
 }

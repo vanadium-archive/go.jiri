@@ -12,12 +12,21 @@ pkg project, func GetProjectStates(*jiri.X, bool) (map[ProjectKey]*ProjectState,
 pkg project, func GitHost(*jiri.X) (string, error)
 pkg project, func InstallTools(*jiri.X, string) error
 pkg project, func LocalProjects(*jiri.X, ScanMode) (Projects, error)
+pkg project, func MakeProjectKey(string, string) ProjectKey
+pkg project, func ManifestFromBytes([]byte) (*Manifest, error)
+pkg project, func ManifestFromFile(*jiri.X, string) (*Manifest, error)
 pkg project, func ParseNames(*jiri.X, []string, map[string]struct{}) (Projects, error)
 pkg project, func PollProjects(*jiri.X, map[string]struct{}) (Update, error)
+pkg project, func ProjectFromFile(*jiri.X, string) (*Project, error)
 pkg project, func ReadManifest(*jiri.X) (Projects, Tools, error)
 pkg project, func TransitionBinDir(*jiri.X) error
 pkg project, func UpdateUniverse(*jiri.X, bool) error
+pkg project, method (*Manifest) ToBytes() ([]byte, error)
+pkg project, method (*Manifest) ToFile(*jiri.X, string) error
+pkg project, method (Import) Key() ProjectKey
+pkg project, method (Import) ToFile(*jiri.X, string) error
 pkg project, method (Project) Key() ProjectKey
+pkg project, method (Project) ToFile(*jiri.X, string) error
 pkg project, method (ProjectKeys) Len() int
 pkg project, method (ProjectKeys) Less(int, int) bool
 pkg project, method (ProjectKeys) Swap(int, int)
@@ -31,28 +40,37 @@ pkg project, type CL struct
 pkg project, type CL struct, Author string
 pkg project, type CL struct, Description string
 pkg project, type CL struct, Email string
+pkg project, type FileImport struct
+pkg project, type FileImport struct, File string
+pkg project, type FileImport struct, XMLName struct{}
 pkg project, type GitHook struct
 pkg project, type GitHook struct, Name string
 pkg project, type GitHook struct, Path string
+pkg project, type GitHook struct, XMLName struct{}
 pkg project, type Hook struct
 pkg project, type Hook struct, Args []HookArg
-pkg project, type Hook struct, Exclude bool
 pkg project, type Hook struct, Interpreter string
 pkg project, type Hook struct, Name string
 pkg project, type Hook struct, Path string
 pkg project, type Hook struct, Project string
+pkg project, type Hook struct, XMLName struct{}
 pkg project, type HookArg struct
 pkg project, type HookArg struct, Arg string
+pkg project, type HookArg struct, XMLName struct{}
 pkg project, type Hooks map[string]Hook
 pkg project, type Host struct
 pkg project, type Host struct, GitHooks []GitHook
 pkg project, type Host struct, Location string
 pkg project, type Host struct, Name string
+pkg project, type Host struct, XMLName struct{}
 pkg project, type Hosts map[string]Host
 pkg project, type Import struct
-pkg project, type Import struct, Name string
-pkg project, type Imports map[string]Import
+pkg project, type Import struct, Manifest string
+pkg project, type Import struct, Root string
+pkg project, type Import struct, XMLName struct{}
+pkg project, type Import struct, embedded Project
 pkg project, type Manifest struct
+pkg project, type Manifest struct, FileImports []FileImport
 pkg project, type Manifest struct, Hooks []Hook
 pkg project, type Manifest struct, Hosts []Host
 pkg project, type Manifest struct, Imports []Import
@@ -61,13 +79,13 @@ pkg project, type Manifest struct, Projects []Project
 pkg project, type Manifest struct, Tools []Tool
 pkg project, type Manifest struct, XMLName struct{}
 pkg project, type Project struct
-pkg project, type Project struct, Exclude bool
 pkg project, type Project struct, Name string
 pkg project, type Project struct, Path string
 pkg project, type Project struct, Protocol string
 pkg project, type Project struct, Remote string
 pkg project, type Project struct, RemoteBranch string
 pkg project, type Project struct, Revision string
+pkg project, type Project struct, XMLName struct{}
 pkg project, type ProjectKey string
 pkg project, type ProjectKeys []ProjectKey
 pkg project, type ProjectState struct
@@ -80,10 +98,10 @@ pkg project, type Projects map[ProjectKey]Project
 pkg project, type ScanMode bool
 pkg project, type Tool struct
 pkg project, type Tool struct, Data string
-pkg project, type Tool struct, Exclude bool
 pkg project, type Tool struct, Name string
 pkg project, type Tool struct, Package string
 pkg project, type Tool struct, Project string
+pkg project, type Tool struct, XMLName struct{}
 pkg project, type Tools map[string]Tool
 pkg project, type UnsupportedProtocolErr string
 pkg project, type Update map[string][]CL

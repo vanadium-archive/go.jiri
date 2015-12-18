@@ -18,7 +18,7 @@ import (
 // breaks.  We should revisit the whole data directory thing, and in particular
 // see if we can get rid of tools having to know their own names.
 func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
-	_, projects, tools, _, err := readManifest(jirix, false)
+	_, projects, tools, _, err := readManifest(jirix)
 	if err != nil {
 		return "", err
 	}
@@ -42,7 +42,7 @@ func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
 }
 
 func getHost(jirix *jiri.X, name string) (string, error) {
-	hosts, _, _, _, err := readManifest(jirix, false)
+	hosts, _, _, _, err := readManifest(jirix)
 	if err != nil {
 		return "", err
 	}
@@ -61,20 +61,4 @@ func GerritHost(jirix *jiri.X) (string, error) {
 // GitHost returns the URL that hosts the git repositories.
 func GitHost(jirix *jiri.X) (string, error) {
 	return getHost(jirix, "git")
-}
-
-func toAbs(jirix *jiri.X, path string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(jirix.Root, path)
-}
-
-// toRel returns the given path relative to JIRI_ROOT, if it is not already a
-// relative path.
-func toRel(jirix *jiri.X, path string) (string, error) {
-	if !filepath.IsAbs(path) {
-		return path, nil
-	}
-	return filepath.Rel(jirix.Root, path)
 }

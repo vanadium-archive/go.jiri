@@ -35,19 +35,21 @@ Command jiri is a multi-purpose tool for multi-repo development.
 	Children: []*cmdline.Command{
 		cmdCL,
 		cmdContributors,
+		cmdImport,
 		cmdProject,
 		cmdRebuild,
 		cmdSnapshot,
 		cmdUpdate,
+		cmdUpgrade,
 	},
 	Topics: []cmdline.Topic{
-		topicLayout,
+		topicFileSystem,
 		topicManifest,
 	},
 }
 
-var topicLayout = cmdline.Topic{
-	Name:  "layout",
+var topicFileSystem = cmdline.Topic{
+	Name:  "filesystem",
 	Short: "Description of jiri file system layout",
 	Long: `
 All data managed by the jiri tool is located in the file system under a root
@@ -111,6 +113,7 @@ The binary is located at [root]/.jiri_root/bin/jiri
 `,
 }
 
+// TODO(toddw): Update the description of manifest files.
 var topicManifest = cmdline.Topic{
 	Name:  "manifest",
 	Short: "Description of manifest files",

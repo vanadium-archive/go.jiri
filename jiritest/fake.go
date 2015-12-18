@@ -5,7 +5,6 @@
 package jiritest
 
 import (
-	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -212,25 +211,13 @@ func getManifest(jirix *jiri.X) string {
 // ReadLocalManifest read a manifest from the local manifest project.
 func (fake FakeJiriRoot) ReadLocalManifest() (*project.Manifest, error) {
 	path := filepath.Join(fake.X.Root, manifestProject, manifestVersion, getManifest(fake.X))
-	return fake.readManifest(path)
+	return project.ManifestFromFile(fake.X, path)
 }
 
 // ReadRemoteManifest read a manifest from the remote manifest project.
 func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
 	path := filepath.Join(fake.remote, manifestProject, manifestVersion, getManifest(fake.X))
-	return fake.readManifest(path)
-}
-
-func (fake FakeJiriRoot) readManifest(path string) (*project.Manifest, error) {
-	bytes, err := fake.X.NewSeq().ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var manifest project.Manifest
-	if err := xml.Unmarshal(bytes, &manifest); err != nil {
-		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(bytes), err)
-	}
-	return &manifest, nil
+	return project.ManifestFromFile(fake.X, path)
 }
 
 // UpdateUniverse synchronizes the content of the Vanadium fake based
@@ -264,11 +251,7 @@ func (fake FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
 }
 
 func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path string) error {
-	bytes, err := xml.Marshal(manifest)
-	if err != nil {
-		return fmt.Errorf("Marshal(%v) failed: %v", manifest, err)
-	}
-	if err := fake.X.NewSeq().WriteFile(path, bytes, os.FileMode(0600)).Done(); err != nil {
+	if err := manifest.ToFile(fake.X, path); err != nil {
 		return err
 	}
 	if err := fake.X.Git(tool.RootDirOpt(dir)).Add(path); err != nil {

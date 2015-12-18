@@ -14,14 +14,16 @@ Usage:
 The jiri commands are:
    cl           Manage project changelists
    contributors List project contributors
+   import       Adds imports to .jiri_manifest file
    project      Manage the jiri projects
    rebuild      Rebuild all jiri tools
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
+   upgrade      Upgrade jiri to new-style manifests
    help         Display help for commands or topics
 
 The jiri additional help topics are:
-   layout      Description of jiri file system layout
+   filesystem  Description of jiri file system layout
    manifest    Description of manifest files
 
 The jiri flags are:
@@ -201,6 +203,52 @@ The jiri contributors flags are:
 
  -color=true
    Use color to format output.
+ -v=false
+   Print verbose output.
+
+Jiri import
+
+Command "import" adds imports to the $JIRI_ROOT/.jiri_manifest file, which
+specifies manifest information for the jiri tool.  The file is created if it
+doesn't already exist, otherwise additional imports are added to the existing
+file.  The arguments and flags configure the <import> element that is added to
+the manifest.
+
+Run "jiri help manifest" for details on manifests.
+
+Usage:
+   jiri import [flags] <remote> <manifest>
+
+<remote> specifies the remote repository that contains your manifest project.
+
+<manifest> specifies the manifest file to use from the manifest project.
+
+The jiri import flags are:
+ -mode=append
+   The import mode:
+      append    - Create file if it doesn't exist, or append to existing file.
+      overwrite - Write file regardless of whether it already exists.
+ -name=
+   The name of the remote manifest project, used to disambiguate manifest
+   projects with the same remote.  Typically empty.
+ -out=
+   The output file.  Uses $JIRI_ROOT/.jiri_manifest if unspecified.  Uses stdout
+   if set to "-".
+ -path=
+   Path to store the manifest project locally.  Uses "manifest" if unspecified.
+ -protocol=git
+   The version control protocol used by the remote manifest project.
+ -remotebranch=master
+   The branch of the remote manifest project to track.
+ -revision=HEAD
+   The revision of the remote manifest project to reset to during "jiri update".
+ -root=
+   Root to store the manifest project locally.
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -458,6 +506,51 @@ The jiri update flags are:
  -v=false
    Print verbose output.
 
+Jiri upgrade - Upgrade jiri to new-style manifests
+
+Upgrades jiri to use new-style manifests.
+
+The old (deprecated) behavior only allowed a single manifest repository, located
+in $JIRI_ROOT/.manifest.  The initial manifest file is located as follows:
+  1) Use -manifest flag, if non-empty.  If it's empty...
+  2) Use $JIRI_ROOT/.local_manifest file.  If it doesn't exist...
+  3) Use $JIRI_ROOT/.manifest/v2/default.
+
+The new behavior allows multiple manifest repositories, by allowing imports to
+specify project attributes describing the remote repository.  The -manifest flag
+is no longer allowed to be set; the initial manifest file is always located in
+$JIRI_ROOT/.jiri_manifest.  The .local_manifest file is ignored.
+
+During the transition phase, both old and new behaviors are supported.  The jiri
+tool uses the existence of the $JIRI_ROOT/.jiri_manifest file as the signal; if
+it exists we run the new behavior, otherwise we run the old behavior.
+
+The new behavior includes a "jiri import" command, which writes or updates the
+.jiri_manifest file.  The new bootstrap procedure runs "jiri import", and it is
+intended as a regular command to add imports to your jiri environment.
+
+This upgrade command eases the transition by writing an initial .jiri_manifest
+file for you.  If you have an existing .local_manifest file, its contents will
+be incorporated into the new .jiri_manifest file, and it will be renamed to
+.local_manifest.BACKUP.  The -revert flag deletes the .jiri_manifest file, and
+restores the .local_manifest file.
+
+Usage:
+   jiri upgrade [flags] <kind>
+
+<kind> specifies the kind of upgrade, one of "v23" or "fuchsia".
+
+The jiri upgrade flags are:
+ -revert=false
+   Revert the upgrade by deleting the $JIRI_ROOT/.jiri_manifest file.
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
 Jiri help - Display help for commands or topics
 
 Help with no args displays the usage of the parent command.
@@ -484,7 +577,7 @@ The jiri help flags are:
    Defaults to the terminal width if available.  Override the default by setting
    the CMDLINE_WIDTH environment variable.
 
-Jiri layout - Description of jiri file system layout
+Jiri filesystem - Description of jiri file system layout
 
 All data managed by the jiri tool is located in the file system under a root
 directory, colloquially called the jiri root directory.  The file system layout

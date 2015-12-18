@@ -1,3 +1,4 @@
+pkg jiri, const JiriManifestFile ideal-string
 pkg jiri, const ProjectMetaDir ideal-string
 pkg jiri, const ProjectMetaFile ideal-string
 pkg jiri, const RootEnv ideal-string
@@ -9,7 +10,7 @@ pkg jiri, func NewX(*cmdline.Env) (*X, error)
 pkg jiri, func RunnerFunc(func(*X, []string) error) cmdline.Runner
 pkg jiri, method (*X) BinDir() string
 pkg jiri, method (*X) Clone(tool.ContextOpts) *X
-pkg jiri, method (*X) LocalManifestFile() string
+pkg jiri, method (*X) JiriManifestFile() string
 pkg jiri, method (*X) LocalSnapshotDir() string
 pkg jiri, method (*X) ManifestDir() string
 pkg jiri, method (*X) ManifestFile(string) string
@@ -18,6 +19,7 @@ pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
 pkg jiri, method (*X) RootMetaDir() string
 pkg jiri, method (*X) UpdateHistoryDir() string
 pkg jiri, method (*X) UsageErrorf(string, ...interface{}) error
+pkg jiri, method (*X) UsingOldManifests() bool
 pkg jiri, method (RelPath) Abs(*X) string
 pkg jiri, method (RelPath) Join(...string) RelPath
 pkg jiri, method (RelPath) Symbolic() string

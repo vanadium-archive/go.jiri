@@ -19,10 +19,11 @@ import (
 )
 
 const (
-	RootEnv         = "JIRI_ROOT"
-	RootMetaDir     = ".jiri_root"
-	ProjectMetaDir  = ".jiri"
-	ProjectMetaFile = "metadata.v2"
+	RootEnv          = "JIRI_ROOT"
+	RootMetaDir      = ".jiri_root"
+	ProjectMetaDir   = ".jiri"
+	ProjectMetaFile  = "metadata.v2"
+	JiriManifestFile = ".jiri_manifest"
 )
 
 // X holds the execution environment for the jiri tool and related tools.  This
@@ -104,12 +105,25 @@ func (x *X) UsageErrorf(format string, args ...interface{}) error {
 	if x.Usage != nil {
 		return x.Usage(format, args...)
 	}
-	return nil
+	return fmt.Errorf(format, args...)
 }
 
 // RootMetaDir returns the path to the root metadata directory.
 func (x *X) RootMetaDir() string {
 	return filepath.Join(x.Root, RootMetaDir)
+}
+
+// JiriManifestFile returns the path to the .jiri_manifest file.
+func (x *X) JiriManifestFile() string {
+	return filepath.Join(x.Root, JiriManifestFile)
+}
+
+// UsingOldManifests returns true iff the JIRI_ROOT/.jiri_manifest file does not
+// exist.  This is the one signal used to decide whether to use the old manifest
+// logic (checking .local_manifest and the -manifest flag), or the new logic.
+func (x *X) UsingOldManifests() bool {
+	_, err := os.Stat(x.JiriManifestFile())
+	return os.IsNotExist(err)
 }
 
 // BinDir returns the path to the bin directory.
@@ -120,11 +134,6 @@ func (x *X) BinDir() string {
 // UpdateHistoryDir returns the path to the update history directory.
 func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
-}
-
-// LocalManifestFile returns the path to the local manifest file.
-func (x *X) LocalManifestFile() string {
-	return filepath.Join(x.Root, ".local_manifest")
 }
 
 // LocalSnapshotDir returns the path to the local snapshot directory.
@@ -150,13 +159,26 @@ func (x *X) ManifestFile(name string) string {
 // ResolveManifestPath resolves the given manifest name to an absolute path in
 // the local filesystem.
 func (x *X) ResolveManifestPath(name string) (string, error) {
+	if x.UsingOldManifests() {
+		return x.resolveManifestPathDeprecated(name)
+	}
+	if name != "" {
+		return "", fmt.Errorf("-manifest flag isn't supported with .jiri_manifest")
+	}
+	return x.JiriManifestFile(), nil
+}
+
+// Deprecated logic, only run if JIRI_ROOT/.jiri_manifest doesn't exist.
+//
+// TODO(toddw): Remove this logic when the transition to .jiri_manifest is done.
+func (x *X) resolveManifestPathDeprecated(name string) (string, error) {
 	if name != "" {
 		if filepath.IsAbs(name) {
 			return name, nil
 		}
 		return x.ManifestFile(name), nil
 	}
-	path := x.LocalManifestFile()
+	path := filepath.Join(x.Root, ".local_manifest")
 	switch _, err := os.Stat(path); {
 	case err == nil:
 		return path, nil

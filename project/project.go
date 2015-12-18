@@ -40,13 +40,193 @@ type CL struct {
 
 // Manifest represents a setting used for updating the universe.
 type Manifest struct {
-	Hooks    []Hook    `xml:"hooks>hook"`
-	Hosts    []Host    `xml:"hosts>host"`
-	Imports  []Import  `xml:"imports>import"`
-	Label    string    `xml:"label,attr"`
-	Projects []Project `xml:"projects>project"`
-	Tools    []Tool    `xml:"tools>tool"`
-	XMLName  struct{}  `xml:"manifest"`
+	Hooks       []Hook       `xml:"hooks>hook"`
+	Hosts       []Host       `xml:"hosts>host"`
+	Imports     []Import     `xml:"imports>import"`
+	FileImports []FileImport `xml:"imports>fileimport"`
+	Label       string       `xml:"label,attr,omitempty"`
+	Projects    []Project    `xml:"projects>project"`
+	Tools       []Tool       `xml:"tools>tool"`
+	XMLName     struct{}     `xml:"manifest"`
+}
+
+// ManifestFromBytes returns a manifest parsed from data, with defaults filled
+// in.
+func ManifestFromBytes(data []byte) (*Manifest, error) {
+	m := new(Manifest)
+	if err := xml.Unmarshal(data, m); err != nil {
+		return nil, err
+	}
+	if err := m.fillDefaults(); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// ManifestFromFile returns a manifest parsed from the contents of filename,
+// with defaults filled in.
+func ManifestFromFile(jirix *jiri.X, filename string) (*Manifest, error) {
+	data, err := jirix.NewSeq().ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	m, err := ManifestFromBytes(data)
+	if err != nil {
+		return nil, fmt.Errorf("invalid manifest %s: %v", filename, err)
+	}
+	return m, nil
+}
+
+var (
+	newlineBytes       = []byte("\n")
+	emptyHooksBytes    = []byte("\n  <hooks></hooks>\n")
+	emptyGitHooksBytes = []byte("\n      <githooks></githooks>\n")
+	emptyHostsBytes    = []byte("\n  <hosts></hosts>\n")
+	emptyImportsBytes  = []byte("\n  <imports></imports>\n")
+	emptyProjectsBytes = []byte("\n  <projects></projects>\n")
+	emptyToolsBytes    = []byte("\n  <tools></tools>\n")
+
+	endElemBytes       = []byte("/>\n")
+	endHookBytes       = []byte("></hook>\n")
+	endGitHookBytes    = []byte("></githook>\n")
+	endHostBytes       = []byte("></host>\n")
+	endImportBytes     = []byte("></import>\n")
+	endFileImportBytes = []byte("></fileimport>\n")
+	endProjectBytes    = []byte("></project>\n")
+	endToolBytes       = []byte("></tool>\n")
+
+	endImportSoloBytes  = []byte("></import>")
+	endProjectSoloBytes = []byte("></project>")
+	endElemSoloBytes    = []byte("/>")
+)
+
+// deepCopy returns a deep copy of Manifest.
+func (m *Manifest) deepCopy() *Manifest {
+	x := new(Manifest)
+	x.Label = m.Label
+	// First make copies of all slices.
+	x.Hooks = append([]Hook(nil), m.Hooks...)
+	x.Hosts = append([]Host(nil), m.Hosts...)
+	x.Imports = append([]Import(nil), m.Imports...)
+	x.FileImports = append([]FileImport(nil), m.FileImports...)
+	x.Projects = append([]Project(nil), m.Projects...)
+	x.Tools = append([]Tool(nil), m.Tools...)
+	// Now make copies of sub-slices.
+	for index, hook := range x.Hooks {
+		x.Hooks[index].Args = append([]HookArg(nil), hook.Args...)
+	}
+	for index, host := range x.Hosts {
+		x.Hosts[index].GitHooks = append([]GitHook(nil), host.GitHooks...)
+	}
+	return x
+}
+
+// ToBytes returns m as serialized bytes, with defaults unfilled.
+func (m *Manifest) ToBytes() ([]byte, error) {
+	m = m.deepCopy() // avoid changing manifest when unfilling defaults.
+	if err := m.unfillDefaults(); err != nil {
+		return nil, err
+	}
+	data, err := xml.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("manifest xml.Marshal failed: %v", err)
+	}
+	// It's hard (impossible?) to get xml.Marshal to elide some of the empty
+	// elements, or produce short empty elements, so we post-process the data.
+	data = bytes.Replace(data, emptyHooksBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyGitHooksBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyHostsBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyImportsBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyProjectsBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyToolsBytes, newlineBytes, -1)
+	data = bytes.Replace(data, endHookBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endGitHookBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endHostBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endImportBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endFileImportBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endProjectBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endToolBytes, endElemBytes, -1)
+	if !bytes.HasSuffix(data, newlineBytes) {
+		data = append(data, '\n')
+	}
+	return data, nil
+}
+
+func safeWriteFile(jirix *jiri.X, filename string, data []byte) error {
+	tmp := filename + ".tmp"
+	return jirix.NewSeq().
+		MkdirAll(filepath.Dir(filename), 0755).
+		WriteFile(tmp, data, 0644).
+		Rename(tmp, filename).
+		Done()
+}
+
+// ToFile writes the manifest m to a file with the given filename, with defaults
+// unfilled.
+func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
+	data, err := m.ToBytes()
+	if err != nil {
+		return err
+	}
+	return safeWriteFile(jirix, filename, data)
+}
+
+func (m *Manifest) fillDefaults() error {
+	for index := range m.Hosts {
+		if err := m.Hosts[index].validate(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Imports {
+		if err := m.Imports[index].fillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.FileImports {
+		if err := m.FileImports[index].validate(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Projects {
+		if err := m.Projects[index].fillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Tools {
+		if err := m.Tools[index].fillDefaults(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manifest) unfillDefaults() error {
+	for index := range m.Hosts {
+		if err := m.Hosts[index].validate(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Imports {
+		if err := m.Imports[index].unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.FileImports {
+		if err := m.FileImports[index].validate(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Projects {
+		if err := m.Projects[index].unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Tools {
+		if err := m.Tools[index].unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Hooks maps hook names to their detailed description.
@@ -54,23 +234,23 @@ type Hooks map[string]Hook
 
 // Hook represents a post-update project hook.
 type Hook struct {
-	// Exclude is flag used to exclude previously included hooks.
-	Exclude bool `xml:"exclude,attr"`
 	// Name is the hook name.
-	Name string `xml:"name,attr"`
+	Name string `xml:"name,attr,omitempty"`
 	// Project is the name of the project the hook is associated with.
-	Project string `xml:"project,attr"`
+	Project string `xml:"project,attr,omitempty"`
 	// Path is the path of the hook relative to its project's root.
-	Path string `xml:"path,attr"`
+	Path string `xml:"path,attr,omitempty"`
 	// Interpreter is an optional program used to interpret the hook (i.e. python). Unlike Path,
 	// Interpreter is relative to the environment's PATH and not the project's root.
-	Interpreter string `xml:"interpreter,attr"`
+	Interpreter string `xml:"interpreter,attr,omitempty"`
 	// Arguments for the hook.
-	Args []HookArg `xml:"arg"`
+	Args    []HookArg `xml:"arg,omitempty"`
+	XMLName struct{}  `xml:"hook"`
 }
 
 type HookArg struct {
-	Arg string `xml:",chardata"`
+	Arg     string   `xml:",chardata,omitempty"`
+	XMLName struct{} `xml:"arg"`
 }
 
 // Hosts map host name to their detailed description.
@@ -79,35 +259,144 @@ type Hosts map[string]Host
 // Host represents the locations of git and gerrit repository hosts.
 type Host struct {
 	// Name is the host name.
-	Name string `xml:"name,attr"`
+	Name string `xml:"name,attr,omitempty"`
 	// Location is the url of the host.
-	Location string `xml:"location,attr"`
+	Location string `xml:"location,attr,omitempty"`
 	// Git hooks to apply to repos from this host.
 	GitHooks []GitHook `xml:"githooks>githook"`
+	XMLName  struct{}  `xml:"host"`
+}
+
+func (h *Host) validate() error {
+	if len(h.GitHooks) > 0 && h.Name != "git" {
+		return fmt.Errorf("bad host: githook provided for non-git host: %+v", *h)
+	}
+	return nil
 }
 
 // GitHook represents the name and source of git hooks.
 type GitHook struct {
 	// The hook name, as required by git (e.g. commit-msg, pre-rebase, etc.)
-	Name string `xml:"name,attr"`
+	Name string `xml:"name,attr,omitempty"`
 	// The filename of the hook implementation.  When editing the manifest,
-	// specify this path as relative to the manifest dir.  In loadManifest,
-	// this gets resolved to the absolute path.
-	Path string `xml:"path,attr"`
+	// specify this path as relative to the manifest dir.
+	Path    string   `xml:"path,attr,omitempty"`
+	XMLName struct{} `xml:"githook"`
 }
 
-// Imports maps manifest import names to their detailed description.
-type Imports map[string]Import
-
-// Import represnts a manifest import.
+// Import represents a remote manifest import.
 type Import struct {
-	// Name is the name under which the manifest can be found the
-	// manifest repository.
-	Name string `xml:"name,attr"`
+	// Manifest file to use from the remote manifest project.
+	Manifest string `xml:"manifest,attr,omitempty"`
+	// Root path, prepended to the manifest project path, as well as all projects
+	// specified in the manifest file.
+	Root string `xml:"root,attr,omitempty"`
+	// Project description of the manifest repository.
+	Project
+	XMLName struct{} `xml:"import"`
+}
+
+// ToFile writes the import i to a file with the given filename, with defaults
+// unfilled.
+func (i Import) ToFile(jirix *jiri.X, filename string) error {
+	if err := i.unfillDefaults(); err != nil {
+		return err
+	}
+	data, err := xml.Marshal(i)
+	if err != nil {
+		return fmt.Errorf("import xml.Marshal failed: %v", err)
+	}
+	// Same logic as Manifest.ToBytes, to make the output more compact.
+	data = bytes.Replace(data, endImportSoloBytes, endElemSoloBytes, -1)
+	return safeWriteFile(jirix, filename, data)
+}
+
+func (i *Import) fillDefaults() error {
+	if i.Remote != "" {
+		if i.Path == "" {
+			i.Path = "manifest"
+		}
+		if err := i.Project.fillDefaults(); err != nil {
+			return err
+		}
+	}
+	return i.validate()
+}
+
+func (i *Import) unfillDefaults() error {
+	if i.Remote != "" {
+		if i.Path == "manifest" {
+			i.Path = ""
+		}
+		if err := i.Project.unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	return i.validate()
+}
+
+func (i *Import) validate() error {
+	// After our transition is done, the "import" element will always denote
+	// remote imports, and the "remote" and "manifest" attributes will be
+	// required.  During the transition we allow old-style local imports, which
+	// only set the "name" attribute.
+	//
+	// This is a bit tricky, since the "name" attribute is allowed in both old and
+	// new styles, but have different semantics.  We distinguish between old and
+	// new styles based on the existence of the "remote" attribute.
+	oldStyle := *i
+	oldStyle.Name = ""
+	switch {
+	case i.Name != "" && oldStyle == Import{}:
+		// Only "name" is set, this is the old-style.
+	case i.Remote != "" && i.Manifest != "":
+		// At least "remote" and "manifest" are set, this is the new-style.
+	default:
+		return fmt.Errorf("bad import: neither old style (only name is set) or new style (at least remote and manifest are set): %+v", *i)
+	}
+	return nil
+}
+
+// remoteKey returns a key based on the remote and manifest, used for
+// cycle-detection.  It's only valid for new-style remote imports; it's empty
+// for the old-style local imports.
+func (i *Import) remoteKey() string {
+	if i.Remote == "" {
+		return ""
+	}
+	// We don't join the remote and manifest with a slash, since that might not be
+	// unique.  E.g.
+	//   remote:   https://foo.com/a/b    remote:   https://foo.com/a
+	//   manifest: c                      manifest: b/c
+	// In both cases, the key would be https://foo.com/a/b/c.
+	return i.Remote + " + " + i.Manifest
+}
+
+// FileImport represents a file-based import.
+type FileImport struct {
+	// Manifest file to import from.
+	File    string   `xml:"file,attr,omitempty"`
+	XMLName struct{} `xml:"fileimport"`
+}
+
+func (i *FileImport) validate() error {
+	if i.File == "" {
+		return fmt.Errorf("bad fileimport: must specify file: %+v", *i)
+	}
+	return nil
 }
 
 // ProjectKey is a unique string for a project.
 type ProjectKey string
+
+// MakeProjectKey returns the project key, given the project name and remote.
+func MakeProjectKey(name, remote string) ProjectKey {
+	return ProjectKey(name + projectKeySeparator + remote)
+}
+
+// projectKeySeparator is a reserved string used in ProjectKeys.  It cannot
+// occur in Project names.
+const projectKeySeparator = "="
 
 // ProjectKeys is a slice of ProjectKeys implementing the Sort interface.
 type ProjectKeys []ProjectKey
@@ -118,64 +407,149 @@ func (pks ProjectKeys) Swap(i, j int)      { pks[i], pks[j] = pks[j], pks[i] }
 
 // Project represents a jiri project.
 type Project struct {
-	// Exclude is flag used to exclude previously included projects.
-	Exclude bool `xml:"exclude,attr"`
 	// Name is the project name.
-	Name string `xml:"name,attr"`
+	Name string `xml:"name,attr,omitempty"`
 	// Path is the path used to store the project locally. Project
 	// manifest uses paths that are relative to the $JIRI_ROOT
 	// environment variable. When a manifest is parsed (e.g. in
 	// RemoteProjects), the program logic converts the relative
 	// paths to an absolute paths, using the current value of the
 	// $JIRI_ROOT environment variable as a prefix.
-	Path string `xml:"path,attr"`
+	Path string `xml:"path,attr,omitempty"`
 	// Protocol is the version control protocol used by the
 	// project. If not set, "git" is used as the default.
-	Protocol string `xml:"protocol,attr"`
+	Protocol string `xml:"protocol,attr,omitempty"`
 	// Remote is the project remote.
-	Remote string `xml:"remote,attr"`
+	Remote string `xml:"remote,attr,omitempty"`
 	// RemoteBranch is the name of the remote branch to track.  It doesn't affect
 	// the name of the local branch that jiri maintains, which is always "master".
-	RemoteBranch string `xml:"remotebranch,attr"`
+	RemoteBranch string `xml:"remotebranch,attr,omitempty"`
 	// Revision is the revision the project should be advanced to
 	// during "jiri update". If not set, "HEAD" is used as the
 	// default.
-	Revision string `xml:"revision,attr"`
+	Revision string   `xml:"revision,attr,omitempty"`
+	XMLName  struct{} `xml:"project"`
 }
 
-// projectKeySeparator is a reserved string used in ProjectKeys.  It cannot
-// occur in Project names or remotes.
-const projectKeySeparator = "="
+var (
+	startUpperProjectBytes = []byte("<Project")
+	startLowerProjectBytes = []byte("<project")
+	endUpperProjectBytes   = []byte("</Project>")
+	endLowerProjectBytes   = []byte("</project>")
+)
+
+// ProjectFromFile returns a project parsed from the contents of filename,
+// with defaults filled in.
+func ProjectFromFile(jirix *jiri.X, filename string) (*Project, error) {
+	data, err := jirix.NewSeq().ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// Previous versions of the jiri tool had a bug where the project start and
+	// end elements were in upper-case, since the XMLName field was missing.  That
+	// bug is now fixed, but the xml.Unmarshal call is case-sensitive, and will
+	// fail if it sees the upper-case version.  This hack rewrites the elements to
+	// the lower-case version.
+	//
+	// TODO(toddw): Remove when the transition to new manifests is complete.
+	data = bytes.Replace(data, startUpperProjectBytes, startLowerProjectBytes, -1)
+	data = bytes.Replace(data, endUpperProjectBytes, endLowerProjectBytes, -1)
+
+	p := new(Project)
+	if err := xml.Unmarshal(data, p); err != nil {
+		return nil, err
+	}
+	if err := p.fillDefaults(); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// ToFile writes the project p to a file with the given filename, with defaults
+// unfilled.
+func (p Project) ToFile(jirix *jiri.X, filename string) error {
+	if err := p.unfillDefaults(); err != nil {
+		return err
+	}
+	data, err := xml.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("project xml.Marshal failed: %v", err)
+	}
+	// Same logic as Manifest.ToBytes, to make the output more compact.
+	data = bytes.Replace(data, endProjectSoloBytes, endElemSoloBytes, -1)
+	return safeWriteFile(jirix, filename, data)
+}
 
 // Key returns a unique ProjectKey for the project.
 func (p Project) Key() ProjectKey {
-	return ProjectKey(p.Name + projectKeySeparator + p.Remote)
+	return MakeProjectKey(p.Name, p.Remote)
+}
+
+func (p *Project) fillDefaults() error {
+	if p.Protocol == "" {
+		p.Protocol = "git"
+	}
+	if p.RemoteBranch == "" {
+		p.RemoteBranch = "master"
+	}
+	if p.Revision == "" {
+		p.Revision = "HEAD"
+	}
+	return p.validate()
+}
+
+func (p *Project) unfillDefaults() error {
+	if p.Protocol == "git" {
+		p.Protocol = ""
+	}
+	if p.RemoteBranch == "master" {
+		p.RemoteBranch = ""
+	}
+	if p.Revision == "HEAD" {
+		p.Revision = ""
+	}
+	return p.validate()
+}
+
+func (p *Project) validate() error {
+	if strings.Contains(p.Name, projectKeySeparator) {
+		return fmt.Errorf("bad project: name cannot contain %q: %+v", projectKeySeparator, *p)
+	}
+	if p.Protocol != "" && p.Protocol != "git" {
+		return fmt.Errorf("bad project: only git protocol is supported: %+v", *p)
+	}
+	return nil
 }
 
 // Projects maps ProjectKeys to Projects.
 type Projects map[ProjectKey]Project
 
 // Find returns all projects in Projects with the given key or name.
-func (ps Projects) Find(name string) Projects {
+func (ps Projects) Find(keyOrName string) Projects {
 	projects := Projects{}
-	for _, p := range ps {
-		if name == p.Name {
-			projects[p.Key()] = p
+	if p, ok := ps[ProjectKey(keyOrName)]; ok {
+		projects[ProjectKey(keyOrName)] = p
+	} else {
+		for key, p := range ps {
+			if keyOrName == p.Name {
+				projects[key] = p
+			}
 		}
 	}
 	return projects
 }
 
-// FindUnique returns the project in Projects with the given key or
-// name, and returns an error if none or multiple matching projects are found.
-func (ps Projects) FindUnique(name string) (Project, error) {
+// FindUnique returns the project in Projects with the given key or name, and
+// returns an error if none or multiple matching projects are found.
+func (ps Projects) FindUnique(keyOrName string) (Project, error) {
 	var p Project
-	projects := ps.Find(name)
+	projects := ps.Find(keyOrName)
 	if len(projects) == 0 {
-		return p, fmt.Errorf("no projects found with name %q", name)
+		return p, fmt.Errorf("no projects found with key or name %q", keyOrName)
 	}
 	if len(projects) > 1 {
-		return p, fmt.Errorf("multiple projects found with name %q", name)
+		return p, fmt.Errorf("multiple projects found with name %q", keyOrName)
 	}
 	// Return the only project in projects.
 	for _, project := range projects {
@@ -189,22 +563,40 @@ type Tools map[string]Tool
 
 // Tool represents a jiri tool.
 type Tool struct {
-	// Exclude is flag used to exclude previously included projects.
-	Exclude bool `xml:"exclude,attr"`
 	// Data is a relative path to a directory for storing tool data
 	// (e.g. tool configuration files). The purpose of this field is to
 	// decouple the configuration of the data directory from the tool
 	// itself so that the location of the data directory can change
 	// without the need to change the tool.
-	Data string `xml:"data,attr"`
+	Data string `xml:"data,attr,omitempty"`
 	// Name is the name of the tool binary.
-	Name string `xml:"name,attr"`
+	Name string `xml:"name,attr,omitempty"`
 	// Package is the package path of the tool.
-	Package string `xml:"package,attr"`
+	Package string `xml:"package,attr,omitempty"`
 	// Project identifies the project that contains the tool. If not
 	// set, "https://vanadium.googlesource.com/<JiriProject>" is
 	// used as the default.
-	Project string `xml:"project,attr"`
+	Project string   `xml:"project,attr,omitempty"`
+	XMLName struct{} `xml:"tool"`
+}
+
+func (t *Tool) fillDefaults() error {
+	if t.Data == "" {
+		t.Data = "data"
+	}
+	if t.Project == "" {
+		t.Project = "https://vanadium.googlesource.com/" + JiriProject
+	}
+	return nil
+}
+
+func (t *Tool) unfillDefaults() error {
+	if t.Data == "data" {
+		t.Data = ""
+	}
+	// Don't unfill the jiri project setting, since that's not meant to be
+	// optional.
+	return nil
 }
 
 // ScanMode determines whether LocalProjects should scan the local filesystem
@@ -242,7 +634,7 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 		return err
 	}
 	for _, project := range localProjects {
-		relPath, err := toRel(jirix, project.Path)
+		relPath, err := filepath.Rel(jirix.Root, project.Path)
 		if err != nil {
 			return err
 		}
@@ -252,7 +644,7 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 
 	// Add all hosts, tools, and hooks from the current manifest to the
 	// snapshot manifest.
-	hosts, _, tools, hooks, err := readManifest(jirix, true)
+	hosts, _, tools, hooks, err := readManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -265,49 +657,29 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 	for _, hook := range hooks {
 		manifest.Hooks = append(manifest.Hooks, hook)
 	}
-
-	s := jirix.NewSeq()
-	data, err := xml.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
-	}
-	return s.MkdirAll(filepath.Dir(path), os.FileMode(0755)).
-		WriteFile(path, data, os.FileMode(0644)).Done()
+	return manifest.ToFile(jirix, path)
 }
-
-const currentManifestFileName = ".current_manifest"
 
 // CurrentManifest returns a manifest that identifies the result of
 // the most recent "jiri update" invocation.
 func CurrentManifest(jirix *jiri.X) (*Manifest, error) {
-	currentManifestPath := toAbs(jirix, currentManifestFileName)
-	bytes, err := jirix.NewSeq().ReadFile(currentManifestPath)
-	if err != nil {
-		if runutil.IsNotExist(err) {
-			fmt.Fprintf(jirix.Stderr(), `WARNING: Could not find %s.
+	filename := filepath.Join(jirix.Root, ".current_manifest")
+	m, err := ManifestFromFile(jirix, filename)
+	if runutil.IsNotExist(err) {
+		fmt.Fprintf(jirix.Stderr(), `WARNING: Could not find %s.
 The contents of this file are stored as metadata in binaries the jiri
 tool builds. To fix this problem, please run "jiri update".
-`, currentManifestPath)
-			return &Manifest{}, nil
-		}
-		return nil, err
+`, filename)
+		return &Manifest{}, nil
 	}
-	var m Manifest
-	if err := xml.Unmarshal(bytes, &m); err != nil {
-		return nil, fmt.Errorf("Unmarshal(%v) failed: %v", string(bytes), err)
-	}
-	return &m, nil
+	return m, err
 }
 
 // writeCurrentManifest writes the given manifest to a file that
 // stores the result of the most recent "jiri update" invocation.
 func writeCurrentManifest(jirix *jiri.X, manifest *Manifest) error {
-	currentManifestPath := toAbs(jirix, currentManifestFileName)
-	bytes, err := xml.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return fmt.Errorf("MarshalIndent(%v) failed: %v", manifest, err)
-	}
-	return jirix.NewSeq().WriteFile(currentManifestPath, bytes, os.FileMode(0644)).Done()
+	filename := filepath.Join(jirix.Root, ".current_manifest")
+	return manifest.ToFile(jirix, filename)
 }
 
 // CurrentProjectKey gets the key of the current project from the current
@@ -318,17 +690,11 @@ func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
 	if err != nil {
 		return "", nil
 	}
-	s := jirix.NewSeq()
 	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
-	if _, err := s.Stat(metadataDir); err == nil {
-		metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
-		bytes, err := s.ReadFile(metadataFile)
+	if _, err := jirix.NewSeq().Stat(metadataDir); err == nil {
+		project, err := ProjectFromFile(jirix, filepath.Join(metadataDir, jiri.ProjectMetaFile))
 		if err != nil {
 			return "", err
-		}
-		var project Project
-		if err := xml.Unmarshal(bytes, &project); err != nil {
-			return "", fmt.Errorf("Unmarshal() failed: %v", err)
 		}
 		return project.Key(), nil
 	}
@@ -390,9 +756,9 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 		}
 	}
 
-	// Slow path: Either full scan was not requested, or projects exist in
-	// manifest that were not found locally.  Do a recursive scan of all projects
-	// under JIRI_ROOT.
+	// Slow path: Either full scan was requested, or projects exist in manifest
+	// that were not found locally.  Do a recursive scan of all projects under
+	// JIRI_ROOT.
 	projects := Projects{}
 	jirix.TimerPush("scan fs")
 	err := findLocalProjects(jirix, jirix.Root, projects)
@@ -441,18 +807,14 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	if err != nil {
 		return nil, err
 	}
-	_, remoteProjects, _, _, err := readManifest(jirix, false)
+	_, remoteProjects, _, _, err := readManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
 
 	// Compute difference between local and remote.
 	update := Update{}
-	ops, err := computeOperations(localProjects, remoteProjects, false)
-	if err != nil {
-		return nil, err
-	}
-
+	ops := computeOperations(localProjects, remoteProjects, false, nil)
 	s := jirix.NewSeq()
 	for _, op := range ops {
 		name := op.Project().Name
@@ -509,7 +871,7 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 // ReadManifest retrieves and parses the manifest that determines what
 // projects and tools are part of the jiri universe.
 func ReadManifest(jirix *jiri.X) (Projects, Tools, error) {
-	_, p, t, _, e := readManifest(jirix, false)
+	_, p, t, _, e := readManifest(jirix)
 	return p, t, e
 }
 
@@ -527,38 +889,57 @@ func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 		}, "get manifest origin").Done()
 }
 
-// readManifest implements the ReadManifest logic and provides an
-// optional flag that can be used to fetch the latest manifest updates
-// from the manifest repository.
-func readManifest(jirix *jiri.X, update bool) (Hosts, Projects, Tools, Hooks, error) {
+func readManifest(jirix *jiri.X) (Hosts, Projects, Tools, Hooks, error) {
 	jirix.TimerPush("read manifest")
 	defer jirix.TimerPop()
-	if update {
-		manifestPath := toAbs(jirix, ".manifest")
-		manifestRemote, err := getManifestRemote(jirix, manifestPath)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-		project := Project{
-			Path:         manifestPath,
-			Protocol:     "git",
-			Remote:       manifestRemote,
-			Revision:     "HEAD",
-			RemoteBranch: "master",
-		}
-		if err := resetProject(jirix, project); err != nil {
-			return nil, nil, nil, nil, err
-		}
-	}
-	path, err := jirix.ResolveManifestPath(jirix.Manifest())
+	file, err := jirix.ResolveManifestPath(jirix.Manifest())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	hosts, projects, tools, hooks, stack := Hosts{}, Projects{}, Tools{}, Hooks{}, map[string]struct{}{}
-	if err := loadManifest(jirix, path, hosts, projects, tools, hooks, stack); err != nil {
+	var imp importer
+	hosts, projects, tools, hooks := Hosts{}, Projects{}, Tools{}, Hooks{}
+	if err := imp.Load(jirix, jirix.Root, file, "", hosts, projects, tools, hooks); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	return hosts, projects, tools, hooks, nil
+}
+
+func updateManifestProjects(jirix *jiri.X) error {
+	jirix.TimerPush("update manifest")
+	defer jirix.TimerPop()
+	if jirix.UsingOldManifests() {
+		return updateManifestProjectsDeprecated(jirix)
+	}
+	// Update the repositories corresponding to all remote imports.
+	//
+	// TODO(toddw): Cache local projects in jirix, so that we don't need to
+	// perform multiple full scans.
+	localProjects, err := LocalProjects(jirix, FullScan)
+	if err != nil {
+		return err
+	}
+	file, err := jirix.ResolveManifestPath(jirix.Manifest())
+	if err != nil {
+		return err
+	}
+	var imp importer
+	return imp.Update(jirix, jirix.Root, file, "", localProjects)
+}
+
+func updateManifestProjectsDeprecated(jirix *jiri.X) error {
+	manifestPath := filepath.Join(jirix.Root, ".manifest")
+	manifestRemote, err := getManifestRemote(jirix, manifestPath)
+	if err != nil {
+		return err
+	}
+	project := Project{
+		Path:         manifestPath,
+		Protocol:     "git",
+		Remote:       manifestRemote,
+		Revision:     "HEAD",
+		RemoteBranch: "master",
+	}
+	return resetProject(jirix, project)
 }
 
 // UpdateUniverse updates all local projects and tools to match the
@@ -568,13 +949,18 @@ func readManifest(jirix *jiri.X, update bool) (Hosts, Projects, Tools, Hooks, er
 func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	jirix.TimerPush("update universe")
 	defer jirix.TimerPop()
-	_, remoteProjects, remoteTools, remoteHooks, err := readManifest(jirix, true)
+	// 0. Update all manifest projects to match their remote counterparts, and
+	// read the manifest file.
+	if err := updateManifestProjects(jirix); err != nil {
+		return err
+	}
+	remoteHosts, remoteProjects, remoteTools, remoteHooks, err := readManifest(jirix)
 	if err != nil {
 		return err
 	}
 	s := jirix.NewSeq()
 	// 1. Update all local projects to match their remote counterparts.
-	if err := updateProjects(jirix, remoteProjects, gc); err != nil {
+	if err := updateProjects(jirix, remoteProjects, gc, remoteHosts); err != nil {
 		return err
 	}
 	// 2. Build all tools in a temporary directory.
@@ -826,10 +1212,9 @@ func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string)
 
 // isLocalProject returns true if there is a project at the given path.
 func isLocalProject(jirix *jiri.X, path string) (bool, error) {
-	absPath := toAbs(jirix, path)
 	// Existence of a metadata directory is how we know we've found a
 	// Jiri-maintained project.
-	metadataDir := filepath.Join(absPath, jiri.ProjectMetaDir)
+	metadataDir := filepath.Join(path, jiri.ProjectMetaDir)
 	if _, err := jirix.NewSeq().Stat(metadataDir); err != nil {
 		if runutil.IsNotExist(err) {
 			return false, nil
@@ -842,35 +1227,29 @@ func isLocalProject(jirix *jiri.X, path string) (bool, error) {
 // projectAtPath returns a Project struct corresponding to the project at the
 // path in the filesystem.
 func projectAtPath(jirix *jiri.X, path string) (Project, error) {
-	var project Project
-	absPath := toAbs(jirix, path)
-	metadataFile := filepath.Join(absPath, jiri.ProjectMetaDir, jiri.ProjectMetaFile)
-	bytes, err := jirix.NewSeq().ReadFile(metadataFile)
+	metadataFile := filepath.Join(path, jiri.ProjectMetaDir, jiri.ProjectMetaFile)
+	project, err := ProjectFromFile(jirix, metadataFile)
 	if err != nil {
-		return project, err
+		return Project{}, err
 	}
-	if err := xml.Unmarshal(bytes, &project); err != nil {
-		return project, fmt.Errorf("Unmarshal() failed: %v\n%s", err, string(bytes))
-	}
-	project.Path = toAbs(jirix, project.Path)
-	return project, nil
+	project.Path = filepath.Join(jirix.Root, project.Path)
+	return *project, nil
 }
 
 // findLocalProjects scans the filesystem for all projects.  Note that project
 // directories can be nested recursively.
 func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
-	absPath := toAbs(jirix, path)
-	isLocal, err := isLocalProject(jirix, absPath)
+	isLocal, err := isLocalProject(jirix, path)
 	if err != nil {
 		return err
 	}
 	if isLocal {
-		project, err := projectAtPath(jirix, absPath)
+		project, err := projectAtPath(jirix, path)
 		if err != nil {
 			return err
 		}
-		if absPath != project.Path {
-			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, absPath)
+		if path != project.Path {
+			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, path)
 		}
 		if p, ok := projects[project.Key()]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain project with key %v", p.Path, project.Path, project.Key())
@@ -1039,111 +1418,190 @@ func resetProject(jirix *jiri.X, project Project) error {
 	return ApplyToLocalMaster(jirix, Projects{project.Key(): project}, fn)
 }
 
-// loadManifest loads the given manifest, processing all of its
-// imports, projects and tools settings.
-func loadManifest(jirix *jiri.X, path string, hosts Hosts, projects Projects, tools Tools, hooks Hooks, stack map[string]struct{}) error {
-	data, err := jirix.NewSeq().ReadFile(path)
+// importer handles importing manifest files.  There are two uses: Load reads
+// full manifests into memory, while Update updates remote manifest projects.
+type importer struct {
+	cycleStack []cycleInfo
+}
+
+type cycleInfo struct {
+	file, key string
+}
+
+// importNoCycles checks for cycles in imports.  There are two types of cycles:
+//   file - Cycle in the paths of manifest files in the local filesystem.
+//   key  - Cycle in the remote manifests specified by remote imports.
+//
+// Example of file cycles.  File A imports file B, and vice versa.
+//     file=manifest/A              file=manifest/B
+//     <manifest>                   <manifest>
+//       <fileimport file="B"/>       <fileimport file="A"/>
+//     </manifest>                  </manifest>
+//
+// Example of key cycles.  The key consists of "remote/manifest", e.g.
+//   https://vanadium.googlesource.com/manifest/v2/default
+// In the example, key x/A imports y/B, and vice versa.
+//     key=x/A                                 key=y/B
+//     <manifest>                              <manifest>
+//       <import remote="y" manifest="B"/>       <import remote="x" manifest="A"/>
+//     </manifest>                             </manifest>
+//
+// The above examples are simple, but the general strategy is demonstrated.  We
+// keep a single stack for both files and keys, and push onto each stack before
+// running the recursive load or update function, and pop the stack when the
+// function is done.  If we see a duplicate on the stack at any point, we know
+// there's a cycle.  Note that we know the file for both local fileimports as
+// well as remote imports, but we only know the key for remote imports; the key
+// for local fileimports is empty.
+//
+// A more complex case would involve a combination of local fileimports and
+// remote imports, using the "root" attribute to change paths on the local
+// filesystem.  In this case the key will eventually expose the cycle.
+func (imp *importer) importNoCycles(file, key string, fn func() error) error {
+	info := cycleInfo{file, key}
+	for _, c := range imp.cycleStack {
+		if file == c.file {
+			return fmt.Errorf("import cycle detected in local manifest files: %q", append(imp.cycleStack, info))
+		}
+		if key != "" && key == c.key {
+			return fmt.Errorf("import cycle detected in remote manifest imports: %q", append(imp.cycleStack, info))
+		}
+	}
+	imp.cycleStack = append(imp.cycleStack, info)
+	if err := fn(); err != nil {
+		return err
+	}
+	imp.cycleStack = imp.cycleStack[:len(imp.cycleStack)-1]
+	return nil
+}
+
+func (imp *importer) Load(jirix *jiri.X, root, file, key string, hosts Hosts, projects Projects, tools Tools, hooks Hooks) error {
+	return imp.importNoCycles(file, key, func() error {
+		return imp.load(jirix, root, file, hosts, projects, tools, hooks)
+	})
+}
+
+func (imp *importer) load(jirix *jiri.X, root, file string, hosts Hosts, projects Projects, tools Tools, hooks Hooks) error {
+	m, err := ManifestFromFile(jirix, file)
 	if err != nil {
 		return err
 	}
-	m := &Manifest{}
-	if err := xml.Unmarshal(data, m); err != nil {
-		return fmt.Errorf("Unmarshal(%v) failed: %v", string(data), err)
-	}
 	// Process all imports.
-	for _, manifest := range m.Imports {
-		if _, ok := stack[manifest.Name]; ok {
-			return fmt.Errorf("import cycle encountered")
+	for _, _import := range m.Imports {
+		newRoot, newFile := root, ""
+		if _import.Remote != "" {
+			// New-style remote import
+			newRoot = filepath.Join(root, _import.Root)
+			newFile = filepath.Join(newRoot, _import.Path, _import.Manifest)
+		} else {
+			// Old-style name-based local import.
+			//
+			// TODO(toddw): Remove this logic when the manifest transition is done.
+			if newFile, err = jirix.ResolveManifestPath(_import.Name); err != nil {
+				return err
+			}
 		}
-		path, err := jirix.ResolveManifestPath(manifest.Name)
-		if err != nil {
+		if err := imp.Load(jirix, newRoot, newFile, _import.remoteKey(), hosts, projects, tools, hooks); err != nil {
 			return err
 		}
-		stack[manifest.Name] = struct{}{}
-		if err := loadManifest(jirix, path, hosts, projects, tools, hooks, stack); err != nil {
+	}
+	// Process all file imports.
+	for _, fileImport := range m.FileImports {
+		newFile := filepath.Join(filepath.Dir(file), fileImport.File)
+		if err := imp.Load(jirix, root, newFile, "", hosts, projects, tools, hooks); err != nil {
 			return err
 		}
-		delete(stack, manifest.Name)
 	}
 	// Process all projects.
 	for _, project := range m.Projects {
-		if strings.Contains(project.Name, projectKeySeparator) {
-			return fmt.Errorf("project name cannot contain %q: %q", projectKeySeparator, project.Name)
-		}
-		if project.Exclude {
-			// Exclude the project in case it was
-			// previously included.
-			delete(projects, project.Key())
-			continue
-		}
-		// Replace the relative path with an absolute one.
-		project.Path = toAbs(jirix, project.Path)
-		// Use git as the default protocol.
-		if project.Protocol == "" {
-			project.Protocol = "git"
-		}
-		// Use HEAD and tip as the default revision for git
-		// and mercurial respectively.
-		if project.Revision == "" {
-			switch project.Protocol {
-			case "git":
-				project.Revision = "HEAD"
-			default:
-				return UnsupportedProtocolErr(project.Protocol)
-			}
-		}
-		// Default to "master" branch if none is provided.
-		if project.RemoteBranch == "" {
-			project.RemoteBranch = "master"
-		}
+		project.Path = filepath.Join(root, project.Path)
 		projects[project.Key()] = project
 	}
 	// Process all tools.
 	for _, tool := range m.Tools {
-		if tool.Exclude {
-			// Exclude the tool in case it was previously
-			// included.
-			delete(tools, tool.Name)
-			continue
-		}
-		// Use <JiriProject> as the default project.
-		if tool.Project == "" {
-			tool.Project = "https://vanadium.googlesource.com/" + JiriProject
-		}
-		// Use "data" as the default data.
-		if tool.Data == "" {
-			tool.Data = "data"
-		}
 		tools[tool.Name] = tool
 	}
 	// Process all hooks.
 	for _, hook := range m.Hooks {
-		if hook.Exclude {
-			// Exclude the hook in case it was previously
-			// included.
-			delete(hooks, hook.Name)
-			continue
-		}
 		project, err := projects.FindUnique(hook.Project)
 		if err != nil {
 			return fmt.Errorf("error while finding project %q for hook %q: %v", hook.Project, hook.Name, err)
 		}
-		// Replace project-relative path with absolute path.
 		hook.Path = filepath.Join(project.Path, hook.Path)
 		hooks[hook.Name] = hook
 	}
 	// Process all hosts.
 	for _, host := range m.Hosts {
 		hosts[host.Name] = host
+	}
+	return nil
+}
 
-		// Sanity check that we only have githooks for git hosts.
-		if host.Name != "git" {
-			if len(host.GitHooks) > 0 {
-				return fmt.Errorf("githook provided for a non-Git host: %s", host.Location)
-			}
+func (imp *importer) Update(jirix *jiri.X, root, file, key string, localProjects Projects) error {
+	return imp.importNoCycles(file, key, func() error {
+		return imp.update(jirix, root, file, localProjects)
+	})
+}
+
+func (imp *importer) update(jirix *jiri.X, root, file string, localProjects Projects) error {
+	m, err := ManifestFromFile(jirix, file)
+	if err != nil {
+		return err
+	}
+	// Process all remote imports.  This logic treats the remote import as a
+	// regular project, and runs our regular create/move/update logic on it.  We
+	// never handle deletes here; those are handled in updateProjects.
+	for _, remote := range m.Imports {
+		if remote.Remote == "" {
+			// Old-style local imports handled in loop below.
+			continue
+		}
+		newRoot := filepath.Join(root, remote.Root)
+		remote.Path = filepath.Join(newRoot, remote.Path)
+		newFile := filepath.Join(remote.Path, remote.Manifest)
+		var localProject *Project
+		if p, ok := localProjects[remote.Project.Key()]; ok {
+			localProject = &p
+		}
+		// Since &remote.Project is never nil, we'll never produce a delete op.
+		//
+		// TODO(toddw): How do we retrieve the hosts, which are necessary for
+		// githooks to be installed during the create operation?
+		op := computeOp(localProject, &remote.Project, false, nil)
+		if err := op.Test(jirix, newFsUpdates()); err != nil {
+			return err
+		}
+		updateFn := func() error { return op.Run(jirix, nil) }
+		if err := jirix.NewSeq().Verbose(true).Call(updateFn, "%v", op).Done(); err != nil {
+			fmt.Fprintf(jirix.Stderr(), "%v\n", err)
+			return err
+		}
+		localProjects[remote.Project.Key()] = remote.Project
+		if err := imp.Update(jirix, newRoot, newFile, remote.remoteKey(), localProjects); err != nil {
+			return err
 		}
 	}
-
+	// Process all old-style local imports.
+	for _, local := range m.Imports {
+		if local.Remote != "" {
+			// New-style remote imports handled in loop above.
+			continue
+		}
+		newFile, err := jirix.ResolveManifestPath(local.Name)
+		if err != nil {
+			return err
+		}
+		if err := imp.Update(jirix, root, newFile, "", localProjects); err != nil {
+			return err
+		}
+	}
+	// Process all file imports.
+	for _, fileImport := range m.FileImports {
+		newFile := filepath.Join(filepath.Dir(file), fileImport.File)
+		if err := imp.Update(jirix, root, newFile, "", localProjects); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -1216,7 +1674,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	}
 }
 
-func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
+func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool, hosts Hosts) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
@@ -1229,11 +1687,7 @@ func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
 		return err
 	}
 	getRemoteHeadRevisions(jirix, remoteProjects)
-	ops, err := computeOperations(localProjects, remoteProjects, gc)
-	if err != nil {
-		return err
-	}
-
+	ops := computeOperations(localProjects, remoteProjects, gc, hosts)
 	updates := newFsUpdates()
 	for _, op := range ops {
 		if err := op.Test(jirix, updates); err != nil {
@@ -1279,22 +1733,13 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 
 	// Replace absolute project paths with relative paths to make it
 	// possible to move the $JIRI_ROOT directory locally.
-	relPath, err := toRel(jirix, project.Path)
+	relPath, err := filepath.Rel(jirix.Root, project.Path)
 	if err != nil {
 		return err
 	}
 	project.Path = relPath
-	bytes, err := xml.Marshal(project)
-	if err != nil {
-		return fmt.Errorf("Marhsal() failed: %v", err)
-	}
 	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
-	tmpMetadataFile := metadataFile + ".tmp"
-	if err := s.WriteFile(tmpMetadataFile, bytes, os.FileMode(0644)).
-		Rename(tmpMetadataFile, metadataFile).Done(); err != nil {
-		return err
-	}
-	return nil
+	return project.ToFile(jirix, metadataFile)
 }
 
 // addProjectToManifest records the information about the given
@@ -1305,6 +1750,9 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 // NOTE: The function assumes that the the given project is on a
 // master branch.
 func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) error {
+	if manifest == nil {
+		return nil
+	}
 	// If the project uses relative revision, replace it with an absolute one.
 	switch project.Protocol {
 	case "git":
@@ -1318,7 +1766,7 @@ func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) er
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
-	relPath, err := toRel(jirix, project.Path)
+	relPath, err := filepath.Rel(jirix.Root, project.Path)
 	if err != nil {
 		return err
 	}
@@ -1382,13 +1830,10 @@ func (op commonOperation) Project() Project {
 // createOperation represents the creation of a project.
 type createOperation struct {
 	commonOperation
+	hosts Hosts
 }
 
 func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
-	hosts, _, _, _, err := readManifest(jirix, false)
-	if err != nil {
-		return err
-	}
 	s := jirix.NewSeq()
 
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
@@ -1412,7 +1857,7 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		// overriding existing hooks.  Customizing your git hooks with jiri is a bad
 		// idea anyway, since jiri won't know to not delete the project when you
 		// switch between manifests or do a cleanup.
-		host, found := hosts["git"]
+		host, found := op.hosts["git"]
 		if found && strings.HasPrefix(op.project.Remote, host.Location) {
 			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
 			for _, githook := range host.GitHooks {
@@ -1551,8 +1996,7 @@ type moveOperation struct {
 func (op moveOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 	s := jirix.NewSeq()
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-	if err := s.MkdirAll(path, perm).
-		Rename(op.source, op.destination).Done(); err != nil {
+	if err := s.MkdirAll(path, perm).Rename(op.source, op.destination).Done(); err != nil {
 		return err
 	}
 	if err := reportNonMaster(jirix, op.project); err != nil {
@@ -1686,60 +2130,68 @@ func (ops operations) Swap(i, j int) {
 // system and manifest file respectively) and outputs a collection of
 // operations that describe the actions needed to update the target
 // projects.
-func computeOperations(localProjects, remoteProjects Projects, gc bool) (operations, error) {
+func computeOperations(localProjects, remoteProjects Projects, gc bool, hosts Hosts) operations {
 	result := operations{}
-	allProjects := map[ProjectKey]struct{}{}
+	allProjects := map[ProjectKey]bool{}
 	for _, p := range localProjects {
-		allProjects[p.Key()] = struct{}{}
+		allProjects[p.Key()] = true
 	}
 	for _, p := range remoteProjects {
-		allProjects[p.Key()] = struct{}{}
+		allProjects[p.Key()] = true
 	}
 	for key, _ := range allProjects {
-		if localProject, ok := localProjects[key]; ok {
-			if remoteProject, ok := remoteProjects[key]; ok {
-				if localProject.Path != remoteProject.Path {
-					// moveOperation also does an update, so we don't need to
-					// check the revision here.
-					result = append(result, moveOperation{commonOperation{
-						destination: remoteProject.Path,
-						project:     remoteProject,
-						source:      localProject.Path,
-					}})
-				} else {
-					if localProject.Revision != remoteProject.Revision {
-						result = append(result, updateOperation{commonOperation{
-							destination: remoteProject.Path,
-							project:     remoteProject,
-							source:      localProject.Path,
-						}})
-					} else {
-						result = append(result, nullOperation{commonOperation{
-							destination: remoteProject.Path,
-							project:     remoteProject,
-							source:      localProject.Path,
-						}})
-					}
-				}
-			} else {
-				result = append(result, deleteOperation{commonOperation{
-					destination: "",
-					project:     localProject,
-					source:      localProject.Path,
-				}, gc})
-			}
-		} else if remoteProject, ok := remoteProjects[key]; ok {
-			result = append(result, createOperation{commonOperation{
-				destination: remoteProject.Path,
-				project:     remoteProject,
-				source:      "",
-			}})
-		} else {
-			return nil, fmt.Errorf("project with key %v does not exist", key)
+		var local, remote *Project
+		if project, ok := localProjects[key]; ok {
+			local = &project
 		}
+		if project, ok := remoteProjects[key]; ok {
+			remote = &project
+		}
+		result = append(result, computeOp(local, remote, gc, hosts))
 	}
 	sort.Sort(result)
-	return result, nil
+	return result
+}
+
+func computeOp(local, remote *Project, gc bool, hosts Hosts) operation {
+	switch {
+	case local != nil && remote != nil:
+		if local.Path != remote.Path {
+			// moveOperation also does an update, so we don't need to check the
+			// revision here.
+			return moveOperation{commonOperation{
+				destination: remote.Path,
+				project:     *remote,
+				source:      local.Path,
+			}}
+		}
+		if local.Revision != remote.Revision {
+			return updateOperation{commonOperation{
+				destination: remote.Path,
+				project:     *remote,
+				source:      local.Path,
+			}}
+		}
+		return nullOperation{commonOperation{
+			destination: remote.Path,
+			project:     *remote,
+			source:      local.Path,
+		}}
+	case local != nil && remote == nil:
+		return deleteOperation{commonOperation{
+			destination: "",
+			project:     *local,
+			source:      local.Path,
+		}, gc}
+	case local == nil && remote != nil:
+		return createOperation{commonOperation{
+			destination: remote.Path,
+			project:     *remote,
+			source:      "",
+		}, hosts}
+	default:
+		panic("jiri: computeOp called with nil local and remote")
+	}
 }
 
 // ParseNames identifies the set of projects that a jiri command should
