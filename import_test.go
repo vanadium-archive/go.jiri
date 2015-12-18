@@ -174,7 +174,7 @@ func TestImport(t *testing.T) {
 `,
 		},
 	}
-	opts := gosh.Opts{Errorf: t.Fatalf, Logf: t.Logf}
+	opts := gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf}
 	sh := gosh.NewShell(opts)
 	defer sh.Cleanup()
 	jiriTool := sh.BuildGoPkg("v.io/jiri")
@@ -207,7 +207,7 @@ func testImport(opts gosh.Opts, jiriTool string, test importTestCase) error {
 	if test.Stderr != "" {
 		cmd.ExitErrorIsOk = true
 	}
-	stdout, stderr := cmd.Output()
+	stdout, stderr := cmd.StdoutStderr()
 	if got, want := stdout, test.Stdout; !strings.Contains(got, want) || (got != "" && want == "") {
 		return fmt.Errorf("stdout got %q, want substr %q", got, want)
 	}

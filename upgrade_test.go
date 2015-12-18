@@ -198,7 +198,7 @@ func TestUpgrade(t *testing.T) {
 `,
 		},
 	}
-	opts := gosh.Opts{Errorf: t.Fatalf, Logf: t.Logf}
+	opts := gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf}
 	sh := gosh.NewShell(opts)
 	defer sh.Cleanup()
 	jiriTool := sh.BuildGoPkg("v.io/jiri")
@@ -232,7 +232,7 @@ func testUpgrade(opts gosh.Opts, jiriTool string, test upgradeTestCase) error {
 	if test.Stderr != "" {
 		cmd.ExitErrorIsOk = true
 	}
-	_, stderr := cmd.Output()
+	_, stderr := cmd.StdoutStderr()
 	if got, want := stderr, test.Stderr; !strings.Contains(got, want) || (got != "" && want == "") {
 		return fmt.Errorf("stderr got %q, want substr %q", got, want)
 	}
@@ -260,7 +260,7 @@ func testUpgrade(opts gosh.Opts, jiriTool string, test upgradeTestCase) error {
 }
 
 func TestUpgradeRevert(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Errorf: t.Fatalf, Logf: t.Logf})
+	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf})
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
 	sh.Pushd(jiriRoot)
