@@ -33,23 +33,6 @@ const (
 	V4 Version = 4
 )
 
-// Profile represents a suite of software that is managed by an implementation
-// of profiles.Manager.
-type Profile struct {
-	Name    string
-	Root    string
-	targets OrderedTargets
-}
-
-func (p *Profile) Targets() OrderedTargets {
-	r := make(OrderedTargets, len(p.targets), len(p.targets))
-	for i, t := range p.targets {
-		tmp := *t
-		r[i] = &tmp
-	}
-	return r
-}
-
 type profilesSchema struct {
 	XMLName  xml.Name         `xml:"profiles"`
 	Version  Version          `xml:"version,attr"`
@@ -77,96 +60,40 @@ type targetSchema struct {
 	CommandLineEnv  Environment `xml:"command-line"`
 }
 
-type profileDB struct {
-	sync.Mutex
-	version Version
-	db      map[string]*Profile
+type DB struct {
+	mu       sync.Mutex
+	version  Version
+	filename string
+	db       map[string]*Profile
 }
 
-func newDB() *profileDB {
-	return &profileDB{db: make(map[string]*Profile), version: V4}
+// NewDB returns a new instance of a profile database.
+func NewDB() *DB {
+	return &DB{db: make(map[string]*Profile), version: V4}
 }
 
-var (
-	db = newDB()
-)
-
-// Profiles returns the names, in lexicographic order, of all of the currently
-// available profiles as read or stored in the manifest. A profile name may
-// be used to lookup a profile manager or the current state of a profile.
-func Profiles() []string {
-	return db.profiles()
+// Filename returns the filename that this database was read from.
+func (pdb *DB) Filename() string {
+	return pdb.filename
 }
 
-func SchemaVersion() Version {
-	return db.schemaVersion()
-}
-
-// LookupProfile returns the profile for the name profile or nil if one is
-// not found.
-func LookupProfile(name string) *Profile {
-	return db.profile(name)
-}
-
-// LookupProfileTarget returns the target information stored for the name
-// profile.
-func LookupProfileTarget(name string, target Target) *Target {
-	mgr := db.profile(name)
-	if mgr == nil {
-		return nil
+// InstallProfile will create a new profile to the profiles database,
+// it has no effect if the profile already exists. It returns the profile
+// that was either newly created or already installed.
+func (pdb *DB) InstallProfile(name, root string) *Profile {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
+	if p := pdb.db[name]; p == nil {
+		pdb.db[name] = &Profile{name: name, root: root}
 	}
-	return FindTarget(mgr.targets, &target)
-}
-
-// InstallProfile will create a new profile and store in the profiles manifest,
-// it has no effect if the profile already exists.
-func InstallProfile(name, root string) {
-	db.installProfile(name, root)
+	return pdb.db[name]
 }
 
 // AddProfileTarget adds the specified target to the named profile.
 // The UpdateTime of the newly installed target will be set to time.Now()
-func AddProfileTarget(name string, target Target) error {
-	return db.addProfileTarget(name, &target)
-}
-
-// RemoveProfileTarget removes the specified target from the named profile.
-// If this is the last target for the profile then the profile will be deleted
-// from the manifest. It returns true if the profile was so deleted or did
-// not originally exist.
-func RemoveProfileTarget(name string, target Target) bool {
-	return db.removeProfileTarget(name, &target)
-}
-
-// UpdateProfileTarget updates the specified target from the named profile.
-// The UpdateTime of the updated target will be set to time.Now()
-func UpdateProfileTarget(name string, target Target) error {
-	return db.updateProfileTarget(name, &target)
-}
-
-// Read reads the specified manifest file to obtain the current set of
-// installed profiles.
-func Read(jirix *jiri.X, filename string) error {
-	return db.read(jirix, filename)
-}
-
-// Write writes the current set of installed profiles to the specified manifest
-// file.
-func Write(jirix *jiri.X, filename string) error {
-	return db.write(jirix, filename)
-}
-
-func (pdb *profileDB) installProfile(name, root string) {
-	pdb.Lock()
-	defer pdb.Unlock()
-	if p := pdb.db[name]; p == nil {
-		pdb.db[name] = &Profile{Name: name, Root: root}
-	}
-}
-
-func (pdb *profileDB) addProfileTarget(name string, target *Target) error {
-	pdb.Lock()
-	defer pdb.Unlock()
+func (pdb *DB) AddProfileTarget(name string, target Target) error {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 	target.UpdateTime = time.Now()
 	if pi, present := pdb.db[name]; present {
 		for _, t := range pi.Targets() {
@@ -174,17 +101,17 @@ func (pdb *profileDB) addProfileTarget(name string, target *Target) error {
 				return fmt.Errorf("%s is already used by profile %s %s", target, name, pi.Targets())
 			}
 		}
-		pi.targets = InsertTarget(pi.targets, target)
+		pi.targets = InsertTarget(pi.targets, &target)
 		return nil
 	}
-	pdb.db[name] = &Profile{Name: name}
-	pdb.db[name].targets = InsertTarget(nil, target)
-	return nil
+	return fmt.Errorf("profile %v is not installed", name)
 }
 
-func (pdb *profileDB) updateProfileTarget(name string, target *Target) error {
-	pdb.Lock()
-	defer pdb.Unlock()
+// UpdateProfileTarget updates the specified target from the named profile.
+// The UpdateTime of the updated target will be set to time.Now()
+func (pdb *DB) UpdateProfileTarget(name string, target Target) error {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 	target.UpdateTime = time.Now()
 	pi, present := pdb.db[name]
 	if !present {
@@ -192,7 +119,7 @@ func (pdb *profileDB) updateProfileTarget(name string, target *Target) error {
 	}
 	for _, t := range pi.targets {
 		if target.Match(t) {
-			*t = *target
+			*t = target
 			t.UpdateTime = time.Now()
 			return nil
 		}
@@ -200,15 +127,19 @@ func (pdb *profileDB) updateProfileTarget(name string, target *Target) error {
 	return fmt.Errorf("profile %v does not have target: %v", name, target)
 }
 
-func (pdb *profileDB) removeProfileTarget(name string, target *Target) bool {
-	pdb.Lock()
-	defer pdb.Unlock()
+// RemoveProfileTarget removes the specified target from the named profile.
+// If this is the last target for the profile then the profile will be deleted
+// from the database. It returns true if the profile was so deleted or did
+// not originally exist.
+func (pdb *DB) RemoveProfileTarget(name string, target Target) bool {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 
 	pi, present := pdb.db[name]
 	if !present {
 		return true
 	}
-	pi.targets = RemoveTarget(pi.targets, target)
+	pi.targets = RemoveTarget(pi.targets, &target)
 	if len(pi.targets) == 0 {
 		delete(pdb.db, name)
 		return true
@@ -216,14 +147,27 @@ func (pdb *profileDB) removeProfileTarget(name string, target *Target) bool {
 	return false
 }
 
-func (pdb *profileDB) profiles() []string {
-	pdb.Lock()
-	defer pdb.Unlock()
+// Names returns the names, in lexicographic order, of all of the currently
+// available profiles.
+func (pdb *DB) Names() []string {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 	return pdb.profilesUnlocked()
-
 }
 
-func (pdb *profileDB) profilesUnlocked() []string {
+// Profiles returns all currently installed the profiles, in lexicographic order.
+func (pdb *DB) Profiles() []*Profile {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
+	names := pdb.profilesUnlocked()
+	r := make([]*Profile, len(names), len(names))
+	for i, name := range names {
+		r[i] = pdb.db[name]
+	}
+	return r
+}
+
+func (pdb *DB) profilesUnlocked() []string {
 	names := make([]string, 0, len(pdb.db))
 	for name := range pdb.db {
 		names = append(names, name)
@@ -232,15 +176,42 @@ func (pdb *profileDB) profilesUnlocked() []string {
 	return names
 }
 
-func (pdb *profileDB) profile(name string) *Profile {
-	pdb.Lock()
-	defer pdb.Unlock()
+// LookupProfile returns the profile for the name profile or nil if one is
+// not found.
+func (pdb *DB) LookupProfile(name string) *Profile {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 	return pdb.db[name]
 }
 
-func (pdb *profileDB) read(jirix *jiri.X, filename string) error {
-	pdb.Lock()
-	defer pdb.Unlock()
+// LookupProfileTarget returns the target information stored for the name
+// profile.
+func (pdb *DB) LookupProfileTarget(name string, target Target) *Target {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
+	mgr := pdb.db[name]
+	if mgr == nil {
+		return nil
+	}
+	return FindTarget(mgr.targets, &target)
+}
+
+// EnvFromProfile obtains the environment variable settings from the specified
+// profile and target. It returns nil if the target and/or profile could not
+// be found.
+func (pdb *DB) EnvFromProfile(name string, target Target) []string {
+	t := pdb.LookupProfileTarget(name, target)
+	if t == nil {
+		return nil
+	}
+	return t.Env.Vars
+}
+
+// Read reads the specified database file to obtain the current set of
+// installed profiles into the receiver database.
+func (pdb *DB) Read(jirix *jiri.X, filename string) error {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 	pdb.db = make(map[string]*Profile)
 
 	data, err := jirix.NewSeq().ReadFile(filename)
@@ -256,13 +227,14 @@ func (pdb *profileDB) read(jirix *jiri.X, filename string) error {
 		return fmt.Errorf("Unmarshal(%v) failed: %v", string(data), err)
 	}
 	pdb.version = schema.Version
-	for _, profile := range schema.Profiles {
-		name := profile.Name
+	pdb.filename = filename
+	for _, p := range schema.Profiles {
+		name := p.Name
 		pdb.db[name] = &Profile{
-			Name: name,
-			Root: profile.Root,
+			name: name,
+			root: p.Root,
 		}
-		for _, target := range profile.Targets {
+		for _, target := range p.Targets {
 			pdb.db[name].targets = append(pdb.db[name].targets, &Target{
 				arch:            target.Arch,
 				opsys:           target.OS,
@@ -278,9 +250,15 @@ func (pdb *profileDB) read(jirix *jiri.X, filename string) error {
 	return nil
 }
 
-func (pdb *profileDB) write(jirix *jiri.X, filename string) error {
-	pdb.Lock()
-	defer pdb.Unlock()
+// Write writes the current set of installed profiles to the specified
+// database file.
+func (pdb *DB) Write(jirix *jiri.X, filename string) error {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
+
+	if len(filename) == 0 {
+		return fmt.Errorf("please specify a filename")
+	}
 
 	var schema profilesSchema
 	schema.Version = V4
@@ -288,7 +266,7 @@ func (pdb *profileDB) write(jirix *jiri.X, filename string) error {
 		profile := pdb.db[name]
 		schema.Profiles = append(schema.Profiles, &profileSchema{
 			Name: name,
-			Root: profile.Root,
+			Root: profile.root,
 		})
 
 		for _, target := range profile.targets {
@@ -336,8 +314,10 @@ func (pdb *profileDB) write(jirix *jiri.X, filename string) error {
 	return nil
 }
 
-func (pdb *profileDB) schemaVersion() Version {
-	pdb.Lock()
-	defer pdb.Unlock()
+// SchemaVersion returns the version of the xml schema used to implement
+// the database.
+func (pdb *DB) SchemaVersion() Version {
+	pdb.mu.Lock()
+	defer pdb.mu.Unlock()
 	return pdb.version
 }

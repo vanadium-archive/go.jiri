@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package profiles
+// Package reader provides support for reading and processing jiri profiles.
+package reader
 
 import (
 	"bytes"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"v.io/jiri/jiri"
+	"v.io/jiri/profiles"
 	"v.io/jiri/project"
 	"v.io/jiri/util"
 	"v.io/x/lib/envvar"
@@ -92,24 +94,25 @@ func GoEnvironmentFromOS() []string {
 	return vars
 }
 
-// ConfigHelper wraps the various sources of configuration and profile
+// Reader wraps the various sources of configuration and profile
 // information to provide convenient methods for determing the environment
 // variables to use for a given situation. It creates an initial copy of the OS
 // environment that is mutated by its various methods.
-type ConfigHelper struct {
+type Reader struct {
 	*envvar.Vars
 	profilesMode bool
 	jirix        *jiri.X
 	config       *util.Config
 	projects     project.Projects
 	tools        project.Tools
+	pdb          *profiles.DB
 }
 
-// NewConfigHelper creates a new config helper. If filename is of non-zero
+// NewReader creates a new profiles reader. If filename is of non-zero
 // length then that file will be read as a profiles manifest file, if not, the
 // existing, if any, in-memory profiles information will be used. If SkipProfiles
 // is specified for profilesMode, then no profiles are used.
-func NewConfigHelper(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*ConfigHelper, error) {
+func NewReader(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*Reader, error) {
 	config, err := util.LoadConfig(jirix)
 	if err != nil {
 		return nil, err
@@ -118,38 +121,62 @@ func NewConfigHelper(jirix *jiri.X, profilesMode ProfilesMode, filename string) 
 	if err != nil {
 		return nil, err
 	}
+	pdb := profiles.NewDB()
 	if profilesMode == UseProfiles && len(filename) > 0 {
-		if err := Read(jirix, filename); err != nil {
+		if err := pdb.Read(jirix, filename); err != nil {
 			return nil, err
 		}
 	}
-	ch := &ConfigHelper{
+	rd := &Reader{
 		jirix:        jirix,
 		config:       config,
 		projects:     projects,
 		tools:        tools,
 		profilesMode: bool(profilesMode),
+		pdb:          pdb,
 	}
-	ch.Vars = envvar.VarsFromOS()
+	rd.Vars = envvar.VarsFromOS()
 	if profilesMode == SkipProfiles {
-		return ch, nil
+		return rd, nil
 	}
 	if len(os.Getenv("JIRI_PROFILE")) > 0 {
 		return nil, fmt.Errorf(`old style profiles are no longer supported. Please
 do not set JIRI_PROFILE.`)
 	}
-	return ch, nil
+	return rd, nil
 }
 
-// Root returns the root of the jiri universe.
-func (ch *ConfigHelper) Root() string {
-	return ch.jirix.Root
+func (rd *Reader) SchemaVersion() profiles.Version {
+	return rd.pdb.SchemaVersion()
+}
+
+func (rd *Reader) ProfileNames() []string {
+	return rd.pdb.Names()
+}
+
+func (rd *Reader) Profiles() []*profiles.Profile {
+	return rd.pdb.Profiles()
+}
+
+func (rd *Reader) LookupProfile(name string) *profiles.Profile {
+	return rd.pdb.LookupProfile(name)
+}
+
+func (rd *Reader) LookupProfileTarget(name string, target profiles.Target) *profiles.Target {
+	return rd.pdb.LookupProfileTarget(name, target)
 }
 
 // MergeEnv merges the embedded environment with the environment
 // variables provided by the vars parameter according to the policies parameter.
-func (ch *ConfigHelper) MergeEnv(policies map[string]MergePolicy, vars ...[]string) {
-	MergeEnv(policies, ch.Vars, vars...)
+func (rd *Reader) MergeEnv(policies map[string]MergePolicy, vars ...[]string) {
+	MergeEnv(policies, rd.Vars, vars...)
+}
+
+// EnvFromProfile obtains the environment variable settings from the specified
+// profile and target. It returns nil if the target and/or profile could not
+// be found.
+func (rd *Reader) EnvFromProfile(name string, target profiles.Target) []string {
+	return rd.pdb.EnvFromProfile(name, target)
 }
 
 // MergeEnvFromProfiles merges the embedded environment with the environment
@@ -157,42 +184,42 @@ func (ch *ConfigHelper) MergeEnv(policies map[string]MergePolicy, vars ...[]stri
 // the manifest and in addition the 'jiri' profile may be used which refers to
 // the environment variables maintained by the jiri tool itself. It will also
 // expand all instances of ${JIRI_ROOT} in the returned environment.
-func (ch *ConfigHelper) MergeEnvFromProfiles(policies map[string]MergePolicy, target Target, profileNames ...string) {
+func (rd *Reader) MergeEnvFromProfiles(policies map[string]MergePolicy, target profiles.Target, profileNames ...string) {
 	envs := [][]string{}
 	for _, profile := range profileNames {
 		var e []string
 		if profile == "jiri" {
-			e = ch.JiriProfile()
+			e = rd.JiriProfile()
 		} else {
-			e = EnvFromProfile(target, profile)
+			e = rd.pdb.EnvFromProfile(profile, target)
 		}
 		if e == nil {
 			continue
 		}
 		envs = append(envs, e)
 	}
-	MergeEnv(policies, ch.Vars, envs...)
-	jiri.ExpandEnv(ch.jirix, ch.Vars)
+	MergeEnv(policies, rd.Vars, envs...)
+	jiri.ExpandEnv(rd.jirix, rd.Vars)
 }
 
 // SkippingProfiles returns true if no profiles are being used.
-func (ch *ConfigHelper) SkippingProfiles() bool {
-	return ch.profilesMode == bool(SkipProfiles)
+func (rd *Reader) SkippingProfiles() bool {
+	return rd.profilesMode == bool(SkipProfiles)
 }
 
 // ValidateRequestProfilesAndTarget checks that the supplied slice of profiles
 // names is supported (including the 'jiri' profile) and that each has
 // the specified target installed taking account if running using profiles
 // at all or if using old-style profiles.
-func (ch *ConfigHelper) ValidateRequestedProfilesAndTarget(profileNames []string, target Target) error {
-	if ProfilesMode(ch.profilesMode) == SkipProfiles {
+func (rd *Reader) ValidateRequestedProfilesAndTarget(profileNames []string, target profiles.Target) error {
+	if ProfilesMode(rd.profilesMode) == SkipProfiles {
 		return nil
 	}
 	for _, n := range profileNames {
 		if n == "jiri" {
 			continue
 		}
-		if LookupProfileTarget(n, target) == nil {
+		if rd.pdb.LookupProfileTarget(n, target) == nil {
 			return fmt.Errorf("%q for %q is not available or not installed, use the \"list\" command to see the installed/available profiles.", target, n)
 		}
 	}
@@ -200,30 +227,30 @@ func (ch *ConfigHelper) ValidateRequestedProfilesAndTarget(profileNames []string
 }
 
 // PrependToPath prepends its argument to the PATH environment variable.
-func (ch *ConfigHelper) PrependToPATH(path string) {
-	existing := ch.GetTokens("PATH", ":")
-	ch.SetTokens("PATH", append([]string{path}, existing...), ":")
+func (rd *Reader) PrependToPATH(path string) {
+	existing := rd.GetTokens("PATH", ":")
+	rd.SetTokens("PATH", append([]string{path}, existing...), ":")
 }
 
 // JiriProfile returns a pseudo profile that is maintained by the Jiri
 // tool itself, this currently consists of the GoPath and VDLPath variables.
 // It will generally be used as the last profile in the set of profiles
 // passed to MergeEnv.
-func (ch *ConfigHelper) JiriProfile() []string {
-	return []string{ch.GoPath(), ch.VDLPath()}
+func (rd *Reader) JiriProfile() []string {
+	return []string{rd.GoPath(), rd.VDLPath()}
 }
 
 // GoPath computes and returns the GOPATH environment variable based on the
 // current jiri configuration.
-func (ch *ConfigHelper) GoPath() string {
-	path := pathHelper(ch.jirix, ch.projects, ch.config.GoWorkspaces(), "")
+func (rd *Reader) GoPath() string {
+	path := pathHelper(rd.jirix, rd.projects, rd.config.GoWorkspaces(), "")
 	return "GOPATH=" + envvar.JoinTokens(path, ":")
 }
 
 // VDLPath computes and returns the VDLPATH environment variable based on the
 // current jiri configuration.
-func (ch *ConfigHelper) VDLPath() string {
-	path := pathHelper(ch.jirix, ch.projects, ch.config.VDLWorkspaces(), "src")
+func (rd *Reader) VDLPath() string {
+	path := pathHelper(rd.jirix, rd.projects, rd.config.VDLWorkspaces(), "src")
 	return "VDLPATH=" + envvar.JoinTokens(path, ":")
 }
 
@@ -406,20 +433,9 @@ func MergeEnv(policies map[string]MergePolicy, base *envvar.Vars, vars ...[]stri
 	}
 }
 
-// EnvFromProfile obtains the environment variable settings from the specified
-// profile and target. It returns nil if the target and/or profile could not
-// be found.
-func EnvFromProfile(target Target, profileName string) []string {
-	t := LookupProfileTarget(profileName, target)
-	if t == nil {
-		return nil
-	}
-	return t.Env.Vars
-}
-
 // WithDefaultVersion returns a copy of the supplied target with its
 // version set to the default (i.e. emtpy string).
-func WithDefaultVersion(target Target) Target {
+func WithDefaultVersion(target profiles.Target) profiles.Target {
 	t := &target
 	t.SetVersion("")
 	return target

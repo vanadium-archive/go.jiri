@@ -87,7 +87,7 @@ func TestProfileEnvArgs(t *testing.T) {
 
 func TestCopyCommandLineEnv(t *testing.T) {
 	env := "A=B,C=D"
-	target, _ := profiles.NewTargetWithEnv("a=a-o", env)
+	target, _ := profiles.NewTarget("a=a-o", env)
 	clenv := target.CommandLineEnv()
 	if got, want := strings.Join(clenv.Vars, ","), env; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -223,11 +223,11 @@ func TestOrderedTargets(t *testing.T) {
 		{"x-b@2", "x-b@1", true},
 		{"x-b", "x-b", false},
 	} {
-		a, err := profiles.NewTarget(c.a)
+		a, err := profiles.NewTarget(c.a, "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		b, _ := profiles.NewTarget(c.b)
+		b, _ := profiles.NewTarget(c.b, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -236,7 +236,7 @@ func TestOrderedTargets(t *testing.T) {
 		}
 	}
 
-	ol := profiles.OrderedTargets{}
+	ol := profiles.Targets{}
 	data := []string{"a-b@2", "x-y", "a-b@12", "a-b@3", "a-b@0", "x-y@3", "x-y@2"}
 	for _, s := range data {
 		target, err := profiles.NewTarget(s)

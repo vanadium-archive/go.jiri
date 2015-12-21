@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"testing"
 
@@ -19,14 +18,15 @@ import (
 	"v.io/jiri/profiles"
 )
 
-func addProfileAndTargets(t *testing.T, name string) {
-	t1, _ := profiles.NewTargetWithEnv("cpu1-os1@1", "A=B,C=D")
-	t2, _ := profiles.NewTargetWithEnv("cpu2-os2@bar", "A=B,C=D")
-	if err := profiles.AddProfileTarget(name, t1); err != nil {
+func addProfileAndTargets(t *testing.T, pdb *profiles.DB, name string) {
+	t1, _ := profiles.NewTarget("cpu1-os1@1", "A=B,C=D")
+	t2, _ := profiles.NewTarget("cpu2-os2@bar", "A=B,C=D")
+	pdb.InstallProfile(name, "")
+	if err := pdb.AddProfileTarget(name, t1); err != nil {
 		t.Fatal(err)
 	}
 	t2.InstallationDir = "bar"
-	if err := profiles.AddProfileTarget(name, t2); err != nil {
+	if err := pdb.AddProfileTarget(name, t2); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -51,25 +51,26 @@ func removeDate(s string) string {
 }
 
 func TestWrite(t *testing.T) {
-	profiles.Clear()
+	pdb := profiles.NewDB()
 	jirix, cleanup := jiritest.NewX(t)
 	defer cleanup()
 	filename := tmpFile()
 	defer os.RemoveAll(filepath.Dir(filename))
 
 	// test for no version being set.
-	t1, _ := profiles.NewTargetWithEnv("cpu1-os1", "A=B,C=D")
-	if err := profiles.AddProfileTarget("b", t1); err != nil {
+	t1, _ := profiles.NewTarget("cpu1-os1", "A=B,C=D")
+	pdb.InstallProfile("b", "")
+	if err := pdb.AddProfileTarget("b", t1); err != nil {
 		t.Fatal(err)
 	}
-	if err := profiles.Write(jirix, filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
+	if err := pdb.Write(jirix, filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
 		t.Fatalf("was expecing a missing version error, but got %v", err)
 	}
-	profiles.RemoveProfileTarget("b", t1)
+	pdb.RemoveProfileTarget("b", t1)
 
-	addProfileAndTargets(t, "b")
-	addProfileAndTargets(t, "a")
-	if err := profiles.Write(jirix, filename); err != nil {
+	addProfileAndTargets(t, pdb, "b")
+	addProfileAndTargets(t, pdb, "a")
+	if err := pdb.Write(jirix, filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,10 +82,10 @@ func TestWrite(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
-	profiles.Clear()
+	pdb := profiles.NewDB()
 	jirix, cleanup := jiritest.NewX(t)
 	defer cleanup()
-	if err := profiles.Read(jirix, "./testdata/m1.xml"); err != nil {
+	if err := pdb.Read(jirix, "./testdata/m1.xml"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,12 +100,11 @@ func TestRead(t *testing.T) {
 		}
 		return true
 	}
-	names := profiles.Profiles()
-	sort.Strings(names)
+	names := pdb.Names()
 	if got, want := names, []string{"a", "b"}; !cmp(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	p := profiles.LookupProfile("a")
+	p := pdb.LookupProfile("a")
 	if got, want := p.Targets()[0].OS(), "os1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -114,39 +114,29 @@ func TestRead(t *testing.T) {
 }
 
 func TestInstallProfile(t *testing.T) {
-	profiles.Clear()
-	profiles.InstallProfile("a", "root1")
-	profiles.InstallProfile("a", "root2")
-	profile := profiles.LookupProfile("a")
-	if got, want := profile.Root, "root1"; got != want {
+	pdb := profiles.NewDB()
+	pdb.InstallProfile("a", "root1")
+	pdb.InstallProfile("a", "root2")
+	profile := pdb.LookupProfile("a")
+	if got, want := profile.Root(), "root1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
 func TestReadingV0(t *testing.T) {
-	profiles.Clear()
+	pdb := profiles.NewDB()
 	jirix, cleanup := jiritest.NewX(t)
 	defer cleanup()
 
-	getProfiles := func() []*profiles.Profile {
-		db := []*profiles.Profile{}
-		names := profiles.Profiles()
-		sort.Strings(names)
-		for _, name := range names {
-			db = append(db, profiles.LookupProfile(name))
-		}
-		return db
-	}
-
-	if err := profiles.Read(jirix, "./testdata/legacy.xml"); err != nil {
+	if err := pdb.Read(jirix, "./testdata/legacy.xml"); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, want := profiles.SchemaVersion(), profiles.Original; got != want {
+	if got, want := pdb.SchemaVersion(), profiles.Original; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	oprofiles := getProfiles()
+	oprofiles := pdb.Profiles()
 	if got, want := len(oprofiles), 5; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -155,30 +145,33 @@ func TestReadingV0(t *testing.T) {
 
 	var t1 profiles.Target
 	t1.Set("cpu-os@1")
-	profiles.AddProfileTarget("__first", t1)
-
-	if err := profiles.Write(jirix, filename); err != nil {
+	pdb.InstallProfile("__first", "")
+	if err := pdb.AddProfileTarget("__first", t1); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := profiles.Read(jirix, filename); err != nil {
+	if err := pdb.Write(jirix, filename); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, want := profiles.SchemaVersion(), profiles.V4; got != want {
+	if err := pdb.Read(jirix, filename); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := pdb.SchemaVersion(), profiles.V4; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	nprofiles := getProfiles()
+	nprofiles := pdb.Profiles()
 	if got, want := len(nprofiles), 6; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := nprofiles[0].Name, "__first"; got != want {
+	if got, want := nprofiles[0].Name(), "__first"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	for i, v := range nprofiles[1:] {
-		if got, want := v.Name, oprofiles[i].Name; got != want {
+		if got, want := v.Name(), oprofiles[i].Name(); got != want {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	}
@@ -194,31 +187,26 @@ func TestReadingV3AndV4(t *testing.T) {
 		{"v3.xml", "", "", profiles.V3},
 		{"v4.xml", fake.X.Root, "${JIRI_ROOT}", profiles.V4},
 	} {
-		ch, err := profiles.NewConfigHelper(fake.X, profiles.UseProfiles, filepath.Join("testdata", c.filename))
+		pdb := profiles.NewDB()
+		err := pdb.Read(fake.X, filepath.Join("testdata", c.filename))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got, want := profiles.SchemaVersion(), c.version; got != want {
+		if got, want := pdb.SchemaVersion(), c.version; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
-		target, err := profiles.NewTarget("cpu1-os1@1")
+		target, err := profiles.NewTarget("cpu1-os1@1", "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		p := profiles.LookupProfile("a")
+		p := pdb.LookupProfile("a")
 		// We need to expand the variable here for a V4 profile if we want
 		// to get the full absolute path.
-		if got, want := p.Root, c.variable+"/an/absolute/root"; got != want {
+		if got, want := p.Root(), c.variable+"/an/absolute/root"; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
-		lt := profiles.LookupProfileTarget("a", target)
+		lt := pdb.LookupProfileTarget("a", target)
 		if got, want := lt.InstallationDir, c.variable+"/an/absolute/dir"; got != want {
-			t.Errorf("%d: got %v, want %v", i, got, want)
-		}
-		// The merged environment variables are expanded appropriately
-		// internally by MergeEnvFromProfiles.
-		ch.MergeEnvFromProfiles(profiles.JiriMergePolicies(), target, "a")
-		if got, want := ch.Get("ABS"), "-I"+c.prefix+"/an/absolute/path"; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
 	}
