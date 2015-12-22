@@ -1,0 +1,5 @@
+pkg profilesmanager, func EnsureProfileTargetIsInstalled(*jiri.X, *profiles.DB, string, jiri.RelPath, profiles.Target) error
+pkg profilesmanager, func EnsureProfileTargetIsUninstalled(*jiri.X, *profiles.DB, string, jiri.RelPath, profiles.Target) error
+pkg profilesmanager, func LookupManager(string) profiles.Manager
+pkg profilesmanager, func Managers() []string
+pkg profilesmanager, func Register(string, profiles.Manager)

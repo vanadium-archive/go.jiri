@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package reader_test
+package profilesreader_test
 
 import (
 	"flag"
@@ -13,7 +13,7 @@ import (
 
 	"v.io/jiri/jiritest"
 	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/reader"
+	"v.io/jiri/profiles/profilesreader"
 	"v.io/jiri/project"
 	"v.io/jiri/util"
 	"v.io/x/lib/envvar"
@@ -22,7 +22,7 @@ import (
 func TestReader(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	rd, err := reader.NewReader(fake.X, reader.UseProfiles, filepath.Join("testdata", "m2.xml"))
+	rd, err := profilesreader.NewReader(fake.X, profilesreader.UseProfiles, filepath.Join("testdata", "m2.xml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rd.MergeEnvFromProfiles(reader.JiriMergePolicies(), native, "go", "syncbase")
+	rd.MergeEnvFromProfiles(profilesreader.JiriMergePolicies(), native, "go", "syncbase")
 	if got, want := rd.Get("CGO_CFLAGS"), "-IX -IY -IA -IB"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -57,7 +57,7 @@ func TestEnvFromTarget(t *testing.T) {
 	if err := pdb.Write(fake.X, filename); err != nil {
 		t.Fatal(err)
 	}
-	rd, err := reader.NewReader(fake.X, reader.UseProfiles, filename)
+	rd, err := profilesreader.NewReader(fake.X, profilesreader.UseProfiles, filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,10 +66,10 @@ func TestEnvFromTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rd.MergeEnvFromProfiles(map[string]reader.MergePolicy{
-		"A": reader.AppendFlag,
-		"B": reader.UseLast,
-		"Z": reader.IgnoreBaseUseLast},
+	rd.MergeEnvFromProfiles(map[string]profilesreader.MergePolicy{
+		"A": profilesreader.AppendFlag,
+		"B": profilesreader.UseLast,
+		"Z": profilesreader.IgnoreBaseUseLast},
 		t1Target, "a", "b")
 	vars := rd.ToMap()
 	if got, want := len(vars), 3; got != want {
@@ -89,27 +89,27 @@ func TestMergeEnv(t *testing.T) {
 	c := []string{"FS1=C", "FS2=C", "FS3=C", "A=BL", "B=C", "C=DL", "P=C", "V=C", "P1=C", "V1=C", "Y=ZL", "GP=XL", "IA=C", "IB=C", "IC=C", "ID=C", "IE=C", "IG3=B"}
 	env := envvar.VarsFromSlice(base)
 
-	policies := map[string]reader.MergePolicy{
-		"GP":  reader.UseLast,
-		"P":   reader.PrependPath,
-		"V":   reader.PrependFlag,
-		"P1":  reader.AppendPath,
-		"V1":  reader.AppendFlag,
-		"A":   reader.IgnoreBaseUseLast,
-		"B":   reader.UseBaseIgnoreProfiles,
-		"IA":  reader.IgnoreBaseAppendPath,
-		"IB":  reader.IgnoreBaseAppendFlag,
-		"IC":  reader.IgnoreBasePrependPath,
-		"ID":  reader.IgnoreBasePrependFlag,
-		"IE":  reader.IgnoreBaseUseLast,
-		"IF":  reader.IgnoreBaseUseFirst,
-		"IG1": reader.IgnoreVariable,
-		"IG2": reader.IgnoreVariable,
-		"IG3": reader.IgnoreVariable,
-		"C":   reader.UseLast,
-		"Y":   reader.UseLast,
+	policies := map[string]profilesreader.MergePolicy{
+		"GP":  profilesreader.UseLast,
+		"P":   profilesreader.PrependPath,
+		"V":   profilesreader.PrependFlag,
+		"P1":  profilesreader.AppendPath,
+		"V1":  profilesreader.AppendFlag,
+		"A":   profilesreader.IgnoreBaseUseLast,
+		"B":   profilesreader.UseBaseIgnoreProfiles,
+		"IA":  profilesreader.IgnoreBaseAppendPath,
+		"IB":  profilesreader.IgnoreBaseAppendFlag,
+		"IC":  profilesreader.IgnoreBasePrependPath,
+		"ID":  profilesreader.IgnoreBasePrependFlag,
+		"IE":  profilesreader.IgnoreBaseUseLast,
+		"IF":  profilesreader.IgnoreBaseUseFirst,
+		"IG1": profilesreader.IgnoreVariable,
+		"IG2": profilesreader.IgnoreVariable,
+		"IG3": profilesreader.IgnoreVariable,
+		"C":   profilesreader.UseLast,
+		"Y":   profilesreader.UseLast,
 	}
-	reader.MergeEnv(policies, env, b, c)
+	profilesreader.MergeEnv(policies, env, b, c)
 
 	expected := []string{"B=A", "A=BL", "C=DL", "GP=XL", "P1=A:B:C", "P=C:B:A",
 		"V1=A B C", "V=C B A", "W=X", "Y=ZL",
@@ -171,7 +171,7 @@ func testSetPathHelper(t *testing.T, name string) {
 		t.Fatalf("%v", err)
 	}
 
-	rd, err := reader.NewReader(fake.X, reader.UseProfiles, filepath.Join(fake.X.Root, "profiles-manifest"))
+	rd, err := profilesreader.NewReader(fake.X, profilesreader.UseProfiles, filepath.Join(fake.X.Root, "profiles-manifest"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestVDLPath(t *testing.T) {
 }
 
 func TestMergePolicyFlags(t *testing.T) {
-	mp := reader.MergePolicies{}
+	mp := profilesreader.MergePolicies{}
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.Var(mp, "p", mp.Usage())
 	all := []string{"-p=:a", "-p=+b", "-p=^c", "-p=^:d", "-p=^e:", "-p=^+f", "-p=^g+", "-p=last*", "-p=xx:", "-p=yy+", "-p=zz^"}
@@ -213,26 +213,26 @@ func TestMergePolicyFlags(t *testing.T) {
 	}
 	for _, c := range []struct {
 		k string
-		p reader.MergePolicy
+		p profilesreader.MergePolicy
 	}{
-		{"a", reader.AppendPath},
-		{"b", reader.AppendFlag},
-		{"c", reader.IgnoreBaseUseFirst},
-		{"d", reader.IgnoreBaseAppendPath},
-		{"e", reader.IgnoreBasePrependPath},
-		{"f", reader.IgnoreBaseAppendFlag},
-		{"g", reader.IgnoreBasePrependFlag},
-		{"last", reader.UseLast},
-		{"xx", reader.PrependPath},
-		{"yy", reader.PrependFlag},
-		{"zz", reader.UseBaseIgnoreProfiles},
+		{"a", profilesreader.AppendPath},
+		{"b", profilesreader.AppendFlag},
+		{"c", profilesreader.IgnoreBaseUseFirst},
+		{"d", profilesreader.IgnoreBaseAppendPath},
+		{"e", profilesreader.IgnoreBasePrependPath},
+		{"f", profilesreader.IgnoreBaseAppendFlag},
+		{"g", profilesreader.IgnoreBasePrependFlag},
+		{"last", profilesreader.UseLast},
+		{"xx", profilesreader.PrependPath},
+		{"yy", profilesreader.PrependFlag},
+		{"zz", profilesreader.UseBaseIgnoreProfiles},
 	} {
 		if got, want := mp[c.k], c.p; got != want {
 			t.Errorf("(%s) got %v, want %v", c.k, got, want)
 		}
 	}
 
-	mp = reader.MergePolicies{}
+	mp = profilesreader.MergePolicies{}
 	fs1 := flag.NewFlagSet("test1", flag.ContinueOnError)
 	fs1.Var(mp, "p", mp.Usage())
 	if err := fs1.Parse([]string{"-p=yy+,zz^"}); err != nil {
@@ -243,7 +243,7 @@ func TestMergePolicyFlags(t *testing.T) {
 	}
 
 	for i, cl := range append(all, "-p=+b,^c,zz^") {
-		mp := reader.MergePolicies{}
+		mp := profilesreader.MergePolicies{}
 		fs := flag.NewFlagSet(fmt.Sprintf("t%d", i), flag.ContinueOnError)
 		fs.Var(mp, "p", mp.Usage())
 		err := fs.Parse([]string{cl})

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package manager_test
+package profilesmanager_test
 
 import (
 	"flag"
@@ -13,7 +13,7 @@ import (
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/manager"
+	"v.io/jiri/profiles/profilesmanager"
 	"v.io/jiri/tool"
 )
 
@@ -83,7 +83,7 @@ func ExampleManager() {
 
 	init := func() {
 		mgr := newProfileMgr(myProfile)
-		manager.Register(myProfile, mgr)
+		profilesmanager.Register(myProfile, mgr)
 		flags := flag.NewFlagSet("example", flag.ContinueOnError)
 		profiles.RegisterTargetAndEnvFlags(flags, &target)
 		flags.Parse([]string{"--target=arm-linux@1", "--env=A=B,C=D", "--env=E=F"})
@@ -91,7 +91,7 @@ func ExampleManager() {
 	init()
 
 	profileRoot := jiri.NewRelPath("profiles")
-	mgr := manager.LookupManager(myProfile)
+	mgr := profilesmanager.LookupManager(myProfile)
 	if mgr == nil {
 		panic("manager not found for: " + myProfile)
 	}
@@ -116,7 +116,7 @@ func ExampleManager() {
 	// Read the profile database.
 	pdb.Read(jirix, filename)
 
-	mgr = manager.LookupManager(myProfile)
+	mgr = profilesmanager.LookupManager(myProfile)
 	if mgr == nil {
 		panic("manager not found for: " + myProfile)
 	}

@@ -1,3 +1,0 @@
-pkg commandline, func Init(string)
-pkg commandline, func Main(string)
-pkg commandline, var CommandLineDriver *cmdline.Command

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package commandline_test
+package profilescmdline_test
 
 import (
 	"fmt"
 	"testing"
 
-	"v.io/jiri/profiles/commandline"
-	"v.io/jiri/profiles/reader"
+	"v.io/jiri/profiles/profilescmdline"
+	"v.io/jiri/profiles/profilesreader"
 	"v.io/x/lib/cmdline"
 )
 
@@ -22,13 +22,13 @@ var parent = cmdline.Command{
 }
 
 func TestReaderParent(t *testing.T) {
-	commandline.Reset()
+	profilescmdline.Reset()
 	p := parent
 	args := []string{"--profiles-db=foo", "--skip-profiles"}
-	var rf commandline.ReaderFlagValues
+	var rf profilescmdline.ReaderFlagValues
 	// If RegisterReaderCommandsUsingParent is called, the common reader
 	// flags are hosted by the parent command.
-	commandline.RegisterReaderCommandsUsingParent(&p, &rf, "")
+	profilescmdline.RegisterReaderCommandsUsingParent(&p, &rf, "")
 	if got, want := len(p.Children), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -41,13 +41,13 @@ func TestReaderParent(t *testing.T) {
 	if got, want := rf.DBFilename, "foo"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := rf.ProfilesMode, reader.SkipProfiles; got != want {
+	if got, want := rf.ProfilesMode, profilesreader.SkipProfiles; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	commandline.Reset()
+	profilescmdline.Reset()
 	p = parent
-	commandline.RegisterReaderFlags(&p.Flags, &rf, "")
+	profilescmdline.RegisterReaderFlags(&p.Flags, &rf, "")
 	if got, want := len(p.Children), 0; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -58,11 +58,11 @@ func TestReaderParent(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	commandline.Reset()
+	profilescmdline.Reset()
 	p = parent
 	// If RegisterReaderCommands is not called, the common reader
 	// flags are hosted by the subcommands.
-	commandline.RegisterReaderCommands(&p, "")
+	profilescmdline.RegisterReaderCommands(&p, "")
 	if err := p.Flags.Parse(args); err == nil {
 		t.Fatal(fmt.Errorf("this should have failed"))
 	}
@@ -74,10 +74,10 @@ func TestReaderParent(t *testing.T) {
 }
 
 func TestSubcommandFlags(t *testing.T) {
-	commandline.Reset()
+	profilescmdline.Reset()
 	p := parent
-	var rf commandline.ReaderFlagValues
-	commandline.RegisterReaderCommandsUsingParent(&p, &rf, "")
+	var rf profilescmdline.ReaderFlagValues
+	profilescmdline.RegisterReaderCommandsUsingParent(&p, &rf, "")
 	if got, want := len(p.Children), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -89,9 +89,9 @@ func TestSubcommandFlags(t *testing.T) {
 		t.Error(err)
 	}
 
-	commandline.Reset()
+	profilescmdline.Reset()
 	p = parent
-	commandline.RegisterReaderCommands(&p, "")
+	profilescmdline.RegisterReaderCommands(&p, "")
 	if got, want := len(p.Children), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}

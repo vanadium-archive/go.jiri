@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package manager provides support for managing jiri profiles.
+// Package profilesmanager provides support for managing jiri profiles.
 // In particular for installing and uninstalling them. It provides a
 // registration mechanism for profile implementations to call from an init
 // function to add themselves to the suite profiles available within this
 // application.
-package manager
+package profilesmanager
 
 import (
 	"sort"

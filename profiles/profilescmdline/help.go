@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package commandline
+package profilescmdline
 
-var HelpMsg = `
+// HelpMsg returns a detailed help message for the profiles packages.
+func HelpMsg() string {
+	return `
 Profiles are used to manage external sofware dependencies and offer a balance
 between providing no support at all and a full blown package manager.
 Profiles can be built natively as well as being cross compiled.
@@ -71,3 +73,4 @@ with the profile command line tools via the *v.io/jiri/profiles* package.
 They must implement the interfaces defined by that package and be imported
 (e.g. import _ "myprofile") by the command line tools that are to use them.
 `
+}

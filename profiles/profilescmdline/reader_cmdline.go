@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package commandline provides a command line driver (for v.io/x/lib/cmdline)
+// Package profilescmdline provides a command line driver (for v.io/x/lib/cmdline)
 // for implementing jiri 'profile' subcommands. The intent is to support
 // project specific instances of such profiles for managing software
 // dependencies.
-package commandline
+package profilescmdline
 
 import (
 	"bytes"
@@ -18,8 +18,8 @@ import (
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/manager"
-	"v.io/jiri/profiles/reader"
+	"v.io/jiri/profiles/profilesmanager"
+	"v.io/jiri/profiles/profilesreader"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/textutil"
 )
@@ -90,7 +90,7 @@ in <name>=<val> format.
 // required to configure and use the profiles/Reader package.
 type ReaderFlagValues struct {
 	// The value of --skip-profiles
-	ProfilesMode reader.ProfilesMode
+	ProfilesMode profilesreader.ProfilesMode
 	// The value of --profiles-db
 	DBFilename string
 	// The value of --profiles
@@ -98,7 +98,7 @@ type ReaderFlagValues struct {
 	// The value of --target and --env
 	Target profiles.Target
 	// The value of --merge-policies
-	MergePolicies reader.MergePolicies
+	MergePolicies profilesreader.MergePolicies
 	// The value of -v
 	Verbose bool
 }
@@ -138,7 +138,7 @@ func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
 }
 
 // RegisterMergePoliciesFlag registers the --merge-policies flag
-func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *reader.MergePolicies) {
+func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *profilesreader.MergePolicies) {
 	flags.Var(policies, "merge-policies", "specify policies for merging environment variables")
 }
 
@@ -155,7 +155,7 @@ func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBFil
 	flags.Var(&fv.ProfilesMode, "skip-profiles", "if set, no profiles will be used")
 	RegisterDBFilenameFlag(flags, &fv.DBFilename, defaultDBFilename)
 	RegisterProfilesFlag(flags, &fv.Profiles)
-	fv.MergePolicies = reader.JiriMergePolicies()
+	fv.MergePolicies = profilesreader.JiriMergePolicies()
 	RegisterMergePoliciesFlag(flags, &fv.MergePolicies)
 	profiles.RegisterTargetAndEnvFlags(flags, &fv.Target)
 }
@@ -187,7 +187,7 @@ func RegisterReaderCommands(parent *cmdline.Command, defaultDBFilename string) {
 }
 
 func newReaderFlags() *ReaderFlagValues {
-	return &ReaderFlagValues{MergePolicies: reader.JiriMergePolicies()}
+	return &ReaderFlagValues{MergePolicies: profilesreader.JiriMergePolicies()}
 }
 
 // registerListCommand the profiles list subcommand and returns it
@@ -230,16 +230,16 @@ func runList(jirix *jiri.X, args []string) error {
 	if listFlags.available {
 		if listFlags.Verbose {
 			fmt.Fprintf(jirix.Stdout(), "Available Profiles:\n")
-			for _, name := range manager.Managers() {
-				mgr := manager.LookupManager(name)
+			for _, name := range profilesmanager.Managers() {
+				mgr := profilesmanager.LookupManager(name)
 				vi := mgr.VersionInfo()
 				fmt.Fprintf(jirix.Stdout(), "%s: versions: %s\n", name, vi)
 			}
 		} else {
-			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(manager.Managers(), ", "))
+			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(profilesmanager.Managers(), ", "))
 		}
 	}
-	rd, err := reader.NewReader(jirix, listFlags.ProfilesMode, listFlags.DBFilename)
+	rd, err := profilesreader.NewReader(jirix, listFlags.ProfilesMode, listFlags.DBFilename)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func runList(jirix *jiri.X, args []string) error {
 	} else {
 		for _, name := range availableNames {
 			profile := rd.LookupProfile(name)
-			mgr := manager.LookupManager(name)
+			mgr := profilesmanager.LookupManager(name)
 			out := &bytes.Buffer{}
 			var targets profiles.Targets
 			if listFlags.Target.IsSet() {
@@ -354,7 +354,7 @@ func fmtOutput(jirix *jiri.X, o string) string {
 	return out.String()
 }
 
-func fmtInfo(jirix *jiri.X, infoFmt string, rd *reader.Reader, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
+func fmtInfo(jirix *jiri.X, infoFmt string, rd *profilesreader.Reader, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
 	if len(infoFmt) > 0 {
 		// Populate an instance listInfo
 		info := &listInfo{}
@@ -405,7 +405,7 @@ func runEnv(jirix *jiri.X, args []string) error {
 	if len(envFlags.Profiles) == 0 {
 		return fmt.Errorf("no profiles were specified using --profiles")
 	}
-	rd, err := reader.NewReader(jirix, envFlags.ProfilesMode, envFlags.DBFilename)
+	rd, err := profilesreader.NewReader(jirix, envFlags.ProfilesMode, envFlags.DBFilename)
 	if err != nil {
 		return err
 	}

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package reader provides support for reading and processing jiri profiles.
-package reader
+// Package profilesreader provides support for reading and processing jiri profiles.
+package profilesreader
 
 import (
 	"bytes"

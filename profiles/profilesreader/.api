@@ -1,0 +1,72 @@
+pkg profilesreader, const Append MergeAction
+pkg profilesreader, const AppendJiriProfile AppendJiriProfileMode
+pkg profilesreader, const DoNotAppendJiriProfile bool
+pkg profilesreader, const First MergeAction
+pkg profilesreader, const Ignore MergeAction
+pkg profilesreader, const IgnoreBaseAndAppend MergeAction
+pkg profilesreader, const IgnoreBaseAndPrepend MergeAction
+pkg profilesreader, const IgnoreBaseAndUseFirst MergeAction
+pkg profilesreader, const IgnoreBaseAndUseLast MergeAction
+pkg profilesreader, const IgnoreProfiles MergeAction
+pkg profilesreader, const Last MergeAction
+pkg profilesreader, const Prepend MergeAction
+pkg profilesreader, const SkipProfiles ProfilesMode
+pkg profilesreader, const UseProfiles ProfilesMode
+pkg profilesreader, func GoEnvironmentFromOS() []string
+pkg profilesreader, func InitProfilesFromFlag(string, AppendJiriProfileMode) []string
+pkg profilesreader, func JiriMergePolicies() MergePolicies
+pkg profilesreader, func MergeEnv(map[string]MergePolicy, *envvar.Vars, ...[]string)
+pkg profilesreader, func NewReader(*jiri.X, ProfilesMode, string) (*Reader, error)
+pkg profilesreader, func ProfileMergePolicies() MergePolicies
+pkg profilesreader, func RegisterReaderFlags(*flag.FlagSet, *ProfilesMode, *string, *string, string, *MergePolicies)
+pkg profilesreader, func UnsetGoEnvMap(map[string]string)
+pkg profilesreader, func UnsetGoEnvVars(*envvar.Vars)
+pkg profilesreader, func WithDefaultVersion(profiles.Target) profiles.Target
+pkg profilesreader, method (*MergePolicy) String() string
+pkg profilesreader, method (*ProfilesMode) Get() interface{}
+pkg profilesreader, method (*ProfilesMode) IsBoolFlag() bool
+pkg profilesreader, method (*ProfilesMode) Set(string) error
+pkg profilesreader, method (*ProfilesMode) String() string
+pkg profilesreader, method (*Reader) EnvFromProfile(string, profiles.Target) []string
+pkg profilesreader, method (*Reader) GoPath() string
+pkg profilesreader, method (*Reader) JiriProfile() []string
+pkg profilesreader, method (*Reader) LookupProfile(string) *profiles.Profile
+pkg profilesreader, method (*Reader) LookupProfileTarget(string, profiles.Target) *profiles.Target
+pkg profilesreader, method (*Reader) MergeEnv(map[string]MergePolicy, ...[]string)
+pkg profilesreader, method (*Reader) MergeEnvFromProfiles(map[string]MergePolicy, profiles.Target, ...string)
+pkg profilesreader, method (*Reader) PrependToPATH(string)
+pkg profilesreader, method (*Reader) ProfileNames() []string
+pkg profilesreader, method (*Reader) Profiles() []*profiles.Profile
+pkg profilesreader, method (*Reader) SchemaVersion() profiles.Version
+pkg profilesreader, method (*Reader) SkippingProfiles() bool
+pkg profilesreader, method (*Reader) VDLPath() string
+pkg profilesreader, method (*Reader) ValidateRequestedProfilesAndTarget([]string, profiles.Target) error
+pkg profilesreader, method (MergePolicies) DebugString() string
+pkg profilesreader, method (MergePolicies) Get() interface{}
+pkg profilesreader, method (MergePolicies) Set(string) error
+pkg profilesreader, method (MergePolicies) String() string
+pkg profilesreader, method (MergePolicies) Usage() string
+pkg profilesreader, type AppendJiriProfileMode bool
+pkg profilesreader, type MergeAction int
+pkg profilesreader, type MergePolicies map[string]MergePolicy
+pkg profilesreader, type MergePolicy struct
+pkg profilesreader, type MergePolicy struct, Action MergeAction
+pkg profilesreader, type MergePolicy struct, Separator string
+pkg profilesreader, type ProfilesMode bool
+pkg profilesreader, type Reader struct
+pkg profilesreader, type Reader struct, embedded *envvar.Vars
+pkg profilesreader, var AppendFlag MergePolicy
+pkg profilesreader, var AppendPath MergePolicy
+pkg profilesreader, var GoFlags []string
+pkg profilesreader, var IgnoreBaseAppendFlag MergePolicy
+pkg profilesreader, var IgnoreBaseAppendPath MergePolicy
+pkg profilesreader, var IgnoreBasePrependFlag MergePolicy
+pkg profilesreader, var IgnoreBasePrependPath MergePolicy
+pkg profilesreader, var IgnoreBaseUseFirst MergePolicy
+pkg profilesreader, var IgnoreBaseUseLast MergePolicy
+pkg profilesreader, var IgnoreVariable MergePolicy
+pkg profilesreader, var PrependFlag MergePolicy
+pkg profilesreader, var PrependPath MergePolicy
+pkg profilesreader, var UseBaseIgnoreProfiles MergePolicy
+pkg profilesreader, var UseFirst MergePolicy
+pkg profilesreader, var UseLast MergePolicy

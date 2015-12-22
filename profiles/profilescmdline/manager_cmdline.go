@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package commandline provides a command line driver (for v.io/x/lib/cmdline)
+// Package profilescmdline provides a command line driver (for v.io/x/lib/cmdline)
 // for implementing jiri 'profile' subcommands. The intent is to support
 // project specific instances of such profiles for managing software
 // dependencies.
-package commandline
+package profilescmdline
 
 import (
 	"flag"
@@ -15,7 +15,7 @@ import (
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/manager"
+	"v.io/jiri/profiles/profilesmanager"
 	"v.io/x/lib/cmdline"
 )
 
@@ -174,11 +174,11 @@ func initCleanupCommand(flags *flag.FlagSet, defaultDBFilename string) {
 // init a command that takes a list of profile managers as its arguments.
 func initProfileManagersCommand(jirix *jiri.X, dbfile string, args []string) ([]string, *profiles.DB, error) {
 	if len(args) == 0 {
-		args = manager.Managers()
+		args = profilesmanager.Managers()
 	} else {
 		for _, n := range args {
-			if mgr := manager.LookupManager(n); mgr == nil {
-				avail := manager.Managers()
+			if mgr := profilesmanager.LookupManager(n); mgr == nil {
+				avail := profilesmanager.Managers()
 				return nil, nil, fmt.Errorf("profile %v is not one of the available ones: %s", n, strings.Join(avail, ", "))
 			}
 		}
@@ -219,7 +219,7 @@ func updateImpl(jirix *jiri.X, cl *updateFlagValues, args []string) error {
 		return err
 	}
 	for _, n := range args {
-		mgr := manager.LookupManager(n)
+		mgr := profilesmanager.LookupManager(n)
 		profile := db.LookupProfile(n)
 		if profile == nil {
 			continue
@@ -248,7 +248,7 @@ func updateImpl(jirix *jiri.X, cl *updateFlagValues, args []string) error {
 
 func cleanupGC(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, args []string) error {
 	for _, name := range args {
-		mgr := manager.LookupManager(name)
+		mgr := profilesmanager.LookupManager(name)
 		if mgr == nil {
 			fmt.Fprintf(jirix.Stderr(), "%s is not linked into this binary", name)
 			continue
@@ -270,7 +270,7 @@ func cleanupGC(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, 
 
 func cleanupEnsureVersionsAreSet(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, args []string) error {
 	for _, name := range args {
-		mgr := manager.LookupManager(name)
+		mgr := profilesmanager.LookupManager(name)
 		if mgr == nil {
 			fmt.Fprintf(jirix.Stderr(), "%s is not linked into this binary", name)
 			continue
@@ -393,7 +393,7 @@ func installImpl(jirix *jiri.X, cl *installFlagValues, args []string) error {
 		}
 	}
 	for _, name := range names {
-		mgr := manager.LookupManager(name)
+		mgr := profilesmanager.LookupManager(name)
 		def, err := targetAtDefaultVersion(mgr, cl.target)
 		if err != nil {
 			return err
@@ -421,7 +421,7 @@ func uninstallImpl(jirix *jiri.X, cl *uninstallFlagValues, args []string) error 
 		if profile == nil {
 			continue
 		}
-		mgr := manager.LookupManager(name)
+		mgr := profilesmanager.LookupManager(name)
 		var targets []*profiles.Target
 		if cl.allTargets {
 			targets = profile.Targets()
