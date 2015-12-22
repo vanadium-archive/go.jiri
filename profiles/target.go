@@ -89,16 +89,14 @@ type Environment struct {
 	Vars []string `xml:"var"`
 }
 
-func NewTarget(target string) (Target, error) {
+// NewTarget creates a new target using the supplied target and environment
+// parameters specified in command line format.
+func NewTarget(target string, env ...string) (Target, error) {
 	t := &Target{}
 	err := t.Set(target)
-	return *t, err
-}
-
-func NewTargetWithEnv(target, env string) (Target, error) {
-	t := &Target{}
-	err := t.Set(target)
-	t.commandLineEnv.Set(env)
+	for _, e := range env {
+		t.commandLineEnv.Set(e)
+	}
 	return *t, err
 }
 
@@ -128,7 +126,6 @@ func (pt Target) Match(pt2 *Target) bool {
 // Thus, (targets in <arch>-<os>[@<version>] format), are all true:
 // b-c < c-c
 // b-c@3 < b-c@2
-//
 func (pt *Target) Less(pt2 *Target) bool {
 	switch {
 	case pt.arch != pt2.arch:
@@ -236,26 +233,26 @@ func (pt Target) String() string {
 	return fmt.Sprintf("%v-%v@%s", v.arch, v.opsys, v.version)
 }
 
-// OrderderTargets is a list of *Targets ordered by architecture,
+// Targets is a list of *Target's ordered by architecture,
 // operating system and descending versions.
-type OrderedTargets []*Target
+type Targets []*Target
 
 // Implements sort.Len
-func (tl OrderedTargets) Len() int {
+func (tl Targets) Len() int {
 	return len(tl)
 }
 
 // Implements sort.Less
-func (tl OrderedTargets) Less(i, j int) bool {
+func (tl Targets) Less(i, j int) bool {
 	return tl[i].Less(tl[j])
 }
 
 // Implements sort.Swap
-func (tl OrderedTargets) Swap(i, j int) {
+func (tl Targets) Swap(i, j int) {
 	tl[i], tl[j] = tl[i], tl[j]
 }
 
-func (tl OrderedTargets) Sort() {
+func (tl Targets) Sort() {
 	sort.Sort(tl)
 }
 
@@ -292,9 +289,9 @@ func (e *Environment) Usage() string {
 	return "specifcy an environment variable in the form: <var>=[<val>],..."
 }
 
-// InsertTarget inserts the given target into OrderedTargets if it's not
+// InsertTarget inserts the given target into Targets if it's not
 // already there and returns a new slice.
-func InsertTarget(targets OrderedTargets, target *Target) OrderedTargets {
+func InsertTarget(targets Targets, target *Target) Targets {
 	for i, t := range targets {
 		if !t.Less(target) {
 			targets = append(targets, nil)
@@ -308,7 +305,7 @@ func InsertTarget(targets OrderedTargets, target *Target) OrderedTargets {
 
 // RemoveTarget removes the given target from a slice of Target and returns
 // a slice.
-func RemoveTarget(targets OrderedTargets, target *Target) OrderedTargets {
+func RemoveTarget(targets Targets, target *Target) Targets {
 	for i, t := range targets {
 		if target.Match(t) {
 			targets, targets[len(targets)-1] = append(targets[:i], targets[i+1:]...), nil
@@ -322,7 +319,7 @@ func RemoveTarget(targets OrderedTargets, target *Target) OrderedTargets {
 // the slice of Targets. If target has not been explicitly set and there is
 // only a single target available in targets then that one target is considered
 // as matching.
-func FindTarget(targets OrderedTargets, target *Target) *Target {
+func FindTarget(targets Targets, target *Target) *Target {
 	for _, t := range targets {
 		if target.Match(t) {
 			tmp := *t
@@ -335,7 +332,7 @@ func FindTarget(targets OrderedTargets, target *Target) *Target {
 // FindTargetWithDefault is like FindTarget except that if there is only one
 // target in the slice and the requested target has not been explicitly set
 // (IsSet is false) then that one target is returned by default.
-func FindTargetWithDefault(targets OrderedTargets, target *Target) *Target {
+func FindTargetWithDefault(targets Targets, target *Target) *Target {
 	if len(targets) == 1 && !target.IsSet() {
 		tmp := *targets[0]
 		return &tmp

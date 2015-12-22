@@ -22,18 +22,11 @@ import (
 )
 
 const (
+	// TODO(cnicolaou): move these to runutil
 	DefaultDirPerm  = os.FileMode(0755)
 	DefaultFilePerm = os.FileMode(0644)
 	targetDefValue  = "<runtime.GOARCH>-<runtime.GOOS>"
 )
-
-// RegisterTargetFlag registers the commonly used --target flag with
-// the supplied FlagSet.
-func RegisterTargetFlag(flags *flag.FlagSet, target *Target) {
-	*target = DefaultTarget()
-	flags.Var(target, "target", target.Usage())
-	flags.Lookup("target").DefValue = targetDefValue
-}
 
 // RegisterTargetAndEnvFlags registers the commonly used --target and --env
 // flags with the supplied FlagSet
@@ -44,50 +37,17 @@ func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
 	flags.Var(&target.commandLineEnv, "env", target.commandLineEnv.Usage())
 }
 
-// RegisterManifestFlag registers the commonly used --profiles-manifest
-// flag with the supplied FlagSet.
-func RegisterManifestFlag(flags *flag.FlagSet, manifest *string, defaultManifest string) {
-	root := jiri.FindRoot()
-	flags.StringVar(manifest, "profiles-manifest", filepath.Join(root, defaultManifest), "specify the profiles XML manifest filename.")
-	flags.Lookup("profiles-manifest").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
-}
-
-// RegisterProfileFlags registers the commonly used --profiles-manifest, --profiles,
-// --target and --merge-policies flags with the supplied FlagSet.
-func RegisterProfileFlags(flags *flag.FlagSet, profilesMode *ProfilesMode, manifest, profiles *string, defaultManifest string, policies *MergePolicies, target *Target) {
-	flags.Var(profilesMode, "skip-profiles", "if set, no profiles will be used")
-	RegisterProfilesFlag(flags, profiles)
-	RegisterMergePoliciesFlag(flags, policies)
-	RegisterManifestFlag(flags, manifest, defaultManifest)
-	RegisterTargetFlag(flags, target)
-}
-
 // RegisterProfilesFlag registers the --profiles flag
 func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
 	flags.StringVar(profiles, "profiles", "base,jiri", "a comma separated list of profiles to use")
 }
 
-// RegisterMergePoliciesFlag registers the --merge-policies flag
-func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *MergePolicies) {
-	flags.Var(policies, "merge-policies", "specify policies for merging environment variables")
-}
-
-type AppendJiriProfileMode bool
-
-const (
-	AppendJiriProfile      AppendJiriProfileMode = true
-	DoNotAppendJiriProfile                       = false
-)
-
-// InitProfilesFromFlag splits a comma separated list of profile names into
-// a slice and optionally appends the 'jiri' profile if it's not already
-// present.
-func InitProfilesFromFlag(flag string, appendJiriProfile AppendJiriProfileMode) []string {
-	n := strings.Split(flag, ",")
-	if appendJiriProfile == AppendJiriProfile && !strings.Contains(flag, "jiri") {
-		n = append(n, "jiri")
-	}
-	return n
+// RegisterTargetFlag registers the commonly used --target flag with
+// the supplied FlagSet.
+func RegisterTargetFlag(flags *flag.FlagSet, target *Target) {
+	*target = DefaultTarget()
+	flags.Var(target, "target", target.Usage())
+	flags.Lookup("target").DefValue = targetDefValue
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -95,6 +55,7 @@ func InitProfilesFromFlag(flag string, appendJiriProfile AppendJiriProfileMode) 
 // are not successfully logged therein after deleting the entire contents of the
 // dir parameter. Consequently it does not make sense to apply AtomicAction to
 // the same directory in sequence.
+// TODO(cnicolaou): move this to runutil
 func AtomicAction(jirix *jiri.X, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
 		completionLogPath := filepath.Join(dir, ".complete")
@@ -141,6 +102,7 @@ func brewList(jirix *jiri.X) (map[string]bool, error) {
 
 // InstallPackages identifies the packages that need to be installed
 // and installs them using the OS-specific package manager.
+// TODO(cnicolaou): move these to runutil
 func InstallPackages(jirix *jiri.X, pkgs []string) error {
 	installDepsFn := func() error {
 		s := jirix.NewSeq()
@@ -192,60 +154,10 @@ func InstallPackages(jirix *jiri.X, pkgs []string) error {
 	return jirix.NewSeq().Call(installDepsFn, "Install dependencies: "+strings.Join(pkgs, ",")).Done()
 }
 
-// ensureAction ensures that the requested profile and target
-// is installed/uninstalled, installing/uninstalling it if and only if necessary.
-func ensureAction(jirix *jiri.X, action Action, profile string, root jiri.RelPath, target Target) error {
-	verb := ""
-	switch action {
-	case Install:
-		verb = "install"
-	case Uninstall:
-		verb = "uninstall"
-	default:
-		return fmt.Errorf("unrecognised action %v", action)
-	}
-	if jirix.Verbose() || jirix.DryRun() {
-		fmt.Fprintf(jirix.Stdout(), "%s %v %s\n", verb, action, target)
-	}
-	if t := LookupProfileTarget(profile, target); t != nil {
-		if jirix.Verbose() {
-			fmt.Fprintf(jirix.Stdout(), "%v %v is already %sed as %v\n", profile, target, verb, t)
-		}
-		return nil
-	}
-	mgr := LookupManager(profile)
-	if mgr == nil {
-		return fmt.Errorf("profile %v is not supported", profile)
-	}
-	version, err := mgr.VersionInfo().Select(target.Version())
-	if err != nil {
-		return err
-	}
-	target.SetVersion(version)
-	if jirix.Verbose() || jirix.DryRun() {
-		fmt.Fprintf(jirix.Stdout(), "%s %s %s\n", verb, profile, target.DebugString())
-	}
-	if action == Install {
-		return mgr.Install(jirix, root, target)
-	}
-	return mgr.Uninstall(jirix, root, target)
-}
-
-// EnsureProfileTargetIsInstalled ensures that the requested profile and target
-// is installed, installing it if only if necessary.
-func EnsureProfileTargetIsInstalled(jirix *jiri.X, profile string, root jiri.RelPath, target Target) error {
-	return ensureAction(jirix, Install, profile, root, target)
-}
-
-// EnsureProfileTargetIsUninstalled ensures that the requested profile and target
-// are no longer installed.
-func EnsureProfileTargetIsUninstalled(jirix *jiri.X, profile string, root jiri.RelPath, target Target) error {
-	return ensureAction(jirix, Uninstall, profile, root, target)
-}
-
 // Fetch downloads the specified url and saves it to dst.
 // TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
 // so it does not pollute the profile package namespace.
+// TODO(cnicolaou): move these to runutil
 func Fetch(jirix *jiri.X, dst, url string) error {
 	s := jirix.NewSeq()
 	s.Output([]string{"fetching " + url})
@@ -268,6 +180,7 @@ func Fetch(jirix *jiri.X, dst, url string) error {
 // Unzip unzips the file in srcFile and puts resulting files in directory dstDir.
 // TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
 // so it does not pollute the profile package namespace.
+// TODO(cnicolaou): move these to runutil
 func Unzip(jirix *jiri.X, srcFile, dstDir string) error {
 	r, err := zip.OpenReader(srcFile)
 	if err != nil {

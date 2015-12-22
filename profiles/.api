@@ -1,88 +1,47 @@
-pkg profiles, const Append MergeAction
-pkg profiles, const AppendJiriProfile AppendJiriProfileMode
 pkg profiles, const DefaultDirPerm os.FileMode
 pkg profiles, const DefaultFilePerm os.FileMode
-pkg profiles, const DoNotAppendJiriProfile bool
-pkg profiles, const First MergeAction
-pkg profiles, const Ignore MergeAction
-pkg profiles, const IgnoreBaseAndAppend MergeAction
-pkg profiles, const IgnoreBaseAndPrepend MergeAction
-pkg profiles, const IgnoreBaseAndUseFirst MergeAction
-pkg profiles, const IgnoreBaseAndUseLast MergeAction
-pkg profiles, const IgnoreProfiles MergeAction
 pkg profiles, const Install Action
-pkg profiles, const Last MergeAction
 pkg profiles, const Original Version
-pkg profiles, const Prepend MergeAction
-pkg profiles, const SkipProfiles ProfilesMode
 pkg profiles, const Uninstall Action
-pkg profiles, const UseProfiles ProfilesMode
 pkg profiles, const V2 Version
 pkg profiles, const V3 Version
 pkg profiles, const V4 Version
-pkg profiles, func AddProfileTarget(string, Target) error
 pkg profiles, func AtomicAction(*jiri.X, func() error, string, string) error
 pkg profiles, func DefaultTarget() Target
-pkg profiles, func EnsureProfileTargetIsInstalled(*jiri.X, string, jiri.RelPath, Target) error
-pkg profiles, func EnsureProfileTargetIsUninstalled(*jiri.X, string, jiri.RelPath, Target) error
-pkg profiles, func EnvFromProfile(Target, string) []string
 pkg profiles, func Fetch(*jiri.X, string, string) error
-pkg profiles, func FindTarget(OrderedTargets, *Target) *Target
-pkg profiles, func FindTargetWithDefault(OrderedTargets, *Target) *Target
-pkg profiles, func GoEnvironmentFromOS() []string
-pkg profiles, func InitProfilesFromFlag(string, AppendJiriProfileMode) []string
-pkg profiles, func InsertTarget(OrderedTargets, *Target) OrderedTargets
+pkg profiles, func FindTarget(Targets, *Target) *Target
+pkg profiles, func FindTargetWithDefault(Targets, *Target) *Target
+pkg profiles, func InsertTarget(Targets, *Target) Targets
 pkg profiles, func InstallPackages(*jiri.X, []string) error
-pkg profiles, func InstallProfile(string, string)
-pkg profiles, func JiriMergePolicies() MergePolicies
-pkg profiles, func LookupManager(string) Manager
-pkg profiles, func LookupProfile(string) *Profile
-pkg profiles, func LookupProfileTarget(string, Target) *Target
-pkg profiles, func Managers() []string
-pkg profiles, func MergeEnv(map[string]MergePolicy, *envvar.Vars, ...[]string)
 pkg profiles, func NativeTarget() Target
-pkg profiles, func NewConfigHelper(*jiri.X, ProfilesMode, string) (*ConfigHelper, error)
-pkg profiles, func NewTarget(string) (Target, error)
-pkg profiles, func NewTargetWithEnv(string, string) (Target, error)
+pkg profiles, func NewDB() *DB
+pkg profiles, func NewTarget(string, ...string) (Target, error)
 pkg profiles, func NewVersionInfo(string, map[string]interface{}, string) *VersionInfo
-pkg profiles, func ProfileMergePolicies() MergePolicies
-pkg profiles, func Profiles() []string
-pkg profiles, func Read(*jiri.X, string) error
-pkg profiles, func Register(string, Manager)
-pkg profiles, func RegisterManifestFlag(*flag.FlagSet, *string, string)
-pkg profiles, func RegisterMergePoliciesFlag(*flag.FlagSet, *MergePolicies)
-pkg profiles, func RegisterProfileFlags(*flag.FlagSet, *ProfilesMode, *string, *string, string, *MergePolicies, *Target)
 pkg profiles, func RegisterProfilesFlag(*flag.FlagSet, *string)
 pkg profiles, func RegisterTargetAndEnvFlags(*flag.FlagSet, *Target)
 pkg profiles, func RegisterTargetFlag(*flag.FlagSet, *Target)
-pkg profiles, func RemoveProfileTarget(string, Target) bool
-pkg profiles, func RemoveTarget(OrderedTargets, *Target) OrderedTargets
-pkg profiles, func SchemaVersion() Version
-pkg profiles, func UnsetGoEnvMap(map[string]string)
-pkg profiles, func UnsetGoEnvVars(*envvar.Vars)
+pkg profiles, func RemoveTarget(Targets, *Target) Targets
 pkg profiles, func Unzip(*jiri.X, string, string) error
-pkg profiles, func UpdateProfileTarget(string, Target) error
-pkg profiles, func WithDefaultVersion(Target) Target
-pkg profiles, func Write(*jiri.X, string) error
-pkg profiles, method (*ConfigHelper) GoPath() string
-pkg profiles, method (*ConfigHelper) JiriProfile() []string
-pkg profiles, method (*ConfigHelper) MergeEnv(map[string]MergePolicy, ...[]string)
-pkg profiles, method (*ConfigHelper) MergeEnvFromProfiles(map[string]MergePolicy, Target, ...string)
-pkg profiles, method (*ConfigHelper) PrependToPATH(string)
-pkg profiles, method (*ConfigHelper) Root() string
-pkg profiles, method (*ConfigHelper) SkippingProfiles() bool
-pkg profiles, method (*ConfigHelper) VDLPath() string
-pkg profiles, method (*ConfigHelper) ValidateRequestedProfilesAndTarget([]string, Target) error
+pkg profiles, method (*DB) AddProfileTarget(string, Target) error
+pkg profiles, method (*DB) EnvFromProfile(string, Target) []string
+pkg profiles, method (*DB) Filename() string
+pkg profiles, method (*DB) InstallProfile(string, string) *Profile
+pkg profiles, method (*DB) LookupProfile(string) *Profile
+pkg profiles, method (*DB) LookupProfileTarget(string, Target) *Target
+pkg profiles, method (*DB) Names() []string
+pkg profiles, method (*DB) Profiles() []*Profile
+pkg profiles, method (*DB) Read(*jiri.X, string) error
+pkg profiles, method (*DB) RemoveProfileTarget(string, Target) bool
+pkg profiles, method (*DB) SchemaVersion() Version
+pkg profiles, method (*DB) UpdateProfileTarget(string, Target) error
+pkg profiles, method (*DB) Write(*jiri.X, string) error
 pkg profiles, method (*Environment) Get() interface{}
 pkg profiles, method (*Environment) Set(string) error
 pkg profiles, method (*Environment) String() string
 pkg profiles, method (*Environment) Usage() string
-pkg profiles, method (*MergePolicy) String() string
-pkg profiles, method (*Profile) Targets() OrderedTargets
-pkg profiles, method (*ProfilesMode) Get() interface{}
-pkg profiles, method (*ProfilesMode) IsBoolFlag() bool
-pkg profiles, method (*ProfilesMode) Set(string) error
-pkg profiles, method (*ProfilesMode) String() string
+pkg profiles, method (*Profile) Name() string
+pkg profiles, method (*Profile) Root() string
+pkg profiles, method (*Profile) Targets() Targets
 pkg profiles, method (*Target) Arch() string
 pkg profiles, method (*Target) Less(*Target) bool
 pkg profiles, method (*Target) OS() string
@@ -99,15 +58,6 @@ pkg profiles, method (*VersionInfo) Lookup(string, interface{}) error
 pkg profiles, method (*VersionInfo) Select(string) (string, error)
 pkg profiles, method (*VersionInfo) String() string
 pkg profiles, method (*VersionInfo) Supported() []string
-pkg profiles, method (MergePolicies) DebugString() string
-pkg profiles, method (MergePolicies) Get() interface{}
-pkg profiles, method (MergePolicies) Set(string) error
-pkg profiles, method (MergePolicies) String() string
-pkg profiles, method (MergePolicies) Usage() string
-pkg profiles, method (OrderedTargets) Len() int
-pkg profiles, method (OrderedTargets) Less(int, int) bool
-pkg profiles, method (OrderedTargets) Sort()
-pkg profiles, method (OrderedTargets) Swap(int, int)
 pkg profiles, method (Target) CommandLineEnv() Environment
 pkg profiles, method (Target) CrossCompiling() bool
 pkg profiles, method (Target) DebugString() string
@@ -115,48 +65,27 @@ pkg profiles, method (Target) Get() interface{}
 pkg profiles, method (Target) IsSet() bool
 pkg profiles, method (Target) Match(*Target) bool
 pkg profiles, method (Target) String() string
+pkg profiles, method (Targets) Len() int
+pkg profiles, method (Targets) Less(int, int) bool
+pkg profiles, method (Targets) Sort()
+pkg profiles, method (Targets) Swap(int, int)
 pkg profiles, type Action int
-pkg profiles, type AppendJiriProfileMode bool
-pkg profiles, type ConfigHelper struct
-pkg profiles, type ConfigHelper struct, embedded *envvar.Vars
+pkg profiles, type DB struct
 pkg profiles, type Environment struct
 pkg profiles, type Environment struct, Vars []string
 pkg profiles, type Manager interface { AddFlags, Info, Install, Name, String, Uninstall, VersionInfo }
 pkg profiles, type Manager interface, AddFlags(*flag.FlagSet, Action)
 pkg profiles, type Manager interface, Info() string
-pkg profiles, type Manager interface, Install(*jiri.X, jiri.RelPath, Target) error
+pkg profiles, type Manager interface, Install(*jiri.X, *DB, jiri.RelPath, Target) error
 pkg profiles, type Manager interface, Name() string
 pkg profiles, type Manager interface, String() string
-pkg profiles, type Manager interface, Uninstall(*jiri.X, jiri.RelPath, Target) error
+pkg profiles, type Manager interface, Uninstall(*jiri.X, *DB, jiri.RelPath, Target) error
 pkg profiles, type Manager interface, VersionInfo() *VersionInfo
-pkg profiles, type MergeAction int
-pkg profiles, type MergePolicies map[string]MergePolicy
-pkg profiles, type MergePolicy struct
-pkg profiles, type MergePolicy struct, Action MergeAction
-pkg profiles, type MergePolicy struct, Separator string
-pkg profiles, type OrderedTargets []*Target
 pkg profiles, type Profile struct
-pkg profiles, type Profile struct, Name string
-pkg profiles, type Profile struct, Root string
-pkg profiles, type ProfilesMode bool
 pkg profiles, type Target struct
 pkg profiles, type Target struct, Env Environment
 pkg profiles, type Target struct, InstallationDir string
 pkg profiles, type Target struct, UpdateTime time.Time
+pkg profiles, type Targets []*Target
 pkg profiles, type Version int
 pkg profiles, type VersionInfo struct
-pkg profiles, var AppendFlag MergePolicy
-pkg profiles, var AppendPath MergePolicy
-pkg profiles, var GoFlags []string
-pkg profiles, var IgnoreBaseAppendFlag MergePolicy
-pkg profiles, var IgnoreBaseAppendPath MergePolicy
-pkg profiles, var IgnoreBasePrependFlag MergePolicy
-pkg profiles, var IgnoreBasePrependPath MergePolicy
-pkg profiles, var IgnoreBaseUseFirst MergePolicy
-pkg profiles, var IgnoreBaseUseLast MergePolicy
-pkg profiles, var IgnoreVariable MergePolicy
-pkg profiles, var PrependFlag MergePolicy
-pkg profiles, var PrependPath MergePolicy
-pkg profiles, var UseBaseIgnoreProfiles MergePolicy
-pkg profiles, var UseFirst MergePolicy
-pkg profiles, var UseLast MergePolicy

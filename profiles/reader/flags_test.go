@@ -2,14 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package profiles
+package reader
 
 import "testing"
-
-// Clear resets the current database and is intended for use from tests only.
-func Clear() {
-	db = newDB()
-}
 
 func TestAppendJiriProfile(t *testing.T) {
 	p := InitProfilesFromFlag("foo", DoNotAppendJiriProfile)

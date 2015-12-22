@@ -4,7 +4,7 @@
 
 package commandline
 
-var helpMsg = `
+var HelpMsg = `
 Profiles are used to manage external sofware dependencies and offer a balance
 between providing no support at all and a full blown package manager.
 Profiles can be built natively as well as being cross compiled.
@@ -19,16 +19,14 @@ Targets
 Profiles generally refer to uncompiled source code that needs to be compiled for
 a specific "target". Targets hence represent compiled code and consist of:
 
-1. A 'tag' that can be used a short hand for refering to a target
+1. An 'architecture' that refers to the CPU to be generate code for
 
-2. An 'architecture' that refers to the CPU to be generate code for
+2. An 'operating system' that refers to the operating system to generate code for
 
-3. An 'operating system' that refers to the operating system to generate code for
-
-4. A lexicographically orderd set of supported versions, one of which is designated
+3. A lexicographically orderd set of supported versions, one of which is designated
 as the default.
 
-5. An 'environment' which is a set of environment variables to use when compiling the profile
+4. An 'environment' which is a set of environment variables to use when compiling the profile
 
 Targets thus provide the basic support needed for cross compilation.
 
@@ -57,14 +55,14 @@ to access the environment variables specified and stored in each profile
 installation and a command (recreate) to generate a list of commands that
 can be run to recreate the currently installed profiles.
 
-The Manifest
+The Profiles Database
 
-The profiles packages manages a manifest that tracks the installed profiles
+The profiles packages manages a database that tracks the installed profiles
 and their configurations. Other command line tools and packages are expected
-to read information about the currently installed profiles from this manifest
+to read information about the currently installed profiles from this database
 via the profiles package. The profile command line tools support displaying the
-manifest (via the list command) or for specifying an alternate version of the
-file (via the -manifest flag) which is generally useful for debugging.
+database (via the list command) or for specifying an alternate version of the
+file (via the -profiles-db flag) which is generally useful for debugging.
 
 Adding Profiles
 
