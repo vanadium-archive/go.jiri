@@ -1,0 +1,73 @@
+pkg gitutil, func Error(string, string, ...string) GitError
+pkg gitutil, func New(runutil.Sequence, string) *Git
+pkg gitutil, method (*Committer) Commit(string) error
+pkg gitutil, method (*Git) Add(string) error
+pkg gitutil, method (*Git) AddRemote(string, string) error
+pkg gitutil, method (*Git) BranchExists(string) bool
+pkg gitutil, method (*Git) BranchesDiffer(string, string) (bool, error)
+pkg gitutil, method (*Git) CheckoutBranch(string, ...CheckoutOpt) error
+pkg gitutil, method (*Git) Clone(string, string) error
+pkg gitutil, method (*Git) Commit() error
+pkg gitutil, method (*Git) CommitAmend() error
+pkg gitutil, method (*Git) CommitAmendWithMessage(string) error
+pkg gitutil, method (*Git) CommitAndEdit() error
+pkg gitutil, method (*Git) CommitFile(string, string) error
+pkg gitutil, method (*Git) CommitMessages(string, string) (string, error)
+pkg gitutil, method (*Git) CommitWithMessage(string) error
+pkg gitutil, method (*Git) CommitWithMessageAndEdit(string) error
+pkg gitutil, method (*Git) Committers() ([]string, error)
+pkg gitutil, method (*Git) CountCommits(string, string) (int, error)
+pkg gitutil, method (*Git) CreateAndCheckoutBranch(string) error
+pkg gitutil, method (*Git) CreateBranch(string) error
+pkg gitutil, method (*Git) CreateBranchWithUpstream(string, string) error
+pkg gitutil, method (*Git) CurrentBranchName() (string, error)
+pkg gitutil, method (*Git) CurrentRevision() (string, error)
+pkg gitutil, method (*Git) CurrentRevisionOfBranch(string) (string, error)
+pkg gitutil, method (*Git) DeleteBranch(string, ...DeleteBranchOpt) error
+pkg gitutil, method (*Git) Fetch(string) error
+pkg gitutil, method (*Git) FetchRefspec(string, string) error
+pkg gitutil, method (*Git) FilesWithUncommittedChanges() ([]string, error)
+pkg gitutil, method (*Git) GetBranches(...string) ([]string, string, error)
+pkg gitutil, method (*Git) HasUncommittedChanges() (bool, error)
+pkg gitutil, method (*Git) HasUntrackedFiles() (bool, error)
+pkg gitutil, method (*Git) Init(string) error
+pkg gitutil, method (*Git) IsFileCommitted(string) bool
+pkg gitutil, method (*Git) LatestCommitMessage() (string, error)
+pkg gitutil, method (*Git) Log(string, string, string) ([][]string, error)
+pkg gitutil, method (*Git) Merge(string, ...MergeOpt) error
+pkg gitutil, method (*Git) MergeInProgress() (bool, error)
+pkg gitutil, method (*Git) ModifiedFiles(string, string) ([]string, error)
+pkg gitutil, method (*Git) NewCommitter(bool) *Committer
+pkg gitutil, method (*Git) Pull(string, string) error
+pkg gitutil, method (*Git) Push(string, string, ...PushOpt) error
+pkg gitutil, method (*Git) Rebase(string) error
+pkg gitutil, method (*Git) RebaseAbort() error
+pkg gitutil, method (*Git) RemoteUrl(string) (string, error)
+pkg gitutil, method (*Git) Remove(...string) error
+pkg gitutil, method (*Git) RemoveUntrackedFiles() error
+pkg gitutil, method (*Git) Reset(string, ...ResetOpt) error
+pkg gitutil, method (*Git) SetRemoteUrl(string, string) error
+pkg gitutil, method (*Git) Stash() (bool, error)
+pkg gitutil, method (*Git) StashPop() error
+pkg gitutil, method (*Git) StashSize() (int, error)
+pkg gitutil, method (*Git) TopLevel() (string, error)
+pkg gitutil, method (*Git) TrackedFiles() ([]string, error)
+pkg gitutil, method (*Git) UntrackedFiles() ([]string, error)
+pkg gitutil, method (*Git) Version() (int, int, error)
+pkg gitutil, method (GitError) Error() string
+pkg gitutil, type CheckoutOpt interface, unexported methods
+pkg gitutil, type CommitOpt interface, unexported methods
+pkg gitutil, type Committer struct
+pkg gitutil, type DeleteBranchOpt interface, unexported methods
+pkg gitutil, type ForceOpt bool
+pkg gitutil, type Git struct
+pkg gitutil, type GitError struct
+pkg gitutil, type MergeOpt interface, unexported methods
+pkg gitutil, type MessageOpt string
+pkg gitutil, type ModeOpt string
+pkg gitutil, type PushOpt interface, unexported methods
+pkg gitutil, type ResetOnFailureOpt bool
+pkg gitutil, type ResetOpt interface, unexported methods
+pkg gitutil, type SquashOpt bool
+pkg gitutil, type StrategyOpt string
+pkg gitutil, type VerifyOpt bool

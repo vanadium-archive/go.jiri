@@ -39,14 +39,14 @@ func (ge GitError) Error() string {
 }
 
 type Git struct {
-	r       *runutil.Run
+	s       runutil.Sequence
 	rootDir string
 }
 
 // New is the Git factory.
-func New(r *runutil.Run, rootDir string) *Git {
+func New(s runutil.Sequence, rootDir string) *Git {
 	return &Git{
-		r:       r,
+		s:       s,
 		rootDir: rootDir,
 	}
 }
@@ -125,13 +125,7 @@ func (g *Git) CommitAmendWithMessage(message string) error {
 // edit the commit message.
 func (g *Git) CommitAndEdit() error {
 	args := []string{"commit", "--allow-empty"}
-	var stderr bytes.Buffer
-	// In order for the editing to work correctly with
-	// terminal-based editors, notably "vim", use os.Stdout.
-	opts := g.r.Opts()
-	opts.Stdout = os.Stdout
-	opts.Stderr = &stderr
-	return g.commandWithOpts(opts, args...)
+	return g.runInteractive(args...)
 }
 
 // CommitFile commits the given file with the given commit message.
@@ -163,19 +157,13 @@ func (g *Git) CommitWithMessage(message string) error {
 // default.
 func (g *Git) CommitWithMessageAndEdit(message string) error {
 	args := []string{"commit", "--allow-empty", "-e", "-m", message}
-	var stderr bytes.Buffer
-	// In order for the editing to work correctly with
-	// terminal-based editors, notably "vim", use os.Stdout.
-	opts := g.r.Opts()
-	opts.Stdout = os.Stdout
-	opts.Stderr = &stderr
-	return g.commandWithOpts(opts, args...)
+	return g.runInteractive(args...)
 }
 
 // Committers returns a list of committers for the current repository
 // along with the number of their commits.
 func (g *Git) Committers() ([]string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "shortlog", "-s", "-n", "-e")
+	out, err := g.runOutputNoDryRun("shortlog", "-s", "-n", "-e")
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +178,7 @@ func (g *Git) CountCommits(branch, base string) (int, error) {
 		args = append(args, "^"+base)
 	}
 	args = append(args, "--")
-	out, err := g.runOutputWithOpts(g.disableDryRun(), args...)
+	out, err := g.runOutputNoDryRun(args...)
 	if err != nil {
 		return 0, err
 	}
@@ -223,7 +211,7 @@ func (g *Git) CreateBranchWithUpstream(branch, upstream string) error {
 
 // CurrentBranchName returns the name of the current branch.
 func (g *Git) CurrentBranchName() (string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", "--abbrev-ref", "HEAD")
+	out, err := g.runOutputNoDryRun("rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +228,7 @@ func (g *Git) CurrentRevision() (string, error) {
 
 // CurrentRevisionOfBranch returns the current revision of the given branch.
 func (g *Git) CurrentRevisionOfBranch(branch string) (string, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", branch)
+	out, err := g.runOutputNoDryRun("rev-parse", branch)
 	if err != nil {
 		return "", err
 	}
@@ -299,7 +287,7 @@ func (g *Git) FilesWithUncommittedChanges() ([]string, error) {
 // (e.g. --merged).
 func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	args = append([]string{"branch"}, args...)
-	out, err := g.runOutputWithOpts(g.disableDryRun(), args...)
+	out, err := g.runOutputNoDryRun(args...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -427,8 +415,8 @@ func (g *Git) MergeInProgress() (bool, error) {
 		return false, err
 	}
 	mergeFile := filepath.Join(repoRoot, ".git", "MERGE_HEAD")
-	if _, err := g.r.Stat(mergeFile); err != nil {
-		if os.IsNotExist(err) {
+	if _, err := g.s.Stat(mergeFile); err != nil {
+		if runutil.IsNotExist(err) {
 			return false, nil
 		}
 		return false, err
@@ -509,7 +497,7 @@ func (g *Git) Remove(fileNames ...string) error {
 // RemoteUrl gets the url of the remote with the given name.
 func (g *Git) RemoteUrl(name string) (string, error) {
 	configKey := fmt.Sprintf("remote.%s.url", name)
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "config", "--get", configKey)
+	out, err := g.runOutputNoDryRun("config", "--get", configKey)
 	if err != nil {
 		return "", err
 	}
@@ -584,7 +572,7 @@ func (g *Git) StashPop() error {
 // TopLevel returns the top level path of the current repository.
 func (g *Git) TopLevel() (string, error) {
 	// TODO(sadovsky): If g.rootDir is set, perhaps simply return that?
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "rev-parse", "--show-toplevel")
+	out, err := g.runOutputNoDryRun("rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", err
 	}
@@ -611,7 +599,7 @@ func (g *Git) UntrackedFiles() ([]string, error) {
 
 // Version returns the major and minor git version.
 func (g *Git) Version() (int, int, error) {
-	out, err := g.runOutputWithOpts(g.disableDryRun(), "version")
+	out, err := g.runOutputNoDryRun("version")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -637,66 +625,74 @@ func (g *Git) Version() (int, int, error) {
 	return major, minor, nil
 }
 
-func (g *Git) disableDryRun() runutil.Opts {
-	opts := g.r.Opts()
-	if opts.DryRun {
-		// Disable the dry run option as this function has no effect and
-		// doing so results in more informative "dry run" output.
-		opts.DryRun = false
-		opts.Verbose = true
-	}
-	return opts
-}
-
-func (g *Git) commandWithOpts(opts runutil.Opts, args ...string) error {
-	if g.rootDir != "" {
-		opts.Dir = g.rootDir
-	}
+func fnlArgs(args []string) []string {
 	if runutil.IsFNLHost() {
 		// TODO(bprosnitz) Remove this after certificates are installed on FNL
 		// Disable SSL verification because certificates are not present on FNL.
-		args = append([]string{"-c", "http.sslVerify=false"}, args...)
+		return append([]string{"-c", "http.sslVerify=false"}, args...)
 	}
-	if err := g.r.CommandWithOpts(opts, "git", args...); err != nil {
-		stdout, stderr := "", ""
-		buf, ok := opts.Stdout.(*bytes.Buffer)
-		if ok {
-			stdout = buf.String()
-		}
-		buf, ok = opts.Stderr.(*bytes.Buffer)
-		if ok {
-			stderr = buf.String()
-		}
-		return Error(stdout, stderr, args...)
-	}
-	return nil
+	return args
 }
 
 func (g *Git) run(args ...string) error {
 	var stdout, stderr bytes.Buffer
-	opts := g.r.Opts()
-	opts.Stdout = &stdout
-	opts.Stderr = &stderr
-	return g.commandWithOpts(opts, args...)
+	capture := func(s runutil.Sequence) runutil.Sequence { return s.Capture(&stdout, &stderr) }
+	if err := g.runWithFn(capture, args...); err != nil {
+		return Error(stdout.String(), stderr.String(), args...)
+	}
+	return nil
+}
+
+func trimOutput(o string) []string {
+	output := strings.TrimSpace(o)
+	if len(output) == 0 {
+		return nil
+	}
+	return strings.Split(output, "\n")
 }
 
 func (g *Git) runOutput(args ...string) ([]string, error) {
-	return g.runOutputWithOpts(g.r.Opts(), args...)
+	var stdout, stderr bytes.Buffer
+	fn := func(s runutil.Sequence) runutil.Sequence { return s.Capture(&stdout, &stderr) }
+	if err := g.runWithFn(fn, args...); err != nil {
+		return nil, Error(stdout.String(), stderr.String(), args...)
+	}
+	return trimOutput(stdout.String()), nil
 }
 
-func (g *Git) runOutputWithOpts(opts runutil.Opts, args ...string) ([]string, error) {
+func (g *Git) runOutputNoDryRun(args ...string) ([]string, error) {
 	var stdout, stderr bytes.Buffer
-	opts.Stdout = &stdout
-	opts.Stderr = &stderr
-	if err := g.commandWithOpts(opts, args...); err != nil {
-		return nil, err
+	fn := func(s runutil.Sequence) runutil.Sequence {
+		dryrun, _ := s.RunOpts()
+		if dryrun {
+			return s.DryRun(false).Verbose(true).Capture(&stdout, &stderr)
+		}
+		return s.Capture(&stdout, &stderr)
 	}
-	output := strings.TrimSpace(stdout.String())
-	if output == "" {
-		return nil, nil
-	} else {
-		return strings.Split(output, "\n"), nil
+	if err := g.runWithFn(fn, args...); err != nil {
+		return nil, Error(stdout.String(), stderr.String(), args...)
 	}
+	return trimOutput(stdout.String()), nil
+}
+
+func (g *Git) runInteractive(args ...string) error {
+	var stderr bytes.Buffer
+	// In order for the editing to work correctly with
+	// terminal-based editors, notably "vim", use os.Stdout.
+	capture := func(s runutil.Sequence) runutil.Sequence { return s.Capture(os.Stdout, &stderr) }
+	if err := g.runWithFn(capture, args...); err != nil {
+		return Error("", stderr.String(), args...)
+	}
+	return nil
+}
+
+func (g *Git) runWithFn(fn func(s runutil.Sequence) runutil.Sequence, args ...string) error {
+	g.s.Dir(g.rootDir)
+	args = fnlArgs(args)
+	if fn == nil {
+		fn = func(s runutil.Sequence) runutil.Sequence { return s }
+	}
+	return fn(g.s).Last("git", args...)
 }
 
 // Committer encapsulates the process of create a commit.

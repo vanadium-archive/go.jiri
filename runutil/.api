@@ -5,56 +5,28 @@ pkg runutil, func IsNotExist(error) bool
 pkg runutil, func IsPermission(error) bool
 pkg runutil, func IsTimeout(error) bool
 pkg runutil, func LookPath(string, map[string]string) (string, error)
-pkg runutil, func NewRun(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Run
 pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) Sequence
-pkg runutil, func NewStart(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) *Start
 pkg runutil, func TranslateExitCode(error) error
-pkg runutil, method (*Run) Chdir(string) error
-pkg runutil, method (*Run) Chmod(string, os.FileMode) error
-pkg runutil, method (*Run) Command(string, ...string) error
-pkg runutil, method (*Run) CommandWithOpts(Opts, string, ...string) error
-pkg runutil, method (*Run) Copy(*os.File, io.Reader) (int64, error)
-pkg runutil, method (*Run) Create(string) (*os.File, error)
-pkg runutil, method (*Run) DirectoryExists(string) bool
-pkg runutil, method (*Run) FileExists(string) bool
-pkg runutil, method (*Run) Function(func() error, string, ...interface{}) error
-pkg runutil, method (*Run) FunctionWithOpts(Opts, func() error, string, ...interface{}) error
-pkg runutil, method (*Run) IsDir(string) (bool, error)
-pkg runutil, method (*Run) Lstat(string) (os.FileInfo, error)
-pkg runutil, method (*Run) MkdirAll(string, os.FileMode) error
-pkg runutil, method (*Run) Open(string) (*os.File, error)
-pkg runutil, method (*Run) OpenFile(string, int, os.FileMode) (*os.File, error)
-pkg runutil, method (*Run) Output([]string)
-pkg runutil, method (*Run) OutputWithOpts(Opts, []string)
-pkg runutil, method (*Run) ReadDir(string) ([]os.FileInfo, error)
-pkg runutil, method (*Run) ReadFile(string) ([]byte, error)
-pkg runutil, method (*Run) Readlink(string) (string, error)
-pkg runutil, method (*Run) Remove(string) error
-pkg runutil, method (*Run) RemoveAll(string) error
-pkg runutil, method (*Run) Rename(string, string) error
-pkg runutil, method (*Run) Stat(string) (os.FileInfo, error)
-pkg runutil, method (*Run) Symlink(string, string) error
-pkg runutil, method (*Run) TempDir(string, string) (string, error)
-pkg runutil, method (*Run) TempFile(string, string) (*os.File, error)
-pkg runutil, method (*Run) TimedCommand(time.Duration, string, ...string) error
-pkg runutil, method (*Run) TimedCommandWithOpts(time.Duration, Opts, string, ...string) error
-pkg runutil, method (*Run) WriteFile(string, []byte, os.FileMode) error
-pkg runutil, method (*Start) Command(string, ...string) (*exec.Cmd, error)
-pkg runutil, method (*Start) CommandWithOpts(Opts, string, ...string) (*exec.Cmd, error)
-pkg runutil, method (Run) Opts() Opts
+pkg runutil, method (*Handle) Kill() error
+pkg runutil, method (*Handle) Pid() int
+pkg runutil, method (*Handle) Signal(os.Signal) error
+pkg runutil, method (*Handle) Wait() error
+pkg runutil, method (Sequence) AssertDirExists(string) Sequence
+pkg runutil, method (Sequence) AssertFileExists(string) Sequence
 pkg runutil, method (Sequence) Call(func() error, string, ...interface{}) Sequence
 pkg runutil, method (Sequence) Capture(io.Writer, io.Writer) Sequence
 pkg runutil, method (Sequence) Chdir(string) Sequence
 pkg runutil, method (Sequence) Chmod(string, os.FileMode) Sequence
 pkg runutil, method (Sequence) Copy(*os.File, io.Reader) (int64, error)
 pkg runutil, method (Sequence) Create(string) (*os.File, error)
-pkg runutil, method (Sequence) DirectoryExists(string) (bool, error)
+pkg runutil, method (Sequence) Dir(string) Sequence
 pkg runutil, method (Sequence) Done() error
+pkg runutil, method (Sequence) DryRun(bool) Sequence
 pkg runutil, method (Sequence) Env(map[string]string) Sequence
 pkg runutil, method (Sequence) Error() error
-pkg runutil, method (Sequence) FileExists(string) (bool, error)
 pkg runutil, method (Sequence) Fprintf(io.Writer, string, ...interface{}) Sequence
 pkg runutil, method (Sequence) IsDir(string) (bool, error)
+pkg runutil, method (Sequence) IsFile(string) (bool, error)
 pkg runutil, method (Sequence) Last(string, ...string) error
 pkg runutil, method (Sequence) Lstat(string) (os.FileInfo, error)
 pkg runutil, method (Sequence) MkdirAll(string, os.FileMode) Sequence
@@ -71,22 +43,14 @@ pkg runutil, method (Sequence) Remove(string) Sequence
 pkg runutil, method (Sequence) RemoveAll(string) Sequence
 pkg runutil, method (Sequence) Rename(string, string) Sequence
 pkg runutil, method (Sequence) Run(string, ...string) Sequence
+pkg runutil, method (Sequence) RunOpts() (bool, bool)
+pkg runutil, method (Sequence) Start(string, ...string) (*Handle, error)
 pkg runutil, method (Sequence) Stat(string) (os.FileInfo, error)
 pkg runutil, method (Sequence) Symlink(string, string) Sequence
 pkg runutil, method (Sequence) TempDir(string, string) (string, error)
+pkg runutil, method (Sequence) TempFile(string, string) (*os.File, error)
 pkg runutil, method (Sequence) Timeout(time.Duration) Sequence
 pkg runutil, method (Sequence) Verbose(bool) Sequence
 pkg runutil, method (Sequence) WriteFile(string, []byte, os.FileMode) Sequence
-pkg runutil, method (Start) Opts() Opts
-pkg runutil, type Opts struct
-pkg runutil, type Opts struct, Color bool
-pkg runutil, type Opts struct, Dir string
-pkg runutil, type Opts struct, DryRun bool
-pkg runutil, type Opts struct, Env map[string]string
-pkg runutil, type Opts struct, Stderr io.Writer
-pkg runutil, type Opts struct, Stdin io.Reader
-pkg runutil, type Opts struct, Stdout io.Writer
-pkg runutil, type Opts struct, Verbose bool
-pkg runutil, type Run struct
+pkg runutil, type Handle struct
 pkg runutil, type Sequence struct
-pkg runutil, type Start struct

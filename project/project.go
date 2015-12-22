@@ -704,20 +704,10 @@ func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
 // setProjectRevisions sets the current project revision from the master for
 // each project as found on the filesystem
 func setProjectRevisions(jirix *jiri.X, projects Projects) (_ Projects, e error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-
-	s := jirix.NewSeq()
 	for name, project := range projects {
 		switch project.Protocol {
 		case "git":
-			if err := s.Chdir(project.Path).Done(); err != nil {
-				return nil, err
-			}
-			revision, err := jirix.Git().CurrentRevisionOfBranch("master")
+			revision, err := jirix.Git(tool.RootDirOpt(project.Path)).CurrentRevisionOfBranch("master")
 			if err != nil {
 				return nil, err
 			}

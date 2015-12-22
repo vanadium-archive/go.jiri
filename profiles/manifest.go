@@ -297,14 +297,10 @@ func (pdb *DB) Write(jirix *jiri.X, filename string) error {
 	newName := filename + fmt.Sprintf(".%d", time.Now().UnixNano())
 
 	s := jirix.NewSeq()
-	if err := s.WriteFile(newName, data, defaultFileMode).Done(); err != nil {
+	if err := s.WriteFile(newName, data, defaultFileMode).
+		AssertFileExists(filename).
+		Rename(filename, oldName).Done(); err != nil && !runutil.IsNotExist(err) {
 		return err
-	}
-
-	if exists, _ := s.FileExists(filename); exists {
-		if err := s.Rename(filename, oldName).Done(); err != nil {
-			return err
-		}
 	}
 
 	if err := s.Rename(newName, filename).Done(); err != nil {

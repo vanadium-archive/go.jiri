@@ -81,18 +81,20 @@ type Sequence struct {
 }
 
 type sequence struct {
-	r                            *Run
+	r                            *executor
 	err                          error
 	caller                       string
 	stdout, stderr               io.Writer
 	stdin                        io.Reader
 	reading                      bool
 	env                          map[string]string
-	opts                         *Opts
+	opts                         *opts
 	defaultStdin                 io.Reader
 	defaultStdout, defaultStderr io.Writer
 	dirs                         []string
 	verbosity                    *bool
+	dryRun                       *bool
+	cmdDir                       string
 	timeout                      time.Duration
 	serializedWriterLock         sync.Mutex
 }
@@ -102,12 +104,19 @@ type sequence struct {
 func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) Sequence {
 	s := Sequence{
 		&sequence{
-			r:            NewRun(env, stdin, stdout, stderr, color, dryRun, verbose),
+			r:            newExecutor(env, stdin, stdout, stderr, color, dryRun, verbose),
 			defaultStdin: stdin,
 		},
 	}
 	s.defaultStdout, s.defaultStderr = s.serializeWriter(stdout), s.serializeWriter(stderr)
 	return s
+}
+
+// RunOpts returns the values of dryRun and verbose that were used to
+// create this sequence.
+func (s Sequence) RunOpts() (dryRun bool, verbose bool) {
+	opts := s.getOpts()
+	return opts.dryRun, opts.verbose
 }
 
 // Capture arranges for the next call to Run or Last to write its stdout and
@@ -117,10 +126,10 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 // to NewSequence. ioutil.Discard should be used to discard output.
 func (s Sequence) Capture(stdout, stderr io.Writer) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	s.stdout, s.stderr = stdout, stderr
-	return Sequence{s.sequence}
+	return s
 }
 
 // Read arranges for the next call to Run or Last to read from the supplied
@@ -128,58 +137,81 @@ func (s Sequence) Capture(stdout, stderr io.Writer) Sequence {
 // beyond the next one. Specifying nil will result in reading from os.DevNull.
 func (s Sequence) Read(stdin io.Reader) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	s.reading = true
 	s.stdin = stdin
-	return Sequence{s.sequence}
+	return s
 }
 
-// Env arranges for the next call to Run, Call or Last to use the supplied
+// Env arranges for the next call to Run, Call, Start or Last to use the supplied
 // environment variables. This will be cleared and not used for any calls
 // to Run, Call or Last beyond the next one.
 func (s Sequence) Env(env map[string]string) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	s.env = env
-	return Sequence{s.sequence}
+	return s
 }
 
-// Verbosity arranges for the next call to Run, Call or Last to use the specified
-// verbosity. This will be cleared and not used for any calls
+// Verbosity arranges for the next call to Run, Call, Start or Last to use the
+// specified verbosity. This will be cleared and not used for any calls
 // to Run, Call or Last beyond the next one.
 func (s Sequence) Verbose(verbosity bool) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	s.verbosity = &verbosity
-	return Sequence{s.sequence}
+	return s
+}
+
+// Dir sets the working directory for the next subprocess that is created
+// via Run, Call, Start or Last to the supplied parameter. This is the only
+// way to safely set the working directory of a command when multiple threads
+// are used.
+func (s Sequence) Dir(dir string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	s.cmdDir = dir
+	return s
+}
+
+// DryRun arranges for the next call to Run, Call, Start or Last to use the
+// specified dry run value. This will be cleared and not used for any calls
+// to Run, Call or Last beyond the next one.
+func (s Sequence) DryRun(dryRun bool) Sequence {
+	if s.err != nil {
+		return s
+	}
+	s.dryRun = &dryRun
+	return s
 }
 
 // internal getOpts that doesn't override stdin, stdout, stderr
-func (s Sequence) getOpts() Opts {
-	var opts Opts
+func (s Sequence) getOpts() opts {
+	var opts opts
 	if s.opts != nil {
 		opts = *s.opts
 	} else {
-		opts = s.r.Opts()
+		opts = s.r.opts
 	}
 	return opts
 }
 
-// Timeout arranges for the next call to Run or Last to be subject to the
+// Timeout arranges for the next call to Run, Start or Last to be subject to the
 // specified timeout. The timeout will be cleared and not used any calls to Run
 // or Last beyond the next one. It has no effect for calls to Call.
 func (s Sequence) Timeout(timeout time.Duration) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	s.timeout = timeout
-	return Sequence{s.sequence}
+	return s
 }
 
-func (s Sequence) setOpts(opts Opts) {
+func (s Sequence) setOpts(opts opts) {
 	s.opts = &opts
 }
 
@@ -196,7 +228,7 @@ func (s Sequence) Error() error {
 	if s.err != nil && len(s.caller) > 0 {
 		return &wrappedError{oe: s.err, we: fmt.Errorf("%s: %v", s.caller, s.err)}
 	}
-	return Sequence{s.sequence}.err
+	return s.err
 }
 
 // TranslateExitCode translates errors from the "os/exec" package that
@@ -275,17 +307,18 @@ func (s Sequence) setError(err error, detail string) {
 	s.caller = fmtError(2, err, detail)
 }
 
+// reset all state except s.err
 func (s Sequence) reset() {
 	s.stdin, s.stdout, s.stderr, s.env = nil, nil, nil, nil
-	s.opts, s.verbosity = nil, nil
+	s.opts, s.verbosity, s.dryRun = nil, nil, nil
+	s.cmdDir = ""
 	s.reading = false
 	s.timeout = 0
 }
 
-func (s Sequence) done(p1, p2 *io.PipeWriter, stdinCh, stderrCh chan error) error {
+func cleanup(p1, p2 *io.PipeWriter, stdinCh, stderrCh chan error) error {
 	p1.Close()
 	p2.Close()
-	defer s.reset()
 	if stdinCh != nil {
 		if err := <-stdinCh; err != nil {
 			return err
@@ -337,22 +370,34 @@ func (s Sequence) serializeWriter(a io.Writer) io.Writer {
 	return nil
 }
 
-func (s Sequence) initAndDefer() func() {
+func (s Sequence) initAndDefer(h *Handle) func() {
 	if s.stdout == nil && s.stderr == nil {
 		fout, err := ioutil.TempFile("", "seq")
 		if err != nil {
 			return func() {}
 		}
 		opts := s.getOpts()
-		opts.Stdout, opts.Stderr = s.serializeWriter(fout), s.serializeWriter(fout)
-		opts.Env = s.env
+		opts.stdout, opts.stderr = s.serializeWriter(fout), s.serializeWriter(fout)
+		opts.env = s.env
 		if s.reading {
-			opts.Stdin = s.stdin
+			opts.stdin = s.stdin
 		}
 		if s.verbosity != nil {
-			opts.Verbose = *s.verbosity
+			opts.verbose = *s.verbosity
 		}
+		if s.dryRun != nil {
+			opts.dryRun = *s.dryRun
+		}
+		opts.dir = s.cmdDir
 		s.setOpts(opts)
+		if h != nil {
+			return func() {
+				h.stderr = useIfNotNil(s.defaultStderr, os.Stderr)
+				h.filename = fout.Name()
+				h.doneErr = nil
+				fout.Close()
+			}
+		}
 		return func() {
 			filename := fout.Name()
 			fout.Close()
@@ -360,7 +405,7 @@ func (s Sequence) initAndDefer() func() {
 			if s.err != nil {
 				writeOutput(true, filename, useIfNotNil(s.defaultStderr, os.Stderr))
 			}
-			if opts.Verbose && s.defaultStderr != s.defaultStdout {
+			if opts.verbose && s.defaultStderr != s.defaultStdout {
 				writeOutput(false, filename, useIfNotNil(s.defaultStdout, os.Stdout))
 			}
 		}
@@ -368,11 +413,11 @@ func (s Sequence) initAndDefer() func() {
 	opts := s.getOpts()
 	rStdout, wStdout := io.Pipe()
 	rStderr, wStderr := io.Pipe()
-	opts.Stdout = wStdout
-	opts.Stderr = wStderr
-	opts.Env = s.env
+	opts.stdout = wStdout
+	opts.stderr = wStderr
+	opts.env = s.env
 	if s.reading {
-		opts.Stdin = s.stdin
+		opts.stdin = s.stdin
 	}
 	var stdinCh, stderrCh chan error
 	stdout, stderr := s.serializeWriter(s.stdout), s.serializeWriter(s.stderr)
@@ -380,22 +425,36 @@ func (s Sequence) initAndDefer() func() {
 		stdinCh = make(chan error)
 		go copy(stdout, rStdout, stdinCh)
 	} else {
-		opts.Stdout = s.defaultStdout
+		opts.stdout = s.defaultStdout
 	}
 	if stderr != nil {
 		stderrCh = make(chan error)
 		go copy(stderr, rStderr, stderrCh)
 	} else {
-		opts.Stderr = s.defaultStderr
+		opts.stderr = s.defaultStderr
 	}
 	if s.verbosity != nil {
-		opts.Verbose = *s.verbosity
+		opts.verbose = *s.verbosity
 	}
+	if s.dryRun != nil {
+		opts.dryRun = *s.dryRun
+	}
+	opts.dir = s.cmdDir
 	s.setOpts(opts)
+	if h != nil {
+		return func() {
+			h.filename = ""
+			h.doneErr = cleanup(wStdout, wStderr, stdinCh, stderrCh)
+		}
+	}
 	return func() {
-		if err := s.done(wStdout, wStderr, stdinCh, stderrCh); err != nil && s.err == nil {
+		if err := cleanup(wStdout, wStderr, stdinCh, stderrCh); err != nil && s.err == nil {
+			// If we haven't already encountered an error and we fail to
+			// cleanup then record the error from the cleanup
 			s.err = err
 		}
+		// reset does not affect s.err
+		s.reset()
 	}
 }
 
@@ -410,45 +469,14 @@ func fmtStringArgs(args ...string) string {
 	return out.String()
 }
 
-// Pushd pushes the current directory onto a stack and changes directory
-// to the specified one. Calling any terminating function will pop back
-// to the first element in the stack on completion of that function.
-func (s Sequence) Pushd(dir string) Sequence {
-	cwd, err := os.Getwd()
-	if err != nil {
-		s.setError(err, "Pushd("+dir+"): os.Getwd")
-		return Sequence{s.sequence}
-	}
-	s.dirs = append(s.dirs, cwd)
-	s.setError(s.r.Chdir(dir), "Pushd("+dir+")")
-	return Sequence{s.sequence}
-}
-
-// Popd popds the last directory from the directory stack and chdir's to it.
-// Calling any termination function will pop back to the first element in
-// the stack on completion of that function.
-func (s Sequence) Popd() Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
-	}
-	if len(s.dirs) == 0 {
-		s.setError(fmt.Errorf("directory stack is empty"), "Popd()")
-		return Sequence{s.sequence}
-	}
-	last := s.dirs[len(s.dirs)-1]
-	s.dirs = s.dirs[:len(s.dirs)-1]
-	s.setError(s.r.Chdir(last), "Popd() -> "+last)
-	return Sequence{s.sequence}
-}
-
 // Run runs the given command as a subprocess.
 func (s Sequence) Run(path string, args ...string) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
-	defer s.initAndDefer()()
-	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Run(%q%s)", path, fmtStringArgs(args...)))
-	return Sequence{s.sequence}
+	defer s.initAndDefer(nil)()
+	s.setError(s.r.run(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Run(%q%s)", path, fmtStringArgs(args...)))
+	return s
 }
 
 // Last runs the given command as a subprocess and returns an error
@@ -459,115 +487,95 @@ func (s Sequence) Last(path string, args ...string) error {
 		return s.Done()
 	}
 	defer s.Done()
-	defer s.initAndDefer()()
-	s.setError(s.r.command(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Last(%q%s)", path, fmtStringArgs(args...)))
-	return Sequence{s.sequence}.err
+	defer s.initAndDefer(nil)()
+	s.setError(s.r.run(s.timeout, s.getOpts(), path, args...), fmt.Sprintf("Last(%q%s)", path, fmtStringArgs(args...)))
+	return s.Error()
 }
 
 // Call runs the given function. Note that Capture and Timeout have no
 // effect on invocations of Call, but Opts can control logging.
 func (s Sequence) Call(fn func() error, format string, args ...interface{}) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
-	defer s.initAndDefer()()
-	s.setError(s.r.FunctionWithOpts(s.getOpts(), fn, format, args...), fmt.Sprintf(format, args))
-	return Sequence{s.sequence}
+	defer s.initAndDefer(nil)()
+	s.setError(s.r.function(s.getOpts(), fn, format, args...), fmt.Sprintf(format, args))
+	return s
 }
 
-// Chdir is a wrapper around os.Chdir that handles options such as
-// "verbose" or "dry run".
-func (s Sequence) Chdir(dir string) Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
-	}
-	s.setError(s.r.Chdir(dir), "Chdir("+dir+")")
-	return Sequence{s.sequence}
+// Handle represents a command running in the background.
+type Handle struct {
+	stdout, stderr io.Writer
+	doneErr        error
+	filename       string
+	deferFn        func()
+	cmd            *exec.Cmd
 }
 
-// Chmod is a wrapper around os.Chmod that handles options such as
-// "verbose" or "dry run".
-func (s Sequence) Chmod(dir string, mode os.FileMode) Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
-	}
-	if err := s.r.Chmod(dir, mode); err != nil {
-		s.setError(err, fmt.Sprintf("Chmod(%s, %s)", dir, mode))
-	}
-	return Sequence{s.sequence}
+// Kill terminates the currently running background process.
+func (h *Handle) Kill() error {
+	return h.cmd.Process.Kill()
 }
 
-// MkdirAll is a wrapper around os.MkdirAll that handles options such
-// as "verbose" or "dry run".
-func (s Sequence) MkdirAll(dir string, mode os.FileMode) Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
-	}
-	s.setError(s.r.MkdirAll(dir, mode), fmt.Sprintf("MkdirAll(%s, %s)", dir, mode))
-	return Sequence{s.sequence}
+// Pid returns the pid of the running process.
+func (h *Handle) Pid() int {
+	return h.cmd.Process.Pid
 }
 
-// RemoveAll is a wrapper around os.RemoveAll that handles options
-// such as "verbose" or "dry run".
-func (s Sequence) RemoveAll(dir string) Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
-	}
-	s.setError(s.r.RemoveAll(dir), fmt.Sprintf("RemoveAll(%s)", dir))
-	return Sequence{s.sequence}
+func (h *Handle) Signal(sig os.Signal) error {
+	return h.cmd.Process.Signal(sig)
 }
 
-// Remove is a wrapper around os.Remove that handles options
-// such as "verbose" or "dry run".
-func (s Sequence) Remove(file string) Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
+// Wait waits for the currently running background process to terminate.
+func (h *Handle) Wait() error {
+	err := h.cmd.Wait()
+	h.deferFn()
+	if len(h.filename) > 0 {
+		if err != nil {
+			writeOutput(true, h.filename, h.stderr)
+		}
+		os.Remove(h.filename)
+		return err
 	}
-	s.setError(s.r.Remove(file), fmt.Sprintf("Remove(%s)", file))
-	return Sequence{s.sequence}
+	return h.doneErr
 }
 
-// Rename is a wrapper around os.Rename that handles options such as
-// "verbose" or "dry run".
-func (s Sequence) Rename(src, dst string) Sequence {
+// Start runs the given command as a subprocess in background and returns
+// a handle that can be used to kill and/or wait for that background process.
+// Start is a terminating function.
+func (s Sequence) Start(path string, args ...string) (*Handle, error) {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return nil, s.Done()
 	}
-	s.setError(s.r.Rename(src, dst), fmt.Sprintf("Rename(%s, %s)", src, dst))
-	return Sequence{s.sequence}
-}
-
-// Symlink is a wrapper around os.Symlink that handles options such as
-// "verbose" or "dry run".
-func (s Sequence) Symlink(src, dst string) Sequence {
-	if s.err != nil {
-		return Sequence{s.sequence}
-	}
-	s.setError(s.r.Symlink(src, dst), fmt.Sprintf("Symlink(%s, %s)", src, dst))
-	return Sequence{s.sequence}
+	h := &Handle{}
+	h.deferFn = s.initAndDefer(h)
+	cmd, err := s.r.start(s.timeout, s.getOpts(), path, args...)
+	h.cmd = cmd
+	s.setError(err, fmt.Sprintf("Start(%q%s)", path, fmtStringArgs(args...)))
+	return h, s.Error()
 }
 
 // Output logs the given list of lines using the currently in effect verbosity
 // as specified by Opts, or the default otherwise.
 func (s Sequence) Output(output []string) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	opts := s.getOpts()
 	if s.verbosity != nil {
-		opts.Verbose = *s.verbosity
+		opts.verbose = *s.verbosity
 	}
-	s.r.OutputWithOpts(opts, output)
-	return Sequence{s.sequence}
+	s.r.output(opts, output)
+	return s
 }
 
 // Fprintf calls fmt.Fprintf.
 func (s Sequence) Fprintf(f io.Writer, format string, args ...interface{}) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
 	fmt.Fprintf(f, format, args...)
-	return Sequence{s.sequence}
+	return s
 }
 
 // Done returns the error stored in the Sequence and pops back to the first
@@ -583,7 +591,10 @@ func (s Sequence) Done() error {
 	if len(s.dirs) > 0 {
 		cwd := s.dirs[0]
 		s.dirs = nil
-		if err := s.r.Chdir(cwd); err != nil {
+		err := s.r.alwaysRun(func() error {
+			return os.Chdir(cwd)
+		}, fmt.Sprintf("sequence done popd %q", cwd))
+		if err != nil {
 			detail := "Done: Chdir(" + cwd + ")"
 			if rerr == nil {
 				s.setError(err, detail)
@@ -598,159 +609,398 @@ func (s Sequence) Done() error {
 	return rerr
 }
 
+// Pushd pushes the current directory onto a stack and changes directory
+// to the specified one. Calling any terminating function will pop back
+// to the first element in the stack on completion of that function.
+func (s Sequence) Pushd(dir string) Sequence {
+	cwd, err := os.Getwd()
+	if err != nil {
+		s.setError(err, "Pushd("+dir+"): os.Getwd")
+		return s
+	}
+	s.dirs = append(s.dirs, cwd)
+	err = s.r.alwaysRun(func() error {
+		fmt.Fprintf(os.Stderr, "PUSHD: %s (wass %s)\n", dir, cwd)
+		return os.Chdir(dir)
+	}, fmt.Sprintf("pushd %q", dir))
+	s.setError(err, "Pushd("+dir+")")
+	return s
+}
+
+// Popd popds the last directory from the directory stack and chdir's to it.
+// Calling any termination function will pop back to the first element in
+// the stack on completion of that function.
+func (s Sequence) Popd() Sequence {
+	if s.err != nil {
+		return s
+	}
+	if len(s.dirs) == 0 {
+		s.setError(fmt.Errorf("directory stack is empty"), "Popd()")
+		return s
+	}
+	last := s.dirs[len(s.dirs)-1]
+	s.dirs = s.dirs[:len(s.dirs)-1]
+	err := s.r.alwaysRun(func() error {
+		return os.Chdir(last)
+	}, fmt.Sprintf("popd %q", last))
+	s.setError(err, "Popd() -> "+last)
+	return s
+}
+
+// Chdir is a wrapper around os.Chdir that handles options such as
+// "verbose" or "dry run".
+func (s Sequence) Chdir(dir string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.alwaysRun(func() error {
+		return os.Chdir(dir)
+	}, fmt.Sprintf("cd %q", dir))
+	s.setError(err, "Chdir("+dir+")")
+	return s
+
+}
+
+// Chmod is a wrapper around os.Chmod that handles options such as
+// "verbose" or "dry run".
+func (s Sequence) Chmod(dir string, mode os.FileMode) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.call(func() error { return os.Chmod(dir, mode) }, fmt.Sprintf("chmod %v %q", mode, dir))
+	s.setError(err, fmt.Sprintf("Chmod(%s, %s)", dir, mode))
+	return s
+
+}
+
+// MkdirAll is a wrapper around os.MkdirAll that handles options such
+// as "verbose" or "dry run".
+func (s Sequence) MkdirAll(dir string, mode os.FileMode) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.call(func() error { return os.MkdirAll(dir, mode) }, fmt.Sprintf("mkdir -p %q", dir))
+	s.setError(err, fmt.Sprintf("MkdirAll(%s, %s)", dir, mode))
+	return s
+}
+
+// RemoveAll is a wrapper around os.RemoveAll that handles options
+// such as "verbose" or "dry run".
+func (s Sequence) RemoveAll(dir string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.call(func() error { return os.RemoveAll(dir) }, fmt.Sprintf("rm -rf %q", dir))
+	s.setError(err, fmt.Sprintf("RemoveAll(%s)", dir))
+	return s
+}
+
+// Remove is a wrapper around os.Remove that handles options
+// such as "verbose" or "dry run".
+func (s Sequence) Remove(file string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.call(func() error { return os.Remove(file) }, fmt.Sprintf("rm %q", file))
+	s.setError(err, fmt.Sprintf("Remove(%s)", file))
+	return s
+}
+
+// Rename is a wrapper around os.Rename that handles options such as
+// "verbose" or "dry run".
+func (s Sequence) Rename(src, dst string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.call(func() error {
+		if err := os.Rename(src, dst); err != nil {
+			// Check if the rename operation failed
+			// because the source and destination are
+			// located on different mount points.
+			linkErr, ok := err.(*os.LinkError)
+			if !ok {
+				return err
+			}
+			errno, ok := linkErr.Err.(syscall.Errno)
+			if !ok || errno != syscall.EXDEV {
+				return err
+			}
+			// Fall back to a non-atomic rename.
+			cmd := exec.Command("mv", src, dst)
+			return cmd.Run()
+		}
+		return nil
+	}, fmt.Sprintf("mv %q %q", src, dst))
+	s.setError(err, fmt.Sprintf("Rename(%s, %s)", src, dst))
+	return s
+
+}
+
+// Symlink is a wrapper around os.Symlink that handles options such as
+// "verbose" or "dry run".
+func (s Sequence) Symlink(src, dst string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	err := s.r.call(func() error { return os.Symlink(src, dst) }, fmt.Sprintf("ln -s %q %q", src, dst))
+	s.setError(err, fmt.Sprintf("Symlink(%s, %s)", src, dst))
+	return s
+}
+
 // Open is a wrapper around os.Open that handles options such as
 // "verbose" or "dry run". Open is a terminating function.
-func (s Sequence) Open(name string) (*os.File, error) {
+func (s Sequence) Open(name string) (f *os.File, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	f, err := s.r.Open(name)
+	s.r.call(func() error {
+		f, err = os.Open(name)
+		return err
+	}, fmt.Sprintf("open %q", name))
 	s.setError(err, fmt.Sprintf("Open(%s)", name))
-	return f, s.Done()
+	err = s.Done()
+	return
 }
 
 // OpenFile is a wrapper around os.OpenFile that handles options such as
 // "verbose" or "dry run". OpenFile is a terminating function.
-func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (f *os.File, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	f, err := s.r.OpenFile(name, flag, perm)
+	s.r.call(func() error {
+		f, err = os.OpenFile(name, flag, perm)
+		return err
+	}, fmt.Sprintf("open file %q", name))
 	s.setError(err, fmt.Sprintf("OpenFile(%s, %s, %s)", name, flag, perm))
-	return f, s.Done()
+	err = s.Done()
+	return
 }
 
 // Create is a wrapper around os.Create that handles options such as "verbose"
 // or "dry run". Create is a terminating function.
-func (s Sequence) Create(name string) (*os.File, error) {
+func (s Sequence) Create(name string) (f *os.File, err error) {
+
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	f, err := s.r.Create(name)
+	s.r.call(func() error {
+		var err error
+		f, err = os.Create(name)
+		return err
+	}, fmt.Sprintf("create %q", name))
 	s.setError(err, fmt.Sprintf("Create(%s)", name))
-	return f, s.Done()
+	err = s.Done()
+	return
 }
 
 // ReadDir is a wrapper around ioutil.ReadDir that handles options
 // such as "verbose" or "dry run". ReadDir is a terminating function.
-func (s Sequence) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (s Sequence) ReadDir(dirname string) (fi []os.FileInfo, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	fi, err := s.r.ReadDir(dirname)
+	s.r.alwaysRun(func() error {
+		fi, err = ioutil.ReadDir(dirname)
+		return err
+	}, fmt.Sprintf("ls %q", dirname))
 	s.setError(err, fmt.Sprintf("ReadDir(%s)", dirname))
-	return fi, s.Done()
+	err = s.Done()
+	return
 }
 
 // ReadFile is a wrapper around ioutil.ReadFile that handles options
 // such as "verbose" or "dry run". ReadFile is a terminating function.
-func (s Sequence) ReadFile(filename string) ([]byte, error) {
+func (s Sequence) ReadFile(filename string) (bytes []byte, err error) {
+
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	data, err := s.r.ReadFile(filename)
+	s.r.alwaysRun(func() error {
+		bytes, err = ioutil.ReadFile(filename)
+		return err
+	}, fmt.Sprintf("read %q", filename))
 	s.setError(err, fmt.Sprintf("ReadFile(%s)", filename))
-	return data, s.Done()
+	err = s.Done()
+	return
 }
 
 // WriteFile is a wrapper around ioutil.WriteFile that handles options
 // such as "verbose" or "dry run".
 func (s Sequence) WriteFile(filename string, data []byte, perm os.FileMode) Sequence {
 	if s.err != nil {
-		return Sequence{s.sequence}
+		return s
 	}
-	err := s.r.WriteFile(filename, data, perm)
+	err := s.r.call(func() error {
+		return ioutil.WriteFile(filename, data, perm)
+	}, fmt.Sprintf("write %q", filename))
 	s.setError(err, fmt.Sprintf("WriteFile(%s, %10s,  %s)", filename, data, perm))
-	return Sequence{s.sequence}
+	return s
 }
 
 // Copy is a wrapper around io.Copy that handles options such as "verbose" or
 // "dry run". Copy is a terminating function.
-func (s Sequence) Copy(dst *os.File, src io.Reader) (int64, error) {
+func (s Sequence) Copy(dst *os.File, src io.Reader) (n int64, err error) {
 	if s.err != nil {
 		return 0, s.Done()
 	}
-	n, err := s.r.Copy(dst, src)
+	s.r.call(func() error {
+		n, err = io.Copy(dst, src)
+		return err
+	}, fmt.Sprintf("io.copy %q", dst.Name()))
 	s.setError(err, fmt.Sprintf("Copy(%s, %s)", dst, src))
-	return n, s.Done()
+	err = s.Done()
+	return
 }
 
 // Stat is a wrapper around os.Stat that handles options such as
 // "verbose" or "dry run". Stat is a terminating function.
-func (s Sequence) Stat(name string) (os.FileInfo, error) {
+func (s Sequence) Stat(name string) (fi os.FileInfo, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	fi, err := s.r.Stat(name)
+	s.r.alwaysRun(func() error {
+		fi, err = os.Stat(name)
+		return err
+	}, fmt.Sprintf("stat %q", name))
 	s.setError(err, fmt.Sprintf("Stat(%s)", name))
-	return fi, s.Done()
+	err = s.Done()
+	return
 }
 
 // Lstat is a wrapper around os.Lstat that handles options such as
 // "verbose" or "dry run". Lstat is a terminating function.
-func (s Sequence) Lstat(name string) (os.FileInfo, error) {
+func (s Sequence) Lstat(name string) (fi os.FileInfo, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	fi, err := s.r.Lstat(name)
+	s.r.alwaysRun(func() error {
+		fi, err = os.Lstat(name)
+		return err
+	}, fmt.Sprintf("lstat %q", name))
 	s.setError(err, fmt.Sprintf("Lstat(%s)", name))
-	return fi, s.Done()
+	err = s.Done()
+	return
 }
 
 // Readlink is a wrapper around os.Readlink that handles options such as
 // "verbose" or "dry run". Lstat is a terminating function.
-func (s Sequence) Readlink(name string) (string, error) {
+func (s Sequence) Readlink(name string) (link string, err error) {
 	if s.err != nil {
 		return "", s.Done()
 	}
-	link, err := s.r.Readlink(name)
+	s.r.alwaysRun(func() error {
+		link, err = os.Readlink(name)
+		return err
+	}, fmt.Sprintf("readlink %q", name))
 	s.setError(err, fmt.Sprintf("Readlink(%s)", name))
-	return link, s.Done()
+	err = s.Done()
+	return
 }
 
 // TempDir is a wrapper around ioutil.TempDir that handles options
 // such as "verbose" or "dry run". TempDir is a terminating function.
-func (s Sequence) TempDir(dir, prefix string) (string, error) {
+func (s Sequence) TempDir(dir, prefix string) (tmpDir string, err error) {
 	if s.err != nil {
 		return "", s.Done()
 	}
-	name, err := s.r.TempDir(dir, prefix)
+	if dir == "" {
+		dir = os.Getenv("TMPDIR")
+	}
+	tmpDir = filepath.Join(dir, prefix+"XXXXXX")
+	s.r.call(func() error {
+		tmpDir, err = ioutil.TempDir(dir, prefix)
+		return err
+	}, fmt.Sprintf("mkdir -p %q", tmpDir))
 	s.setError(err, fmt.Sprintf("TempDir(%s,%s)", dir, prefix))
-	return name, s.Done()
+	err = s.Done()
+	return
 }
 
-// IsDir is a wrapper around os.Stat with appropriate logging.
+// TempFile is a wrapper around ioutil.TempFile that handles options
+// such as "verbose" or "dry run".
+func (s Sequence) TempFile(dir, prefix string) (f *os.File, err error) {
+	if s.err != nil {
+		return nil, s.Done()
+	}
+	if dir == "" {
+		dir = os.Getenv("TMPDIR")
+	}
+	s.r.call(func() error {
+		f, err = ioutil.TempFile(dir, prefix)
+		return err
+	}, fmt.Sprintf("tempFile %q %q", dir, prefix))
+	s.setError(err, fmt.Sprintf("TempFile(%s,%s)", dir, prefix))
+	err = s.Done()
+	return
+}
+
+// IsDir is a wrapper around os.Stat with appropriate logging that
+// returns true of dirname exists and is a directory.
 // IsDir is a terminating function.
 func (s Sequence) IsDir(dirname string) (bool, error) {
 	if s.err != nil {
 		return false, s.Done()
 	}
-	t, err := s.r.IsDir(dirname)
-	s.setError(err, fmt.Sprintf("IsDir(%s)", dirname))
-	return t, s.Done()
-}
-
-// DirExists tests if a directory exists with appropriate logging.
-// DirExists is a terminating function.
-func (s Sequence) DirectoryExists(dir string) (bool, error) {
-	if s.err != nil {
-		return false, s.Done()
-	}
-	isdir, err := s.r.IsDir(dir)
+	var fileInfo os.FileInfo
+	var err error
+	err = s.r.alwaysRun(func() error {
+		fileInfo, err = os.Stat(dirname)
+		return err
+	}, fmt.Sprintf("isdir %q", dirname))
 	if err != nil {
-		return false, s.Done()
+		return false, err
 	}
-	return isdir, s.Done()
+	s.setError(err, fmt.Sprintf("IsDir(%s)", dirname))
+	return fileInfo.IsDir(), s.Done()
 }
 
-// FileExists tests if a file exists with appropriate logging.
-// FileExists is a terminating function.
-func (s Sequence) FileExists(file string) (bool, error) {
+// IsFile is a wrapper around os.Stat with appropriate logging that
+// returns true if file exists and is not a directory.
+// IsFile is a terminating function.
+func (s Sequence) IsFile(file string) (bool, error) {
 	if s.err != nil {
 		return false, s.Done()
 	}
-	_, err := s.r.Stat(file)
-	return err == nil, s.Done()
+	var fileInfo os.FileInfo
+	var err error
+	err = s.r.alwaysRun(func() error {
+		fileInfo, err = os.Stat(file)
+		return err
+	}, fmt.Sprintf("isfile %q", file))
+	if err != nil {
+		return false, err
+	}
+	s.setError(err, fmt.Sprintf("IsFile(%s)", file))
+	return !fileInfo.IsDir(), s.Done()
+}
+
+// AssertDirExists asserts that the specified directory exists with appropriate
+// logging.
+func (s Sequence) AssertDirExists(dirname string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	isdir, err := s.IsDir(dirname)
+	if !isdir && err == nil {
+		err = os.ErrNotExist
+	}
+	s.setError(err, fmt.Sprintf("AssertDirExists(%s)", dirname))
+	return s
+}
+
+// AssertFileExists asserts that the specified file exists with appropriate
+// logging.
+func (s Sequence) AssertFileExists(file string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	isfile, err := s.IsFile(file)
+	if !isfile && err == nil {
+		err = os.ErrNotExist
+	}
+	s.setError(err, fmt.Sprintf("AssertFileExists(%s)", file))
+	return s
 }
 
 func copy(to io.Writer, from io.Reader, ch chan error) {

@@ -61,11 +61,11 @@ func AtomicAction(jirix *jiri.X, installFn func() error, dir, message string) er
 		completionLogPath := filepath.Join(dir, ".complete")
 		s := jirix.NewSeq()
 		if dir != "" {
-			if exists, _ := s.DirectoryExists(dir); exists {
+			if exists, _ := s.IsDir(dir); exists {
 				// If the dir exists but the completionLogPath doesn't, then it
 				// means the previous action didn't finish.
 				// Remove the dir so we can perform the action again.
-				if exists, _ := s.FileExists(completionLogPath); !exists {
+				if exists, _ := s.IsFile(completionLogPath); !exists {
 					s.RemoveAll(dir).Done()
 				} else {
 					if jirix.Verbose() {

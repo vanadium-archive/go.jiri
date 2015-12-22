@@ -21,18 +21,15 @@ import (
 // invocation. Its purpose is to enable sharing of state throughout
 // the lifetime of a command invocation.
 type Context struct {
-	opts  ContextOpts
-	run   *runutil.Run
-	seq   *runutil.Sequence
-	start *runutil.Start
+	opts ContextOpts
 }
 
 // ContextOpts records the context options.
 type ContextOpts struct {
 	Color    *bool
 	DryRun   *bool
-	Env      map[string]string
 	Manifest *string
+	Env      map[string]string
 	Stdin    io.Reader
 	Stdout   io.Writer
 	Stderr   io.Writer
@@ -89,13 +86,7 @@ func initOpts(defaultOpts, opts *ContextOpts) {
 // NewContext is the Context factory.
 func NewContext(opts ContextOpts) *Context {
 	initOpts(newContextOpts(), &opts)
-	run := runutil.NewRun(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
-	start := runutil.NewStart(opts.Env, opts.Stdin, opts.Stdout, opts.Stderr, *opts.Color, *opts.DryRun, *opts.Verbose)
-	return &Context{
-		opts:  opts,
-		run:   run,
-		start: start,
-	}
+	return &Context{opts: opts}
 }
 
 // NewContextFromEnv returns a new context instance based on the given
@@ -178,7 +169,7 @@ func (ctx Context) Git(opts ...gitOpt) *gitutil.Git {
 			rootDir = string(typedOpt)
 		}
 	}
-	return gitutil.New(gitCtx.run, rootDir)
+	return gitutil.New(gitCtx.NewSeq(), rootDir)
 }
 
 // Jenkins returns a new Jenkins instance that can be used to
@@ -196,11 +187,6 @@ func (ctx Context) Manifest() string {
 // stored in the context.
 func (ctx Context) NewSeq() runutil.Sequence {
 	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Color, *ctx.opts.DryRun, *ctx.opts.Verbose)
-}
-
-// Start returns the start instance of the context.
-func (ctx Context) Start() *runutil.Start {
-	return ctx.start
 }
 
 // Stdin returns the standard input of the context.

@@ -299,19 +299,14 @@ func cleanupEnsureVersionsAreSet(jirix *jiri.X, db *profiles.DB, root jiri.RelPa
 
 func cleanupRmAll(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, args []string) error {
 	s := jirix.NewSeq()
-	if exists, err := s.FileExists(db.Filename()); err != nil || exists {
-		if err := s.Remove(db.Filename()).Done(); err != nil {
-			return err
-		}
+	if err := s.AssertFileExists(db.Filename()).Remove(db.Filename()).Done(); err != nil {
+		return err
 	}
 	d := root.Abs(jirix)
-	if exists, err := s.DirectoryExists(d); err != nil || exists {
-		if err := s.Run("chmod", "-R", "u+w", d).
-			RemoveAll(d).Done(); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.AssertDirExists(d).
+		Run("chmod", "-R", "u+w", d).
+		RemoveAll(d).
+		Done()
 }
 
 func cleanupImpl(jirix *jiri.X, cl *cleanupFlagValues, args []string) error {

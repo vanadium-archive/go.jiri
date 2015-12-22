@@ -81,6 +81,55 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+func exists(t *testing.T, filename string) bool {
+	fi, err := os.Stat(filename)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		return false
+	}
+	return fi.Size() > 0
+}
+
+func TestWriteAndRename(t *testing.T) {
+	pdb := profiles.NewDB()
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+	filename := tmpFile()
+	defer os.RemoveAll(filepath.Dir(filename))
+
+	addProfileAndTargets(t, pdb, "b")
+
+	if exists(t, filename) {
+		t.Fatalf("%q  exists", filename)
+	}
+	if exists(t, filename+".prev") {
+		t.Fatalf("%q  exists", filename+".prev")
+	}
+	if err := pdb.Write(jirix, filename); err != nil {
+		t.Fatal(err)
+	}
+
+	if !exists(t, filename) {
+		t.Fatalf("%q  exists", filename)
+	}
+	if exists(t, filename+".prev") {
+		t.Fatalf("%q  exists", filename+".prev")
+	}
+
+	if err := pdb.Write(jirix, filename); err != nil {
+		t.Fatal(err)
+	}
+
+	if !exists(t, filename) {
+		t.Fatalf("%q does not exist", filename)
+	}
+	if !exists(t, filename+".prev") {
+		t.Fatalf("%q does not exist", filename+".prev")
+	}
+}
+
 func TestRead(t *testing.T) {
 	pdb := profiles.NewDB()
 	jirix, cleanup := jiritest.NewX(t)

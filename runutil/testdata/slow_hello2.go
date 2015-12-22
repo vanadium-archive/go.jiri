@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	fmt.Printf("NOW: %s\n", time.Now())
 	time.Sleep(10 * time.Second)
 	fmt.Println("hello!!")
 }

@@ -6,16 +6,19 @@ package runutil_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"v.io/jiri/runutil"
+	"v.io/x/lib/envvar"
 )
 
 func rmLineNumbers(s string) string {
@@ -250,6 +253,49 @@ func TestSequenceModifiers(t *testing.T) {
 	}
 }
 
+func TestMoreSequenceModifiers(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	seq := runutil.NewSequence(nil, os.Stdin, &stdout, &stderr, false, false, true)
+
+	for _, verbose := range []bool{false, true} {
+		err := seq.Verbose(verbose).Last("sh", "-c", "echo hello")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := stdout.String()
+		want := ""
+		if verbose {
+			out = sanitizeTimestamps(out)
+			want = `[hh:mm:ss.xx] >> sh -c "echo hello"
+[hh:mm:ss.xx] >> OK
+hello
+`
+		}
+		if got, want := out, want; got != want {
+			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
+		}
+		stdout.Reset()
+	}
+	for _, dryRun := range []bool{false, true} {
+		err := seq.DryRun(dryRun).Last("sh", "-c", "echo hello")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := sanitizeTimestamps(stdout.String())
+		want := `[hh:mm:ss.xx] >> sh -c "echo hello"
+[hh:mm:ss.xx] >> OK
+`
+		if !dryRun {
+			want += `hello
+`
+		}
+		if got, want := out, want; got != want {
+			t.Errorf("dryRun: %t, got %v, want %v", dryRun, got, want)
+		}
+		stdout.Reset()
+	}
+}
+
 func TestSequenceOutputOnError(t *testing.T) {
 	var out bytes.Buffer
 	// Only the output from the command that generates an error is written
@@ -392,6 +438,159 @@ func TestSequencePushPop(t *testing.T) {
 	}
 }
 
-// TODO(cnicolaou):
-// - tests for functions
-// - tests for terminating functions, make sure they clean up correctly.
+func TestExists(t *testing.T) {
+	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false, true)
+	f, err := s.TempFile("", "file-exists")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := f.Name()
+	f.Close()
+	defer os.RemoveAll(name)
+	newName := name + "x"
+
+	err = s.AssertFileExists(name).Rename(name, newName).Done()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(newName)
+	err = s.AssertFileExists(name).Last("exit 1")
+	if !runutil.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	err = s.AssertFileExists(newName).Last("sh", "-c", "exit 33")
+	if got, want := err.Error(), "exit status 33"; !strings.Contains(got, want) {
+		t.Errorf("got %v, does not contain %v", got, want)
+	}
+	err = s.AssertDirExists(newName).Last("sh", "-c", "exit 33")
+	if !runutil.IsNotExist(err) {
+		t.Fatal(err)
+	}
+
+	dir, err := s.TempDir("", "dir-exists")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	newDir := dir + "x"
+
+	err = s.AssertDirExists(dir).Rename(dir, newDir).Done()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(newDir)
+	err = s.AssertDirExists(dir).Last("exit 1")
+	if !runutil.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	err = s.AssertDirExists(newDir).Last("sh", "-c", "exit 33")
+	if got, want := err.Error(), "exit status 33"; !strings.Contains(got, want) {
+		t.Errorf("got %v, does not contain %v", got, want)
+	}
+	err = s.AssertFileExists(newDir).Last("sh", "-c", "exit 33")
+	if !runutil.IsNotExist(err) {
+		t.Fatal(err)
+	}
+}
+
+func TestDirModifier(t *testing.T) {
+	noError := errors.New("no error")
+	runner := func(cwd, dir string, ech chan error) {
+		s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false, true)
+		var out bytes.Buffer
+		parent := filepath.Dir(dir)
+		if err := os.Chdir(parent); err != nil {
+			panic(fmt.Sprintf("chdir(%s): %v", parent, err))
+		}
+		err := s.Dir(dir).Capture(&out, nil).Last("sh", "-c", "pwd")
+		pwd := strings.TrimSpace(out.String())
+		switch {
+		case err != nil:
+			ech <- err
+		case dir != pwd:
+			ech <- fmt.Errorf("got %v, want %v", pwd, dir)
+		default:
+			ech <- noError
+		}
+		if err := os.Chdir(cwd); err != nil {
+			panic(fmt.Sprintf("chdir(%s): %v", cwd, err))
+		}
+	}
+	cwd, _ := os.Getwd()
+	n := 50
+	errCh := make(chan error, 10)
+	for i := 0; i < n; i++ {
+		dir, err := ioutil.TempDir(cwd, fmt.Sprintf("%d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		go runner(cwd, dir, errCh)
+		defer os.RemoveAll(dir)
+	}
+	for i := 0; i < n; i++ {
+		err := <-errCh
+		if err != noError {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+}
+
+func TestStart(t *testing.T) {
+	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false, true)
+	path, err := runutil.LookPath("sleep", envvar.SliceToMap(os.Environ()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := s.Start(path, "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := h.Pid()
+	time.Sleep(time.Second)
+	if err := syscall.Kill(pid, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	if err := h.Wait(); err == nil || (err != nil && err.Error() != "signal: killed") {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	if err := syscall.Kill(pid, 0); err == nil {
+		t.Fatal("command has not terminated.")
+	}
+}
+
+func TestStartWithOutput(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := "Current Directory: " + cwd + "\n"
+	var out bytes.Buffer
+	s := runutil.NewSequence(nil, os.Stdin, &out, &out, false, false, true)
+	h, err := s.Verbose(false).Start("sh", "-c", "echo hello; echo world; sleep 1; echo wakeup; exit 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Wait(); err == nil {
+		t.Fatal("expected an error")
+	}
+	if got, want := out.String(), "hello\nworld\nwakeup\n"+dir; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	out.Reset()
+	h, err = s.Verbose(false).Capture(&out, &out).Start("sh", "-c", "echo hello; echo world; sleep 1; echo wakeup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "hello\nworld\nwakeup\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
