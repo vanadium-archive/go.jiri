@@ -620,7 +620,6 @@ func (s Sequence) Pushd(dir string) Sequence {
 	}
 	s.dirs = append(s.dirs, cwd)
 	err = s.r.alwaysRun(func() error {
-		fmt.Fprintf(os.Stderr, "PUSHD: %s (wass %s)\n", dir, cwd)
 		return os.Chdir(dir)
 	}, fmt.Sprintf("pushd %q", dir))
 	s.setError(err, "Pushd("+dir+")")
