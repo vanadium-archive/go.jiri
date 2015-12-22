@@ -16,6 +16,19 @@ import (
 	"v.io/jiri/runutil"
 )
 
+// PlatformSpecificGitArgs returns a git command line with platform specific,
+// if any, modifications. The code is duplicated here because of the dependency
+// structure in the jiri tool.
+// TODO(cnicolaou,bprosnitz): remove this once ssl certs are installed.
+func platformSpecificGitArgs(args ...string) []string {
+	if os.Getenv("FNL_SYSTEM") != "" {
+		// TODO(bprosnitz) Remove this after certificates are installed on FNL
+		// Disable SSL verification because certificates are not present on FNL.func
+		return append([]string{"-c", "http.sslVerify=false"}, args...)
+	}
+	return args
+}
+
 type GitError struct {
 	args        []string
 	output      string
@@ -625,15 +638,6 @@ func (g *Git) Version() (int, int, error) {
 	return major, minor, nil
 }
 
-func fnlArgs(args []string) []string {
-	if runutil.IsFNLHost() {
-		// TODO(bprosnitz) Remove this after certificates are installed on FNL
-		// Disable SSL verification because certificates are not present on FNL.
-		return append([]string{"-c", "http.sslVerify=false"}, args...)
-	}
-	return args
-}
-
 func (g *Git) run(args ...string) error {
 	var stdout, stderr bytes.Buffer
 	capture := func(s runutil.Sequence) runutil.Sequence { return s.Capture(&stdout, &stderr) }
@@ -688,7 +692,7 @@ func (g *Git) runInteractive(args ...string) error {
 
 func (g *Git) runWithFn(fn func(s runutil.Sequence) runutil.Sequence, args ...string) error {
 	g.s.Dir(g.rootDir)
-	args = fnlArgs(args)
+	args = platformSpecificGitArgs(args...)
 	if fn == nil {
 		fn = func(s runutil.Sequence) runutil.Sequence { return s }
 	}
