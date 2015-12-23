@@ -1,18 +1,13 @@
-pkg profiles, const DefaultDirPerm os.FileMode
-pkg profiles, const DefaultFilePerm os.FileMode
 pkg profiles, const Install Action
 pkg profiles, const Original Version
 pkg profiles, const Uninstall Action
 pkg profiles, const V2 Version
 pkg profiles, const V3 Version
 pkg profiles, const V4 Version
-pkg profiles, func AtomicAction(*jiri.X, func() error, string, string) error
 pkg profiles, func DefaultTarget() Target
-pkg profiles, func Fetch(*jiri.X, string, string) error
 pkg profiles, func FindTarget(Targets, *Target) *Target
 pkg profiles, func FindTargetWithDefault(Targets, *Target) *Target
 pkg profiles, func InsertTarget(Targets, *Target) Targets
-pkg profiles, func InstallPackages(*jiri.X, []string) error
 pkg profiles, func NativeTarget() Target
 pkg profiles, func NewDB() *DB
 pkg profiles, func NewTarget(string, ...string) (Target, error)
@@ -21,7 +16,6 @@ pkg profiles, func RegisterProfilesFlag(*flag.FlagSet, *string)
 pkg profiles, func RegisterTargetAndEnvFlags(*flag.FlagSet, *Target)
 pkg profiles, func RegisterTargetFlag(*flag.FlagSet, *Target)
 pkg profiles, func RemoveTarget(Targets, *Target) Targets
-pkg profiles, func Unzip(*jiri.X, string, string) error
 pkg profiles, method (*DB) AddProfileTarget(string, Target) error
 pkg profiles, method (*DB) EnvFromProfile(string, Target) []string
 pkg profiles, method (*DB) Filename() string

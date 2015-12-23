@@ -1,6 +1,5 @@
 pkg runutil, func GetOriginalError(error) error
 pkg runutil, func IsExist(error) bool
-pkg runutil, func IsFNLHost() bool
 pkg runutil, func IsNotExist(error) bool
 pkg runutil, func IsPermission(error) bool
 pkg runutil, func IsTimeout(error) bool

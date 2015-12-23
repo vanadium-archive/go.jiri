@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package profiles
+// package profilesutil provides utility routines for implementing profiles.
+package profilesutil
 
 import (
 	"archive/zip"
 	"bufio"
 	"bytes"
-	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,37 +17,22 @@ import (
 	"strings"
 
 	"v.io/jiri/jiri"
-	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 )
 
 const (
-	// TODO(cnicolaou): move these to runutil
 	DefaultDirPerm  = os.FileMode(0755)
 	DefaultFilePerm = os.FileMode(0644)
-	targetDefValue  = "<runtime.GOARCH>-<runtime.GOOS>"
 )
 
-// RegisterTargetAndEnvFlags registers the commonly used --target and --env
-// flags with the supplied FlagSet
-func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
-	*target = DefaultTarget()
-	flags.Var(target, "target", target.Usage())
-	flags.Lookup("target").DefValue = targetDefValue
-	flags.Var(&target.commandLineEnv, "env", target.commandLineEnv.Usage())
-}
-
-// RegisterProfilesFlag registers the --profiles flag
-func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
-	flags.StringVar(profiles, "profiles", "base,jiri", "a comma separated list of profiles to use")
-}
-
-// RegisterTargetFlag registers the commonly used --target flag with
-// the supplied FlagSet.
-func RegisterTargetFlag(flags *flag.FlagSet, target *Target) {
-	*target = DefaultTarget()
-	flags.Var(target, "target", target.Usage())
-	flags.Lookup("target").DefValue = targetDefValue
+// IsFNLHost returns true iff the host machine is running FNL
+// TODO(bprosnitz) We should find a better way to detect that the machine is
+// running FNL
+// TODO(bprosnitz) This is needed in part because fnl is not currently a
+// GOHOSTOS. This should probably be handled by having hosts that are separate
+// from GOHOSTOSs similarly to how targets are defined.
+func IsFNLHost() bool {
+	return os.Getenv("FNL_SYSTEM") != ""
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -55,7 +40,6 @@ func RegisterTargetFlag(flags *flag.FlagSet, target *Target) {
 // are not successfully logged therein after deleting the entire contents of the
 // dir parameter. Consequently it does not make sense to apply AtomicAction to
 // the same directory in sequence.
-// TODO(cnicolaou): move this to runutil
 func AtomicAction(jirix *jiri.X, installFn func() error, dir, message string) error {
 	atomicFn := func() error {
 		completionLogPath := filepath.Join(dir, ".complete")
@@ -102,13 +86,12 @@ func brewList(jirix *jiri.X) (map[string]bool, error) {
 
 // InstallPackages identifies the packages that need to be installed
 // and installs them using the OS-specific package manager.
-// TODO(cnicolaou): move these to runutil
 func InstallPackages(jirix *jiri.X, pkgs []string) error {
 	installDepsFn := func() error {
 		s := jirix.NewSeq()
 		switch runtime.GOOS {
 		case "linux":
-			if runutil.IsFNLHost() {
+			if IsFNLHost() {
 				fmt.Fprintf(jirix.Stdout(), "skipping installation of %v on FNL host", pkgs)
 				fmt.Fprintf(jirix.Stdout(), "success\n")
 				break
@@ -155,9 +138,6 @@ func InstallPackages(jirix *jiri.X, pkgs []string) error {
 }
 
 // Fetch downloads the specified url and saves it to dst.
-// TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
-// so it does not pollute the profile package namespace.
-// TODO(cnicolaou): move these to runutil
 func Fetch(jirix *jiri.X, dst, url string) error {
 	s := jirix.NewSeq()
 	s.Output([]string{"fetching " + url})
@@ -178,9 +158,6 @@ func Fetch(jirix *jiri.X, dst, url string) error {
 }
 
 // Unzip unzips the file in srcFile and puts resulting files in directory dstDir.
-// TODO(nlacasse, cnicoloau): Move this to a package for profile-implementors
-// so it does not pollute the profile package namespace.
-// TODO(cnicolaou): move these to runutil
 func Unzip(jirix *jiri.X, srcFile, dstDir string) error {
 	r, err := zip.OpenReader(srcFile)
 	if err != nil {
