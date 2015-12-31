@@ -499,7 +499,7 @@ func (s Sequence) Call(fn func() error, format string, args ...interface{}) Sequ
 		return s
 	}
 	defer s.initAndDefer(nil)()
-	s.setError(s.r.function(s.getOpts(), fn, format, args...), fmt.Sprintf(format, args))
+	s.setError(s.r.function(s.getOpts(), fn, format, args...), fmt.Sprintf(format, args...))
 	return s
 }
 

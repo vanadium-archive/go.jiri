@@ -148,6 +148,9 @@ func initInstallCommand(flags *flag.FlagSet, defaultDBFilename string) {
 	initCommon(flags, &installFlags.commonFlagValues, defaultDBFilename)
 	profiles.RegisterTargetAndEnvFlags(flags, &installFlags.target)
 	flags.BoolVar(&installFlags.force, "force", false, "force install the profile even if it is already installed")
+	for _, name := range profilesmanager.Managers() {
+		profilesmanager.LookupManager(name).AddFlags(flags, profiles.Install)
+	}
 }
 
 func initUninstallCommand(flags *flag.FlagSet, defaultDBFilename string) {
@@ -155,6 +158,9 @@ func initUninstallCommand(flags *flag.FlagSet, defaultDBFilename string) {
 	profiles.RegisterTargetFlag(flags, &uninstallFlags.target)
 	flags.BoolVar(&uninstallFlags.allTargets, "all-targets", false, "apply to all targets for the specified profile(s)")
 	flags.BoolVar(&uninstallFlags.verbose, "v", false, "print more detailed information")
+	for _, name := range profilesmanager.Managers() {
+		profilesmanager.LookupManager(name).AddFlags(flags, profiles.Uninstall)
+	}
 }
 
 func initUpdateCommand(flags *flag.FlagSet, defaultDBFilename string) {
