@@ -833,7 +833,7 @@ func (s Sequence) WriteFile(filename string, data []byte, perm os.FileMode) Sequ
 	err := s.r.call(func() error {
 		return ioutil.WriteFile(filename, data, perm)
 	}, fmt.Sprintf("write %q", filename))
-	s.setError(err, fmt.Sprintf("WriteFile(%s, %10s,  %s)", filename, data, perm))
+	s.setError(err, fmt.Sprintf("WriteFile(%s, %.10s,  %s)", filename, data, perm))
 	return s
 }
 
