@@ -20,6 +20,7 @@ The jiri commands are:
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
    upgrade      Upgrade jiri to new-style manifests
+   which        Show path to the jiri tool
    help         Display help for commands or topics
 
 The jiri additional help topics are:
@@ -211,29 +212,45 @@ Jiri import
 Command "import" adds imports to the $JIRI_ROOT/.jiri_manifest file, which
 specifies manifest information for the jiri tool.  The file is created if it
 doesn't already exist, otherwise additional imports are added to the existing
-file.  The arguments and flags configure the <import> element that is added to
-the manifest.
+file.
+
+<manifest> specifies the manifest file to use.
+
+[remote] optionally specifies the remote manifest repository.
+
+If [remote] is not specified, a <fileimport> element is added to the manifest,
+representing a local file import.  The manifest file may be an absolute path, or
+relative to the current working directory.  The resulting path must be a
+subdirectory of $JIRI_ROOT.
+
+If [remote] is specified, an <import> element is added to the manifest,
+representing a remote manifest import.  The remote manifest repository is
+treated similar to regular projects; "jiri update" will update all remote
+manifest repository projects before updating regular projects.  The manifest
+file path is relative to the root directory of the remote import repository.
+
+Example of a local file import:
+  $ jiri import $JIRI_ROOT/path/to/manifest/file
+
+Example of a remote manifest import:
+  $ jiri import myfile https://foo.com/bar.git
 
 Run "jiri help manifest" for details on manifests.
 
 Usage:
-   jiri import [flags] <remote> <manifest>
-
-<remote> specifies the remote repository that contains your manifest project.
-
-<manifest> specifies the manifest file to use from the manifest project.
+   jiri import [flags] <manifest> [remote]
 
 The jiri import flags are:
- -mode=append
-   The import mode:
-      append    - Create file if it doesn't exist, or append to existing file.
-      overwrite - Write file regardless of whether it already exists.
  -name=
    The name of the remote manifest project, used to disambiguate manifest
    projects with the same remote.  Typically empty.
  -out=
    The output file.  Uses $JIRI_ROOT/.jiri_manifest if unspecified.  Uses stdout
    if set to "-".
+ -overwrite=false
+   Write a new .jiri_manifest file with the given specification.  If it already
+   exists, the existing content will be ignored and the file will be
+   overwritten.
  -path=
    Path to store the manifest project locally.  Uses "manifest" if unspecified.
  -protocol=git
@@ -544,6 +561,33 @@ The jiri upgrade flags are:
  -revert=false
    Revert the upgrade by deleting the $JIRI_ROOT/.jiri_manifest file.
 
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri which - Show path to the jiri tool
+
+Which behaves similarly to the unix commandline tool.  It is useful in
+determining whether the jiri binary is being run directly, or run via the jiri
+shim script.
+
+If the binary is being run directly, the output looks like this:
+
+  # binary
+  /path/to/binary/jiri
+
+If the script is being run, the output looks like this:
+
+  # script
+  /path/to/script/jiri
+
+Usage:
+   jiri which [flags]
+
+The jiri which flags are:
  -color=true
    Use color to format output.
  -n=false

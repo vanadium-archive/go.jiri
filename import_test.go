@@ -7,6 +7,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,15 +26,58 @@ type importTestCase struct {
 func TestImport(t *testing.T) {
 	tests := []importTestCase{
 		{
-			Stderr: `must specify non-empty`,
+			Stderr: `wrong number of arguments`,
 		},
 		{
-			Args:   []string{"https://github.com/new.git"},
-			Stderr: `must specify non-empty`,
+			Args:   []string{"a", "b", "c"},
+			Stderr: `wrong number of arguments`,
 		},
-		// Default mode = append
+		// Local file imports, default append behavior
 		{
-			Args: []string{"-name=name", "-path=path", "-remotebranch=remotebranch", "-revision=revision", "-root=root", "https://github.com/new.git", "foo"},
+			Args: []string{"manfile"},
+			Want: `<manifest>
+  <imports>
+    <fileimport file="manfile"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			Args: []string{"./manfile"},
+			Want: `<manifest>
+  <imports>
+    <fileimport file="manfile"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			Args: []string{"manfile"},
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Want: `<manifest>
+  <imports>
+    <import manifest="bar" remote="https://github.com/orig.git"/>
+    <fileimport file="manfile"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			Args:   []string{"../manfile"},
+			Stderr: `not a subdirectory of JIRI_ROOT`,
+		},
+		{
+			Args:   []string{"noexist"},
+			Stderr: `no such file`,
+		},
+		// Remote imports, default append behavior
+		{
+			Args: []string{"-name=name", "-path=path", "-remotebranch=remotebranch", "-revision=revision", "-root=root", "foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="foo" root="root" name="name" path="path" remote="https://github.com/new.git" remotebranch="remotebranch" revision="revision"/>
@@ -41,7 +86,7 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"https://github.com/new.git", "foo"},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="foo" remote="https://github.com/new.git"/>
@@ -50,7 +95,7 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args:     []string{"-out=file", "https://github.com/new.git", "foo"},
+			Args:     []string{"-out=file", "foo", "https://github.com/new.git"},
 			Filename: `file`,
 			Want: `<manifest>
   <imports>
@@ -60,7 +105,7 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"-out=-", "https://github.com/new.git", "foo"},
+			Args: []string{"-out=-", "foo", "https://github.com/new.git"},
 			Stdout: `<manifest>
   <imports>
     <import manifest="foo" remote="https://github.com/new.git"/>
@@ -69,24 +114,66 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"https://github.com/new.git", "foo"},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
-    <import manifest="bar" remote="https://github.com/exist.git"/>
+    <import manifest="bar" remote="https://github.com/orig.git"/>
   </imports>
 </manifest>
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="bar" remote="https://github.com/exist.git"/>
+    <import manifest="bar" remote="https://github.com/orig.git"/>
     <import manifest="foo" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
 		},
-		// Explicit mode = append
+		// Local file imports, explicit overwrite behavior
 		{
-			Args: []string{"-mode=append", "https://github.com/new.git", "foo"},
+			Args: []string{"-overwrite", "manfile"},
+			Want: `<manifest>
+  <imports>
+    <fileimport file="manfile"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			Args: []string{"-overwrite", "./manfile"},
+			Want: `<manifest>
+  <imports>
+    <fileimport file="manfile"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			Args: []string{"-overwrite", "manfile"},
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Want: `<manifest>
+  <imports>
+    <fileimport file="manfile"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			Args:   []string{"-overwrite", "../manfile"},
+			Stderr: `not a subdirectory of JIRI_ROOT`,
+		},
+		{
+			Args:   []string{"-overwrite", "noexist"},
+			Stderr: `no such file`,
+		},
+		// Remote imports, explicit overwrite behavior
+		{
+			Args: []string{"-overwrite", "foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="foo" remote="https://github.com/new.git"/>
@@ -95,7 +182,7 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args:     []string{"-mode=append", "-out=file", "https://github.com/new.git", "foo"},
+			Args:     []string{"-overwrite", "-out=file", "foo", "https://github.com/new.git"},
 			Filename: `file`,
 			Want: `<manifest>
   <imports>
@@ -105,7 +192,7 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"-mode=append", "-out=-", "https://github.com/new.git", "foo"},
+			Args: []string{"-overwrite", "-out=-", "foo", "https://github.com/new.git"},
 			Stdout: `<manifest>
   <imports>
     <import manifest="foo" remote="https://github.com/new.git"/>
@@ -114,55 +201,10 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"-mode=append", "https://github.com/new.git", "foo"},
+			Args: []string{"-overwrite", "foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
-    <import manifest="bar" remote="https://github.com/exist.git"/>
-  </imports>
-</manifest>
-`,
-			Want: `<manifest>
-  <imports>
-    <import manifest="bar" remote="https://github.com/exist.git"/>
-    <import manifest="foo" remote="https://github.com/new.git"/>
-  </imports>
-</manifest>
-`,
-		},
-		// Explicit mode = overwrite
-		{
-			Args: []string{"-mode=overwrite", "https://github.com/new.git", "foo"},
-			Want: `<manifest>
-  <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args:     []string{"-mode=overwrite", "-out=file", "https://github.com/new.git", "foo"},
-			Filename: `file`,
-			Want: `<manifest>
-  <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args: []string{"-mode=overwrite", "-out=-", "https://github.com/new.git", "foo"},
-			Stdout: `<manifest>
-  <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args: []string{"-mode=overwrite", "https://github.com/new.git", "foo"},
-			Exist: `<manifest>
-  <imports>
-    <import manifest="bar" remote="https://github.com/exist.git"/>
+    <import manifest="bar" remote="https://github.com/orig.git"/>
   </imports>
 </manifest>
 `,
@@ -188,12 +230,22 @@ func TestImport(t *testing.T) {
 func testImport(opts gosh.Opts, jiriTool string, test importTestCase) error {
 	sh := gosh.NewShell(opts)
 	defer sh.Cleanup()
-	jiriRoot := sh.MakeTempDir()
+	tmpDir := sh.MakeTempDir()
+	jiriRoot := filepath.Join(tmpDir, "root")
+	if err := os.Mkdir(jiriRoot, 0755); err != nil {
+		return err
+	}
 	sh.Pushd(jiriRoot)
-	defer sh.Popd()
 	filename := test.Filename
 	if filename == "" {
 		filename = ".jiri_manifest"
+	}
+	// Set up manfile for the local file import tests.  It should exist in both
+	// the tmpDir (for ../manfile tests) and jiriRoot.
+	for _, dir := range []string{tmpDir, jiriRoot} {
+		if err := ioutil.WriteFile(filepath.Join(dir, "manfile"), nil, 0644); err != nil {
+			return err
+		}
 	}
 	// Set up an existing file if it was specified.
 	if test.Exist != "" {

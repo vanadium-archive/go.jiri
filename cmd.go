@@ -41,6 +41,7 @@ Command jiri is a multi-purpose tool for multi-repo development.
 		cmdSnapshot,
 		cmdUpdate,
 		cmdUpgrade,
+		cmdWhich,
 	},
 	Topics: []cmdline.Topic{
 		topicFileSystem,

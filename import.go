@@ -7,6 +7,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
@@ -15,11 +17,11 @@ import (
 )
 
 var (
-	// Flags for configuring project attributes.
+	// Flags for configuring project attributes for remote imports.
 	flagImportName, flagImportPath, flagImportProtocol, flagImportRemoteBranch, flagImportRevision, flagImportRoot string
 	// Flags for controlling the behavior of the command.
-	flagImportMode importMode
-	flagImportOut  string
+	flagImportOverwrite bool
+	flagImportOut       string
 )
 
 func init() {
@@ -30,45 +32,8 @@ func init() {
 	cmdImport.Flags.StringVar(&flagImportRevision, "revision", "HEAD", `The revision of the remote manifest project to reset to during "jiri update".`)
 	cmdImport.Flags.StringVar(&flagImportRoot, "root", "", `Root to store the manifest project locally.`)
 
-	cmdImport.Flags.Var(&flagImportMode, "mode", `
-The import mode:
-   append    - Create file if it doesn't exist, or append to existing file.
-   overwrite - Write file regardless of whether it already exists.
-`)
+	cmdImport.Flags.BoolVar(&flagImportOverwrite, "overwrite", false, `Write a new .jiri_manifest file with the given specification.  If it already exists, the existing content will be ignored and the file will be overwritten.`)
 	cmdImport.Flags.StringVar(&flagImportOut, "out", "", `The output file.  Uses $JIRI_ROOT/.jiri_manifest if unspecified.  Uses stdout if set to "-".`)
-}
-
-type importMode int
-
-const (
-	importAppend importMode = iota
-	importOverwrite
-)
-
-func (m *importMode) Set(s string) error {
-	switch s {
-	case "append":
-		*m = importAppend
-		return nil
-	case "overwrite":
-		*m = importOverwrite
-		return nil
-	}
-	return fmt.Errorf("unknown import mode %q", s)
-}
-
-func (m importMode) String() string {
-	switch m {
-	case importAppend:
-		return "append"
-	case importOverwrite:
-		return "overwrite"
-	}
-	return "UNKNOWN"
-}
-
-func (m importMode) Get() interface{} {
-	return m
 }
 
 var cmdImport = &cmdline.Command{
@@ -79,26 +44,41 @@ var cmdImport = &cmdline.Command{
 Command "import" adds imports to the $JIRI_ROOT/.jiri_manifest file, which
 specifies manifest information for the jiri tool.  The file is created if it
 doesn't already exist, otherwise additional imports are added to the existing
-file.  The arguments and flags configure the <import> element that is added to
-the manifest.
+file.
+
+<manifest> specifies the manifest file to use.
+
+[remote] optionally specifies the remote manifest repository.
+
+If [remote] is not specified, a <fileimport> element is added to the manifest,
+representing a local file import.  The manifest file may be an absolute path, or
+relative to the current working directory.  The resulting path must be a
+subdirectory of $JIRI_ROOT.
+
+If [remote] is specified, an <import> element is added to the manifest,
+representing a remote manifest import.  The remote manifest repository is
+treated similar to regular projects; "jiri update" will update all remote
+manifest repository projects before updating regular projects.  The manifest
+file path is relative to the root directory of the remote import repository.
+
+Example of a local file import:
+  $ jiri import $JIRI_ROOT/path/to/manifest/file
+
+Example of a remote manifest import:
+  $ jiri import myfile https://foo.com/bar.git
 
 Run "jiri help manifest" for details on manifests.
 `,
-	ArgsName: "<remote> <manifest>",
-	ArgsLong: `
-<remote> specifies the remote repository that contains your manifest project.
-
-<manifest> specifies the manifest file to use from the manifest project.
-`,
+	ArgsName: "<manifest> [remote]",
 }
 
 func runImport(jirix *jiri.X, args []string) error {
-	if len(args) != 2 || args[0] == "" || args[1] == "" {
-		return jirix.UsageErrorf("must specify non-empty <remote> and <manifest>")
+	if len(args) == 0 || len(args) > 2 {
+		return jirix.UsageErrorf("wrong number of arguments")
 	}
 	// Initialize manifest.
 	var manifest *project.Manifest
-	if flagImportMode == importAppend {
+	if !flagImportOverwrite {
 		m, err := project.ManifestFromFile(jirix, jirix.JiriManifestFile())
 		if err != nil && !runutil.IsNotExist(err) {
 			return err
@@ -108,19 +88,44 @@ func runImport(jirix *jiri.X, args []string) error {
 	if manifest == nil {
 		manifest = &project.Manifest{}
 	}
-	// Add remote import.
-	manifest.Imports = append(manifest.Imports, project.Import{
-		Manifest: args[1],
-		Root:     flagImportRoot,
-		Project: project.Project{
-			Name:         flagImportName,
-			Path:         flagImportPath,
-			Protocol:     flagImportProtocol,
-			Remote:       args[0],
-			RemoteBranch: flagImportRemoteBranch,
-			Revision:     flagImportRevision,
-		},
-	})
+	// Add the local or remote import.
+	if len(args) == 1 {
+		// FileImport.File is relative to the directory containing the manifest
+		// file; since the .jiri_manifest file is in JIRI_ROOT, that's what it
+		// should be relative to.
+		if _, err := os.Stat(args[0]); err != nil {
+			return err
+		}
+		abs, err := filepath.Abs(args[0])
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(jirix.Root, abs)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("%s is not a subdirectory of JIRI_ROOT %s", abs, jirix.Root)
+		}
+		manifest.FileImports = append(manifest.FileImports, project.FileImport{
+			File: rel,
+		})
+	} else {
+		// There's not much error checking when writing the .jiri_manifest file;
+		// errors will be reported when "jiri update" is run.
+		manifest.Imports = append(manifest.Imports, project.Import{
+			Manifest: args[0],
+			Root:     flagImportRoot,
+			Project: project.Project{
+				Name:         flagImportName,
+				Path:         flagImportPath,
+				Protocol:     flagImportProtocol,
+				Remote:       args[1],
+				RemoteBranch: flagImportRemoteBranch,
+				Revision:     flagImportRevision,
+			},
+		})
+	}
 	// Write output to stdout or file.
 	outFile := flagImportOut
 	if outFile == "" {

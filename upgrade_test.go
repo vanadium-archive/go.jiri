@@ -214,7 +214,6 @@ func testUpgrade(opts gosh.Opts, jiriTool string, test upgradeTestCase) error {
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
 	sh.Pushd(jiriRoot)
-	defer sh.Popd()
 	// Set up an existing file or local_manifest, if they were specified
 	if test.Exist {
 		if err := ioutil.WriteFile(".jiri_manifest", []byte("<manifest/>"), 0644); err != nil {
@@ -264,7 +263,6 @@ func TestUpgradeRevert(t *testing.T) {
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
 	sh.Pushd(jiriRoot)
-	defer sh.Popd()
 	jiriTool := sh.BuildGoPkg("v.io/jiri")
 	localData := `<manifest/>`
 	jiriData := `<manifest>
