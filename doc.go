@@ -255,7 +255,7 @@ The jiri import flags are:
    Path to store the manifest project locally.  Uses "manifest" if unspecified.
  -protocol=git
    The version control protocol used by the remote manifest project.
- -remotebranch=master
+ -remote-branch=master
    The branch of the remote manifest project to track.
  -revision=HEAD
    The revision of the remote manifest project to reset to during "jiri update".

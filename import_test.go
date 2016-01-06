@@ -77,7 +77,7 @@ func TestImport(t *testing.T) {
 		},
 		// Remote imports, default append behavior
 		{
-			Args: []string{"-name=name", "-path=path", "-remotebranch=remotebranch", "-revision=revision", "-root=root", "foo", "https://github.com/new.git"},
+			Args: []string{"-name=name", "-path=path", "-remote-branch=remotebranch", "-revision=revision", "-root=root", "foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="foo" root="root" name="name" path="path" remote="https://github.com/new.git" remotebranch="remotebranch" revision="revision"/>
