@@ -58,23 +58,23 @@ var (
 
 // init carries out the package initialization.
 func init() {
-	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, "Ignore unmerged changes.")
-	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
-	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, "Automatically submit the changelist when feasiable.")
-	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", "Comma-seperated list of emails or LDAPs to cc.")
-	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, "Send a draft changelist.")
-	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, "Open an editor to edit the CL description.")
-	cmdCLMail.Flags.StringVar(&hostFlag, "host", "", "Gerrit host to use.  Defaults to gerrit host specified in manifest.")
-	cmdCLMail.Flags.StringVar(&messageFlag, "m", "", "CL description.")
+	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, `Ignore unmerged changes.`)
+	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to.`)
+	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, `Automatically submit the changelist when feasiable.`)
+	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", `Comma-seperated list of emails or LDAPs to cc.`)
+	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, `Send a draft changelist.`)
+	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, `Open an editor to edit the CL description.`)
+	cmdCLMail.Flags.StringVar(&hostFlag, "host", "", `Gerrit host to use.  Defaults to gerrit host specified in manifest.`)
+	cmdCLMail.Flags.StringVar(&messageFlag, "m", "", `CL description.`)
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
-	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
-	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", "Comma-seperated list of emails or LDAPs to request review.")
-	cmdCLMail.Flags.BoolVar(&setTopicFlag, "set-topic", true, "Set Gerrit CL topic.")
-	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", "CL topic, defaults to <username>-<branchname>.")
-	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, "Check that no uncommitted changes exist.")
-	cmdCLMail.Flags.BoolVar(&verifyFlag, "verify", true, "Run pre-push git hooks.")
-	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", "Name of the remote branch the CL pertains to.")
+	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to.`)
+	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", `Comma-seperated list of emails or LDAPs to request review.`)
+	cmdCLMail.Flags.BoolVar(&setTopicFlag, "set-topic", true, `Set Gerrit CL topic.`)
+	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", `CL topic, defaults to <username>-<branchname>.`)
+	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, `Check that no uncommitted changes exist.`)
+	cmdCLMail.Flags.BoolVar(&verifyFlag, "verify", true, `Run pre-push git hooks.`)
+	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to.`)
 }
 
 func getCommitMessageFileName(jirix *jiri.X, branch string) (string, error) {
