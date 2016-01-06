@@ -53,22 +53,19 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 		return err
 	}
 
+	// Update all projects to their latest version.
+	// Attempt <attemptsFlag> times before failing.
+	updateFn := func() error { return project.UpdateUniverse(jirix, gcFlag) }
+	if err := retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag)); err != nil {
+		return err
+	}
 	// Create a snapshot of the current state of all projects and write it to the
 	// update history directory.
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
 	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
-
-	// Update all projects to their latest version.
-	// Attempt <attemptsFlag> times before failing.
-	updateFn := func() error {
-		if err := project.UpdateUniverse(jirix, gcFlag); err != nil {
-			return err
-		}
-		// We're careful to only attempt the bin dir transition after the update has
-		// succeeded, to avoid messy partial states.
-		return project.TransitionBinDir(jirix)
-	}
-	return retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag))
+	// Only attempt the bin dir transition after the update has succeeded, to
+	// avoid messy partial states.
+	return project.TransitionBinDir(jirix)
 }

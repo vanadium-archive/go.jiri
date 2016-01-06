@@ -41,7 +41,7 @@ func TestUpgrade(t *testing.T) {
 			Args: []string{"v23"},
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -56,7 +56,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -71,7 +71,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/private" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="private" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -88,9 +88,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/private" remote="https://vanadium.googlesource.com/manifest"/>
-    <fileimport file="manifest/v2/infrastructure"/>
-    <fileimport file="manifest/v2/default"/>
+    <import manifest="private" remote="https://vanadium.googlesource.com/manifest"/>
+    <fileimport file="manifest/infrastructure"/>
+    <fileimport file="manifest/public"/>
   </imports>
 </manifest>
 `,
@@ -107,9 +107,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://vanadium.googlesource.com/manifest"/>
-    <fileimport file="manifest/v2/infrastructure"/>
-    <fileimport file="manifest/v2/private"/>
+    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
+    <fileimport file="manifest/infrastructure"/>
+    <fileimport file="manifest/private"/>
   </imports>
 </manifest>
 `,
@@ -124,7 +124,7 @@ func TestUpgrade(t *testing.T) {
 			Args: []string{"fuchsia"},
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="default" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -139,7 +139,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="default" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -154,7 +154,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/private" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="private" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -171,9 +171,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/private" remote="https://github.com/effenel/fnl-start.git"/>
-    <fileimport file="manifest/v2/infrastructure"/>
-    <fileimport file="manifest/v2/default"/>
+    <import manifest="private" remote="https://github.com/effenel/fnl-start.git"/>
+    <fileimport file="manifest/infrastructure"/>
+    <fileimport file="manifest/default"/>
   </imports>
 </manifest>
 `,
@@ -190,9 +190,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://github.com/effenel/fnl-start.git"/>
-    <fileimport file="manifest/v2/infrastructure"/>
-    <fileimport file="manifest/v2/private"/>
+    <import manifest="default" remote="https://github.com/effenel/fnl-start.git"/>
+    <fileimport file="manifest/infrastructure"/>
+    <fileimport file="manifest/private"/>
   </imports>
 </manifest>
 `,
@@ -267,7 +267,7 @@ func TestUpgradeRevert(t *testing.T) {
 	localData := `<manifest/>`
 	jiriData := `<manifest>
   <imports>
-    <import manifest="v2/default" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `

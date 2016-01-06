@@ -81,15 +81,16 @@ func runUpgrade(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("must specify upgrade kind")
 	}
+	kind := args[0]
 	var argRemote, argRoot, argPath, argManifest string
-	switch kind := args[0]; kind {
+	switch kind {
 	case "v23":
 		argRemote = "https://vanadium.googlesource.com/manifest"
-		argRoot, argPath, argManifest = "", "manifest", "v2/default"
+		argRoot, argPath, argManifest = "", "manifest", "public"
 	case "fuchsia":
 		// TODO(toddw): Confirm these choices.
 		argRemote = "https://github.com/effenel/fnl-start.git"
-		argRoot, argPath, argManifest = "", "manifest", "v2/default"
+		argRoot, argPath, argManifest = "", "manifest", "default"
 	default:
 		return jirix.UsageErrorf("unknown upgrade kind %q", kind)
 	}
@@ -104,19 +105,25 @@ func runUpgrade(jirix *jiri.X, args []string) error {
 		seenOldImport := false
 		var newImports []project.Import
 		for _, oldImport := range manifest.Imports {
-			switch {
-			case oldImport.Remote != "":
+			if oldImport.Remote != "" {
 				// This is a new-style remote import, carry it over directly.
 				newImports = append(newImports, oldImport)
-			case !seenOldImport:
+				continue
+			}
+			// This is an old-style file import, convert it to the new style.
+			oldName := oldImport.Name
+			if kind == "v23" && oldName == "default" {
+				oldName = "public" // default no longer exists, now it's just public.
+			}
+			if !seenOldImport {
 				// This is the first old import, update the manifest name for the remote
 				// import we'll be adding later.
-				argManifest = filepath.Join("v2", oldImport.Name)
+				argManifest = oldName
 				seenOldImport = true
-			default:
-				// Convert import from name="foo" to file="manifest/v2/foo"
+			} else {
+				// Convert import from name="foo" to file="manifest/foo"
 				manifest.FileImports = append(manifest.FileImports, project.FileImport{
-					File: filepath.Join(argRoot, argPath, "v2", oldImport.Name),
+					File: filepath.Join(argRoot, argPath, oldName),
 				})
 			}
 		}
