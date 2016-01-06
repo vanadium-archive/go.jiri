@@ -212,7 +212,7 @@ func (rd *Reader) SkippingProfiles() bool {
 // the specified target installed taking account if running using profiles
 // at all or if using old-style profiles.
 func (rd *Reader) ValidateRequestedProfilesAndTarget(profileNames []string, target profiles.Target) error {
-	if ProfilesMode(rd.profilesMode) == SkipProfiles {
+	if rd.SkippingProfiles() {
 		return nil
 	}
 	for _, n := range profileNames {
