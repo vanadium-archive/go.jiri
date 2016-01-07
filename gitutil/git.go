@@ -116,6 +116,13 @@ func (g *Git) Clone(repo, path string) error {
 	return g.run("clone", "--recursive", repo, path)
 }
 
+// CloneNonRecursive clones the given repository to the given local path without
+// being recursive.
+// TODO(alexfandrianto): Should we instead rename Clone to CloneRecursive?
+func (g *Git) CloneNonRecursive(repo, path string) error {
+	return g.run("clone", repo, path)
+}
+
 // Commit commits all files in staging with an empty message.
 func (g *Git) Commit() error {
 	return g.run("commit", "--allow-empty", "--allow-empty-message", "--no-edit")
