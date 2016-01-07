@@ -21,14 +21,28 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
+const (
+	defaultSnapshotDir = ".snapshot"
+)
+
 var (
-	remoteFlag     bool
-	timeFormatFlag string
+	snapshotDirFlag string
+	pushRemoteFlag  bool
+	timeFormatFlag  string
+
+	// TODO(nlacasse): Remove the -remote flag once all users have moved to the
+	// -push-remote flag.
+	remoteFlag bool
 )
 
 func init() {
-	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
+	cmdSnapshot.Flags.StringVar(&snapshotDirFlag, "dir", "", "Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.")
+	cmdSnapshotCreate.Flags.BoolVar(&pushRemoteFlag, "push-remote", false, "Commit and push snapshot upstream.")
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
+
+	// TODO(nlacasse): Remove the -remote flag once all users have moved to the
+	// -push-remote flag.
+	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
 }
 
 var cmdSnapshot = &cmdline.Command{
@@ -38,10 +52,6 @@ var cmdSnapshot = &cmdline.Command{
 The "jiri snapshot" command can be used to manage project snapshots.
 In particular, it can be used to create new snapshots and to list
 existing snapshots.
-
-The command-line flag "-remote" determines whether the command
-pertains to "local" snapshots that are only stored locally or "remote"
-snapshots the are revisioned in the manifest repository.
 `,
 	Children: []*cmdline.Command{cmdSnapshotCreate, cmdSnapshotList},
 }
@@ -52,12 +62,9 @@ var cmdSnapshotCreate = &cmdline.Command{
 	Name:   "create",
 	Short:  "Create a new project snapshot",
 	Long: `
-The "jiri snapshot create <label>" command captures the current project
-state in a manifest and, depending on the value of the -remote flag,
-the command either stores the manifest in the local
-$JIRI_ROOT/.snapshots directory, or in the manifest repository, pushing
-the change to the remote repository and thus making it available
-globally.
+The "jiri snapshot create <label>" command captures the current project state
+in a manifest.  If the -push-remote flag is provided, the snapshot is committed
+and pushed upstream.
 
 Internally, snapshots are organized as follows:
 
@@ -94,75 +101,59 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 		return err
 	}
 	snapshotFile := filepath.Join(snapshotDir, "labels", label, time.Now().Format(timeFormatFlag))
-	// Either atomically create a new snapshot that captures the project
-	// state and push the changes to the remote repository (if
-	// applicable), or fail with no effect.
+
+	if !remoteFlag && !pushRemoteFlag {
+		// No git operations necessary.  Just create the snapshot file.
+		return createSnapshot(jirix, snapshotDir, snapshotFile, label)
+	}
+
+	// Attempt to create a snapshot on a clean master branch.  If snapshot
+	// creation fails, return to the state we were in before.
 	createFn := func() error {
 		revision, err := jirix.Git().CurrentRevision()
 		if err != nil {
 			return err
 		}
 		if err := createSnapshot(jirix, snapshotDir, snapshotFile, label); err != nil {
-			// Clean up on all errors.
 			jirix.Git().Reset(revision)
 			jirix.Git().RemoveUntrackedFiles()
 			return err
 		}
-		return nil
+		return commitAndPushChanges(jirix, snapshotDir, snapshotFile, label)
 	}
 
-	// Execute the above function in the snapshot directory.
+	// Execute the above function in the snapshot directory on a clean master branch.
 	p := project.Project{
 		Path:     snapshotDir,
 		Protocol: "git",
 		Revision: "HEAD",
 	}
-	if err := project.ApplyToLocalMaster(jirix, project.Projects{p.Key(): p}, createFn); err != nil {
-		return err
-	}
-	return nil
+	return project.ApplyToLocalMaster(jirix, project.Projects{p.Key(): p}, createFn)
 }
 
-// getSnapshotDir returns the path to the snapshot directory, respecting the
-// value of the "-remote" command-line flag.  It performs validation that the
-// directory exists and is initialized.
+// getSnapshotDir returns the path to the snapshot directory, creating it if
+// necessary.
 func getSnapshotDir(jirix *jiri.X) (string, error) {
-	dir := jirix.LocalSnapshotDir()
+	dir := snapshotDirFlag
+	if dir == "" {
+		dir = filepath.Join(jirix.Root, defaultSnapshotDir)
+	}
+
+	// TODO(nlacasse): Remove once there are no more user of the -remote flag.
 	if remoteFlag {
-		dir = jirix.RemoteSnapshotDir()
+		dir = filepath.Join(jirix.ManifestDir(), "snapshot")
 	}
-	s := jirix.NewSeq()
-	switch _, err := s.Stat(dir); {
-	case err == nil:
-		return dir, nil
-	case !runutil.IsNotExist(err):
-		return "", err
-	case remoteFlag:
-		if err := s.MkdirAll(dir, 0755).Done(); err != nil {
-			return "", err
-		}
-		return dir, nil
-	}
-	// Create a new local snapshot directory.
-	createFn := func() (e error) {
-		if err := s.MkdirAll(dir, 0755).Done(); err != nil {
-			return err
-		}
-		if err := jirix.Git().Init(dir); err != nil {
-			return err
-		}
+
+	if !filepath.IsAbs(dir) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return err
+			return "", err
 		}
-		defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-		if err := s.Chdir(dir).Done(); err != nil {
-			return err
-		}
-		return jirix.Git().Commit()
+		dir = filepath.Join(cwd, dir)
 	}
-	if err := createFn(); err != nil {
-		s.RemoveAll(dir)
+
+	// Make sure directory exists.
+	if err := jirix.NewSeq().MkdirAll(dir, 0755).Done(); err != nil {
 		return "", err
 	}
 	return dir, nil
@@ -181,23 +172,15 @@ func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) erro
 	symlink := filepath.Join(snapshotDir, label)
 	newSymlink := symlink + ".new"
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	if err := s.RemoveAll(newSymlink).
+	return s.RemoveAll(newSymlink).
 		Symlink(relativeSnapshotPath, newSymlink).
-		Rename(newSymlink, symlink).Done(); err != nil {
-		return err
-	}
-
-	// Revision the changes.
-	if err := revisionChanges(jirix, snapshotDir, snapshotFile, label); err != nil {
-		return err
-	}
-	return nil
+		Rename(newSymlink, symlink).Done()
 }
 
-// revisionChanges commits changes identified by the given manifest
-// file and label to the manifest repository and (if applicable)
-// pushes these changes to the remote repository.
-func revisionChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string) (e error) {
+// commitAndPushChanges commits changes identified by the given manifest file
+// and label to the containing repository and pushes these changes to the
+// remote repository.
+func commitAndPushChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string) (e error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -217,10 +200,8 @@ func revisionChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string) (e 
 	if err := jirix.Git().CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
 		return err
 	}
-	if remoteFlag {
-		if err := jirix.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
-			return err
-		}
+	if err := jirix.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
+		return err
 	}
 	return nil
 }

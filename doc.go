@@ -405,10 +405,6 @@ The "jiri snapshot" command can be used to manage project snapshots. In
 particular, it can be used to create new snapshots and to list existing
 snapshots.
 
-The command-line flag "-remote" determines whether the command pertains to
-"local" snapshots that are only stored locally or "remote" snapshots the are
-revisioned in the manifest repository.
-
 Usage:
    jiri snapshot [flags] <command>
 
@@ -417,6 +413,8 @@ The jiri snapshot commands are:
    list        List existing project snapshots
 
 The jiri snapshot flags are:
+ -dir=
+   Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
  -remote=false
    Manage remote snapshots.
 
@@ -430,10 +428,8 @@ The jiri snapshot flags are:
 Jiri snapshot create - Create a new project snapshot
 
 The "jiri snapshot create <label>" command captures the current project state in
-a manifest and, depending on the value of the -remote flag, the command either
-stores the manifest in the local $JIRI_ROOT/.snapshots directory, or in the
-manifest repository, pushing the change to the remote repository and thus making
-it available globally.
+a manifest.  If the -push-remote flag is provided, the snapshot is committed and
+pushed upstream.
 
 Internally, snapshots are organized as follows:
 
@@ -462,11 +458,15 @@ Usage:
 <label> is the snapshot label.
 
 The jiri snapshot create flags are:
+ -push-remote=false
+   Commit and push snapshot upstream.
  -time-format=2006-01-02T15:04:05Z07:00
    Time format for snapshot file name.
 
  -color=true
    Use color to format output.
+ -dir=
+   Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
  -n=false
    Show what commands will run but do not execute them.
  -remote=false
@@ -488,6 +488,8 @@ Usage:
 The jiri snapshot list flags are:
  -color=true
    Use color to format output.
+ -dir=
+   Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
  -n=false
    Show what commands will run but do not execute them.
  -remote=false
