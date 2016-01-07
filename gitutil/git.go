@@ -113,14 +113,12 @@ func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 
 // Clone clones the given repository to the given local path.
 func (g *Git) Clone(repo, path string) error {
-	return g.run("clone", "--recursive", repo, path)
+	return g.run("clone", repo, path)
 }
 
-// CloneNonRecursive clones the given repository to the given local path without
-// being recursive.
-// TODO(alexfandrianto): Should we instead rename Clone to CloneRecursive?
-func (g *Git) CloneNonRecursive(repo, path string) error {
-	return g.run("clone", repo, path)
+// CloneRecursive clones the given repository recursively to the given local path.
+func (g *Git) CloneRecursive(repo, path string) error {
+	return g.run("clone", "--recursive", repo, path)
 }
 
 // Commit commits all files in staging with an empty message.

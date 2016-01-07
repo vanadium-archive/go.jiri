@@ -7,7 +7,7 @@ pkg gitutil, method (*Git) BranchExists(string) bool
 pkg gitutil, method (*Git) BranchesDiffer(string, string) (bool, error)
 pkg gitutil, method (*Git) CheckoutBranch(string, ...CheckoutOpt) error
 pkg gitutil, method (*Git) Clone(string, string) error
-pkg gitutil, method (*Git) CloneNonRecursive(string, string) error
+pkg gitutil, method (*Git) CloneRecursive(string, string) error
 pkg gitutil, method (*Git) Commit() error
 pkg gitutil, method (*Git) CommitAmend() error
 pkg gitutil, method (*Git) CommitAmendWithMessage(string) error

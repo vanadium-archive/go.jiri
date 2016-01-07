@@ -63,7 +63,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	if err := fake.WriteRemoteManifest(&project.Manifest{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := jirix.Git().Clone(fake.Projects[manifestProject], filepath.Join(jirix.Root, manifestProject)); err != nil {
+	if err := jirix.Git().CloneRecursive(fake.Projects[manifestProject], filepath.Join(jirix.Root, manifestProject)); err != nil {
 		t.Fatal(err)
 	}
 
