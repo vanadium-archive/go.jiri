@@ -1851,7 +1851,12 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		if found && strings.HasPrefix(op.project.Remote, host.Location) {
 			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
 			for _, githook := range host.GitHooks {
-				mdir := jirix.ManifestDir()
+				// TODO(nlacasse): GitHook paths are relative to the manifest
+				// file.  Currently all manifests live in
+				// JIRI_ROOT/.manifest/v2, but that is changing.  I think
+				// GitHooks should be associated with projects, and their paths
+				// should be relative to the project root.
+				mdir := filepath.Join(jirix.Root, ".manifest", "v2")
 				src, err := s.ReadFile(filepath.Join(mdir, githook.Path))
 				if err != nil {
 					return err

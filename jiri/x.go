@@ -136,16 +136,6 @@ func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
 }
 
-// ManifestDir returns the path to the manifest directory.
-func (x *X) ManifestDir() string {
-	return filepath.Join(x.Root, ".manifest", "v2")
-}
-
-// ManifestFile returns the path to the manifest file with the given name.
-func (x *X) ManifestFile(name string) string {
-	return filepath.Join(x.ManifestDir(), name)
-}
-
 // ResolveManifestPath resolves the given manifest name to an absolute path in
 // the local filesystem.
 func (x *X) ResolveManifestPath(name string) (string, error) {
@@ -162,18 +152,19 @@ func (x *X) ResolveManifestPath(name string) (string, error) {
 //
 // TODO(toddw): Remove this logic when the transition to .jiri_manifest is done.
 func (x *X) resolveManifestPathDeprecated(name string) (string, error) {
+	manifestDir := filepath.Join(x.Root, ".manifest", "v2")
 	if name != "" {
 		if filepath.IsAbs(name) {
 			return name, nil
 		}
-		return x.ManifestFile(name), nil
+		return filepath.Join(manifestDir, name), nil
 	}
 	path := filepath.Join(x.Root, ".local_manifest")
 	switch _, err := os.Stat(path); {
 	case err == nil:
 		return path, nil
 	case os.IsNotExist(err):
-		return x.ManifestFile("default"), nil
+		return filepath.Join(manifestDir, "default"), nil
 	default:
 		return "", fmt.Errorf("Stat(%v) failed: %v", path, err)
 	}

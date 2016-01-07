@@ -141,7 +141,7 @@ func getSnapshotDir(jirix *jiri.X) (string, error) {
 
 	// TODO(nlacasse): Remove once there are no more user of the -remote flag.
 	if remoteFlag {
-		dir = filepath.Join(jirix.ManifestDir(), "snapshot")
+		dir = filepath.Join(jirix.Root, ".manifest", "v2", "snapshot")
 	}
 
 	if !filepath.IsAbs(dir) {
