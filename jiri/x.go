@@ -136,16 +136,6 @@ func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
 }
 
-// LocalSnapshotDir returns the path to the local snapshot directory.
-func (x *X) LocalSnapshotDir() string {
-	return filepath.Join(x.Root, ".snapshot")
-}
-
-// RemoteSnapshotDir returns the path to the remote snapshot directory.
-func (x *X) RemoteSnapshotDir() string {
-	return filepath.Join(x.ManifestDir(), "snapshot")
-}
-
 // ManifestDir returns the path to the manifest directory.
 func (x *X) ManifestDir() string {
 	return filepath.Join(x.Root, ".manifest", "v2")

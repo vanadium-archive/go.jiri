@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/jiritest"
 	"v.io/jiri/project"
@@ -18,6 +19,9 @@ import (
 )
 
 func createLabelDir(t *testing.T, jirix *jiri.X, snapshotDir, name string, snapshots []string) {
+	if snapshotDir == "" {
+		snapshotDir = filepath.Join(jirix.Root, defaultSnapshotDir)
+	}
 	s := jirix.NewSeq()
 	labelDir, perm := filepath.Join(snapshotDir, "labels", name), os.FileMode(0700)
 	if err := s.MkdirAll(labelDir, perm).Done(); err != nil {
@@ -60,21 +64,20 @@ type label struct {
 }
 
 func TestList(t *testing.T) {
+	resetFlags()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
-	remoteSnapshotDir := fake.X.RemoteSnapshotDir()
-	localSnapshotDir := fake.X.LocalSnapshotDir()
+	snapshotDir1 := "" // Should use default dir.
+	snapshotDir2 := filepath.Join(fake.X.Root, "some/other/dir")
 
 	// Create a test suite.
 	tests := []config{
 		config{
-			remote: false,
-			dir:    localSnapshotDir,
+			dir: snapshotDir1,
 		},
 		config{
-			remote: true,
-			dir:    remoteSnapshotDir,
+			dir: snapshotDir2,
 		},
 	}
 	labels := []label{
@@ -89,7 +92,7 @@ func TestList(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		remoteFlag = test.remote
+		snapshotDirFlag = test.dir
 		// Create the snapshots directory and populate it with the
 		// data specified by the test suite.
 		for _, label := range labels {
@@ -174,7 +177,186 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	}
 }
 
+func resetFlags() {
+	snapshotDirFlag = ""
+	pushRemoteFlag = false
+	remoteFlag = false
+}
+
+func TestGetSnapshotDir(t *testing.T) {
+	resetFlags()
+	defer resetFlags()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// With all flags at default values, snapshot dir should be default.
+	resetFlags()
+	got, err := getSnapshotDir(fake.X)
+	if err != nil {
+		t.Fatalf("getSnapshotDir() failed: %v\n", err)
+	}
+	if want := filepath.Join(fake.X.Root, defaultSnapshotDir); got != want {
+		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
+	}
+
+	// With remote flag set, snapshot dir should be JIRI_ROOT/.manifest/v2/snapshot.
+	resetFlags()
+	remoteFlag = true
+	got, err = getSnapshotDir(fake.X)
+	if err != nil {
+		t.Fatalf("getSnapshotDir() failed: %v\n", err)
+	}
+	if want := filepath.Join(fake.X.Root, ".manifest", "v2", "snapshot"); got != want {
+		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
+	}
+
+	// With dir flag set to absolute path, snapshot dir should be value of dir
+	// flag.
+	resetFlags()
+	tempDir, err := fake.X.NewSeq().TempDir("", "")
+	if err != nil {
+		t.Fatalf("TempDir() failed: %v", err)
+	}
+	defer fake.X.NewSeq().RemoveAll(tempDir).Done()
+	snapshotDirFlag = tempDir
+	got, err = getSnapshotDir(fake.X)
+	if err != nil {
+		t.Fatalf("getSnapshotDir() failed: %v\n", err)
+	}
+	if want := snapshotDirFlag; got != want {
+		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
+	}
+
+	// With dir flag set to relative path, snapshot dir should absolute path
+	// rooted at current working dir.
+	resetFlags()
+	snapshotDirFlag = "some/relative/path"
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd() failed: %v", err)
+	}
+	got, err = getSnapshotDir(fake.X)
+	if err != nil {
+		t.Fatalf("getSnapshotDir() failed: %v\n", err)
+	}
+	if want := filepath.Join(cwd, snapshotDirFlag); got != want {
+		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
+	}
+}
+
+// TestCreate tests creating and checking out a snapshot.
 func TestCreate(t *testing.T) {
+	resetFlags()
+	defer resetFlags()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+
+	// Setup the initial remote and local projects.
+	numProjects, remoteProjects := 2, []string{}
+	for i := 0; i < numProjects; i++ {
+		if err := fake.CreateRemoteProject(remoteProjectName(i)); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := fake.AddProject(project.Project{
+			Name:   remoteProjectName(i),
+			Path:   localProjectName(i),
+			Remote: fake.Projects[remoteProjectName(i)],
+		}); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}
+
+	// Create initial commits in the remote projects and use UpdateUniverse()
+	// to mirror them locally.
+	for i := 0; i < numProjects; i++ {
+		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], "revision 1")
+	}
+	if err := project.UpdateUniverse(fake.X, true); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Create a snapshot.
+	var stdout bytes.Buffer
+	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
+	if err := runSnapshotCreate(fake.X, []string{"test-local"}); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Remove the local project repositories.
+	for i, _ := range remoteProjects {
+		localProject := filepath.Join(fake.X.Root, localProjectName(i))
+		if err := s.RemoveAll(localProject).Done(); err != nil {
+			t.Fatalf("%v", err)
+		}
+	}
+
+	// Check that invoking the UpdateUniverse() with the snapshot restores the
+	// local repositories.
+	snapshotDir := filepath.Join(fake.X.Root, defaultSnapshotDir)
+	snapshotFile := filepath.Join(snapshotDir, "test-local")
+	localX := fake.X.Clone(tool.ContextOpts{
+		Manifest: &snapshotFile,
+	})
+	if err := project.UpdateUniverse(localX, true); err != nil {
+		t.Fatalf("%v", err)
+	}
+	for i, _ := range remoteProjects {
+		localProject := filepath.Join(fake.X.Root, localProjectName(i))
+		checkReadme(t, fake.X, localProject, "revision 1")
+	}
+}
+
+// TestCreatePushRemote checks that creating a snapshot with the -push-remote
+// flag causes the snapshot to be committed and pushed upstream.
+func TestCreatePushRemote(t *testing.T) {
+	resetFlags()
+	defer resetFlags()
+
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	fake.EnableRemoteManifestPush()
+	defer fake.DisableRemoteManifestPush()
+
+	snapshotDir := filepath.Join(fake.X.ManifestDir(), "snapshot")
+	label := "test"
+
+	git := gitutil.New(fake.X.NewSeq(), fake.X.ManifestDir())
+	commitCount, err := git.CountCommits("master", "")
+	if err != nil {
+		t.Fatalf("git.CountCommits(\"master\", \"\") failed: %v", err)
+	}
+
+	// Create snapshot with -push-remote flag set to true.
+	snapshotDirFlag = snapshotDir
+	pushRemoteFlag = true
+	if err := runSnapshotCreate(fake.X, []string{label}); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	// Check that repo has one new commit.
+	newCommitCount, err := git.CountCommits("master", "")
+	if err != nil {
+		t.Fatalf("git.CountCommits(\"master\", \"\") failed: %v", err)
+	}
+	if got, want := newCommitCount, commitCount+1; got != want {
+		t.Errorf("unexpected commit count: got %v want %v", got, want)
+	}
+
+	// Check that new label is commited.
+	labelFile := filepath.Join(snapshotDir, "labels", label)
+	if !git.IsFileCommitted(labelFile) {
+		t.Errorf("expected file %v to be committed but it was not", labelFile)
+	}
+}
+
+// TestCreateDeprecated tests "local" and "remote" snapshot creation.
+// TODO(nlacasse): Delete this test once the old -remote flag has been removed.
+// The new snapshot behavior is tested in TestCreate and TestCreatePushRemote.
+func TestCreateDeprecated(t *testing.T) {
+	resetFlags()
+	defer resetFlags()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	s := fake.X.NewSeq()
@@ -221,7 +403,7 @@ func TestCreate(t *testing.T) {
 
 	// Check that invoking the UpdateUniverse() with the local
 	// snapshot restores the local repositories.
-	snapshotDir := fake.X.LocalSnapshotDir()
+	snapshotDir := filepath.Join(fake.X.Root, defaultSnapshotDir)
 	snapshotFile := filepath.Join(snapshotDir, "test-local")
 	localX := fake.X.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,
