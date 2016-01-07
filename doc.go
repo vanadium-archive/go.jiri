@@ -78,7 +78,7 @@ The jiri cl cleanup flags are:
  -f=false
    Ignore unmerged changes.
  -remote-branch=master
-   Name of the remote branch the CL pertains to.
+   Name of the remote branch the CL pertains to, without the leading "origin/".
 
  -color=true
    Use color to format output.
@@ -119,7 +119,7 @@ The jiri cl mail flags are:
  -r=
    Comma-seperated list of emails or LDAPs to request review.
  -remote-branch=master
-   Name of the remote branch the CL pertains to.
+   Name of the remote branch the CL pertains to, without the leading "origin/".
  -set-topic=true
    Set Gerrit CL topic.
  -topic=
@@ -176,7 +176,7 @@ Usage:
 
 The jiri cl sync flags are:
  -remote-branch=master
-   Name of the remote branch the CL pertains to.
+   Name of the remote branch the CL pertains to, without the leading "origin/".
 
  -color=true
    Use color to format output.
@@ -256,7 +256,8 @@ The jiri import flags are:
  -protocol=git
    The version control protocol used by the remote manifest project.
  -remote-branch=master
-   The branch of the remote manifest project to track.
+   The branch of the remote manifest project to track, without the leading
+   "origin/".
  -revision=HEAD
    The revision of the remote manifest project to reset to during "jiri update".
  -root=
