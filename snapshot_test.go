@@ -319,10 +319,11 @@ func TestCreatePushRemote(t *testing.T) {
 	fake.EnableRemoteManifestPush()
 	defer fake.DisableRemoteManifestPush()
 
-	snapshotDir := filepath.Join(fake.X.ManifestDir(), "snapshot")
+	manifestDir := filepath.Join(fake.X.Root, ".manifest")
+	snapshotDir := filepath.Join(manifestDir, "snapshot")
 	label := "test"
 
-	git := gitutil.New(fake.X.NewSeq(), fake.X.ManifestDir())
+	git := gitutil.New(fake.X.NewSeq(), manifestDir)
 	commitCount, err := git.CountCommits("master", "")
 	if err != nil {
 		t.Fatalf("git.CountCommits(\"master\", \"\") failed: %v", err)

@@ -11,8 +11,6 @@ pkg jiri, func RunnerFunc(func(*X, []string) error) cmdline.Runner
 pkg jiri, method (*X) BinDir() string
 pkg jiri, method (*X) Clone(tool.ContextOpts) *X
 pkg jiri, method (*X) JiriManifestFile() string
-pkg jiri, method (*X) ManifestDir() string
-pkg jiri, method (*X) ManifestFile(string) string
 pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
 pkg jiri, method (*X) RootMetaDir() string
 pkg jiri, method (*X) UpdateHistoryDir() string
