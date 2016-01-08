@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/envvar"
 )
 
 // Sequence provides for convenient chaining of multiple calls to its
@@ -101,7 +102,12 @@ type sequence struct {
 
 // NewSequence creates an instance of Sequence with default values for its
 // environment, stdin, stderr, stdout and other supported options.
+// If the environment parameter is nil or empty then the current value of
+// os.Environ() will be used instead.
 func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) Sequence {
+	if len(env) == 0 {
+		env = envvar.SliceToMap(os.Environ())
+	}
 	s := Sequence{
 		&sequence{
 			r:            newExecutor(env, stdin, stdout, stderr, color, dryRun, verbose),
@@ -144,14 +150,32 @@ func (s Sequence) Read(stdin io.Reader) Sequence {
 	return s
 }
 
-// Env arranges for the next call to Run, Call, Start or Last to use the supplied
-// environment variables. This will be cleared and not used for any calls
+// SetEnv arranges for the next call to Run, Call, Start or Last to use the supplied
+// environment variables. These will be cleared and not used for any calls
 // to Run, Call or Last beyond the next one.
-func (s Sequence) Env(env map[string]string) Sequence {
+func (s Sequence) SetEnv(env map[string]string) Sequence {
 	if s.err != nil {
 		return s
 	}
 	s.env = env
+	return s
+}
+
+// Env arranges for the next call to Run, Call, Start or Last to use
+// the result of merging the supplied environment variables with those
+// specified when the sequence was created or with those set by the most
+// recent call to the Env method. These will be cleared and not used
+// for any calls to Run, Call or Last beyond the next one.
+func (s Sequence) Env(env map[string]string) Sequence {
+	if s.err != nil {
+		return s
+	}
+	if s.env != nil {
+		s.env = envvar.MergeMaps(s.env, env)
+	} else {
+		e := s.getOpts().env
+		s.env = envvar.MergeMaps(e, env)
+	}
 	return s
 }
 
@@ -378,7 +402,9 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 		}
 		opts := s.getOpts()
 		opts.stdout, opts.stderr = s.serializeWriter(fout), s.serializeWriter(fout)
-		opts.env = s.env
+		if len(s.env) > 0 {
+			opts.env = s.env
+		}
 		if s.reading {
 			opts.stdin = s.stdin
 		}
@@ -415,7 +441,9 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 	rStderr, wStderr := io.Pipe()
 	opts.stdout = wStdout
 	opts.stderr = wStderr
-	opts.env = s.env
+	if len(s.env) > 0 {
+		opts.env = s.env
+	}
 	if s.reading {
 		opts.stdin = s.stdin
 	}

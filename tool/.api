@@ -8,7 +8,6 @@ pkg tool, method (Context) Color() bool
 pkg tool, method (Context) DryRun() bool
 pkg tool, method (Context) Env() map[string]string
 pkg tool, method (Context) Gerrit(string) *gerrit.Gerrit
-pkg tool, method (Context) Git(...gitOpt) *gitutil.Git
 pkg tool, method (Context) Jenkins(string) (*jenkins.Jenkins, error)
 pkg tool, method (Context) Manifest() string
 pkg tool, method (Context) NewSeq() runutil.Sequence
@@ -19,8 +18,6 @@ pkg tool, method (Context) Timer() *timing.Timer
 pkg tool, method (Context) TimerPop()
 pkg tool, method (Context) TimerPush(string)
 pkg tool, method (Context) Verbose() bool
-pkg tool, type AuthorDateOpt string
-pkg tool, type CommitterDateOpt string
 pkg tool, type Context struct
 pkg tool, type ContextOpts struct
 pkg tool, type ContextOpts struct, Color *bool
@@ -32,7 +29,6 @@ pkg tool, type ContextOpts struct, Stdin io.Reader
 pkg tool, type ContextOpts struct, Stdout io.Writer
 pkg tool, type ContextOpts struct, Timer *timing.Timer
 pkg tool, type ContextOpts struct, Verbose *bool
-pkg tool, type RootDirOpt string
 pkg tool, var ColorFlag bool
 pkg tool, var DryRunFlag bool
 pkg tool, var ManifestFlag string

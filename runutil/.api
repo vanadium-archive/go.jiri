@@ -43,6 +43,7 @@ pkg runutil, method (Sequence) RemoveAll(string) Sequence
 pkg runutil, method (Sequence) Rename(string, string) Sequence
 pkg runutil, method (Sequence) Run(string, ...string) Sequence
 pkg runutil, method (Sequence) RunOpts() (bool, bool)
+pkg runutil, method (Sequence) SetEnv(map[string]string) Sequence
 pkg runutil, method (Sequence) Start(string, ...string) (*Handle, error)
 pkg runutil, method (Sequence) Stat(string) (os.FileInfo, error)
 pkg runutil, method (Sequence) Symlink(string, string) Sequence

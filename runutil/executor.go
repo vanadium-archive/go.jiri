@@ -167,13 +167,7 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 	command.Stdin = opts.stdin
 	command.Stdout = opts.stdout
 	command.Stderr = opts.stderr
-	if len(opts.env) != 0 {
-		vars := envvar.VarsFromOS()
-		for key, value := range opts.env {
-			vars.Set(key, value)
-		}
-		command.Env = vars.ToSlice()
-	}
+	command.Env = envvar.MapToSlice(opts.env)
 	if opts.verbose || opts.dryRun {
 		args := []string{}
 		for _, arg := range command.Args {

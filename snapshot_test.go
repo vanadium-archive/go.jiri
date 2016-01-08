@@ -172,7 +172,7 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	if err := s.Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Git().CommitFile(path, "creating README"); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).CommitFile(path, "creating README"); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -323,7 +323,7 @@ func TestCreatePushRemote(t *testing.T) {
 	snapshotDir := filepath.Join(manifestDir, "snapshot")
 	label := "test"
 
-	git := gitutil.New(fake.X.NewSeq(), manifestDir)
+	git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(manifestDir))
 	commitCount, err := git.CountCommits("master", "")
 	if err != nil {
 		t.Fatalf("git.CountCommits(\"master\", \"\") failed: %v", err)

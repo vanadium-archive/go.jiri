@@ -7,6 +7,7 @@ package project
 import (
 	"path/filepath"
 
+	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
@@ -29,7 +30,7 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 	var err error
 	switch state.Project.Protocol {
 	case "git":
-		scm := jirix.Git(tool.RootDirOpt(state.Project.Path))
+		scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(state.Project.Path))
 		var branches []string
 		branches, state.CurrentBranch, err = scm.GetBranches()
 		if err != nil {

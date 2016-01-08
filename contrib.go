@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"v.io/jiri/collect"
+	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
@@ -203,20 +204,20 @@ func runContributors(jirix *jiri.X, args []string) error {
 }
 
 func listCommitters(jirix *jiri.X) (_ []string, e error) {
-	branch, err := jirix.Git().CurrentBranchName()
+	branch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
-	stashed, err := jirix.Git().Stash()
+	stashed, err := gitutil.New(jirix.NewSeq()).Stash()
 	if err != nil {
 		return nil, err
 	}
 	if stashed {
-		defer collect.Error(func() error { return jirix.Git().StashPop() }, &e)
+		defer collect.Error(func() error { return gitutil.New(jirix.NewSeq()).StashPop() }, &e)
 	}
-	if err := jirix.Git().CheckoutBranch("master"); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch("master"); err != nil {
 		return nil, err
 	}
-	defer collect.Error(func() error { return jirix.Git().CheckoutBranch(branch) }, &e)
-	return jirix.Git().Committers()
+	defer collect.Error(func() error { return gitutil.New(jirix.NewSeq()).CheckoutBranch(branch) }, &e)
+	return gitutil.New(jirix.NewSeq()).Committers()
 }

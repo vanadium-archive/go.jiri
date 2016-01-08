@@ -1,5 +1,5 @@
 pkg gitutil, func Error(string, string, ...string) GitError
-pkg gitutil, func New(runutil.Sequence, string) *Git
+pkg gitutil, func New(runutil.Sequence, ...gitOpt) *Git
 pkg gitutil, method (*Committer) Commit(string) error
 pkg gitutil, method (*Git) Add(string) error
 pkg gitutil, method (*Git) AddRemote(string, string) error
@@ -56,9 +56,11 @@ pkg gitutil, method (*Git) TrackedFiles() ([]string, error)
 pkg gitutil, method (*Git) UntrackedFiles() ([]string, error)
 pkg gitutil, method (*Git) Version() (int, int, error)
 pkg gitutil, method (GitError) Error() string
+pkg gitutil, type AuthorDateOpt string
 pkg gitutil, type CheckoutOpt interface, unexported methods
 pkg gitutil, type CommitOpt interface, unexported methods
 pkg gitutil, type Committer struct
+pkg gitutil, type CommitterDateOpt string
 pkg gitutil, type DeleteBranchOpt interface, unexported methods
 pkg gitutil, type ForceOpt bool
 pkg gitutil, type Git struct
@@ -69,6 +71,7 @@ pkg gitutil, type ModeOpt string
 pkg gitutil, type PushOpt interface, unexported methods
 pkg gitutil, type ResetOnFailureOpt bool
 pkg gitutil, type ResetOpt interface, unexported methods
+pkg gitutil, type RootDirOpt string
 pkg gitutil, type SquashOpt bool
 pkg gitutil, type StrategyOpt string
 pkg gitutil, type VerifyOpt bool

@@ -19,7 +19,6 @@ import (
 	"v.io/jiri/googlesource"
 	"v.io/jiri/jiri"
 	"v.io/jiri/runutil"
-	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/set"
 )
@@ -686,7 +685,7 @@ func writeCurrentManifest(jirix *jiri.X, manifest *Manifest) error {
 // directory by reading the jiri project metadata located in a directory at the
 // root of the current repository.
 func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
-	topLevel, err := jirix.Git().TopLevel()
+	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
 	if err != nil {
 		return "", nil
 	}
@@ -707,7 +706,7 @@ func setProjectRevisions(jirix *jiri.X, projects Projects) (_ Projects, e error)
 	for name, project := range projects {
 		switch project.Protocol {
 		case "git":
-			revision, err := jirix.Git(tool.RootDirOpt(project.Path)).CurrentRevisionOfBranch("master")
+			revision, err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).CurrentRevisionOfBranch("master")
 			if err != nil {
 				return nil, err
 			}
@@ -828,12 +827,12 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 				}
 
 				// Fetch the latest from origin.
-				if err := jirix.Git().FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
+				if err := gitutil.New(jirix.NewSeq()).FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
 					return nil, err
 				}
 
 				// Collect commits visible from FETCH_HEAD that aren't visible from master.
-				commitsText, err := jirix.Git().Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
+				commitsText, err := gitutil.New(jirix.NewSeq()).Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
 				if err != nil {
 					return nil, err
 				}
@@ -874,7 +873,7 @@ func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 	var remote string
 	return remote, jirix.NewSeq().Pushd(manifestPath).Call(
 		func() (e error) {
-			remote, e = jirix.Git().RemoteUrl("origin")
+			remote, e = gitutil.New(jirix.NewSeq()).RemoteUrl("origin")
 			return
 		}, "get manifest origin").Done()
 }
@@ -990,15 +989,15 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 		}
 		switch p.Protocol {
 		case "git":
-			branch, err := jirix.Git().CurrentBranchName()
+			branch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
 			if err != nil {
 				return err
 			}
-			stashed, err := jirix.Git().Stash()
+			stashed, err := gitutil.New(jirix.NewSeq()).Stash()
 			if err != nil {
 				return err
 			}
-			if err := jirix.Git().CheckoutBranch("master"); err != nil {
+			if err := gitutil.New(jirix.NewSeq()).CheckoutBranch("master"); err != nil {
 				return err
 			}
 			// After running the function, return to this project's directory,
@@ -1007,11 +1006,11 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 				if err := s.Chdir(p.Path).Done(); err != nil {
 					return err
 				}
-				if err := jirix.Git().CheckoutBranch(branch); err != nil {
+				if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(branch); err != nil {
 					return err
 				}
 				if stashed {
-					return jirix.Git().StashPop()
+					return gitutil.New(jirix.NewSeq()).StashPop()
 				}
 				return nil
 			}, &e)
@@ -1160,29 +1159,29 @@ func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e 
 // and uncommitted changes, and optionally deletes all the other branches.
 func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string) error {
 	// Check out master and clean up changes.
-	curBranchName, err := jirix.Git().CurrentBranchName()
+	curBranchName, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
 	if err != nil {
 		return err
 	}
 	if curBranchName != "master" {
-		if err := jirix.Git().CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
+		if err := gitutil.New(jirix.NewSeq()).CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
-	if err := jirix.Git().RemoveUntrackedFiles(); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).RemoveUntrackedFiles(); err != nil {
 		return err
 	}
 	// Discard any uncommitted changes.
 	if remoteBranch == "" {
 		remoteBranch = "master"
 	}
-	if err := jirix.Git().Reset("origin/" + remoteBranch); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Reset("origin/" + remoteBranch); err != nil {
 		return err
 	}
 
 	// Delete all the other branches.
 	// At this point we should be at the master branch.
-	branches, _, err := jirix.Git().GetBranches()
+	branches, _, err := gitutil.New(jirix.NewSeq()).GetBranches()
 	if err != nil {
 		return err
 	}
@@ -1191,7 +1190,7 @@ func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string)
 			continue
 		}
 		if cleanupBranches {
-			if err := jirix.Git().DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
+			if err := gitutil.New(jirix.NewSeq()).DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 				return nil
 			}
 		}
@@ -1381,17 +1380,17 @@ func resetProject(jirix *jiri.X, project Project) error {
 			if project.Remote == "" {
 				return fmt.Errorf("project %v does not have a remote", project.Name)
 			}
-			if err := jirix.Git().SetRemoteUrl("origin", project.Remote); err != nil {
+			if err := gitutil.New(jirix.NewSeq()).SetRemoteUrl("origin", project.Remote); err != nil {
 				return err
 			}
-			if err := jirix.Git().Fetch("origin"); err != nil {
+			if err := gitutil.New(jirix.NewSeq()).Fetch("origin"); err != nil {
 				return err
 			}
 
 			// Having a specific revision trumps everything else - once fetched,
 			// always reset to that revision.
 			if project.Revision != "" && project.Revision != "HEAD" {
-				return jirix.Git().Reset(project.Revision)
+				return gitutil.New(jirix.NewSeq()).Reset(project.Revision)
 			}
 
 			// If no revision, reset to the configured remote branch, or master
@@ -1400,7 +1399,7 @@ func resetProject(jirix *jiri.X, project Project) error {
 			if remoteBranch == "" {
 				remoteBranch = "master"
 			}
-			return jirix.Git().Reset("origin/" + remoteBranch)
+			return gitutil.New(jirix.NewSeq()).Reset("origin/" + remoteBranch)
 		default:
 			return UnsupportedProtocolErr(project.Protocol)
 		}
@@ -1609,7 +1608,7 @@ func reportNonMaster(jirix *jiri.X, project Project) (e error) {
 	}
 	switch project.Protocol {
 	case "git":
-		current, err := jirix.Git().CurrentBranchName()
+		current, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
 		if err != nil {
 			return err
 		}
@@ -1747,7 +1746,7 @@ func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) er
 	switch project.Protocol {
 	case "git":
 		if project.Revision == "HEAD" {
-			revision, err := jirix.Git(tool.RootDirOpt(project.Path)).CurrentRevision()
+			revision, err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).CurrentRevision()
 			if err != nil {
 				return err
 			}
@@ -1839,7 +1838,7 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpDir).Done() }, &e)
 	switch op.project.Protocol {
 	case "git":
-		if err := jirix.Git().Clone(op.project.Remote, tmpDir); err != nil {
+		if err := gitutil.New(jirix.NewSeq()).Clone(op.project.Remote, tmpDir); err != nil {
 			return err
 		}
 
@@ -1886,7 +1885,7 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		if err := s.Chdir(tmpDir).Done(); err != nil {
 			return err
 		}
-		if err := jirix.Git().Reset(op.project.Revision); err != nil {
+		if err := gitutil.New(jirix.NewSeq()).Reset(op.project.Revision); err != nil {
 			return err
 		}
 	default:
@@ -1934,7 +1933,7 @@ func (op deleteOperation) Run(jirix *jiri.X, _ *Manifest) error {
 	if op.gc {
 		// Never delete projects with non-master branches, uncommitted
 		// work, or untracked content.
-		git := jirix.Git(tool.RootDirOpt(op.project.Path))
+		git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(op.project.Path))
 		branches, _, err := git.GetBranches()
 		if err != nil {
 			return err

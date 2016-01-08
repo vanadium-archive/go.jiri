@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
 	"v.io/jiri/util"
 )
 
@@ -63,7 +63,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	if err := fake.WriteRemoteManifest(&project.Manifest{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := jirix.Git().CloneRecursive(fake.Projects[manifestProject], filepath.Join(jirix.Root, manifestProject)); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).CloneRecursive(fake.Projects[manifestProject], filepath.Join(jirix.Root, manifestProject)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -162,8 +162,8 @@ func (fake FakeJiriRoot) AddTool(tool project.Tool) error {
 // DisableRemoteManifestPush disables pushes to the remote manifest
 // repository.
 func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
-	dir := tool.RootDirOpt(filepath.Join(fake.remote, manifestProject))
-	if err := fake.X.Git(dir).CheckoutBranch("master"); err != nil {
+	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProject))
+	if err := gitutil.New(fake.X.NewSeq(), dir).CheckoutBranch("master"); err != nil {
 		return err
 	}
 	return nil
@@ -172,13 +172,13 @@ func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 // EnableRemoteManifestPush enables pushes to the remote manifest
 // repository.
 func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
-	dir := tool.RootDirOpt(filepath.Join(fake.remote, manifestProject))
-	if !fake.X.Git(dir).BranchExists("non-master") {
-		if err := fake.X.Git(dir).CreateBranch("non-master"); err != nil {
+	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProject))
+	if !gitutil.New(fake.X.NewSeq(), dir).BranchExists("non-master") {
+		if err := gitutil.New(fake.X.NewSeq(), dir).CreateBranch("non-master"); err != nil {
 			return err
 		}
 	}
-	if err := fake.X.Git(dir).CheckoutBranch("non-master"); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), dir).CheckoutBranch("non-master"); err != nil {
 		return err
 	}
 	return nil
@@ -190,10 +190,10 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	if err := fake.X.NewSeq().MkdirAll(projectDir, os.FileMode(0700)).Done(); err != nil {
 		return err
 	}
-	if err := fake.X.Git().Init(projectDir); err != nil {
+	if err := gitutil.New(fake.X.NewSeq()).Init(projectDir); err != nil {
 		return err
 	}
-	if err := fake.X.Git(tool.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
 		return err
 	}
 	fake.Projects[name] = projectDir
@@ -254,10 +254,10 @@ func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path str
 	if err := manifest.ToFile(fake.X, path); err != nil {
 		return err
 	}
-	if err := fake.X.Git(tool.RootDirOpt(dir)).Add(path); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir)).Add(path); err != nil {
 		return err
 	}
-	if err := fake.X.Git(tool.RootDirOpt(dir)).Commit(); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir)).Commit(); err != nil {
 		return err
 	}
 	return nil
