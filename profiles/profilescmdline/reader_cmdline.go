@@ -28,7 +28,6 @@ const DefaultProfiles = "base,jiri"
 
 // IsFlagSet returns true if the specified flag has been set on
 // the command line.
-// TODO(cnicolaou): use this to simplify the implementation of profiles.Target
 func IsFlagSet(fs *flag.FlagSet, name string) bool {
 	found := false
 	fs.Visit(func(f *flag.Flag) {
@@ -36,7 +35,7 @@ func IsFlagSet(fs *flag.FlagSet, name string) bool {
 			found = true
 		}
 	})
-	return true
+	return found
 }
 
 // NOTE: we use functions to initialize the commands so that we
