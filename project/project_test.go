@@ -118,16 +118,6 @@ func createRemoteManifest(t *testing.T, jirix *jiri.X, dir string, remotes []str
 		}
 		manifest.Projects = append(manifest.Projects, project)
 	}
-	manifest.Hosts = []project.Host{
-		{
-			Name:     "gerrit",
-			Location: "git://example.com/gerrit",
-		},
-		{
-			Name:     "git",
-			Location: "git://example.com/git",
-		},
-	}
 	commitManifest(t, jirix, &manifest, dir)
 }
 
@@ -932,14 +922,6 @@ func TestManifestToFromBytes(t *testing.T) {
 						},
 					},
 				},
-				Hosts: []project.Host{
-					{
-						Name: "git",
-						GitHooks: []project.GitHook{
-							{Name: "githook"},
-						},
-					},
-				},
 				Imports: []project.Import{
 					{
 						Manifest: "manifest",
@@ -958,6 +940,8 @@ func TestManifestToFromBytes(t *testing.T) {
 				},
 				Projects: []project.Project{
 					{
+						GerritHost:   "https://test-review.googlesource.com",
+						GitHooks:     "path/to/githooks",
 						Name:         "project",
 						Path:         "path",
 						Protocol:     "git",
@@ -982,20 +966,13 @@ func TestManifestToFromBytes(t *testing.T) {
       <arg>bar</arg>
     </hook>
   </hooks>
-  <hosts>
-    <host name="git">
-      <githooks>
-        <githook name="githook"/>
-      </githooks>
-    </host>
-  </hosts>
   <imports>
     <import manifest="manifest" remote="remote"/>
     <import name="localimport"/>
     <fileimport file="fileimport"/>
   </imports>
   <projects>
-    <project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"/>
+    <project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks"/>
   </projects>
   <tools>
     <tool data="tooldata" name="tool" project="toolproject"/>

@@ -18,7 +18,7 @@ import (
 // breaks.  We should revisit the whole data directory thing, and in particular
 // see if we can get rid of tools having to know their own names.
 func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
-	_, projects, tools, _, err := readManifest(jirix)
+	projects, tools, _, err := readManifest(jirix)
 	if err != nil {
 		return "", err
 	}
@@ -39,26 +39,4 @@ func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(project.Path, tool.Data), nil
-}
-
-func getHost(jirix *jiri.X, name string) (string, error) {
-	hosts, _, _, _, err := readManifest(jirix)
-	if err != nil {
-		return "", err
-	}
-	host, found := hosts[name]
-	if !found {
-		return "", fmt.Errorf("host %s not found in manifest", name)
-	}
-	return host.Location, nil
-}
-
-// GerritHost returns the URL that hosts the Gerrit code review system.
-func GerritHost(jirix *jiri.X) (string, error) {
-	return getHost(jirix, "gerrit")
-}
-
-// GitHost returns the URL that hosts the git repositories.
-func GitHost(jirix *jiri.X) (string, error) {
-	return getHost(jirix, "git")
 }

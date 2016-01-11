@@ -86,21 +86,6 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		t.Fatal(err)
 	}
 
-	// Add "gerrit" and "git" hosts to the manifest, as required by the "jiri"
-	// tool.
-	if err := fake.AddHost(project.Host{
-		Name:     "gerrit",
-		Location: "git://example.com/gerrit",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := fake.AddHost(project.Host{
-		Name:     "git",
-		Location: "git://example.com/git",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
 	// Update the contents of the fake JIRI_ROOT instance based on
 	// the information recorded in the remote manifest.
 	if err := fake.UpdateUniverse(false); err != nil {
@@ -118,19 +103,6 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 			t.Fatalf("RemoveAll(%q) failed: %v", fake.remote, err)
 		}
 	}
-}
-
-// AddHost adds the given host to a remote manifest.
-func (fake FakeJiriRoot) AddHost(host project.Host) error {
-	manifest, err := fake.ReadRemoteManifest()
-	if err != nil {
-		return err
-	}
-	manifest.Hosts = append(manifest.Hosts, host)
-	if err := fake.WriteRemoteManifest(manifest); err != nil {
-		return err
-	}
-	return nil
 }
 
 // AddProject adds the given project to a remote manifest.

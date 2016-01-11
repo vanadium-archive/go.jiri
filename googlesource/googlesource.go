@@ -100,6 +100,17 @@ func gitCookies(jirix *jiri.X) []*http.Cookie {
 
 // GetRepoStatuses returns the RepoStatus of all public projects hosted on the
 // remote host.  Host must be a googlesource host.
+//
+// NOTE(nlacasse): Googlesource uses gitiles as its git repo browser.  gitiles
+// has a completely undocumented feature that allows one to query the state of
+// all repositories in a single request.  See "doGetJson" method in
+// https://gerrit.googlesource.com/gitiles/+/master/gitiles-servlet/src/main/java/com/google/gitiles/RepositoryIndexServlet.java
+//
+// It's possible that gitiles will stop responding to this request at some
+// future version, or that googlesource will move away from gitiles entirely.
+// If that happens we can still get all the repo information in one request by
+// using the /projects/ endpoint on Gerrit.  See
+// https://review.typo3.org/Documentation/rest-api-projects.html#list-projects
 func GetRepoStatuses(jirix *jiri.X, host string) (RepoStatuses, error) {
 	u, err := url.Parse(host)
 	if err != nil {
@@ -109,6 +120,7 @@ func GetRepoStatuses(jirix *jiri.X, host string) (RepoStatuses, error) {
 		return nil, fmt.Errorf("remote host scheme is not http(s): %s", host)
 	}
 
+	u.Path = "/"
 	q := u.Query()
 	q.Set("format", "json")
 	q.Set("b", "master")
@@ -141,9 +153,9 @@ func GetRepoStatuses(jirix *jiri.X, host string) (RepoStatuses, error) {
 	return repoStatuses, nil
 }
 
-var googleSourceHostRegExp = regexp.MustCompile(`(?i)https?://.*\.googlesource.com/.*`)
+var googleSourceRemoteRegExp = regexp.MustCompile(`(?i)https?://.*\.googlesource.com.*`)
 
-// IsGoogleSourceHost returns true if the host url is a googlesource url.
-func IsGoogleSourceHost(host string) bool {
-	return googleSourceHostRegExp.MatchString(host)
+// IsGoogleSourceRemote returns true if the host url is a googlesource remote.
+func IsGoogleSourceRemote(host string) bool {
+	return googleSourceRemoteRegExp.MatchString(host)
 }

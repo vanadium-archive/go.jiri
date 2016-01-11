@@ -1,5 +1,5 @@
 pkg googlesource, func GetRepoStatuses(*jiri.X, string) (RepoStatuses, error)
-pkg googlesource, func IsGoogleSourceHost(string) bool
+pkg googlesource, func IsGoogleSourceRemote(string) bool
 pkg googlesource, type RepoStatus struct
 pkg googlesource, type RepoStatus struct, Branches map[string]string
 pkg googlesource, type RepoStatus struct, CloneUrl string

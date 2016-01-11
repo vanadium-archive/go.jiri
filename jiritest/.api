@@ -1,6 +1,5 @@
 pkg jiritest, func NewFakeJiriRoot(*testing.T) (*FakeJiriRoot, func())
 pkg jiritest, func NewX(*testing.T) (*jiri.X, func())
-pkg jiritest, method (FakeJiriRoot) AddHost(project.Host) error
 pkg jiritest, method (FakeJiriRoot) AddProject(project.Project) error
 pkg jiritest, method (FakeJiriRoot) AddTool(project.Tool) error
 pkg jiritest, method (FakeJiriRoot) CreateRemoteProject(string) error
