@@ -286,7 +286,7 @@ func (e *Environment) String() string {
 
 // Usage returns the usage string for Environment.
 func (e *Environment) Usage() string {
-	return "specifcy an environment variable in the form: <var>=[<val>],..."
+	return "specify an environment variable in the form: <var>=[<val>],..."
 }
 
 // InsertTarget inserts the given target into Targets if it's not
