@@ -26,7 +26,7 @@ Usage:
 A typical bootstrap workflow looks like this:
 
 $ curl -s https://raw.githubusercontent.com/vanadium/go.jiri/master/scripts/bootstrap_jiri | bash -s myroot
-$ export PATH=myroot/scripts:$PATH
+$ export PATH=myroot/.jiri_root/scripts:$PATH
 $ cd myroot
 $ jiri import public https://vanadium.googlesource.com/manifest
 $ jiri update'
