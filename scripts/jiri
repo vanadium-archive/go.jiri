@@ -38,7 +38,7 @@ fi
 
 # If $JIRI_ROOT is set we always use it, otherwise look for a .jiri_root
 # directory starting with the current working directory, and walking up.
-if [[ "${JIRI_ROOT}" == "" ]]; then
+if [[ -z ${JIRI_ROOT+x} ]]; then
   while [[ ! -d  "$(pwd)/.jiri_root" ]]; do
     if [[ "$(pwd)" == "/" ]]; then
       fatal "could not find .jiri_root directory"
