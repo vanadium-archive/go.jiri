@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -41,7 +42,6 @@ type CL struct {
 // Manifest represents a setting used for updating the universe.
 type Manifest struct {
 	Hooks       []Hook       `xml:"hooks>hook"`
-	Hosts       []Host       `xml:"hosts>host"`
 	Imports     []Import     `xml:"imports>import"`
 	FileImports []FileImport `xml:"imports>fileimport"`
 	Label       string       `xml:"label,attr,omitempty"`
@@ -80,16 +80,12 @@ func ManifestFromFile(jirix *jiri.X, filename string) (*Manifest, error) {
 var (
 	newlineBytes       = []byte("\n")
 	emptyHooksBytes    = []byte("\n  <hooks></hooks>\n")
-	emptyGitHooksBytes = []byte("\n      <githooks></githooks>\n")
-	emptyHostsBytes    = []byte("\n  <hosts></hosts>\n")
 	emptyImportsBytes  = []byte("\n  <imports></imports>\n")
 	emptyProjectsBytes = []byte("\n  <projects></projects>\n")
 	emptyToolsBytes    = []byte("\n  <tools></tools>\n")
 
 	endElemBytes       = []byte("/>\n")
 	endHookBytes       = []byte("></hook>\n")
-	endGitHookBytes    = []byte("></githook>\n")
-	endHostBytes       = []byte("></host>\n")
 	endImportBytes     = []byte("></import>\n")
 	endFileImportBytes = []byte("></fileimport>\n")
 	endProjectBytes    = []byte("></project>\n")
@@ -106,7 +102,6 @@ func (m *Manifest) deepCopy() *Manifest {
 	x.Label = m.Label
 	// First make copies of all slices.
 	x.Hooks = append([]Hook(nil), m.Hooks...)
-	x.Hosts = append([]Host(nil), m.Hosts...)
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.FileImports = append([]FileImport(nil), m.FileImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
@@ -114,9 +109,6 @@ func (m *Manifest) deepCopy() *Manifest {
 	// Now make copies of sub-slices.
 	for index, hook := range x.Hooks {
 		x.Hooks[index].Args = append([]HookArg(nil), hook.Args...)
-	}
-	for index, host := range x.Hosts {
-		x.Hosts[index].GitHooks = append([]GitHook(nil), host.GitHooks...)
 	}
 	return x
 }
@@ -134,14 +126,10 @@ func (m *Manifest) ToBytes() ([]byte, error) {
 	// It's hard (impossible?) to get xml.Marshal to elide some of the empty
 	// elements, or produce short empty elements, so we post-process the data.
 	data = bytes.Replace(data, emptyHooksBytes, newlineBytes, -1)
-	data = bytes.Replace(data, emptyGitHooksBytes, newlineBytes, -1)
-	data = bytes.Replace(data, emptyHostsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyImportsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyProjectsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyToolsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, endHookBytes, endElemBytes, -1)
-	data = bytes.Replace(data, endGitHookBytes, endElemBytes, -1)
-	data = bytes.Replace(data, endHostBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endFileImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endProjectBytes, endElemBytes, -1)
@@ -172,11 +160,6 @@ func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
 }
 
 func (m *Manifest) fillDefaults() error {
-	for index := range m.Hosts {
-		if err := m.Hosts[index].validate(); err != nil {
-			return err
-		}
-	}
 	for index := range m.Imports {
 		if err := m.Imports[index].fillDefaults(); err != nil {
 			return err
@@ -201,11 +184,6 @@ func (m *Manifest) fillDefaults() error {
 }
 
 func (m *Manifest) unfillDefaults() error {
-	for index := range m.Hosts {
-		if err := m.Hosts[index].validate(); err != nil {
-			return err
-		}
-	}
 	for index := range m.Imports {
 		if err := m.Imports[index].unfillDefaults(); err != nil {
 			return err
@@ -251,37 +229,6 @@ type Hook struct {
 type HookArg struct {
 	Arg     string   `xml:",chardata"`
 	XMLName struct{} `xml:"arg"`
-}
-
-// Hosts map host name to their detailed description.
-type Hosts map[string]Host
-
-// Host represents the locations of git and gerrit repository hosts.
-type Host struct {
-	// Name is the host name.
-	Name string `xml:"name,attr,omitempty"`
-	// Location is the url of the host.
-	Location string `xml:"location,attr,omitempty"`
-	// Git hooks to apply to repos from this host.
-	GitHooks []GitHook `xml:"githooks>githook"`
-	XMLName  struct{}  `xml:"host"`
-}
-
-func (h *Host) validate() error {
-	if len(h.GitHooks) > 0 && h.Name != "git" {
-		return fmt.Errorf("bad host: githook provided for non-git host: %+v", *h)
-	}
-	return nil
-}
-
-// GitHook represents the name and source of git hooks.
-type GitHook struct {
-	// The hook name, as required by git (e.g. commit-msg, pre-rebase, etc.)
-	Name string `xml:"name,attr,omitempty"`
-	// The filename of the hook implementation.  When editing the manifest,
-	// specify this path as relative to the manifest dir.
-	Path    string   `xml:"path,attr,omitempty"`
-	XMLName struct{} `xml:"githook"`
 }
 
 // Import represents a remote manifest import.
@@ -427,7 +374,12 @@ type Project struct {
 	// Revision is the revision the project should be advanced to
 	// during "jiri update". If not set, "HEAD" is used as the
 	// default.
-	Revision string   `xml:"revision,attr,omitempty"`
+	Revision string `xml:"revision,attr,omitempty"`
+	// GerritHost is the gerrit host where project CLs will be sent.
+	GerritHost string `xml:"gerrithost,attr,omitempty"`
+	// GitHooks is a directory containing git hooks that will be installed for
+	// this project.
+	GitHooks string   `xml:"githooks,attr,omitempty"`
 	XMLName  struct{} `xml:"project"`
 }
 
@@ -642,17 +594,14 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	// Add all hosts, tools, and hooks from the current manifest to the
+	// Add all tools and hooks from the current manifest to the
 	// snapshot manifest.
-	hosts, _, tools, hooks, err := readManifest(jirix)
+	_, tools, hooks, err := readManifest(jirix)
 	if err != nil {
 		return err
 	}
 	for _, tool := range tools {
 		manifest.Tools = append(manifest.Tools, tool)
-	}
-	for _, host := range hosts {
-		manifest.Hosts = append(manifest.Hosts, host)
 	}
 	for _, hook := range hooks {
 		manifest.Hooks = append(manifest.Hooks, hook)
@@ -797,14 +746,14 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	if err != nil {
 		return nil, err
 	}
-	_, remoteProjects, _, _, err := readManifest(jirix)
+	remoteProjects, _, _, err := readManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
 
 	// Compute difference between local and remote.
 	update := Update{}
-	ops := computeOperations(localProjects, remoteProjects, false, nil)
+	ops := computeOperations(localProjects, remoteProjects, false, "")
 	s := jirix.NewSeq()
 	for _, op := range ops {
 		name := op.Project().Name
@@ -861,7 +810,7 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 // ReadManifest retrieves and parses the manifest that determines what
 // projects and tools are part of the jiri universe.
 func ReadManifest(jirix *jiri.X) (Projects, Tools, error) {
-	_, p, t, _, e := readManifest(jirix)
+	p, t, _, e := readManifest(jirix)
 	return p, t, e
 }
 
@@ -879,19 +828,19 @@ func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 		}, "get manifest origin").Done()
 }
 
-func readManifest(jirix *jiri.X) (Hosts, Projects, Tools, Hooks, error) {
+func readManifest(jirix *jiri.X) (Projects, Tools, Hooks, error) {
 	jirix.TimerPush("read manifest")
 	defer jirix.TimerPop()
 	file, err := jirix.ResolveManifestPath(jirix.Manifest())
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 	var imp importer
-	hosts, projects, tools, hooks := Hosts{}, Projects{}, Tools{}, Hooks{}
-	if err := imp.Load(jirix, jirix.Root, file, "", hosts, projects, tools, hooks); err != nil {
-		return nil, nil, nil, nil, err
+	projects, tools, hooks := Projects{}, Tools{}, Hooks{}
+	if err := imp.Load(jirix, jirix.Root, file, "", projects, tools, hooks); err != nil {
+		return nil, nil, nil, err
 	}
-	return hosts, projects, tools, hooks, nil
+	return projects, tools, hooks, nil
 }
 
 func updateManifestProjects(jirix *jiri.X) error {
@@ -944,13 +893,13 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	if err := updateManifestProjects(jirix); err != nil {
 		return err
 	}
-	remoteHosts, remoteProjects, remoteTools, remoteHooks, err := readManifest(jirix)
+	remoteProjects, remoteTools, remoteHooks, err := readManifest(jirix)
 	if err != nil {
 		return err
 	}
 	s := jirix.NewSeq()
 	// 1. Update all local projects to match their remote counterparts.
-	if err := updateProjects(jirix, remoteProjects, gc, remoteHosts); err != nil {
+	if err := updateProjects(jirix, remoteProjects, gc); err != nil {
 		return err
 	}
 	// 2. Build all tools in a temporary directory.
@@ -1214,9 +1163,9 @@ func isLocalProject(jirix *jiri.X, path string) (bool, error) {
 	return true, nil
 }
 
-// projectAtPath returns a Project struct corresponding to the project at the
+// ProjectAtPath returns a Project struct corresponding to the project at the
 // path in the filesystem.
-func projectAtPath(jirix *jiri.X, path string) (Project, error) {
+func ProjectAtPath(jirix *jiri.X, path string) (Project, error) {
 	metadataFile := filepath.Join(path, jiri.ProjectMetaDir, jiri.ProjectMetaFile)
 	project, err := ProjectFromFile(jirix, metadataFile)
 	if err != nil {
@@ -1234,7 +1183,7 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 		return err
 	}
 	if isLocal {
-		project, err := projectAtPath(jirix, path)
+		project, err := ProjectAtPath(jirix, path)
 		if err != nil {
 			return err
 		}
@@ -1465,13 +1414,13 @@ func (imp *importer) importNoCycles(file, key string, fn func() error) error {
 	return nil
 }
 
-func (imp *importer) Load(jirix *jiri.X, root, file, key string, hosts Hosts, projects Projects, tools Tools, hooks Hooks) error {
+func (imp *importer) Load(jirix *jiri.X, root, file, key string, projects Projects, tools Tools, hooks Hooks) error {
 	return imp.importNoCycles(file, key, func() error {
-		return imp.load(jirix, root, file, hosts, projects, tools, hooks)
+		return imp.load(jirix, root, file, projects, tools, hooks)
 	})
 }
 
-func (imp *importer) load(jirix *jiri.X, root, file string, hosts Hosts, projects Projects, tools Tools, hooks Hooks) error {
+func (imp *importer) load(jirix *jiri.X, root, file string, projects Projects, tools Tools, hooks Hooks) error {
 	m, err := ManifestFromFile(jirix, file)
 	if err != nil {
 		return err
@@ -1491,14 +1440,14 @@ func (imp *importer) load(jirix *jiri.X, root, file string, hosts Hosts, project
 				return err
 			}
 		}
-		if err := imp.Load(jirix, newRoot, newFile, _import.remoteKey(), hosts, projects, tools, hooks); err != nil {
+		if err := imp.Load(jirix, newRoot, newFile, _import.remoteKey(), projects, tools, hooks); err != nil {
 			return err
 		}
 	}
 	// Process all file imports.
 	for _, fileImport := range m.FileImports {
 		newFile := filepath.Join(filepath.Dir(file), fileImport.File)
-		if err := imp.Load(jirix, root, newFile, "", hosts, projects, tools, hooks); err != nil {
+		if err := imp.Load(jirix, root, newFile, "", projects, tools, hooks); err != nil {
 			return err
 		}
 	}
@@ -1519,10 +1468,6 @@ func (imp *importer) load(jirix *jiri.X, root, file string, hosts Hosts, project
 		}
 		hook.Path = filepath.Join(project.Path, hook.Path)
 		hooks[hook.Name] = hook
-	}
-	// Process all hosts.
-	for _, host := range m.Hosts {
-		hosts[host.Name] = host
 	}
 	return nil
 }
@@ -1554,10 +1499,7 @@ func (imp *importer) update(jirix *jiri.X, root, file string, localProjects Proj
 			localProject = &p
 		}
 		// Since &remote.Project is never nil, we'll never produce a delete op.
-		//
-		// TODO(toddw): How do we retrieve the hosts, which are necessary for
-		// githooks to be installed during the create operation?
-		op := computeOp(localProject, &remote.Project, false, nil)
+		op := computeOp(localProject, &remote.Project, false, newRoot)
 		if err := op.Test(jirix, newFsUpdates()); err != nil {
 			return err
 		}
@@ -1624,6 +1566,24 @@ func reportNonMaster(jirix *jiri.X, project Project) (e error) {
 	}
 }
 
+// collectGoogleSourceHosts returns a slice of googlesource hosts for the given
+// projects.  Each host will appear once in the slice.
+func collectGoogleSourceHosts(ps Projects) []string {
+	hostsMap := map[string]bool{}
+	for _, p := range ps {
+		if !googlesource.IsGoogleSourceRemote(p.Remote) {
+			continue
+		}
+		u, err := url.Parse(p.Remote)
+		if err != nil {
+			continue
+		}
+		host := u.Scheme + "://" + u.Host
+		hostsMap[host] = true
+	}
+	return set.StringBool.ToSlice(hostsMap)
+}
+
 // getRemoteHeadRevisions attempts to get the repo statuses from remote for HEAD
 // projects so we can detect when a local project is already up-to-date.
 func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
@@ -1637,21 +1597,24 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	if !someAtHead {
 		return
 	}
-	gitHost, gitHostErr := GitHost(jirix)
-	if gitHostErr != nil || !googlesource.IsGoogleSourceHost(gitHost) {
-		return
-	}
-	repoStatuses, err := googlesource.GetRepoStatuses(jirix, gitHost)
-	if err != nil {
-		// Log the error but don't fail.
-		fmt.Fprintf(jirix.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
-		return
+	gsHosts := collectGoogleSourceHosts(remoteProjects)
+	allRepoStatuses := googlesource.RepoStatuses{}
+	for _, host := range gsHosts {
+		repoStatuses, err := googlesource.GetRepoStatuses(jirix, host)
+		if err != nil {
+			// Log the error but don't fail.
+			fmt.Fprintf(jirix.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
+			continue
+		}
+		for repo, status := range repoStatuses {
+			allRepoStatuses[repo] = status
+		}
 	}
 	for name, rp := range remoteProjects {
 		if rp.Revision != "HEAD" {
 			continue
 		}
-		status, ok := repoStatuses[rp.Name]
+		status, ok := allRepoStatuses[rp.Name]
 		if !ok {
 			continue
 		}
@@ -1664,7 +1627,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	}
 }
 
-func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool, hosts Hosts) error {
+func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
@@ -1677,7 +1640,7 @@ func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool, hosts Hosts
 		return err
 	}
 	getRemoteHeadRevisions(jirix, remoteProjects)
-	ops := computeOperations(localProjects, remoteProjects, gc, hosts)
+	ops := computeOperations(localProjects, remoteProjects, gc, "")
 	updates := newFsUpdates()
 	for _, op := range ops {
 		if err := op.Test(jirix, updates); err != nil {
@@ -1820,7 +1783,7 @@ func (op commonOperation) Project() Project {
 // createOperation represents the creation of a project.
 type createOperation struct {
 	commonOperation
-	hosts Hosts
+	root string
 }
 
 func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
@@ -1847,24 +1810,31 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		// overriding existing hooks.  Customizing your git hooks with jiri is a bad
 		// idea anyway, since jiri won't know to not delete the project when you
 		// switch between manifests or do a cleanup.
-		host, found := op.hosts["git"]
-		if found && strings.HasPrefix(op.project.Remote, host.Location) {
-			gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
-			for _, githook := range host.GitHooks {
-				// TODO(nlacasse): GitHook paths are relative to the manifest
-				// file.  Currently all manifests live in
-				// JIRI_ROOT/.manifest/v2, but that is changing.  I think
-				// GitHooks should be associated with projects, and their paths
-				// should be relative to the project root.
-				mdir := filepath.Join(jirix.Root, ".manifest", "v2")
-				src, err := s.ReadFile(filepath.Join(mdir, githook.Path))
+		gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
+		if op.project.GitHooks != "" {
+			// Copy the specified GitHooks directory into the project's git
+			// hook directory.  We walk the file system, creating directories
+			// and copying files as we encounter them.
+			copyFn := func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
-				dst := filepath.Join(gitHookDir, githook.Name)
-				if err := s.WriteFile(dst, src, perm).Done(); err != nil {
+				relPath, err := filepath.Rel(op.project.GitHooks, path)
+				if err != nil {
 					return err
 				}
+				dst := filepath.Join(gitHookDir, relPath)
+				if info.IsDir() {
+					return s.MkdirAll(dst, perm).Done()
+				}
+				src, err := s.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				return s.WriteFile(dst, src, perm).Done()
+			}
+			if err := filepath.Walk(filepath.Join(op.root, op.project.GitHooks), copyFn); err != nil {
+				return err
 			}
 		}
 
@@ -2125,7 +2095,7 @@ func (ops operations) Swap(i, j int) {
 // system and manifest file respectively) and outputs a collection of
 // operations that describe the actions needed to update the target
 // projects.
-func computeOperations(localProjects, remoteProjects Projects, gc bool, hosts Hosts) operations {
+func computeOperations(localProjects, remoteProjects Projects, gc bool, root string) operations {
 	result := operations{}
 	allProjects := map[ProjectKey]bool{}
 	for _, p := range localProjects {
@@ -2142,13 +2112,13 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool, hosts Ho
 		if project, ok := remoteProjects[key]; ok {
 			remote = &project
 		}
-		result = append(result, computeOp(local, remote, gc, hosts))
+		result = append(result, computeOp(local, remote, gc, root))
 	}
 	sort.Sort(result)
 	return result
 }
 
-func computeOp(local, remote *Project, gc bool, hosts Hosts) operation {
+func computeOp(local, remote *Project, gc bool, root string) operation {
 	switch {
 	case local != nil && remote != nil:
 		if local.Path != remote.Path {
@@ -2183,7 +2153,7 @@ func computeOp(local, remote *Project, gc bool, hosts Hosts) operation {
 			destination: remote.Path,
 			project:     *remote,
 			source:      "",
-		}, hosts}
+		}, root}
 	default:
 		panic("jiri: computeOp called with nil local and remote")
 	}

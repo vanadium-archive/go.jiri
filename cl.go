@@ -331,6 +331,31 @@ var defaultMessageHeader = `
 #
 `
 
+// currentProject returns the Project containing the current working directory.
+// The current working directory must be inside JIRI_ROOT.
+func currentProject(jirix *jiri.X) (project.Project, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return project.Project{}, fmt.Errorf("os.Getwd() failed: %v", err)
+	}
+
+	// Error if current working dir is not inside jirix.Root.
+	if !strings.HasPrefix(dir, jirix.Root) {
+		return project.Project{}, fmt.Errorf("'jiri cl mail' must be run from within a project in JIRI_ROOT")
+	}
+
+	// Walk up the path until we find a project at that path, or hit the jirix.Root.
+	for dir != jirix.Root {
+		p, err := project.ProjectAtPath(jirix, dir)
+		if err != nil {
+			dir = filepath.Dir(dir)
+			continue
+		}
+		return p, nil
+	}
+	return project.Project{}, fmt.Errorf("directory %q is not contained in a project", dir)
+}
+
 // runCLMail is a wrapper that sets up and runs a review instance.
 func runCLMail(jirix *jiri.X, _ []string) error {
 	// Sanity checks for the <presubmitFlag> flag.
@@ -341,14 +366,17 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 
 	host := hostFlag
 	if host == "" {
-		var err error
-		if host, err = project.GerritHost(jirix); err != nil {
+		p, err := currentProject(jirix)
+		if err != nil {
 			return err
 		}
+		if p.GerritHost == "" {
+			return fmt.Errorf("No gerrit host found.  Please use the '--host' flag, or add a 'gerrithost' attribute for project %q.", p.Name)
+		}
+		host = p.GerritHost
 	}
 
 	// Create and run the review.
-
 	review, err := newReview(jirix, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
 		Ccs:          parseEmails(ccsFlag),
