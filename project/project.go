@@ -1810,8 +1810,9 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		// overriding existing hooks.  Customizing your git hooks with jiri is a bad
 		// idea anyway, since jiri won't know to not delete the project when you
 		// switch between manifests or do a cleanup.
-		gitHookDir := filepath.Join(tmpDir, ".git", "hooks")
+		gitHooksDstDir := filepath.Join(tmpDir, ".git", "hooks")
 		if op.project.GitHooks != "" {
+			gitHooksSrcDir := filepath.Join(jirix.Root, op.root, op.project.GitHooks)
 			// Copy the specified GitHooks directory into the project's git
 			// hook directory.  We walk the file system, creating directories
 			// and copying files as we encounter them.
@@ -1819,11 +1820,11 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 				if err != nil {
 					return err
 				}
-				relPath, err := filepath.Rel(op.project.GitHooks, path)
+				relPath, err := filepath.Rel(gitHooksSrcDir, path)
 				if err != nil {
 					return err
 				}
-				dst := filepath.Join(gitHookDir, relPath)
+				dst := filepath.Join(gitHooksDstDir, relPath)
 				if info.IsDir() {
 					return s.MkdirAll(dst, perm).Done()
 				}
@@ -1833,7 +1834,7 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 				}
 				return s.WriteFile(dst, src, perm).Done()
 			}
-			if err := filepath.Walk(filepath.Join(op.root, op.project.GitHooks), copyFn); err != nil {
+			if err := filepath.Walk(gitHooksSrcDir, copyFn); err != nil {
 				return err
 			}
 		}
