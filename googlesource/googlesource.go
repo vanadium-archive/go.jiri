@@ -111,7 +111,7 @@ func gitCookies(jirix *jiri.X) []*http.Cookie {
 // If that happens we can still get all the repo information in one request by
 // using the /projects/ endpoint on Gerrit.  See
 // https://review.typo3.org/Documentation/rest-api-projects.html#list-projects
-func GetRepoStatuses(jirix *jiri.X, host string) (RepoStatuses, error) {
+func GetRepoStatuses(jirix *jiri.X, host string, branches []string) (RepoStatuses, error) {
 	u, err := url.Parse(host)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,9 @@ func GetRepoStatuses(jirix *jiri.X, host string) (RepoStatuses, error) {
 	u.Path = "/"
 	q := u.Query()
 	q.Set("format", "json")
-	q.Set("b", "master")
+	for _, b := range branches {
+		q.Add("show-branch", b)
+	}
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequest("GET", u.String(), nil)

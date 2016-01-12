@@ -1566,10 +1566,10 @@ func reportNonMaster(jirix *jiri.X, project Project) (e error) {
 	}
 }
 
-// collectGoogleSourceHosts returns a slice of googlesource hosts for the given
-// projects.  Each host will appear once in the slice.
-func collectGoogleSourceHosts(ps Projects) []string {
-	hostsMap := map[string]bool{}
+// groupByGoogleSourceHosts returns a map of googlesource host to a Projects
+// map where all project remotes come from that host.
+func groupByGoogleSourceHosts(ps Projects) map[string]Projects {
+	m := make(map[string]Projects)
 	for _, p := range ps {
 		if !googlesource.IsGoogleSourceRemote(p.Remote) {
 			continue
@@ -1579,51 +1579,50 @@ func collectGoogleSourceHosts(ps Projects) []string {
 			continue
 		}
 		host := u.Scheme + "://" + u.Host
-		hostsMap[host] = true
+		if _, ok := m[host]; !ok {
+			m[host] = Projects{}
+		}
+		m[host][p.Key()] = p
 	}
-	return set.StringBool.ToSlice(hostsMap)
+	return m
 }
 
-// getRemoteHeadRevisions attempts to get the repo statuses from remote for HEAD
-// projects so we can detect when a local project is already up-to-date.
+// getRemoteHeadRevisions attempts to get the repo statuses from remote for
+// projects at HEAD so we can detect when a local project is already
+// up-to-date.
 func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
-	someAtHead := false
+	projectsAtHead := Projects{}
 	for _, rp := range remoteProjects {
 		if rp.Revision == "HEAD" {
-			someAtHead = true
-			break
+			projectsAtHead[rp.Key()] = rp
 		}
 	}
-	if !someAtHead {
-		return
-	}
-	gsHosts := collectGoogleSourceHosts(remoteProjects)
-	allRepoStatuses := googlesource.RepoStatuses{}
-	for _, host := range gsHosts {
-		repoStatuses, err := googlesource.GetRepoStatuses(jirix, host)
+	gsHostsMap := groupByGoogleSourceHosts(projectsAtHead)
+	for host, projects := range gsHostsMap {
+		branchesMap := make(map[string]bool)
+		for _, p := range projects {
+			branchesMap[p.RemoteBranch] = true
+		}
+		branches := set.StringBool.ToSlice(branchesMap)
+		repoStatuses, err := googlesource.GetRepoStatuses(jirix, host, branches)
 		if err != nil {
 			// Log the error but don't fail.
 			fmt.Fprintf(jirix.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
 			continue
 		}
-		for repo, status := range repoStatuses {
-			allRepoStatuses[repo] = status
+		for _, p := range projects {
+			status, ok := repoStatuses[p.Name]
+			if !ok {
+				continue
+			}
+			rev, ok := status.Branches[p.RemoteBranch]
+			if !ok || rev == "" {
+				continue
+			}
+			rp := remoteProjects[p.Key()]
+			rp.Revision = rev
+			remoteProjects[p.Key()] = rp
 		}
-	}
-	for name, rp := range remoteProjects {
-		if rp.Revision != "HEAD" {
-			continue
-		}
-		status, ok := allRepoStatuses[rp.Name]
-		if !ok {
-			continue
-		}
-		masterRev, ok := status.Branches["master"]
-		if !ok || masterRev == "" {
-			continue
-		}
-		rp.Revision = masterRev
-		remoteProjects[name] = rp
 	}
 }
 

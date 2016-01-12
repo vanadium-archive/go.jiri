@@ -1,4 +1,4 @@
-pkg googlesource, func GetRepoStatuses(*jiri.X, string) (RepoStatuses, error)
+pkg googlesource, func GetRepoStatuses(*jiri.X, string, []string) (RepoStatuses, error)
 pkg googlesource, func IsGoogleSourceRemote(string) bool
 pkg googlesource, type RepoStatus struct
 pkg googlesource, type RepoStatus struct, Branches map[string]string
