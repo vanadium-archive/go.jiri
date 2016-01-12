@@ -180,7 +180,6 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 func resetFlags() {
 	snapshotDirFlag = ""
 	pushRemoteFlag = false
-	remoteFlag = false
 }
 
 func TestGetSnapshotDir(t *testing.T) {
@@ -196,17 +195,6 @@ func TestGetSnapshotDir(t *testing.T) {
 		t.Fatalf("getSnapshotDir() failed: %v\n", err)
 	}
 	if want := filepath.Join(fake.X.Root, defaultSnapshotDir); got != want {
-		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
-	}
-
-	// With remote flag set, snapshot dir should be JIRI_ROOT/.manifest/v2/snapshot.
-	resetFlags()
-	remoteFlag = true
-	got, err = getSnapshotDir(fake.X)
-	if err != nil {
-		t.Fatalf("getSnapshotDir() failed: %v\n", err)
-	}
-	if want := filepath.Join(fake.X.Root, ".manifest", "v2", "snapshot"); got != want {
 		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
 	}
 
@@ -349,100 +337,5 @@ func TestCreatePushRemote(t *testing.T) {
 	labelFile := filepath.Join(snapshotDir, "labels", label)
 	if !git.IsFileCommitted(labelFile) {
 		t.Errorf("expected file %v to be committed but it was not", labelFile)
-	}
-}
-
-// TestCreateDeprecated tests "local" and "remote" snapshot creation.
-// TODO(nlacasse): Delete this test once the old -remote flag has been removed.
-// The new snapshot behavior is tested in TestCreate and TestCreatePushRemote.
-func TestCreateDeprecated(t *testing.T) {
-	resetFlags()
-	defer resetFlags()
-	fake, cleanup := jiritest.NewFakeJiriRoot(t)
-	defer cleanup()
-	s := fake.X.NewSeq()
-
-	// Setup the initial remote and local projects.
-	numProjects, remoteProjects := 2, []string{}
-	for i := 0; i < numProjects; i++ {
-		if err := fake.CreateRemoteProject(remoteProjectName(i)); err != nil {
-			t.Fatalf("%v", err)
-		}
-		if err := fake.AddProject(project.Project{
-			Name:   remoteProjectName(i),
-			Path:   localProjectName(i),
-			Remote: fake.Projects[remoteProjectName(i)],
-		}); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-
-	// Create initial commits in the remote projects and use
-	// UpdateUniverse() to mirror them locally.
-	for i := 0; i < numProjects; i++ {
-		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], "revision 1")
-	}
-	if err := project.UpdateUniverse(fake.X, true); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	// Create a local snapshot.
-	var stdout bytes.Buffer
-	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
-	remoteFlag = false
-	if err := runSnapshotCreate(fake.X, []string{"test-local"}); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	// Remove the local project repositories.
-	for i, _ := range remoteProjects {
-		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		if err := s.RemoveAll(localProject).Done(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-
-	// Check that invoking the UpdateUniverse() with the local
-	// snapshot restores the local repositories.
-	snapshotDir := filepath.Join(fake.X.Root, defaultSnapshotDir)
-	snapshotFile := filepath.Join(snapshotDir, "test-local")
-	localX := fake.X.Clone(tool.ContextOpts{
-		Manifest: &snapshotFile,
-	})
-	if err := project.UpdateUniverse(localX, true); err != nil {
-		t.Fatalf("%v", err)
-	}
-	for i, _ := range remoteProjects {
-		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		checkReadme(t, fake.X, localProject, "revision 1")
-	}
-
-	// Create a remote snapshot.
-	remoteFlag = true
-	fake.EnableRemoteManifestPush()
-	if err := runSnapshotCreate(fake.X, []string{"test-remote"}); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	// Remove the local project repositories.
-	for i, _ := range remoteProjects {
-		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		if err := s.RemoveAll(localProject).Done(); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-
-	// Check that invoking the UpdateUniverse() with the remote snapshot
-	// restores the local repositories.
-	manifest := "snapshot/test-remote"
-	remoteX := fake.X.Clone(tool.ContextOpts{
-		Manifest: &manifest,
-	})
-	if err := project.UpdateUniverse(remoteX, true); err != nil {
-		t.Fatalf("%v", err)
-	}
-	for i, _ := range remoteProjects {
-		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		checkReadme(t, fake.X, localProject, "revision 1")
 	}
 }

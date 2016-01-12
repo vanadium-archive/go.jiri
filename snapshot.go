@@ -29,20 +29,12 @@ var (
 	snapshotDirFlag string
 	pushRemoteFlag  bool
 	timeFormatFlag  string
-
-	// TODO(nlacasse): Remove the -remote flag once all users have moved to the
-	// -push-remote flag.
-	remoteFlag bool
 )
 
 func init() {
 	cmdSnapshot.Flags.StringVar(&snapshotDirFlag, "dir", "", "Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.")
 	cmdSnapshotCreate.Flags.BoolVar(&pushRemoteFlag, "push-remote", false, "Commit and push snapshot upstream.")
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
-
-	// TODO(nlacasse): Remove the -remote flag once all users have moved to the
-	// -push-remote flag.
-	cmdSnapshot.Flags.BoolVar(&remoteFlag, "remote", false, "Manage remote snapshots.")
 }
 
 var cmdSnapshot = &cmdline.Command{
@@ -102,7 +94,7 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 	}
 	snapshotFile := filepath.Join(snapshotDir, "labels", label, time.Now().Format(timeFormatFlag))
 
-	if !remoteFlag && !pushRemoteFlag {
+	if !pushRemoteFlag {
 		// No git operations necessary.  Just create the snapshot file.
 		return createSnapshot(jirix, snapshotDir, snapshotFile, label)
 	}
@@ -137,11 +129,6 @@ func getSnapshotDir(jirix *jiri.X) (string, error) {
 	dir := snapshotDirFlag
 	if dir == "" {
 		dir = filepath.Join(jirix.Root, defaultSnapshotDir)
-	}
-
-	// TODO(nlacasse): Remove once there are no more user of the -remote flag.
-	if remoteFlag {
-		dir = filepath.Join(jirix.Root, ".manifest", "v2", "snapshot")
 	}
 
 	if !filepath.IsAbs(dir) {
