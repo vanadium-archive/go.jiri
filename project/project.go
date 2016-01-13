@@ -41,7 +41,6 @@ type CL struct {
 
 // Manifest represents a setting used for updating the universe.
 type Manifest struct {
-	Hooks       []Hook       `xml:"hooks>hook"`
 	Imports     []Import     `xml:"imports>import"`
 	FileImports []FileImport `xml:"imports>fileimport"`
 	Label       string       `xml:"label,attr,omitempty"`
@@ -79,13 +78,11 @@ func ManifestFromFile(jirix *jiri.X, filename string) (*Manifest, error) {
 
 var (
 	newlineBytes       = []byte("\n")
-	emptyHooksBytes    = []byte("\n  <hooks></hooks>\n")
 	emptyImportsBytes  = []byte("\n  <imports></imports>\n")
 	emptyProjectsBytes = []byte("\n  <projects></projects>\n")
 	emptyToolsBytes    = []byte("\n  <tools></tools>\n")
 
 	endElemBytes       = []byte("/>\n")
-	endHookBytes       = []byte("></hook>\n")
 	endImportBytes     = []byte("></import>\n")
 	endFileImportBytes = []byte("></fileimport>\n")
 	endProjectBytes    = []byte("></project>\n")
@@ -100,16 +97,10 @@ var (
 func (m *Manifest) deepCopy() *Manifest {
 	x := new(Manifest)
 	x.Label = m.Label
-	// First make copies of all slices.
-	x.Hooks = append([]Hook(nil), m.Hooks...)
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.FileImports = append([]FileImport(nil), m.FileImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
 	x.Tools = append([]Tool(nil), m.Tools...)
-	// Now make copies of sub-slices.
-	for index, hook := range x.Hooks {
-		x.Hooks[index].Args = append([]HookArg(nil), hook.Args...)
-	}
 	return x
 }
 
@@ -125,11 +116,9 @@ func (m *Manifest) ToBytes() ([]byte, error) {
 	}
 	// It's hard (impossible?) to get xml.Marshal to elide some of the empty
 	// elements, or produce short empty elements, so we post-process the data.
-	data = bytes.Replace(data, emptyHooksBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyImportsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyProjectsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyToolsBytes, newlineBytes, -1)
-	data = bytes.Replace(data, endHookBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endFileImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endProjectBytes, endElemBytes, -1)
@@ -205,30 +194,6 @@ func (m *Manifest) unfillDefaults() error {
 		}
 	}
 	return nil
-}
-
-// Hooks maps hook names to their detailed description.
-type Hooks map[string]Hook
-
-// Hook represents a post-update project hook.
-type Hook struct {
-	// Name is the hook name.
-	Name string `xml:"name,attr,omitempty"`
-	// Project is the name of the project the hook is associated with.
-	Project string `xml:"project,attr,omitempty"`
-	// Path is the path of the hook relative to its project's root.
-	Path string `xml:"path,attr,omitempty"`
-	// Interpreter is an optional program used to interpret the hook (i.e. python). Unlike Path,
-	// Interpreter is relative to the environment's PATH and not the project's root.
-	Interpreter string `xml:"interpreter,attr,omitempty"`
-	// Arguments for the hook.
-	Args    []HookArg `xml:"arg,omitempty"`
-	XMLName struct{}  `xml:"hook"`
-}
-
-type HookArg struct {
-	Arg     string   `xml:",chardata"`
-	XMLName struct{} `xml:"arg"`
 }
 
 // Import represents a remote manifest import.
@@ -379,8 +344,12 @@ type Project struct {
 	GerritHost string `xml:"gerrithost,attr,omitempty"`
 	// GitHooks is a directory containing git hooks that will be installed for
 	// this project.
-	GitHooks string   `xml:"githooks,attr,omitempty"`
-	XMLName  struct{} `xml:"project"`
+	GitHooks string `xml:"githooks,attr,omitempty"`
+	// RunHook is a script that will run when the project is created, updated,
+	// or moved.  The argument to the script will be "create", "update" or
+	// "move" depending on the type of operation being performed.
+	RunHook string   `xml:"runhook,attr,omitempty"`
+	XMLName struct{} `xml:"project"`
 }
 
 var (
@@ -594,17 +563,13 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	// Add all tools and hooks from the current manifest to the
-	// snapshot manifest.
-	_, tools, hooks, err := readManifest(jirix)
+	// Add all tools from the current manifest to the snapshot manifest.
+	_, tools, err := ReadManifest(jirix)
 	if err != nil {
 		return err
 	}
 	for _, tool := range tools {
 		manifest.Tools = append(manifest.Tools, tool)
-	}
-	for _, hook := range hooks {
-		manifest.Hooks = append(manifest.Hooks, hook)
 	}
 	return manifest.ToFile(jirix, path)
 }
@@ -746,7 +711,7 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	if err != nil {
 		return nil, err
 	}
-	remoteProjects, _, _, err := readManifest(jirix)
+	remoteProjects, _, err := ReadManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
@@ -810,8 +775,18 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 // ReadManifest retrieves and parses the manifest that determines what
 // projects and tools are part of the jiri universe.
 func ReadManifest(jirix *jiri.X) (Projects, Tools, error) {
-	p, t, _, e := readManifest(jirix)
-	return p, t, e
+	jirix.TimerPush("read manifest")
+	defer jirix.TimerPop()
+	file, err := jirix.ResolveManifestPath(jirix.Manifest())
+	if err != nil {
+		return nil, nil, err
+	}
+	var imp importer
+	projects, tools := Projects{}, Tools{}
+	if err := imp.Load(jirix, jirix.Root, file, "", projects, tools); err != nil {
+		return nil, nil, err
+	}
+	return projects, tools, nil
 }
 
 // getManifestRemote returns the remote url of the origin from the manifest
@@ -826,21 +801,6 @@ func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 			remote, e = jirix.Git().RemoteUrl("origin")
 			return
 		}, "get manifest origin").Done()
-}
-
-func readManifest(jirix *jiri.X) (Projects, Tools, Hooks, error) {
-	jirix.TimerPush("read manifest")
-	defer jirix.TimerPop()
-	file, err := jirix.ResolveManifestPath(jirix.Manifest())
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	var imp importer
-	projects, tools, hooks := Projects{}, Tools{}, Hooks{}
-	if err := imp.Load(jirix, jirix.Root, file, "", projects, tools, hooks); err != nil {
-		return nil, nil, nil, err
-	}
-	return projects, tools, hooks, nil
 }
 
 func updateManifestProjects(jirix *jiri.X) error {
@@ -893,7 +853,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	if err := updateManifestProjects(jirix); err != nil {
 		return err
 	}
-	remoteProjects, remoteTools, remoteHooks, err := readManifest(jirix)
+	remoteProjects, remoteTools, err := ReadManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -912,11 +872,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 		return err
 	}
 	// 3. Install the tools into $JIRI_ROOT/.jiri_root/bin.
-	if err := InstallTools(jirix, tmpDir); err != nil {
-		return err
-	}
-	// 4. Run all specified hooks
-	return runHooks(jirix, remoteHooks)
+	return InstallTools(jirix, tmpDir)
 }
 
 // ApplyToLocalMaster applies an operation expressed as the given function to
@@ -1299,28 +1255,6 @@ func TransitionBinDir(jirix *jiri.X) error {
 	return nil
 }
 
-// runHooks runs the specified hooks
-func runHooks(jirix *jiri.X, hooks Hooks) error {
-	jirix.TimerPush("run hooks")
-	defer jirix.TimerPop()
-	s := jirix.NewSeq()
-	for _, hook := range hooks {
-		command := hook.Path
-		args := []string{}
-		if hook.Interpreter != "" {
-			command = hook.Interpreter
-			args = append(args, hook.Path)
-		}
-		for _, arg := range hook.Args {
-			args = append(args, arg.Arg)
-		}
-		if err := s.Last(command, args...); err != nil {
-			return fmt.Errorf("Hook %v failed: %v command: %v args: %v", hook.Name, err, command, args)
-		}
-	}
-	return nil
-}
-
 // resetProject advances the local master branch of the given
 // project, which is expected to exist locally at project.Path.
 func resetProject(jirix *jiri.X, project Project) error {
@@ -1414,13 +1348,13 @@ func (imp *importer) importNoCycles(file, key string, fn func() error) error {
 	return nil
 }
 
-func (imp *importer) Load(jirix *jiri.X, root, file, key string, projects Projects, tools Tools, hooks Hooks) error {
+func (imp *importer) Load(jirix *jiri.X, root, file, key string, projects Projects, tools Tools) error {
 	return imp.importNoCycles(file, key, func() error {
-		return imp.load(jirix, root, file, projects, tools, hooks)
+		return imp.load(jirix, root, file, projects, tools)
 	})
 }
 
-func (imp *importer) load(jirix *jiri.X, root, file string, projects Projects, tools Tools, hooks Hooks) error {
+func (imp *importer) load(jirix *jiri.X, root, file string, projects Projects, tools Tools) error {
 	m, err := ManifestFromFile(jirix, file)
 	if err != nil {
 		return err
@@ -1440,14 +1374,14 @@ func (imp *importer) load(jirix *jiri.X, root, file string, projects Projects, t
 				return err
 			}
 		}
-		if err := imp.Load(jirix, newRoot, newFile, _import.remoteKey(), projects, tools, hooks); err != nil {
+		if err := imp.Load(jirix, newRoot, newFile, _import.remoteKey(), projects, tools); err != nil {
 			return err
 		}
 	}
 	// Process all file imports.
 	for _, fileImport := range m.FileImports {
 		newFile := filepath.Join(filepath.Dir(file), fileImport.File)
-		if err := imp.Load(jirix, root, newFile, "", projects, tools, hooks); err != nil {
+		if err := imp.Load(jirix, root, newFile, "", projects, tools); err != nil {
 			return err
 		}
 	}
@@ -1459,15 +1393,6 @@ func (imp *importer) load(jirix *jiri.X, root, file string, projects Projects, t
 	// Process all tools.
 	for _, tool := range m.Tools {
 		tools[tool.Name] = tool
-	}
-	// Process all hooks.
-	for _, hook := range m.Hooks {
-		project, err := projects.FindUnique(hook.Project)
-		if err != nil {
-			return fmt.Errorf("error while finding project %q for hook %q: %v", hook.Project, hook.Name, err)
-		}
-		hook.Path = filepath.Join(project.Path, hook.Path)
-		hooks[hook.Name] = hook
 	}
 	return nil
 }
@@ -1661,10 +1586,43 @@ func updateProjects(jirix *jiri.X, remoteProjects Projects, gc bool) error {
 	if failed {
 		return cmdline.ErrExitCode(2)
 	}
+
+	// Run all RunHook scripts.
+	if !runHooks(jirix, ops) {
+		return cmdline.ErrExitCode(2)
+	}
+
 	if err := writeCurrentManifest(jirix, manifest); err != nil {
 		return err
 	}
 	return nil
+}
+
+// runHooks runs all hooks for the given operations.  It returns true iff all
+// hooks run successfully.
+func runHooks(jirix *jiri.X, ops []operation) bool {
+	jirix.TimerPush("run hooks")
+	defer jirix.TimerPop()
+	ok := true
+	for _, op := range ops {
+		if op.Project().RunHook == "" {
+			continue
+		}
+		if op.Kind() != "create" && op.Kind() != "update" && op.Kind() != "move" {
+			continue
+		}
+		s := jirix.NewSeq()
+		s.Verbose(true).Output([]string{fmt.Sprintf("running hook for project %q", op.Project().Name)})
+		rootDir := filepath.Join(jirix.Root, op.Root())
+		hook := filepath.Join(rootDir, op.Project().RunHook)
+		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(hook, op.Kind()); err != nil {
+			// TODO(nlacasse): Should we delete projectDir or perform some
+			// other cleanup in the event of a hook failure?
+			fmt.Fprintf(jirix.Stderr(), "error running hook for project %q: %v\n", op.Project().Name, err)
+			ok = false
+		}
+	}
+	return ok
 }
 
 // writeMetadata stores the given project metadata in the directory
@@ -1755,6 +1713,10 @@ func (u *fsUpdates) isDeleted(dir string) bool {
 type operation interface {
 	// Project identifies the project this operation pertains to.
 	Project() Project
+	// Kind returns the kind of operation.
+	Kind() string
+	// Root returns the operation's root directory, relative to JIRI_ROOT.
+	Root() string
 	// Run executes the operation.
 	Run(jirix *jiri.X, manifest *Manifest) error
 	// String returns a string representation of the operation.
@@ -1773,16 +1735,25 @@ type commonOperation struct {
 	destination string
 	// source is the current project path.
 	source string
+	// root is the directory inside JIRI_ROOT where this operation will run.
+	root string
 }
 
 func (op commonOperation) Project() Project {
 	return op.project
 }
 
+func (op commonOperation) Root() string {
+	return op.root
+}
+
 // createOperation represents the creation of a project.
 type createOperation struct {
 	commonOperation
-	root string
+}
+
+func (op createOperation) Kind() string {
+	return "create"
 }
 
 func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
@@ -1899,6 +1870,9 @@ type deleteOperation struct {
 	gc bool
 }
 
+func (op deleteOperation) Kind() string {
+	return "delete"
+}
 func (op deleteOperation) Run(jirix *jiri.X, _ *Manifest) error {
 	s := jirix.NewSeq()
 	if op.gc {
@@ -1958,6 +1932,9 @@ type moveOperation struct {
 	commonOperation
 }
 
+func (op moveOperation) Kind() string {
+	return "move"
+}
 func (op moveOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 	s := jirix.NewSeq()
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
@@ -2004,6 +1981,9 @@ type updateOperation struct {
 	commonOperation
 }
 
+func (op updateOperation) Kind() string {
+	return "update"
+}
 func (op updateOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 	if err := reportNonMaster(jirix, op.project); err != nil {
 		return err
@@ -2029,6 +2009,10 @@ func (op updateOperation) Test(jirix *jiri.X, _ *fsUpdates) error {
 // information to the current manifest.
 type nullOperation struct {
 	commonOperation
+}
+
+func (op nullOperation) Kind() string {
+	return "null"
 }
 
 func (op nullOperation) Run(jirix *jiri.X, manifest *Manifest) error {
@@ -2066,16 +2050,16 @@ func (ops operations) Len() int {
 func (ops operations) Less(i, j int) bool {
 	vals := make([]int, 2)
 	for idx, op := range []operation{ops[i], ops[j]} {
-		switch op.(type) {
-		case deleteOperation:
+		switch op.Kind() {
+		case "delete":
 			vals[idx] = 0
-		case moveOperation:
+		case "move":
 			vals[idx] = 1
-		case createOperation:
+		case "create":
 			vals[idx] = 2
-		case updateOperation:
+		case "update":
 			vals[idx] = 3
-		case nullOperation:
+		case "null":
 			vals[idx] = 4
 		}
 	}
@@ -2128,6 +2112,7 @@ func computeOp(local, remote *Project, gc bool, root string) operation {
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,
+				root:        root,
 			}}
 		}
 		if local.Revision != remote.Revision {
@@ -2135,25 +2120,29 @@ func computeOp(local, remote *Project, gc bool, root string) operation {
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,
+				root:        root,
 			}}
 		}
 		return nullOperation{commonOperation{
 			destination: remote.Path,
 			project:     *remote,
 			source:      local.Path,
+			root:        root,
 		}}
 	case local != nil && remote == nil:
 		return deleteOperation{commonOperation{
 			destination: "",
 			project:     *local,
 			source:      local.Path,
+			root:        root,
 		}, gc}
 	case local == nil && remote != nil:
 		return createOperation{commonOperation{
 			destination: remote.Path,
 			project:     *remote,
 			source:      "",
-		}, root}
+			root:        root,
+		}}
 	default:
 		panic("jiri: computeOp called with nil local and remote")
 	}

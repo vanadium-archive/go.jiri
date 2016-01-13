@@ -42,17 +42,6 @@ pkg project, type CL struct, Email string
 pkg project, type FileImport struct
 pkg project, type FileImport struct, File string
 pkg project, type FileImport struct, XMLName struct{}
-pkg project, type Hook struct
-pkg project, type Hook struct, Args []HookArg
-pkg project, type Hook struct, Interpreter string
-pkg project, type Hook struct, Name string
-pkg project, type Hook struct, Path string
-pkg project, type Hook struct, Project string
-pkg project, type Hook struct, XMLName struct{}
-pkg project, type HookArg struct
-pkg project, type HookArg struct, Arg string
-pkg project, type HookArg struct, XMLName struct{}
-pkg project, type Hooks map[string]Hook
 pkg project, type Import struct
 pkg project, type Import struct, Manifest string
 pkg project, type Import struct, Root string
@@ -60,7 +49,6 @@ pkg project, type Import struct, XMLName struct{}
 pkg project, type Import struct, embedded Project
 pkg project, type Manifest struct
 pkg project, type Manifest struct, FileImports []FileImport
-pkg project, type Manifest struct, Hooks []Hook
 pkg project, type Manifest struct, Imports []Import
 pkg project, type Manifest struct, Label string
 pkg project, type Manifest struct, Projects []Project
@@ -75,6 +63,7 @@ pkg project, type Project struct, Protocol string
 pkg project, type Project struct, Remote string
 pkg project, type Project struct, RemoteBranch string
 pkg project, type Project struct, Revision string
+pkg project, type Project struct, RunHook string
 pkg project, type Project struct, XMLName struct{}
 pkg project, type ProjectKey string
 pkg project, type ProjectKeys []ProjectKey

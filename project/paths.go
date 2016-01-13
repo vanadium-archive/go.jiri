@@ -18,7 +18,7 @@ import (
 // breaks.  We should revisit the whole data directory thing, and in particular
 // see if we can get rid of tools having to know their own names.
 func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
-	projects, tools, _, err := readManifest(jirix)
+	projects, tools, err := ReadManifest(jirix)
 	if err != nil {
 		return "", err
 	}

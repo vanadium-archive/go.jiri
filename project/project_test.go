@@ -912,16 +912,6 @@ func TestManifestToFromBytes(t *testing.T) {
 		{
 			project.Manifest{
 				Label: "label",
-				Hooks: []project.Hook{
-					{Name: "hook"},
-					{
-						Name: "hookwithargs",
-						Args: []project.HookArg{
-							{Arg: "foo"},
-							{Arg: "bar"},
-						},
-					},
-				},
 				Imports: []project.Import{
 					{
 						Manifest: "manifest",
@@ -942,6 +932,7 @@ func TestManifestToFromBytes(t *testing.T) {
 					{
 						GerritHost:   "https://test-review.googlesource.com",
 						GitHooks:     "path/to/githooks",
+						RunHook:      "path/to/hook",
 						Name:         "project",
 						Path:         "path",
 						Protocol:     "git",
@@ -959,20 +950,13 @@ func TestManifestToFromBytes(t *testing.T) {
 				},
 			},
 			`<manifest label="label">
-  <hooks>
-    <hook name="hook"/>
-    <hook name="hookwithargs">
-      <arg>foo</arg>
-      <arg>bar</arg>
-    </hook>
-  </hooks>
   <imports>
     <import manifest="manifest" remote="remote"/>
     <import name="localimport"/>
     <fileimport file="fileimport"/>
   </imports>
   <projects>
-    <project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks"/>
+    <project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" runhook="path/to/hook"/>
   </projects>
   <tools>
     <tool data="tooldata" name="tool" project="toolproject"/>
