@@ -136,6 +136,12 @@ func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
 }
 
+// UpdateHistoryLatestLink returns the path to a symlink that points to the
+// latest update in the update history directory.
+func (x *X) UpdateHistoryLatestLink() string {
+	return filepath.Join(x.UpdateHistoryDir(), "latest")
+}
+
 // ResolveManifestPath resolves the given manifest name to an absolute path in
 // the local filesystem.
 func (x *X) ResolveManifestPath(name string) (string, error) {

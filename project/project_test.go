@@ -319,8 +319,6 @@ func TestLocalProjects(t *testing.T) {
 	jirix, cleanup := jiritest.NewX(t)
 	defer cleanup()
 
-	manifestDir := setupNewProject(t, jirix, jirix.Root, ".manifest", false)
-
 	// Create some projects.
 	numProjects, projectPaths := 3, []string{}
 	for i := 0; i < numProjects; i++ {
@@ -337,8 +335,23 @@ func TestLocalProjects(t *testing.T) {
 		projectPaths = append(projectPaths, path)
 	}
 
-	// Create manifest but only tell it about the first project.
-	createRemoteManifest(t, jirix, manifestDir, projectPaths[:1])
+	// Create a latest update snapshot but only tell it about the first project.
+	manifest := project.Manifest{
+		Projects: []project.Project{
+			{
+				Name:     projectPaths[0],
+				Path:     localProjectName(0),
+				Protocol: "git",
+				Remote:   projectPaths[0],
+			},
+		},
+	}
+	if err := jirix.NewSeq().MkdirAll(jirix.UpdateHistoryDir(), 0755).Done(); err != nil {
+		t.Fatalf("MkdirAll(%v) failed: %v", jirix.UpdateHistoryDir(), err)
+	}
+	if err := manifest.ToFile(jirix, jirix.UpdateHistoryLatestLink()); err != nil {
+		t.Fatalf("manifest.ToFile(%v) failed: %v", jirix.UpdateHistoryLatestLink(), err)
+	}
 
 	// LocalProjects with scanMode = FastScan should only find the first
 	// project.

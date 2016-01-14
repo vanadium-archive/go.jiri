@@ -564,7 +564,7 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 	}
 
 	// Add all tools from the current manifest to the snapshot manifest.
-	_, tools, err := ReadManifest(jirix)
+	_, tools, err := ReadJiriManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -643,11 +643,16 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 	jirix.TimerPush("local projects")
 	defer jirix.TimerPop()
 
-	if scanMode == FastScan {
-		// Fast path:  Full scan was not requested, and all projects in
-		// manifest exist on local filesystem.  We just use the projects
-		// directly from the manifest.
-		manifestProjects, _, err := ReadManifest(jirix)
+	latestUpdateSnapshot := jirix.UpdateHistoryLatestLink()
+	latestUpdateSnapshotExists, err := jirix.NewSeq().IsFile(latestUpdateSnapshot)
+	if err != nil {
+		return nil, err
+	}
+	if scanMode == FastScan && latestUpdateSnapshotExists {
+		// Fast path:  Full scan was not requested, and we have a snapshot
+		// containing the latest update.  Check that the projects listed in the
+		// snapshot exist locally.  If not, then fall back on the slow path.
+		manifestProjects, _, err := readManifestFile(jirix, latestUpdateSnapshot)
 		if err != nil {
 			return nil, err
 		}
@@ -665,7 +670,7 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 	// JIRI_ROOT.
 	projects := Projects{}
 	jirix.TimerPush("scan fs")
-	err := findLocalProjects(jirix, jirix.Root, projects)
+	err = findLocalProjects(jirix, jirix.Root, projects)
 	jirix.TimerPop()
 	if err != nil {
 		return nil, err
@@ -711,7 +716,7 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	if err != nil {
 		return nil, err
 	}
-	remoteProjects, _, err := ReadManifest(jirix)
+	remoteProjects, _, err := ReadJiriManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
@@ -772,15 +777,19 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	return update, nil
 }
 
-// ReadManifest retrieves and parses the manifest that determines what
-// projects and tools are part of the jiri universe.
-func ReadManifest(jirix *jiri.X) (Projects, Tools, error) {
-	jirix.TimerPush("read manifest")
-	defer jirix.TimerPop()
+// ReadJiriManifest reads and parses the .jiri_manifest file.
+func ReadJiriManifest(jirix *jiri.X) (Projects, Tools, error) {
 	file, err := jirix.ResolveManifestPath(jirix.Manifest())
 	if err != nil {
 		return nil, nil, err
 	}
+	return readManifestFile(jirix, file)
+}
+
+// readManifestFile reads and parses the manifest with the given filename.
+func readManifestFile(jirix *jiri.X, file string) (Projects, Tools, error) {
+	jirix.TimerPush("read manifest")
+	defer jirix.TimerPop()
 	var imp importer
 	projects, tools := Projects{}, Tools{}
 	if err := imp.Load(jirix, jirix.Root, file, "", projects, tools); err != nil {
@@ -853,7 +862,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	if err := updateManifestProjects(jirix); err != nil {
 		return err
 	}
-	remoteProjects, remoteTools, err := ReadManifest(jirix)
+	remoteProjects, remoteTools, err := ReadJiriManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -2151,7 +2160,7 @@ func computeOp(local, remote *Project, gc bool, root string) operation {
 // ParseNames identifies the set of projects that a jiri command should
 // be applied to.
 func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{}) (Projects, error) {
-	manifestProjects, _, err := ReadManifest(jirix)
+	manifestProjects, _, err := ReadJiriManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
