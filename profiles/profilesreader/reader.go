@@ -117,7 +117,7 @@ func NewReader(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*Read
 	if err != nil {
 		return nil, err
 	}
-	projects, tools, err := project.ReadManifest(jirix)
+	projects, tools, err := project.ReadJiriManifest(jirix)
 	if err != nil {
 		return nil, err
 	}

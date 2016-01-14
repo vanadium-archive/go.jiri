@@ -17,7 +17,7 @@ pkg project, func ParseNames(*jiri.X, []string, map[string]struct{}) (Projects, 
 pkg project, func PollProjects(*jiri.X, map[string]struct{}) (Update, error)
 pkg project, func ProjectAtPath(*jiri.X, string) (Project, error)
 pkg project, func ProjectFromFile(*jiri.X, string) (*Project, error)
-pkg project, func ReadManifest(*jiri.X) (Projects, Tools, error)
+pkg project, func ReadJiriManifest(*jiri.X) (Projects, Tools, error)
 pkg project, func TransitionBinDir(*jiri.X) error
 pkg project, func UpdateUniverse(*jiri.X, bool) error
 pkg project, method (*Manifest) ToBytes() ([]byte, error)

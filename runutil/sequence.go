@@ -947,6 +947,9 @@ func (s Sequence) IsDir(dirname string) (bool, error) {
 		fileInfo, err = os.Stat(dirname)
 		return err
 	}, fmt.Sprintf("isdir %q", dirname))
+	if IsNotExist(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -967,6 +970,9 @@ func (s Sequence) IsFile(file string) (bool, error) {
 		fileInfo, err = os.Stat(file)
 		return err
 	}, fmt.Sprintf("isfile %q", file))
+	if IsNotExist(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}

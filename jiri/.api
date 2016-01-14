@@ -14,6 +14,7 @@ pkg jiri, method (*X) JiriManifestFile() string
 pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
 pkg jiri, method (*X) RootMetaDir() string
 pkg jiri, method (*X) UpdateHistoryDir() string
+pkg jiri, method (*X) UpdateHistoryLatestLink() string
 pkg jiri, method (*X) UsageErrorf(string, ...interface{}) error
 pkg jiri, method (*X) UsingOldManifests() bool
 pkg jiri, method (RelPath) Abs(*X) string
