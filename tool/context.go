@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"v.io/jiri/gerrit"
-	"v.io/jiri/gitutil"
 	"v.io/jiri/jenkins"
 	"v.io/jiri/runutil"
 	"v.io/x/lib/cmdline"
@@ -132,44 +131,6 @@ func (ctx Context) Env() map[string]string {
 // Gerrit returns the Gerrit instance of the context.
 func (ctx Context) Gerrit(host string) *gerrit.Gerrit {
 	return gerrit.New(ctx.NewSeq(), host)
-}
-
-type gitOpt interface {
-	gitOpt()
-}
-type AuthorDateOpt string
-type CommitterDateOpt string
-type RootDirOpt string
-
-func (AuthorDateOpt) gitOpt()    {}
-func (CommitterDateOpt) gitOpt() {}
-func (RootDirOpt) gitOpt()       {}
-
-// Git returns a new git instance.
-//
-// This method accepts one optional argument: the repository root to
-// use for commands issued by the returned instance. If not specified,
-// commands will use the current directory as the repository root.
-func (ctx Context) Git(opts ...gitOpt) *gitutil.Git {
-	rootDir := ""
-	gitCtx := &ctx
-	for _, opt := range opts {
-		switch typedOpt := opt.(type) {
-		case AuthorDateOpt:
-			opts := ContextOpts{}
-			opts.Env = ctx.Env()
-			opts.Env["GIT_AUTHOR_DATE"] = string(typedOpt)
-			gitCtx = ctx.Clone(opts)
-		case CommitterDateOpt:
-			opts := ContextOpts{}
-			opts.Env = ctx.Env()
-			opts.Env["GIT_COMMITTER_DATE"] = string(typedOpt)
-			gitCtx = ctx.Clone(opts)
-		case RootDirOpt:
-			rootDir = string(typedOpt)
-		}
-	}
-	return gitutil.New(gitCtx.NewSeq(), rootDir)
 }
 
 // Jenkins returns a new Jenkins instance that can be used to

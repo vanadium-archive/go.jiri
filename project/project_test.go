@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"v.io/jiri/gitutil"
 	"v.io/jiri/jiri"
 	"v.io/jiri/jiritest"
 	"v.io/jiri/project"
@@ -30,7 +31,7 @@ func addRemote(t *testing.T, jirix *jiri.X, localProject, name, remoteProject st
 	if err := jirix.NewSeq().Chdir(localProject).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Git().AddRemote(name, remoteProject); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).AddRemote(name, remoteProject); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -98,7 +99,7 @@ func commitFile(t *testing.T, jirix *jiri.X, dir, file, msg string) {
 	if err := jirix.NewSeq().Chdir(dir).Done(); err != nil {
 		t.Fatal(err)
 	}
-	if err := jirix.Git().CommitFile(file, msg); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).CommitFile(file, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -164,7 +165,7 @@ func currentRevision(t *testing.T, jirix *jiri.X, name string) string {
 	if err := jirix.NewSeq().Chdir(name).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	revision, err := jirix.Git().CurrentRevision()
+	revision, err := gitutil.New(jirix.NewSeq()).CurrentRevision()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -239,7 +240,7 @@ func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool)
 	if err := s.Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Git().Init(projectDir); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Init(projectDir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if ignore {
@@ -247,11 +248,11 @@ func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool)
 		if err := s.WriteFile(ignoreFile, []byte(jiri.ProjectMetaDir), os.FileMode(0644)).Done(); err != nil {
 			t.Fatalf("%v", err)
 		}
-		if err := jirix.Git().Add(ignoreFile); err != nil {
+		if err := gitutil.New(jirix.NewSeq()).Add(ignoreFile); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}
-	if err := jirix.Git().Commit(); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Commit(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	return projectDir
@@ -282,7 +283,7 @@ func createAndCheckoutBranch(t *testing.T, jirix *jiri.X, projectDir, branch str
 	if err := jirix.NewSeq().Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Git().CreateAndCheckoutBranch(branch); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -296,7 +297,7 @@ func resetToOriginMaster(t *testing.T, jirix *jiri.X, projectDir string) {
 	if err := jirix.NewSeq().Chdir(projectDir).Done(); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := jirix.Git().Reset("origin/master"); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Reset("origin/master"); err != nil {
 		t.Fatalf("%v", err)
 	}
 }

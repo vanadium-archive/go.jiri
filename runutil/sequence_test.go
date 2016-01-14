@@ -5,6 +5,7 @@
 package runutil_test
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -26,9 +27,37 @@ func rmLineNumbers(s string) string {
 	return re.ReplaceAllString(s, "$1:-:$2")
 }
 
-func sanitizeTimestamps(s string) string {
+func sanitizePaths(s string, base string) string {
+	re := regexp.MustCompile("/.*/" + base)
+	return re.ReplaceAllString(s, base)
+}
+
+func sanitizeTimestampsAndPaths(s string) string {
 	re := regexp.MustCompile(`\[(\d\d:\d\d:\d\d.\d\d)\]`)
-	return re.ReplaceAllString(s, "[hh:mm:ss.xx]")
+	tmp := re.ReplaceAllString(s, "[hh:mm:ss.xx]")
+	scanner := bufio.NewScanner(bytes.NewBufferString(tmp))
+	re = regexp.MustCompile(`(\[hh:mm:ss.xx\] >>) (\S+) (.*)`)
+	out := bytes.Buffer{}
+	for scanner.Scan() {
+		parts := re.FindAllStringSubmatch(scanner.Text(), -1)
+		if len(parts) == 0 {
+			out.WriteString(scanner.Text())
+			out.WriteString("\n")
+			continue
+		}
+		for _, p := range parts {
+			if len(p) != 4 {
+				out.WriteString(scanner.Text())
+				out.WriteString("\n")
+				continue
+			}
+			// Turn any absolute path names into the base name component
+			p[2] = filepath.Base(p[2])
+			out.WriteString(strings.Join(p[1:], " "))
+			out.WriteString("\n")
+		}
+	}
+	return out.String()
 }
 
 func ExampleSequence() {
@@ -87,10 +116,10 @@ b
 a
 ` + post
 		}
-		if got := sanitizeTimestamps(cnstrStdout.String()); got != wantA && got != wantB {
+		if got := sanitizeTimestampsAndPaths(cnstrStdout.String()); got != wantA && got != wantB {
 			t.Errorf("verbose: %t, got %v, want either %v or %v", verbose, got, wantA, wantB)
 		}
-		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
+		if got, want := sanitizePaths(cnstrStderr.String(), "sleep"), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
 	}
@@ -121,10 +150,10 @@ a
 [hh:mm:ss.xx] >> TIMED OUT
 `
 		}
-		if got := sanitizeTimestamps(cnstrStdout.String()); want != got {
+		if got := sanitizeTimestampsAndPaths(cnstrStdout.String()); want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
-		if got, want := cnstrStderr.String(), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
+		if got, want := sanitizePaths(cnstrStderr.String(), "sleep"), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
 		if got, want := captureStdout.String(), "a\n"; want != got {
@@ -211,6 +240,59 @@ func TestSequence(t *testing.T) {
 	}
 }
 
+func TestSequenceEnv(t *testing.T) {
+	// Make sure env provided at construction time is used.
+	defaultEnv := map[string]string{"A": "dA", "B": "dB"}
+	seq := runutil.NewSequence(defaultEnv, os.Stdin, os.Stdout, os.Stderr, false, false, true)
+	var out bytes.Buffer
+	err := seq.Capture(&out, nil).Last("sh", "-c", "echo $A $B")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := out.String(), "dA dB\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// Make sure we can merge new variables into the one used at
+	// construnction time.
+	out.Reset()
+
+	err = seq.Env(map[string]string{"A": "nA", "C": "nC"}).
+		Capture(&out, nil).Last("sh", "-c", "echo $A $B $C")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "nA dB nC\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// Make sure that Env(...).Env(...) merges correctly
+	out.Reset()
+	err = seq.SetEnv(map[string]string{"B": "nB", "D": "nD"}).
+		Env(map[string]string{"A": "nA", "C": "nC"}).
+		Capture(&out, nil).Last("sh", "-c", "echo $A $B $C $D")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "nA nB nC nD\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// Make sure that Env(...).SetEnv(...) results in
+	// Env essentially being ignored.
+	out.Reset()
+	err = seq.Env(map[string]string{"D": "nD"}).
+		SetEnv(map[string]string{"A": "nA"}).
+		Capture(&out, nil).Last("sh", "-c", "echo $A $B $C $D")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "nA\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // Test that modifiers don't get applied beyond the first invocation of Run.
 func TestSequenceModifiers(t *testing.T) {
 	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false, true)
@@ -265,7 +347,7 @@ func TestMoreSequenceModifiers(t *testing.T) {
 		out := stdout.String()
 		want := ""
 		if verbose {
-			out = sanitizeTimestamps(out)
+			out = sanitizeTimestampsAndPaths(out)
 			want = `[hh:mm:ss.xx] >> sh -c "echo hello"
 [hh:mm:ss.xx] >> OK
 hello
@@ -281,7 +363,7 @@ hello
 		if err != nil {
 			t.Fatal(err)
 		}
-		out := sanitizeTimestamps(stdout.String())
+		out := sanitizeTimestampsAndPaths(stdout.String())
 		want := `[hh:mm:ss.xx] >> sh -c "echo hello"
 [hh:mm:ss.xx] >> OK
 `

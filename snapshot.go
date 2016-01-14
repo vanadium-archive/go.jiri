@@ -102,13 +102,13 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 	// Attempt to create a snapshot on a clean master branch.  If snapshot
 	// creation fails, return to the state we were in before.
 	createFn := func() error {
-		revision, err := jirix.Git().CurrentRevision()
+		revision, err := gitutil.New(jirix.NewSeq()).CurrentRevision()
 		if err != nil {
 			return err
 		}
 		if err := createSnapshot(jirix, snapshotDir, snapshotFile, label); err != nil {
-			jirix.Git().Reset(revision)
-			jirix.Git().RemoveUntrackedFiles()
+			gitutil.New(jirix.NewSeq()).Reset(revision)
+			gitutil.New(jirix.NewSeq()).RemoveUntrackedFiles()
 			return err
 		}
 		return commitAndPushChanges(jirix, snapshotDir, snapshotFile, label)
@@ -177,17 +177,17 @@ func commitAndPushChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string
 		return err
 	}
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	if err := jirix.Git().Add(relativeSnapshotPath); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Add(relativeSnapshotPath); err != nil {
 		return err
 	}
-	if err := jirix.Git().Add(label); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Add(label); err != nil {
 		return err
 	}
 	name := strings.TrimPrefix(snapshotFile, snapshotDir)
-	if err := jirix.Git().CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
 		return err
 	}
-	if err := jirix.Git().Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
+	if err := gitutil.New(jirix.NewSeq()).Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
 		return err
 	}
 	return nil

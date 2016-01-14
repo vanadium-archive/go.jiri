@@ -151,7 +151,7 @@ func (pt Target) CrossCompiling() bool {
 
 // Usage returns the usage string for Target.
 func (pt *Target) Usage() string {
-	return "specifies a profile target in the following form: <arch>-<os>[@<version>]|<arch>-<val>[@<version>]"
+	return "specifies a profile target in the following form: <arch>-<os>[@<version>]"
 }
 
 // Set implements flag.Value.

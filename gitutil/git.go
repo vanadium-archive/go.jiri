@@ -53,13 +53,38 @@ func (ge GitError) Error() string {
 
 type Git struct {
 	s       runutil.Sequence
+	opts    map[string]string
 	rootDir string
 }
 
+type gitOpt interface {
+	gitOpt()
+}
+type AuthorDateOpt string
+type CommitterDateOpt string
+type RootDirOpt string
+
+func (AuthorDateOpt) gitOpt()    {}
+func (CommitterDateOpt) gitOpt() {}
+func (RootDirOpt) gitOpt()       {}
+
 // New is the Git factory.
-func New(s runutil.Sequence, rootDir string) *Git {
+func New(s runutil.Sequence, opts ...gitOpt) *Git {
+	rootDir := ""
+	env := map[string]string{}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case AuthorDateOpt:
+			env["GIT_AUTHOR_DATE"] = string(typedOpt)
+		case CommitterDateOpt:
+			env["GIT_COMMITTER_DATE"] = string(typedOpt)
+		case RootDirOpt:
+			rootDir = string(typedOpt)
+		}
+	}
 	return &Git{
 		s:       s,
+		opts:    env,
 		rootDir: rootDir,
 	}
 }
@@ -701,7 +726,7 @@ func (g *Git) runWithFn(fn func(s runutil.Sequence) runutil.Sequence, args ...st
 	if fn == nil {
 		fn = func(s runutil.Sequence) runutil.Sequence { return s }
 	}
-	return fn(g.s).Last("git", args...)
+	return fn(g.s).Env(g.opts).Last("git", args...)
 }
 
 // Committer encapsulates the process of create a commit.
