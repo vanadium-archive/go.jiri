@@ -6,6 +6,7 @@ package tool
 
 import (
 	"io"
+	"net/url"
 	"os"
 
 	"v.io/jiri/gerrit"
@@ -129,7 +130,7 @@ func (ctx Context) Env() map[string]string {
 }
 
 // Gerrit returns the Gerrit instance of the context.
-func (ctx Context) Gerrit(host string) *gerrit.Gerrit {
+func (ctx Context) Gerrit(host *url.URL) *gerrit.Gerrit {
 	return gerrit.New(ctx.NewSeq(), host)
 }
 

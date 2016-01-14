@@ -61,12 +61,12 @@ type CLOpts struct {
 	// Edit determines if the user should be prompted to edit the commit
 	// message when the CL is exported to Gerrit.
 	Edit bool
+	// Remote identifies the Gerrit remote that this CL will be pushed to
+	Remote string
 	// Host identifies the Gerrit host.
-	Host string
+	Host *url.URL
 	// Presubmit determines what presubmit tests to run.
 	Presubmit PresubmitTestType
-	// Remote identifies the remote that the CL pertains to.
-	Remote string
 	// RemoteBranch identifies the remote branch the CL pertains to.
 	RemoteBranch string
 	// Reviewers records a list of email addresses of CL reviewers.
@@ -79,12 +79,12 @@ type CLOpts struct {
 
 // Gerrit records a hostname of a Gerrit instance.
 type Gerrit struct {
-	host string
+	host *url.URL
 	s    runutil.Sequence
 }
 
 // New is the Gerrit factory.
-func New(s runutil.Sequence, host string) *Gerrit {
+func New(s runutil.Sequence, host *url.URL) *Gerrit {
 	return &Gerrit{
 		host: host,
 		s:    s,
@@ -425,33 +425,10 @@ func Reference(opts CLOpts) string {
 	return ref
 }
 
-// getRemoteURL returns the URL of the Gerrit project with respect to the
-// project identified by the current working directory.
-func getRemoteURL(seq runutil.Sequence, clOpts CLOpts) (string, error) {
-	args := []string{"config", "--get", "remote.origin.url"}
-	var stdout, stderr bytes.Buffer
-	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
-		return "", gitutil.Error(stdout.String(), stderr.String(), args...)
-	}
-	baseUrl := clOpts.Host
-	if !strings.HasSuffix(baseUrl, "/") {
-		baseUrl = baseUrl + "/"
-	}
-	return baseUrl + filepath.Base(strings.TrimSpace(stdout.String())), nil
-}
-
 // Push pushes the current branch to Gerrit.
 func Push(seq runutil.Sequence, clOpts CLOpts) error {
-	remote := clOpts.Remote
-	if remote == "" {
-		var err error
-		remote, err = getRemoteURL(seq, clOpts)
-		if err != nil {
-			return err
-		}
-	}
 	refspec := "HEAD:" + Reference(clOpts)
-	args := []string{"push", remote, refspec}
+	args := []string{"push", clOpts.Remote, refspec}
 	// TODO(jamesr): This should really reuse gitutil/git.go's Push which knows
 	// how to set this option but doesn't yet know how to pipe stdout/stderr the way
 	// this function wants.
@@ -480,16 +457,7 @@ type credentials struct {
 // hostCredentials returns credentials for the given Gerrit host. The
 // function uses best effort to scan common locations where the
 // credentials could exist.
-func hostCredentials(seq runutil.Sequence, host string) (_ *credentials, e error) {
-	// Check the host URL is valid.
-	url, err := url.Parse(host)
-	if err != nil {
-		return nil, fmt.Errorf("Parse(%q) failed: %v", host, err)
-	}
-	if url.Host == "" {
-		return nil, fmt.Errorf("%q has no host", host)
-	}
-
+func hostCredentials(seq runutil.Sequence, hostUrl *url.URL) (_ *credentials, e error) {
 	// Look for the host credentials in the .netrc file.
 	netrcPath := filepath.Join(os.Getenv("HOME"), ".netrc")
 	file, err := seq.Open(netrcPath)
@@ -503,7 +471,7 @@ func hostCredentials(seq runutil.Sequence, host string) (_ *credentials, e error
 		if err != nil {
 			return nil, err
 		}
-		creds, ok := credsMap[url.Host]
+		creds, ok := credsMap[hostUrl.Host]
 		if ok {
 			return creds, nil
 		}
@@ -525,7 +493,7 @@ func hostCredentials(seq runutil.Sequence, host string) (_ *credentials, e error
 			if err != nil {
 				return nil, err
 			}
-			creds, ok := credsMap[url.Host]
+			creds, ok := credsMap[hostUrl.Host]
 			if ok {
 				return creds, nil
 			}
@@ -533,14 +501,14 @@ func hostCredentials(seq runutil.Sequence, host string) (_ *credentials, e error
 			// file can contain credentials of the form ".<name>", which
 			// should match any host "*.<name>".
 			for host, creds := range credsMap {
-				if strings.HasPrefix(host, ".") && strings.HasSuffix(url.Host, host) {
+				if strings.HasPrefix(host, ".") && strings.HasSuffix(hostUrl.Host, host) {
 					return creds, nil
 				}
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("cannot find credentials for %q", host)
+	return nil, fmt.Errorf("cannot find credentials for %q", hostUrl.String())
 }
 
 // parseGitCookieFile parses the content of the given git cookie file

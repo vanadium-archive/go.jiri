@@ -7,7 +7,7 @@ pkg tool, method (Context) Clone(ContextOpts) *Context
 pkg tool, method (Context) Color() bool
 pkg tool, method (Context) DryRun() bool
 pkg tool, method (Context) Env() map[string]string
-pkg tool, method (Context) Gerrit(string) *gerrit.Gerrit
+pkg tool, method (Context) Gerrit(*url.URL) *gerrit.Gerrit
 pkg tool, method (Context) Jenkins(string) (*jenkins.Jenkins, error)
 pkg tool, method (Context) Manifest() string
 pkg tool, method (Context) NewSeq() runutil.Sequence

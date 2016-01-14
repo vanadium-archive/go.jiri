@@ -1,6 +1,6 @@
 pkg gerrit, const PresubmitTestTypeAll PresubmitTestType
 pkg gerrit, const PresubmitTestTypeNone PresubmitTestType
-pkg gerrit, func New(runutil.Sequence, string) *Gerrit
+pkg gerrit, func New(runutil.Sequence, *url.URL) *Gerrit
 pkg gerrit, func PresubmitTestTypes() []string
 pkg gerrit, func Push(runutil.Sequence, CLOpts) error
 pkg gerrit, func Reference(CLOpts) string
@@ -16,7 +16,7 @@ pkg gerrit, type CLOpts struct, Branch string
 pkg gerrit, type CLOpts struct, Ccs []string
 pkg gerrit, type CLOpts struct, Draft bool
 pkg gerrit, type CLOpts struct, Edit bool
-pkg gerrit, type CLOpts struct, Host string
+pkg gerrit, type CLOpts struct, Host *url.URL
 pkg gerrit, type CLOpts struct, Presubmit PresubmitTestType
 pkg gerrit, type CLOpts struct, Remote string
 pkg gerrit, type CLOpts struct, RemoteBranch string

@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -363,17 +364,28 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
 
+	p, err := currentProject(jirix)
+	if err != nil {
+		return err
+	}
+
 	host := hostFlag
 	if host == "" {
-		p, err := currentProject(jirix)
-		if err != nil {
-			return err
-		}
 		if p.GerritHost == "" {
 			return fmt.Errorf("No gerrit host found.  Please use the '--host' flag, or add a 'gerrithost' attribute for project %q.", p.Name)
 		}
 		host = p.GerritHost
 	}
+	hostUrl, err := url.Parse(host)
+	if err != nil {
+		return fmt.Errorf("invalid Gerrit host %q: %v", host, err)
+	}
+	projectRemoteUrl, err := url.Parse(p.Remote)
+	if err != nil {
+		return fmt.Errorf("invalid project remote: %v", p.Remote, err)
+	}
+	gerritRemote := *hostUrl
+	gerritRemote.Path = projectRemoteUrl.Path
 
 	// Create and run the review.
 	review, err := newReview(jirix, gerrit.CLOpts{
@@ -381,7 +393,8 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
 		Edit:         editFlag,
-		Host:         host,
+		Remote: gerritRemote.String(),
+		Host:         hostUrl,
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
 		Reviewers:    parseEmails(reviewersFlag),
@@ -883,7 +896,11 @@ func (review *review) setTopic() error {
 	if err != nil {
 		return err
 	}
-	if err := review.jirix.Gerrit(review.CLOpts.Host).SetTopic(changeID, review.CLOpts); err != nil {
+	host := review.CLOpts.Host
+	if host.Scheme != "http" && host.Scheme != "https" {
+		return fmt.Errorf("Cannot set topic for gerrit host %q. Please use a host url with 'https' scheme or run with '--set-topic=false'.", host.String())
+	}
+	if err := review.jirix.Gerrit(host).SetTopic(changeID, review.CLOpts); err != nil {
 		return err
 	}
 	return nil
