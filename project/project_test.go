@@ -1068,7 +1068,7 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 			},
 		},
 		{
-			`<Project exclude="false" name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"></Project>`,
+			`<Project this_attribute_should_be_ignored="junk" name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"></Project>`,
 			project.Project{
 				Name:         "project",
 				Path:         "path",
