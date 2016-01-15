@@ -65,9 +65,14 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
-	// Point the "latest" update history symlink to the new snapshot file.
-	link := jirix.UpdateHistoryLatestLink()
-	if err := jirix.NewSeq().RemoveAll(link).Symlink(snapshotFile, link).Done(); err != nil {
+	// Point the "latest" update history symlink to the new snapshot file.  Try to
+	// keep the symlink relative, to make it easy to move or copy the entire
+	// update_history directory.
+	link, latest := jirix.UpdateHistoryLatestLink(), snapshotFile
+	if rel, err := filepath.Rel(filepath.Dir(link), latest); err == nil {
+		latest = rel
+	}
+	if err := jirix.NewSeq().RemoveAll(link).Symlink(latest, link).Done(); err != nil {
 		return err
 	}
 	// Only attempt the bin dir transition after the update has succeeded, to
