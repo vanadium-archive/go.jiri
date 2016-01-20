@@ -394,6 +394,16 @@ func (s Sequence) serializeWriter(a io.Writer) io.Writer {
 	return nil
 }
 
+// isWriterTTY returns whether the io.Writer w is an os.File pointing at a tty.
+func isWriterTTY(w io.Writer) (isTTY bool) {
+	_, isOsFile := w.(*os.File)
+	if isOsFile {
+		stat, _ := os.Stdin.Stat()
+		isTTY = (stat.Mode() & (os.ModeDevice | os.ModeCharDevice)) == (os.ModeDevice | os.ModeCharDevice)
+	}
+	return isTTY
+}
+
 func (s Sequence) initAndDefer(h *Handle) func() {
 	if s.stdout == nil && s.stderr == nil {
 		fout, err := ioutil.TempFile("", "seq")
@@ -439,8 +449,19 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 	opts := s.getOpts()
 	rStdout, wStdout := io.Pipe()
 	rStderr, wStderr := io.Pipe()
-	opts.stdout = wStdout
-	opts.stderr = wStderr
+	// If the requested stdout/stderr is a raw os.File pointing at a tty,
+	// use that directly.  This allows the invocation of tools
+	// like editors, which expect stdout/stderr to be ttys.
+	if isWriterTTY(s.stdout) {
+		opts.stdout = s.stdout
+	} else {
+		opts.stdout = wStdout
+	}
+	if isWriterTTY(s.stderr) {
+		opts.stderr = s.stderr
+	} else {
+		opts.stderr = wStderr
+	}
 	if len(s.env) > 0 {
 		opts.env = s.env
 	}
