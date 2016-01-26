@@ -462,7 +462,7 @@ func hostCredentials(seq runutil.Sequence, hostUrl *url.URL) (_ *credentials, e 
 	netrcPath := filepath.Join(os.Getenv("HOME"), ".netrc")
 	file, err := seq.Open(netrcPath)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !runutil.IsNotExist(err) {
 			return nil, err
 		}
 	} else {
@@ -484,7 +484,7 @@ func hostCredentials(seq runutil.Sequence, hostUrl *url.URL) (_ *credentials, e 
 		cookieFilePath := strings.TrimSpace(stdout.String())
 		file, err := seq.Open(cookieFilePath)
 		if err != nil {
-			if !os.IsNotExist(err) {
+			if !runutil.IsNotExist(err) {
 				return nil, err
 			}
 		} else {
