@@ -66,3 +66,35 @@ func TestParseCookie(t *testing.T) {
 		t.Errorf("expected parseCookie(%q) to return error but it did not", s)
 	}
 }
+
+type cookieFileTests struct {
+	fileContents []byte
+	cookies      []http.Cookie
+}
+
+func TestParseCookieFile(t *testing.T) {
+	tests := []cookieFileTests{{
+		fileContents: []byte(fmt.Sprintf("\n# this is a comment\n%s\t%s\t%s\t%s\t%d\t%s\t%s", ".example.com", "FALSE", "/", "FALSE", 0, "name", "value")),
+		cookies: []http.Cookie{{
+			Domain:  ".example.com",
+			Path:    "/",
+			Secure:  false,
+			Expires: time.Unix(0, 0),
+			Name:    "name",
+			Value:   "value",
+		}},
+	}}
+
+	for testIdx, test := range tests {
+		actual := parseCookieFile(nil, test.fileContents)
+		if len(actual) != len(test.cookies) {
+			t.Errorf("expected to parse %v cookies but got %v on test case %v", len(test.cookies), len(actual), testIdx)
+		}
+		for i, got := range actual {
+			want := test.cookies[i]
+			if !reflect.DeepEqual(*got, want) {
+				t.Errorf("expected test case %v cookie %v to be %#v but got %#v", testIdx, i, want, *got)
+			}
+		}
+	}
+}
