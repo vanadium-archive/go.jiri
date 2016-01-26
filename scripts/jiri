@@ -39,6 +39,7 @@ fi
 # If $JIRI_ROOT is set we always use it, otherwise look for a .jiri_root
 # directory starting with the current working directory, and walking up.
 if [[ -z ${JIRI_ROOT+x} ]]; then
+  CWD="$(pwd)"
   while [[ ! -d  "$(pwd)/.jiri_root" ]]; do
     if [[ "$(pwd)" == "/" ]]; then
       fatal "could not find .jiri_root directory"
@@ -46,6 +47,7 @@ if [[ -z ${JIRI_ROOT+x} ]]; then
     cd ..
   done
   export JIRI_ROOT="$(pwd)"
+  cd "${CWD}"
 fi
 
 # Make sure the jiri binary exists and is executable.
