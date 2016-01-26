@@ -828,7 +828,6 @@ func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (f *os.File,
 // Create is a wrapper around os.Create that handles options such as "verbose"
 // or "dry run". Create is a terminating function.
 func (s Sequence) Create(name string) (f *os.File, err error) {
-
 	if s.err != nil {
 		return nil, s.Done()
 	}
@@ -888,14 +887,14 @@ func (s Sequence) WriteFile(filename string, data []byte, perm os.FileMode) Sequ
 
 // Copy is a wrapper around io.Copy that handles options such as "verbose" or
 // "dry run". Copy is a terminating function.
-func (s Sequence) Copy(dst *os.File, src io.Reader) (n int64, err error) {
+func (s Sequence) Copy(dst io.Writer, src io.Reader) (n int64, err error) {
 	if s.err != nil {
 		return 0, s.Done()
 	}
 	s.r.call(func() error {
 		n, err = io.Copy(dst, src)
 		return err
-	}, fmt.Sprintf("io.copy %q", dst.Name()))
+	}, "io.copy")
 	s.setError(err, fmt.Sprintf("Copy(%s, %s)", dst, src))
 	err = s.Done()
 	return

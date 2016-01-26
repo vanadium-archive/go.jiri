@@ -153,8 +153,10 @@ func Fetch(jirix *jiri.X, dst, url string) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.Copy(file, resp.Body)
-	return err
+	if _, err := s.Copy(file, resp.Body); err != nil {
+		return err
+	}
+	return file.Close()
 }
 
 // Unzip unzips the file in srcFile and puts resulting files in directory dstDir.

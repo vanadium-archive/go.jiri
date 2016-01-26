@@ -16,7 +16,7 @@ pkg runutil, method (Sequence) Call(func() error, string, ...interface{}) Sequen
 pkg runutil, method (Sequence) Capture(io.Writer, io.Writer) Sequence
 pkg runutil, method (Sequence) Chdir(string) Sequence
 pkg runutil, method (Sequence) Chmod(string, os.FileMode) Sequence
-pkg runutil, method (Sequence) Copy(*os.File, io.Reader) (int64, error)
+pkg runutil, method (Sequence) Copy(io.Writer, io.Reader) (int64, error)
 pkg runutil, method (Sequence) Create(string) (*os.File, error)
 pkg runutil, method (Sequence) Dir(string) Sequence
 pkg runutil, method (Sequence) Done() error
