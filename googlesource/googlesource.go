@@ -82,10 +82,14 @@ func gitCookies(jirix *jiri.X) []*http.Cookie {
 	if err != nil {
 		return cookies
 	}
+	return parseCookieFile(jirix, bytes)
+}
 
+func parseCookieFile(jirix *jiri.X, bytes []byte) (cookies []*http.Cookie) {
 	lines := strings.Split(string(bytes), "\n")
+
 	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
+		if strings.TrimSpace(line) == "" || line[0] == '#' {
 			continue
 		}
 		cookie, err := parseCookie(line)
@@ -95,7 +99,7 @@ func gitCookies(jirix *jiri.X) []*http.Cookie {
 			cookies = append(cookies, cookie)
 		}
 	}
-	return cookies
+	return
 }
 
 // GetRepoStatuses returns the RepoStatus of all public projects hosted on the
