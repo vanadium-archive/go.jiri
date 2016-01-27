@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -14,8 +13,9 @@ import (
 )
 
 func TestWhich(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf})
+	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
 	defer sh.Cleanup()
+
 	jiriBinary := sh.BuildGoPkg("v.io/jiri")
 	stdout, stderr := sh.Cmd(jiriBinary, []string{"which"}...).StdoutStderr()
 	if got, want := stdout, fmt.Sprintf("# binary\n%s\n", jiriBinary); got != want {
@@ -28,17 +28,14 @@ func TestWhich(t *testing.T) {
 
 // TestWhichScript tests the behavior of "jiri which" for the shim script.
 func TestWhichScript(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf})
+	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
 	defer sh.Cleanup()
 
 	jiriScript, err := filepath.Abs("./scripts/jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to jiri script")
 	}
-	c := sh.Cmd(jiriScript, []string{"which"}...)
-	c.AddStdoutWriter(gosh.NopWriteCloser(os.Stdout))
-	c.AddStderrWriter(gosh.NopWriteCloser(os.Stderr))
-	stdout, stderr := c.StdoutStderr()
+	stdout, stderr := sh.Cmd(jiriScript, "which").StdoutStderr()
 	if got, want := stdout, fmt.Sprintf("# script\n%s\n", jiriScript); got != want {
 		t.Errorf("stdout got %q, want %q", got, want)
 	}
