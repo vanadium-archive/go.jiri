@@ -41,6 +41,7 @@ pkg gerrit, type Commit struct
 pkg gerrit, type Commit struct, Message string
 pkg gerrit, type Fetch struct
 pkg gerrit, type Fetch struct, embedded Http
+pkg gerrit, type Files map[string]struct{}
 pkg gerrit, type Gerrit struct
 pkg gerrit, type Http struct
 pkg gerrit, type Http struct, Ref string
@@ -58,6 +59,7 @@ pkg gerrit, type Review struct, Message string
 pkg gerrit, type Revision struct
 pkg gerrit, type Revision struct, embedded Commit
 pkg gerrit, type Revision struct, embedded Fetch
+pkg gerrit, type Revision struct, embedded Files
 pkg gerrit, type Revisions map[string]Revision
 pkg gerrit, type Topic struct
 pkg gerrit, type Topic struct, Topic string

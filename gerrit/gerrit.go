@@ -31,6 +31,8 @@ var (
 	remoteRE        = regexp.MustCompile("remote:[^\n]*")
 	multiPartRE     = regexp.MustCompile(`MultiPart:\s*(\d+)\s*/\s*(\d+)`)
 	presubmitTestRE = regexp.MustCompile(`PresubmitTest:\s*(.*)`)
+
+	queryParameters = []string{"CURRENT_REVISION", "CURRENT_COMMIT", "CURRENT_FILES", "LABELS", "DETAILED_ACCOUNTS"}
 )
 
 // Comment represents a single inline file comment.
@@ -195,6 +197,7 @@ type Revisions map[string]Revision
 type Revision struct {
 	Fetch  `json:"fetch"`
 	Commit `json:"commit"`
+	Files  `json:"files"`
 }
 type Fetch struct {
 	Http `json:"http"`
@@ -208,6 +211,7 @@ type Commit struct {
 type Owner struct {
 	Email string
 }
+type Files map[string]struct{}
 
 func (c Change) Reference() string {
 	return c.Revisions[c.Current_revision].Fetch.Http.Ref
@@ -322,7 +326,19 @@ func (g *Gerrit) Query(query string) (_ []Change, e error) {
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/a/changes/?o=CURRENT_REVISION&o=CURRENT_COMMIT&o=LABELS&o=DETAILED_ACCOUNTS&q=%s", g.host, url.QueryEscape(query))
+	u, err := url.Parse(g.host.String())
+	if err != nil {
+		return nil, err
+	}
+	u.Path = "/a/changes/"
+	v := url.Values{}
+	v.Set("q", query)
+	for _, o := range queryParameters {
+		v.Add("o", o)
+	}
+	u.RawQuery = v.Encode()
+	url := u.String()
+
 	var body io.Reader
 	method, body := "GET", nil
 	req, err := http.NewRequest(method, url, body)
