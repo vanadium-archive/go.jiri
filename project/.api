@@ -9,6 +9,7 @@ pkg project, func CurrentProjectKey(*jiri.X) (ProjectKey, error)
 pkg project, func DataDirPath(*jiri.X, string) (string, error)
 pkg project, func GetProjectStates(*jiri.X, bool) (map[ProjectKey]*ProjectState, error)
 pkg project, func InstallTools(*jiri.X, string) error
+pkg project, func LoadManifest(*jiri.X) (Projects, Tools, error)
 pkg project, func LocalProjects(*jiri.X, ScanMode) (Projects, error)
 pkg project, func MakeProjectKey(string, string) ProjectKey
 pkg project, func ManifestFromBytes([]byte) (*Manifest, error)
@@ -17,13 +18,11 @@ pkg project, func ParseNames(*jiri.X, []string, map[string]struct{}) (Projects, 
 pkg project, func PollProjects(*jiri.X, map[string]struct{}) (Update, error)
 pkg project, func ProjectAtPath(*jiri.X, string) (Project, error)
 pkg project, func ProjectFromFile(*jiri.X, string) (*Project, error)
-pkg project, func ReadJiriManifest(*jiri.X) (Projects, Tools, error)
 pkg project, func TransitionBinDir(*jiri.X) error
 pkg project, func UpdateUniverse(*jiri.X, bool) error
+pkg project, method (*Import) ProjectKey() ProjectKey
 pkg project, method (*Manifest) ToBytes() ([]byte, error)
 pkg project, method (*Manifest) ToFile(*jiri.X, string) error
-pkg project, method (Import) Key() ProjectKey
-pkg project, method (Import) ToFile(*jiri.X, string) error
 pkg project, method (Project) Key() ProjectKey
 pkg project, method (Project) ToFile(*jiri.X, string) error
 pkg project, method (ProjectKeys) Len() int
@@ -39,18 +38,21 @@ pkg project, type CL struct
 pkg project, type CL struct, Author string
 pkg project, type CL struct, Description string
 pkg project, type CL struct, Email string
-pkg project, type FileImport struct
-pkg project, type FileImport struct, File string
-pkg project, type FileImport struct, XMLName struct{}
 pkg project, type Import struct
 pkg project, type Import struct, Manifest string
+pkg project, type Import struct, Name string
+pkg project, type Import struct, Protocol string
+pkg project, type Import struct, Remote string
+pkg project, type Import struct, RemoteBranch string
 pkg project, type Import struct, Root string
 pkg project, type Import struct, XMLName struct{}
-pkg project, type Import struct, embedded Project
+pkg project, type LocalImport struct
+pkg project, type LocalImport struct, File string
+pkg project, type LocalImport struct, XMLName struct{}
 pkg project, type Manifest struct
-pkg project, type Manifest struct, FileImports []FileImport
 pkg project, type Manifest struct, Imports []Import
 pkg project, type Manifest struct, Label string
+pkg project, type Manifest struct, LocalImports []LocalImport
 pkg project, type Manifest struct, Projects []Project
 pkg project, type Manifest struct, Tools []Tool
 pkg project, type Manifest struct, XMLName struct{}

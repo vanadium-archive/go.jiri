@@ -41,7 +41,7 @@ func TestUpgrade(t *testing.T) {
 			Args: []string{"v23"},
 			Want: `<manifest>
   <imports>
-    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -56,7 +56,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -71,7 +71,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="private" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="private" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -88,9 +88,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="private" remote="https://vanadium.googlesource.com/manifest"/>
-    <fileimport file="manifest/infrastructure"/>
-    <fileimport file="manifest/public"/>
+    <import manifest="private" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="infrastructure" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -107,9 +107,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
-    <fileimport file="manifest/infrastructure"/>
-    <fileimport file="manifest/private"/>
+    <import manifest="public" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="infrastructure" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="private" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `,
@@ -124,7 +124,7 @@ func TestUpgrade(t *testing.T) {
 			Args: []string{"fuchsia"},
 			Want: `<manifest>
   <imports>
-    <import manifest="default" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -139,7 +139,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="default" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -154,7 +154,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="private" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="private" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -171,9 +171,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="private" remote="https://github.com/effenel/fnl-start.git"/>
-    <fileimport file="manifest/infrastructure"/>
-    <fileimport file="manifest/default"/>
+    <import manifest="private" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="infrastructure" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -190,9 +190,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="default" remote="https://github.com/effenel/fnl-start.git"/>
-    <fileimport file="manifest/infrastructure"/>
-    <fileimport file="manifest/private"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="infrastructure" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="private" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
   </imports>
 </manifest>
 `,
@@ -210,6 +210,7 @@ func TestUpgrade(t *testing.T) {
 }
 
 func testUpgrade(opts gosh.Opts, jiriTool string, test upgradeTestCase) error {
+	opts.PropagateChildOutput = true
 	sh := gosh.NewShell(opts)
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
@@ -267,7 +268,7 @@ func TestUpgradeRevert(t *testing.T) {
 	localData := `<manifest/>`
 	jiriData := `<manifest>
   <imports>
-    <import manifest="public" remote="https://vanadium.googlesource.com/manifest"/>
+    <import manifest="public" name="manifest" remote="https://vanadium.googlesource.com/manifest"/>
   </imports>
 </manifest>
 `

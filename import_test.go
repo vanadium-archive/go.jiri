@@ -29,58 +29,19 @@ func TestImport(t *testing.T) {
 			Stderr: `wrong number of arguments`,
 		},
 		{
+			Args:   []string{"a"},
+			Stderr: `wrong number of arguments`,
+		},
+		{
 			Args:   []string{"a", "b", "c"},
 			Stderr: `wrong number of arguments`,
 		},
-		// Local file imports, default append behavior
-		{
-			Args: []string{"manfile"},
-			Want: `<manifest>
-  <imports>
-    <fileimport file="manfile"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args: []string{"./manfile"},
-			Want: `<manifest>
-  <imports>
-    <fileimport file="manfile"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args: []string{"manfile"},
-			Exist: `<manifest>
-  <imports>
-    <import manifest="bar" remote="https://github.com/orig.git"/>
-  </imports>
-</manifest>
-`,
-			Want: `<manifest>
-  <imports>
-    <import manifest="bar" remote="https://github.com/orig.git"/>
-    <fileimport file="manfile"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args:   []string{"../manfile"},
-			Stderr: `not a subdirectory of JIRI_ROOT`,
-		},
-		{
-			Args:   []string{"noexist"},
-			Stderr: `no such file`,
-		},
 		// Remote imports, default append behavior
 		{
-			Args: []string{"-name=name", "-path=path", "-remote-branch=remotebranch", "-revision=revision", "-root=root", "foo", "https://github.com/new.git"},
+			Args: []string{"-name=name", "-remote-branch=remotebranch", "-root=root", "foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
-    <import manifest="foo" root="root" name="name" path="path" remote="https://github.com/new.git" remotebranch="remotebranch" revision="revision"/>
+    <import manifest="foo" name="name" remote="https://github.com/new.git" remotebranch="remotebranch" root="root"/>
   </imports>
 </manifest>
 `,
@@ -128,48 +89,6 @@ func TestImport(t *testing.T) {
   </imports>
 </manifest>
 `,
-		},
-		// Local file imports, explicit overwrite behavior
-		{
-			Args: []string{"-overwrite", "manfile"},
-			Want: `<manifest>
-  <imports>
-    <fileimport file="manfile"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args: []string{"-overwrite", "./manfile"},
-			Want: `<manifest>
-  <imports>
-    <fileimport file="manfile"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args: []string{"-overwrite", "manfile"},
-			Exist: `<manifest>
-  <imports>
-    <import manifest="bar" remote="https://github.com/orig.git"/>
-  </imports>
-</manifest>
-`,
-			Want: `<manifest>
-  <imports>
-    <fileimport file="manfile"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			Args:   []string{"-overwrite", "../manfile"},
-			Stderr: `not a subdirectory of JIRI_ROOT`,
-		},
-		{
-			Args:   []string{"-overwrite", "noexist"},
-			Stderr: `no such file`,
 		},
 		// Remote imports, explicit overwrite behavior
 		{

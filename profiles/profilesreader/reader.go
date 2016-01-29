@@ -104,7 +104,6 @@ type Reader struct {
 	jirix        *jiri.X
 	config       *util.Config
 	projects     project.Projects
-	tools        project.Tools
 	pdb          *profiles.DB
 }
 
@@ -117,7 +116,7 @@ func NewReader(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*Read
 	if err != nil {
 		return nil, err
 	}
-	projects, tools, err := project.ReadJiriManifest(jirix)
+	projects, _, err := project.LoadManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +130,6 @@ func NewReader(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*Read
 		jirix:        jirix,
 		config:       config,
 		projects:     projects,
-		tools:        tools,
 		profilesMode: bool(profilesMode),
 		pdb:          pdb,
 	}

@@ -144,6 +144,9 @@ func (x *X) UpdateHistoryLatestLink() string {
 
 // ResolveManifestPath resolves the given manifest name to an absolute path in
 // the local filesystem.
+//
+// TODO(toddw): Remove this once the transition to new manifests is done.  In
+// the new world, we always start with the JiriManifestFile.
 func (x *X) ResolveManifestPath(name string) (string, error) {
 	if x.UsingOldManifests() {
 		return x.resolveManifestPathDeprecated(name)

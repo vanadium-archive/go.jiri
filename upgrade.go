@@ -82,65 +82,56 @@ func runUpgrade(jirix *jiri.X, args []string) error {
 		return jirix.UsageErrorf("must specify upgrade kind")
 	}
 	kind := args[0]
-	var argRemote, argRoot, argPath, argManifest string
+	var argRemote, argName, argManifest string
 	switch kind {
 	case "v23":
 		argRemote = "https://vanadium.googlesource.com/manifest"
-		argRoot, argPath, argManifest = "", "manifest", "public"
+		argName, argManifest = "manifest", "public"
 	case "fuchsia":
-		// TODO(toddw): Confirm these choices.
 		argRemote = "https://github.com/effenel/fnl-start.git"
-		argRoot, argPath, argManifest = "", "manifest", "default"
+		argName, argManifest = "fnl-start", "manifest/fuchsia"
 	default:
 		return jirix.UsageErrorf("unknown upgrade kind %q", kind)
 	}
 	// Initialize manifest from .local_manifest.
-	hasLocalFile := false
+	hasLocalFile := true
 	manifest, err := project.ManifestFromFile(jirix, localFile)
-	switch {
-	case err != nil && !runutil.IsNotExist(err):
-		return err
-	case err == nil:
-		hasLocalFile = true
-		seenOldImport := false
-		var newImports []project.Import
-		for _, oldImport := range manifest.Imports {
-			if oldImport.Remote != "" {
-				// This is a new-style remote import, carry it over directly.
-				newImports = append(newImports, oldImport)
-				continue
-			}
-			// This is an old-style file import, convert it to the new style.
-			oldName := oldImport.Name
-			if kind == "v23" && oldName == "default" {
-				oldName = "public" // default no longer exists, now it's just public.
-			}
-			if !seenOldImport {
-				// This is the first old import, update the manifest name for the remote
-				// import we'll be adding later.
-				argManifest = oldName
-				seenOldImport = true
-			} else {
-				// Convert import from name="foo" to file="manifest/foo"
-				manifest.FileImports = append(manifest.FileImports, project.FileImport{
-					File: filepath.Join(argRoot, argPath, oldName),
-				})
-			}
+	if err != nil {
+		if !runutil.IsNotExist(err) {
+			return err
 		}
-		manifest.Imports = newImports
-	}
-	if manifest == nil {
+		hasLocalFile = false
 		manifest = &project.Manifest{}
 	}
-	// Add remote import.
-	manifest.Imports = append(manifest.Imports, project.Import{
-		Manifest: argManifest,
-		Root:     argRoot,
-		Project: project.Project{
-			Path:   argPath,
-			Remote: argRemote,
-		},
-	})
+	oldImports := manifest.Imports
+	manifest.Imports = nil
+	for _, oldImport := range oldImports {
+		if oldImport.Remote != "" {
+			// This is a new-style remote import, carry it over directly.
+			manifest.Imports = append(manifest.Imports, oldImport)
+			continue
+		}
+		// This is an old-style import, convert it to the new style.
+		oldName := oldImport.Name
+		switch {
+		case kind == "v23" && oldName == "default":
+			oldName = "public"
+		case kind == "fuchsia" && oldName == "default":
+			oldName = "manifest/fuchsia"
+		}
+		manifest.Imports = append(manifest.Imports, project.Import{
+			Manifest: oldName,
+			Name:     argName,
+			Remote:   argRemote,
+		})
+	}
+	if len(manifest.Imports) == 0 {
+		manifest.Imports = append(manifest.Imports, project.Import{
+			Manifest: argManifest,
+			Name:     argName,
+			Remote:   argRemote,
+		})
+	}
 	// Write output to .jiri_manifest file.
 	outFile := jirix.JiriManifestFile()
 	if _, err := os.Stat(outFile); err == nil {

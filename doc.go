@@ -214,31 +214,21 @@ specifies manifest information for the jiri tool.  The file is created if it
 doesn't already exist, otherwise additional imports are added to the existing
 file.
 
-<manifest> specifies the manifest file to use.
+An <import> element is added to the manifest representing a remote manifest
+import.  The manifest file path is relative to the root directory of the remote
+import repository.
 
-[remote] optionally specifies the remote manifest repository.
-
-If [remote] is not specified, a <fileimport> element is added to the manifest,
-representing a local file import.  The manifest file may be an absolute path, or
-relative to the current working directory.  The resulting path must be a
-subdirectory of $JIRI_ROOT.
-
-If [remote] is specified, an <import> element is added to the manifest,
-representing a remote manifest import.  The remote manifest repository is
-treated similar to regular projects; "jiri update" will update all remote
-manifest repository projects before updating regular projects.  The manifest
-file path is relative to the root directory of the remote import repository.
-
-Example of a local file import:
-  $ jiri import $JIRI_ROOT/path/to/manifest/file
-
-Example of a remote manifest import:
+Example:
   $ jiri import myfile https://foo.com/bar.git
 
 Run "jiri help manifest" for details on manifests.
 
 Usage:
-   jiri import [flags] <manifest> [remote]
+   jiri import [flags] <manifest> <remote>
+
+<manifest> specifies the manifest file to use.
+
+<remote> specifies the remote manifest repository.
 
 The jiri import flags are:
  -name=
@@ -251,15 +241,11 @@ The jiri import flags are:
    Write a new .jiri_manifest file with the given specification.  If it already
    exists, the existing content will be ignored and the file will be
    overwritten.
- -path=
-   Path to store the manifest project locally.  Uses "manifest" if unspecified.
  -protocol=git
    The version control protocol used by the remote manifest project.
  -remote-branch=master
    The branch of the remote manifest project to track, without the leading
    "origin/".
- -revision=HEAD
-   The revision of the remote manifest project to reset to during "jiri update".
  -root=
    Root to store the manifest project locally.
 

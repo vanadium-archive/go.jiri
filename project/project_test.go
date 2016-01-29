@@ -579,17 +579,17 @@ func TestFileImportCycle(t *testing.T) {
 
 	// Set up the cycle .jiri_manifest -> A -> B -> A
 	jiriManifest := project.Manifest{
-		FileImports: []project.FileImport{
+		LocalImports: []project.LocalImport{
 			{File: "A"},
 		},
 	}
 	manifestA := project.Manifest{
-		FileImports: []project.FileImport{
+		LocalImports: []project.LocalImport{
 			{File: "B"},
 		},
 	}
 	manifestB := project.Manifest{
-		FileImports: []project.FileImport{
+		LocalImports: []project.LocalImport{
 			{File: "A"},
 		},
 	}
@@ -623,23 +623,17 @@ func TestRemoteImportCycle(t *testing.T) {
 	// Set up the cycle .jiri_manifest -> remote1+A -> remote2+B -> remote1+A
 	jiriManifest := project.Manifest{
 		Imports: []project.Import{
-			{Manifest: "A", Project: project.Project{
-				Name: "n1", Path: "p1", Remote: remote1,
-			}},
+			{Manifest: "A", Name: "n1", Remote: remote1},
 		},
 	}
 	manifestA := project.Manifest{
 		Imports: []project.Import{
-			{Manifest: "B", Project: project.Project{
-				Name: "n2", Path: "p2", Remote: remote2,
-			}},
+			{Manifest: "B", Name: "n2", Remote: remote2},
 		},
 	}
 	manifestB := project.Manifest{
 		Imports: []project.Import{
-			{Manifest: "A", Project: project.Project{
-				Name: "n3", Path: "p3", Remote: remote1,
-			}},
+			{Manifest: "A", Name: "n3", Remote: remote1},
 		},
 	}
 	if err := jiriManifest.ToFile(jirix, jirix.JiriManifestFile()); err != nil {
@@ -675,32 +669,26 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	// Set up the cycle .jiri_manifest -> remote1+A -> remote2+B -> C -> remote1+D -> A
 	jiriManifest := project.Manifest{
 		Imports: []project.Import{
-			{Manifest: "A", Root: "r1", Project: project.Project{
-				Name: "n1", Path: "p1", Remote: remote1,
-			}},
+			{Manifest: "A", Root: "r1", Name: "n1", Remote: remote1},
 		},
 	}
 	manifestA := project.Manifest{
 		Imports: []project.Import{
-			{Manifest: "B", Root: "r2", Project: project.Project{
-				Name: "n2", Path: "p2", Remote: remote2,
-			}},
+			{Manifest: "B", Root: "r2", Name: "n2", Remote: remote2},
 		},
 	}
 	manifestB := project.Manifest{
-		FileImports: []project.FileImport{
+		LocalImports: []project.LocalImport{
 			{File: "C"},
 		},
 	}
 	manifestC := project.Manifest{
 		Imports: []project.Import{
-			{Manifest: "D", Root: "r3", Project: project.Project{
-				Name: "n3", Path: "p3", Remote: remote1,
-			}},
+			{Manifest: "D", Root: "r3", Name: "n3", Remote: remote1},
 		},
 	}
 	manifestD := project.Manifest{
-		FileImports: []project.FileImport{
+		LocalImports: []project.LocalImport{
 			{File: "A"},
 		},
 	}
@@ -928,31 +916,45 @@ func TestManifestToFromBytes(t *testing.T) {
 				Label: "label",
 				Imports: []project.Import{
 					{
-						Manifest: "manifest",
-						Project: project.Project{
-							Path:         "manifest",
-							Protocol:     "git",
-							Remote:       "remote",
-							RemoteBranch: "master",
-							Revision:     "HEAD",
-						},
+						Manifest:     "manifest1",
+						Name:         "remoteimport1",
+						Protocol:     "git",
+						Remote:       "remote1",
+						RemoteBranch: "master",
 					},
-					{Project: project.Project{Name: "localimport"}},
+					{
+						Manifest:     "manifest2",
+						Name:         "remoteimport2",
+						Protocol:     "git",
+						Remote:       "remote2",
+						RemoteBranch: "branch2",
+					},
+					{
+						Name: "oldimport",
+					},
 				},
-				FileImports: []project.FileImport{
+				LocalImports: []project.LocalImport{
 					{File: "fileimport"},
 				},
 				Projects: []project.Project{
 					{
+						Name:         "project1",
+						Path:         "path1",
+						Protocol:     "git",
+						Remote:       "remote1",
+						RemoteBranch: "master",
+						Revision:     "HEAD",
 						GerritHost:   "https://test-review.googlesource.com",
 						GitHooks:     "path/to/githooks",
 						RunHook:      "path/to/hook",
-						Name:         "project",
-						Path:         "path",
+					},
+					{
+						Name:         "project2",
+						Path:         "path2",
 						Protocol:     "git",
-						Remote:       "remote",
-						RemoteBranch: "otherbranch",
-						Revision:     "rev",
+						Remote:       "remote2",
+						RemoteBranch: "branch2",
+						Revision:     "rev2",
 					},
 				},
 				Tools: []project.Tool{
@@ -965,12 +967,14 @@ func TestManifestToFromBytes(t *testing.T) {
 			},
 			`<manifest label="label">
   <imports>
-    <import manifest="manifest" remote="remote"/>
-    <import name="localimport"/>
-    <fileimport file="fileimport"/>
+    <import manifest="manifest1" name="remoteimport1" remote="remote1"/>
+    <import manifest="manifest2" name="remoteimport2" remote="remote2" remotebranch="branch2"/>
+    <import name="oldimport"/>
+    <localimport file="fileimport"/>
   </imports>
   <projects>
-    <project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" runhook="path/to/hook"/>
+    <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" runhook="path/to/hook"/>
+    <project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
   </projects>
   <tools>
     <tool data="tooldata" name="tool" project="toolproject"/>
@@ -1008,25 +1012,27 @@ func TestProjectToFromFile(t *testing.T) {
 		{
 			// Default fields are dropped when marshaled, and added when unmarshaled.
 			project.Project{
-				Name:         "project",
-				Path:         "path",
+				Name:         "project1",
+				Path:         "path1",
 				Protocol:     "git",
-				Remote:       "remote",
+				Remote:       "remote1",
 				RemoteBranch: "master",
 				Revision:     "HEAD",
 			},
-			`<project name="project" path="path" remote="remote"/>`,
+			`<project name="project1" path="path1" remote="remote1"/>
+`,
 		},
 		{
 			project.Project{
-				Name:         "project",
-				Path:         "path",
+				Name:         "project2",
+				Path:         "path2",
 				Protocol:     "git",
-				Remote:       "remote",
-				RemoteBranch: "otherbranch",
-				Revision:     "rev",
+				Remote:       "remote2",
+				RemoteBranch: "branch2",
+				Revision:     "rev2",
 			},
-			`<project name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"/>`,
+			`<project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
+`,
 		},
 	}
 	for index, test := range tests {
@@ -1059,6 +1065,7 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 		XML     string
 		Project project.Project
 	}{
+		// Make sure <Project> opening tag is accepted.
 		{
 			`<Project name="project" path="path" remote="remote"/>`,
 			project.Project{
@@ -1070,6 +1077,7 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 				Revision:     "HEAD",
 			},
 		},
+		// Make sure <Project> opening and closing tags are accepted.
 		{
 			`<Project name="project" path="path" remote="remote"></Project>`,
 			project.Project{
@@ -1081,14 +1089,15 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 				Revision:     "HEAD",
 			},
 		},
+		// Make sure "this_attribute_should_be_ignored" is silently ignored.
 		{
-			`<Project this_attribute_should_be_ignored="junk" name="project" path="path" remote="remote" remotebranch="otherbranch" revision="rev"></Project>`,
+			`<Project this_attribute_should_be_ignored="junk" name="project" path="path" remote="remote" remotebranch="branch" revision="rev"></Project>`,
 			project.Project{
 				Name:         "project",
 				Path:         "path",
 				Protocol:     "git",
 				Remote:       "remote",
-				RemoteBranch: "otherbranch",
+				RemoteBranch: "branch",
 				Revision:     "rev",
 			},
 		},
@@ -1104,67 +1113,6 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 		}
 		if got, want := project, &test.Project; !reflect.DeepEqual(got, want) {
 			t.Errorf("%+v FromFile got %#v, want %#v", test.Project, got, want)
-		}
-	}
-}
-
-func TestImportToFile(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
-	defer cleanup()
-
-	tests := []struct {
-		Import project.Import
-		XML    string
-	}{
-		{
-			project.Import{
-				Project: project.Project{
-					Name: "import",
-				},
-			},
-			`<import name="import"/>`,
-		},
-		{
-			// Default fields are dropped when marshaled, and added when unmarshaled.
-			project.Import{
-				Manifest: "manifest",
-				Project: project.Project{
-					Name:         "import",
-					Path:         "manifest",
-					Protocol:     "git",
-					Remote:       "remote",
-					RemoteBranch: "master",
-					Revision:     "HEAD",
-				},
-			},
-			`<import manifest="manifest" name="import" remote="remote"/>`,
-		},
-		{
-			project.Import{
-				Manifest: "manifest",
-				Project: project.Project{
-					Name:         "import",
-					Path:         "path",
-					Protocol:     "git",
-					Remote:       "remote",
-					RemoteBranch: "otherbranch",
-					Revision:     "rev",
-				},
-			},
-			`<import manifest="manifest" name="import" path="path" remote="remote" remotebranch="otherbranch" revision="rev"/>`,
-		},
-	}
-	for index, test := range tests {
-		filename := filepath.Join(jirix.Root, fmt.Sprintf("test-%d", index))
-		if err := test.Import.ToFile(jirix, filename); err != nil {
-			t.Errorf("%+v ToFile failed: %v", test.Import, err)
-		}
-		gotBytes, err := jirix.NewSeq().ReadFile(filename)
-		if err != nil {
-			t.Errorf("%+v ReadFile failed: %v", test.Import, err)
-		}
-		if got, want := string(gotBytes), test.XML; got != want {
-			t.Errorf("%+v ToFile GOT\n%v\nWANT\n%v", test.Import, got, want)
 		}
 	}
 }
