@@ -60,7 +60,7 @@ var (
 func init() {
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, `Ignore unmerged changes.`)
 	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
-	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, `Automatically submit the changelist when feasiable.`)
+	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, `Automatically submit the changelist when feasable.`)
 	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", `Comma-seperated list of emails or LDAPs to cc.`)
 	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, `Send a draft changelist.`)
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, `Open an editor to edit the CL description.`)
@@ -393,7 +393,7 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
 		Edit:         editFlag,
-		Remote: gerritRemote.String(),
+		Remote:       gerritRemote.String(),
 		Host:         hostUrl,
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
