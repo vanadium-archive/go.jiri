@@ -15,7 +15,7 @@ import (
 )
 
 func TestBootstrapJiri(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf})
+	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
 	defer sh.Cleanup()
 
 	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
@@ -23,10 +23,7 @@ func TestBootstrapJiri(t *testing.T) {
 		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")
 	}
 	rootDir := filepath.Join(sh.MakeTempDir(), "root")
-	c := sh.Cmd(bootstrap, []string{rootDir}...)
-	c.AddStdoutWriter(gosh.NopWriteCloser(os.Stdout))
-	c.AddStderrWriter(gosh.NopWriteCloser(os.Stderr))
-	stdout, stderr := c.StdoutStderr()
+	stdout, stderr := sh.Cmd(bootstrap, rootDir).StdoutStderr()
 	if got, want := stdout, fmt.Sprintf("Please add %s to your PATH.\n", filepath.Join(rootDir, ".jiri_root", "scripts")); got != want {
 		t.Errorf("stdout got %q, want %q", got, want)
 	}
@@ -42,7 +39,7 @@ func TestBootstrapJiri(t *testing.T) {
 }
 
 func TestBootstrapJiriAlreadyExists(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf})
+	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
 	defer sh.Cleanup()
 
 	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
@@ -50,9 +47,7 @@ func TestBootstrapJiriAlreadyExists(t *testing.T) {
 		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")
 	}
 	rootDir := sh.MakeTempDir()
-	c := sh.Cmd(bootstrap, []string{rootDir}...)
-	c.AddStdoutWriter(gosh.NopWriteCloser(os.Stdout))
-	c.AddStderrWriter(gosh.NopWriteCloser(os.Stderr))
+	c := sh.Cmd(bootstrap, rootDir)
 	c.ExitErrorIsOk = true
 	stdout, stderr := c.StdoutStderr()
 	if c.Err == nil {
