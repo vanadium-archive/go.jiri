@@ -592,8 +592,11 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	// Add all tools from the current manifest to the snapshot manifest.
-	_, tools, err := LoadManifest(jirix)
+	// Add all tools from the current manifest to the snapshot manifest.  We can't
+	// just call LoadManifest here, since that determines the local projects using
+	// FastScan, but if we're calling CreateSnapshot during "jiri update" and we
+	// added some new projects, they won't be found anymore.
+	_, tools, err := loadManifestFile(jirix, jirix.JiriManifestFile(), localProjects)
 	if err != nil {
 		return err
 	}
