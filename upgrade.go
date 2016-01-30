@@ -88,7 +88,7 @@ func runUpgrade(jirix *jiri.X, args []string) error {
 		argRemote = "https://vanadium.googlesource.com/manifest"
 		argName, argManifest = "manifest", "public"
 	case "fuchsia":
-		argRemote = "https://github.com/effenel/fnl-start.git"
+		argRemote = "https://fuchsia.googlesource.com/fnl-start"
 		argName, argManifest = "fnl-start", "manifest/fuchsia"
 	default:
 		return jirix.UsageErrorf("unknown upgrade kind %q", kind)
