@@ -124,7 +124,7 @@ func TestUpgrade(t *testing.T) {
 			Args: []string{"fuchsia"},
 			Want: `<manifest>
   <imports>
-    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
   </imports>
 </manifest>
 `,
@@ -139,7 +139,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
   </imports>
 </manifest>
 `,
@@ -154,7 +154,7 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="private" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="private" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
   </imports>
 </manifest>
 `,
@@ -171,9 +171,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="private" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
-    <import manifest="infrastructure" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
-    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="private" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
+    <import manifest="infrastructure" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
   </imports>
 </manifest>
 `,
@@ -190,9 +190,9 @@ func TestUpgrade(t *testing.T) {
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
-    <import manifest="infrastructure" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
-    <import manifest="private" name="fnl-start" remote="https://github.com/effenel/fnl-start.git"/>
+    <import manifest="manifest/fuchsia" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
+    <import manifest="infrastructure" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
+    <import manifest="private" name="fnl-start" remote="https://fuchsia.googlesource.com/fnl-start"/>
   </imports>
 </manifest>
 `,
