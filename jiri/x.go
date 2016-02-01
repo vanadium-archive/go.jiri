@@ -142,6 +142,12 @@ func (x *X) UpdateHistoryLatestLink() string {
 	return filepath.Join(x.UpdateHistoryDir(), "latest")
 }
 
+// UpdateHistorySecondLatestLink returns the path to a symlink that points to
+// the second latest update in the update history directory.
+func (x *X) UpdateHistorySecondLatestLink() string {
+	return filepath.Join(x.UpdateHistoryDir(), "second-latest")
+}
+
 // ResolveManifestPath resolves the given manifest name to an absolute path in
 // the local filesystem.
 //

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"time"
 
@@ -44,12 +45,13 @@ Run "jiri help manifest" for details on manifests.
 }
 
 func runUpdate(jirix *jiri.X, _ []string) error {
+	seq := jirix.NewSeq()
 	// Create the $JIRI_ROOT/.jiri_root directory if it doesn't already exist.
 	//
 	// TODO(toddw): Remove this logic after the transition to .jiri_root is done.
 	// The bootstrapping logic should create this directory, and jiri should fail
 	// if the directory doesn't exist.
-	if err := jirix.NewSeq().MkdirAll(jirix.RootMetaDir(), 0755).Done(); err != nil {
+	if err := seq.MkdirAll(jirix.RootMetaDir(), 0755).Done(); err != nil {
 		return err
 	}
 
@@ -65,16 +67,34 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
-	// Point the "latest" update history symlink to the new snapshot file.  Try to
-	// keep the symlink relative, to make it easy to move or copy the entire
-	// update_history directory.
-	link, latest := jirix.UpdateHistoryLatestLink(), snapshotFile
-	if rel, err := filepath.Rel(filepath.Dir(link), latest); err == nil {
-		latest = rel
-	}
-	if err := jirix.NewSeq().RemoveAll(link).Symlink(latest, link).Done(); err != nil {
+
+	latestLink, secondLatestLink := jirix.UpdateHistoryLatestLink(), jirix.UpdateHistorySecondLatestLink()
+
+	// If the "latest" symlink exists, point the "second-latest" symlink to its value.
+	latestLinkExists, err := seq.IsFile(latestLink)
+	if err != nil {
 		return err
 	}
+	if latestLinkExists {
+		latestFile, err := os.Readlink(latestLink)
+		if err != nil {
+			return err
+		}
+		if err := seq.RemoveAll(secondLatestLink).Symlink(latestFile, secondLatestLink).Done(); err != nil {
+			return err
+		}
+	}
+
+	// Point the "latest" update history symlink to the new snapshot file.  Try
+	// to keep the symlink relative, to make it easy to move or copy the entire
+	// update_history directory.
+	if rel, err := filepath.Rel(filepath.Dir(latestLink), snapshotFile); err == nil {
+		snapshotFile = rel
+	}
+	if err := seq.RemoveAll(latestLink).Symlink(snapshotFile, latestLink).Done(); err != nil {
+		return err
+	}
+
 	// Only attempt the bin dir transition after the update has succeeded, to
 	// avoid messy partial states.
 	return project.TransitionBinDir(jirix)
