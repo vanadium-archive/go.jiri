@@ -2295,7 +2295,7 @@ func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{
 		if len(projects) == 0 {
 			// Issue a warning if the target project does not exist in the
 			// project manifest.
-			fmt.Fprintf(jirix.Stderr(), "project %q does not exist in the project manifest", name)
+			fmt.Fprintf(jirix.Stderr(), "project %q does not exist in the project manifest\n", name)
 		}
 		for _, project := range projects {
 			result[project.Key()] = project
