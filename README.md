@@ -228,61 +228,61 @@ change lands.
 ### Creating a new CL
 
 1. Sync the master branch with the remote.
-```
-jiri update
-```
+  ```
+  jiri update
+  ```
 2. Create a new feature branch for the CL.
-```
-jiri cl new <branch-name>
-```
+  ```
+  jiri cl new <branch-name>
+  ```
 3. Make modifications to the project source code.
 4. Stage any changed files for commit.
-```
-git add <file1> <file2> ... <fileN>
-```
+  ```
+  git add <file1> <file2> ... <fileN>
+  ```
 5. Commit the changes.
-```
-git commit
-```
+  ```
+  git commit
+  ```
 6. Repeat steps 3-5 as necessary.
 
 ### Syncing a CL with the remote
 
 1. Sync the master branch with the remote.
-```
-jiri update
-```
+  ```
+  jiri update
+  ```
 2. Switch to the feature branch that corresponds to the CL under development.
-```
-git checkout <branch-name>
-```
+  ```
+  git checkout <branch-name>
+  ```
 3. Sync the feature branch with the master branch.
-```
-jiri cl sync
-```
+  ```
+  jiri cl sync
+  ```
 4. If there are no conflicts between the master and the feature branch, the CL
    has been successfully synced with the remote.
 5. If there are conflicts:
   1. Manually [resolve the conflicts][github resolve conflict].
   2. Stage any changed files for a commit.
-  ```
-  git add <file1> <file2> ... <fileN>
-  ```
+    ```
+    git add <file1> <file2> ... <fileN>
+    ```
   3. Commit the changes.
-  ```
-  git commit
-  ```
+    ```
+    git commit
+    ```
 
 ### Requesting a code review
 
 1. Switch to the feature branch that corresponds to the CL under development.
-```
-git checkout <branch-name>
-```
+  ```
+  git checkout <branch-name>
+  ```
 2.  Upload the CL to Gerrit.
-```
-jiri cl mail
-```
+  ```
+  jiri cl mail
+  ```
 
 If the CL upload is  successful, this will print the URL of the CL hosted on
 Gerrit.  You can add reviewers and comments through the [Gerrit web UI][gerrit
@@ -302,36 +302,36 @@ by running `jiri cl --help`.
 
 
 1. Switch to the feature branch that corresponds to the CL under development.
-```
-git checkout <branch-name>
-```
+  ```
+  git checkout <branch-name>
+  ```
 2. Modify and commit the code as described above.
 3. Reply to each Gerrit comment and click the "Reply" button to send them.
 4. Send the updated CL to Gerrit.
-```
-jiri cl mail
-```
+  ```
+  jiri cl mail
+  ```
 
 ### Submitting a CL
 1. Note that if the CL conflicts with any changes that have been submitted
    since the last update of the CL, these conflicts need to be resolved before
    the CL can be submitted.  To do so, follow the steps in the "Syncing a CL
    with the remote" section above and then upload the updated CL to Gerrit.
-```
-jiri cl mail
-```
+  ```
+  jiri cl mail
+  ```
 2. Once a CL meets the conditions for being submitted, it can be merged into
    the remote master branch by clicking the "Submit" button on the Gerrit web
    UI.
 3. Delete the local feature branch after the CL has been submitted to Gerrit.
   1. Sync the master branch to the laster version of the remote.
-  ```
-  jiri update
-  ```
+    ```
+    jiri update
+    ```
   2. Safely delete the feature branch that corresponds to the CL.
-  ```
-  jiri cl cleanup <branch-name>
-  ```
+    ```
+    jiri cl cleanup <branch-name>
+    ```
 
 Note that deleting the feature branch with `git branch -d <branch-name>` won't
 work in general because the git history on the local feature branch differs
@@ -344,17 +344,22 @@ has not been merged into master yet.  For this reason, we recommend using `jiri
 cl cleanup` to delete the feature branch safely.
 
 ## FAQ
-TODO(nlacasse): Answer these questions.
+
+TODO(nlacasse): Answer these.
+
+### Why the name "jiri"?
+[Jiří][jiri-wiki] is a very popular boys name in the Czech Republic.
+
+### How do you pronounce "jiri"?
+We pronounce "jiri" like "yiree".
+
+The actual Czech name [Jiří][jiri-wiki] is pronounced something like "yirzhee".
 
 ### Why not repo/gclient/etc?
 
 ### Why can't I commit to my master branch?
 
 ### How can I test changes to a manifest without pushing it upstream?
-
-### Why the name "jiri" ?
-"Jiří" is a very popular boys name in the Czech Republic.
-
 
 [android repo]: https://source.android.com/source/using-repo.html "Repo command reference"
 [bootstrap_jiri]: scripts/bootstrap_jiri "bootstrap_jiri"
@@ -363,5 +368,6 @@ TODO(nlacasse): Answer these questions.
 [gerrit web ui]: https://gerrit-review.googlesource.com/Documentation/user-review-ui.html "Gerrit review UI"
 [github resolve conflict]: https://help.github.com/articles/resolving-a-merge-conflict-from-the-command-line/ "Resolving a merge conflict"
 [go contrib]: https://golang.org/doc/contribute.html#Code_review "Go Contribution Guidelines - Code Review"
+[jiri-wiki]: https://en.wikipedia.org/wiki/Ji%C5%99%C3%AD "Jiří"
 [manifests]: #manifests "manifests"
 [minimal manifest]: https://vanadium.googlesource.com/manifest/+/refs/heads/master/minimal "minimal manifest"
