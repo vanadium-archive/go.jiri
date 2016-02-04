@@ -45,6 +45,7 @@ toabs() (
 if [[ $# -ne 1 ]]; then
   fatal "need <root_dir> argument"
 fi
+mkdir -p $(dirname $1)
 root_dir=$(toabs $1)
 if [[ -e ${root_dir} ]]; then
   fatal "${root_dir} already exists"
