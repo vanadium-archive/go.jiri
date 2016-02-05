@@ -5,7 +5,6 @@
 package project
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"v.io/jiri/jiri"
@@ -18,25 +17,5 @@ import (
 // breaks.  We should revisit the whole data directory thing, and in particular
 // see if we can get rid of tools having to know their own names.
 func DataDirPath(jirix *jiri.X, toolName string) (string, error) {
-	projects, tools, err := LoadManifest(jirix)
-	if err != nil {
-		return "", err
-	}
-	if toolName == "" {
-		// If the tool name is not set, use "jiri" as the default. As a
-		// consequence, any manifest is assumed to specify a "jiri" tool.
-		toolName = "jiri"
-	}
-	tool, ok := tools[toolName]
-	if !ok {
-		return "", fmt.Errorf("tool %q not found in the manifest", toolName)
-	}
-	// TODO(nlacasse): Tools refer to their project by name, but project name
-	// might not be unique.  We really should stop telling telling tools what their
-	// projects are.
-	project, err := projects.FindUnique(tool.Project)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(project.Path, tool.Data), nil
+	return filepath.Join(jirix.Root, "release", "go", "src", "v.io", "x", "devtools", "data"), nil
 }
