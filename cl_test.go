@@ -385,7 +385,7 @@ func TestSendReview(t *testing.T) {
 	{
 		// Test with draft = true, no reviewers, and no ccs.
 		review, err := newReview(fake.X, gerrit.CLOpts{
-			Draft:        true,
+			Draft:  true,
 			Remote: gerritPath,
 		})
 		if err != nil {
@@ -400,8 +400,8 @@ func TestSendReview(t *testing.T) {
 	{
 		// Test with draft = false, reviewers, and no ccs.
 		review, err := newReview(fake.X, gerrit.CLOpts{
-			Remote: gerritPath,
-			Reviewers:    parseEmails("reviewer1,reviewer2@example.org"),
+			Remote:    gerritPath,
+			Reviewers: parseEmails("reviewer1,reviewer2@example.org"),
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -415,10 +415,10 @@ func TestSendReview(t *testing.T) {
 	{
 		// Test with draft = true, reviewers, and ccs.
 		review, err := newReview(fake.X, gerrit.CLOpts{
-			Ccs:          parseEmails("cc1@example.org,cc2"),
-			Draft:        true,
-			Remote: gerritPath,
-			Reviewers:    parseEmails("reviewer3@example.org,reviewer4"),
+			Ccs:       parseEmails("cc1@example.org,cc2"),
+			Draft:     true,
+			Remote:    gerritPath,
+			Reviewers: parseEmails("reviewer3@example.org,reviewer4"),
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -504,10 +504,10 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, fake.X, files)
 	review, err := newReview(fake.X, gerrit.CLOpts{
-		Autosubmit:   true,
-		Presubmit:    gerrit.PresubmitTestTypeNone,
-		Remote: gerritPath,
-		Reviewers:    parseEmails("run1"),
+		Autosubmit: true,
+		Presubmit:  gerrit.PresubmitTestTypeNone,
+		Remote:     gerritPath,
+		Reviewers:  parseEmails("run1"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -547,9 +547,9 @@ func TestLabelsInCommitMessage(t *testing.T) {
 
 	// Test setting -presubmit=all but keep autosubmit=true.
 	review, err = newReview(fake.X, gerrit.CLOpts{
-		Autosubmit:   true,
-		Remote: gerritPath,
-		Reviewers:    parseEmails("run2"),
+		Autosubmit: true,
+		Remote:     gerritPath,
+		Reviewers:  parseEmails("run2"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -576,8 +576,8 @@ func TestLabelsInCommitMessage(t *testing.T) {
 
 	// Test setting autosubmit=false.
 	review, err = newReview(fake.X, gerrit.CLOpts{
-		Remote: gerritPath,
-		Reviewers:    parseEmails("run3"),
+		Remote:    gerritPath,
+		Reviewers: parseEmails("run3"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -869,8 +869,8 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 		t.Fatalf("git commit failed: %v", err)
 	}
 	review, err := newReview(fake.X, gerrit.CLOpts{
-		Remote: gerritPath,
-		Reviewers:    parseEmails("run1"), // See hack note about TestLabelsInCommitMessage
+		Remote:    gerritPath,
+		Reviewers: parseEmails("run1"), // See hack note about TestLabelsInCommitMessage
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -890,8 +890,8 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 		t.Fatalf("git commit failed: %v", err)
 	}
 	review, err = newReview(fake.X, gerrit.CLOpts{
-		Remote: gerritPath,
-		Reviewers:    parseEmails("run2"),
+		Remote:    gerritPath,
+		Reviewers: parseEmails("run2"),
 	})
 	if err != nil {
 		t.Fatalf("%v", err)
