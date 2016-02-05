@@ -820,7 +820,7 @@ func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (f *os.File,
 		f, err = os.OpenFile(name, flag, perm)
 		return err
 	}, fmt.Sprintf("open file %q", name))
-	s.setError(err, fmt.Sprintf("OpenFile(%s, %s, %s)", name, flag, perm))
+	s.setError(err, fmt.Sprintf("OpenFile(%s, 0x%x, %s)", name, flag, perm))
 	err = s.Done()
 	return
 }

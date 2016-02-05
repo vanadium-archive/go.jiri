@@ -182,10 +182,15 @@ func Unzip(jirix *jiri.X, srcFile, dstDir string) error {
 
 		// Make sure the parent directory exists.  Note that sometimes files
 		// can appear in a zip file before their directory.
-		if err := s.MkdirAll(filepath.Dir(fileDst), zFile.Mode()).Done(); err != nil {
+		dirmode := zFile.Mode() | 0100
+		if dirmode&0060 != 0 {
+			// "group" has read or write permissions, so give
+			// execute permissions on the directory.
+			dirmode = dirmode | 0010
+		}
+		if err := s.MkdirAll(filepath.Dir(fileDst), dirmode).Done(); err != nil {
 			return err
 		}
-
 		file, err := s.OpenFile(fileDst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zFile.Mode())
 		if err != nil {
 			return err
