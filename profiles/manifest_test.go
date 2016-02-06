@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -21,12 +22,12 @@ import (
 func addProfileAndTargets(t *testing.T, pdb *profiles.DB, name string) {
 	t1, _ := profiles.NewTarget("cpu1-os1@1", "A=B,C=D")
 	t2, _ := profiles.NewTarget("cpu2-os2@bar", "A=B,C=D")
-	pdb.InstallProfile(name, "")
-	if err := pdb.AddProfileTarget(name, t1); err != nil {
+	pdb.InstallProfile("test", name, "")
+	if err := pdb.AddProfileTarget("test", name, t1); err != nil {
 		t.Fatal(err)
 	}
 	t2.InstallationDir = "bar"
-	if err := pdb.AddProfileTarget(name, t2); err != nil {
+	if err := pdb.AddProfileTarget("test", name, t2); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -59,18 +60,18 @@ func TestWrite(t *testing.T) {
 
 	// test for no version being set.
 	t1, _ := profiles.NewTarget("cpu1-os1", "A=B,C=D")
-	pdb.InstallProfile("b", "")
-	if err := pdb.AddProfileTarget("b", t1); err != nil {
+	pdb.InstallProfile("test", "b", "")
+	if err := pdb.AddProfileTarget("test", "b", t1); err != nil {
 		t.Fatal(err)
 	}
-	if err := pdb.Write(jirix, filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
+	if err := pdb.Write(jirix, "test", filename); err == nil || !strings.HasPrefix(err.Error(), "missing version for profile") {
 		t.Fatalf("was expecing a missing version error, but got %v", err)
 	}
-	pdb.RemoveProfileTarget("b", t1)
+	pdb.RemoveProfileTarget("test", "b", t1)
 
 	addProfileAndTargets(t, pdb, "b")
 	addProfileAndTargets(t, pdb, "a")
-	if err := pdb.Write(jirix, filename); err != nil {
+	if err := pdb.Write(jirix, "test", filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,7 +108,7 @@ func TestWriteAndRename(t *testing.T) {
 	if exists(t, filename+".prev") {
 		t.Fatalf("%q  exists", filename+".prev")
 	}
-	if err := pdb.Write(jirix, filename); err != nil {
+	if err := pdb.Write(jirix, "test", filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +119,7 @@ func TestWriteAndRename(t *testing.T) {
 		t.Fatalf("%q  exists", filename+".prev")
 	}
 
-	if err := pdb.Write(jirix, filename); err != nil {
+	if err := pdb.Write(jirix, "test", filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -130,6 +131,50 @@ func TestWriteAndRename(t *testing.T) {
 	}
 }
 
+func TestWriteDir(t *testing.T) {
+	pdb := profiles.NewDB()
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+	dir, err := ioutil.TempDir("", "pdb-")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t1, _ := profiles.NewTarget("cpu1-os1@1", "A=B,C=D")
+	pdb.InstallProfile("i1", "b", "")
+	if err := pdb.AddProfileTarget("i1", "b", t1); err != nil {
+		t.Fatal(err)
+	}
+
+	t2, _ := profiles.NewTarget("cpu1-os1@2", "A=B,C=D")
+	pdb.InstallProfile("i2", "b", "")
+	if err := pdb.AddProfileTarget("i2", "b", t2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write out i1 installer's data
+	if err := pdb.Write(jirix, "i1", dir); err != nil {
+		t.Fatal(err)
+	}
+	if f := filepath.Join(dir, "i1"); !exists(t, f) {
+		t.Errorf("%s doesn't exist", f)
+	}
+	if f := filepath.Join(dir, "i2"); exists(t, f) {
+		t.Errorf("%s exists", f)
+	}
+
+	// Write out i2 installer's data
+	if err := pdb.Write(jirix, "i2", dir); err != nil {
+		t.Fatal(err)
+	}
+	if f := filepath.Join(dir, "i1"); !exists(t, f) {
+		t.Errorf("%s doesn't exist", f)
+	}
+	if f := filepath.Join(dir, "i2"); !exists(t, f) {
+		t.Errorf("%s doesn't exist", f)
+	}
+}
+
 func TestRead(t *testing.T) {
 	pdb := profiles.NewDB()
 	jirix, cleanup := jiritest.NewX(t)
@@ -137,23 +182,11 @@ func TestRead(t *testing.T) {
 	if err := pdb.Read(jirix, "./testdata/m1.xml"); err != nil {
 		t.Fatal(err)
 	}
-
-	cmp := func(a, b []string) bool {
-		if len(a) != len(b) {
-			return false
-		}
-		for i, s := range a {
-			if s != b[i] {
-				return false
-			}
-		}
-		return true
-	}
 	names := pdb.Names()
-	if got, want := names, []string{"a", "b"}; !cmp(got, want) {
-		t.Errorf("got %v, want %v", got, want)
+	if got, want := names, []string{"test:a", "test:b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
 	}
-	p := pdb.LookupProfile("a")
+	p := pdb.LookupProfile("test", "a")
 	if got, want := p.Targets()[0].OS(), "os1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -162,11 +195,59 @@ func TestRead(t *testing.T) {
 	}
 }
 
+func TestReadDir(t *testing.T) {
+	pdb := profiles.NewDB()
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+	if err := pdb.Read(jirix, "./testdata/old_version"); err == nil || !strings.Contains(err.Error(), "files must be at version") {
+		t.Fatalf("missing or wrong error: %v", err)
+	}
+	if err := pdb.Read(jirix, "./testdata/mismatched_versions"); err == nil || !strings.Contains(err.Error(), "files must have the same version") {
+		t.Fatalf("missing or wrong error: %v", err)
+	}
+	if err := pdb.Read(jirix, "./testdata/db_dir"); err != nil {
+		t.Fatal(err)
+	}
+	names := pdb.Names()
+	if got, want := names, []string{"m1:a", "m1:b", "m2:a", "m2:b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	profile := pdb.LookupProfile("m2", "a")
+	if got, want := profile.Root(), "root"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	profile = pdb.LookupProfile("m1", "b")
+	if got, want := profile.Root(), "r1"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestReadDirWithPrevFiles(t *testing.T) {
+	pdb := profiles.NewDB()
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+	if err := pdb.Read(jirix, "./testdata/db_dir_with_prev"); err != nil {
+		t.Fatal(err)
+	}
+	names := pdb.Names()
+	if got, want := names, []string{"m1:a", "m2:b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	profile := pdb.LookupProfile("m1", "a")
+	if got, want := profile.Root(), "root"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	profile = pdb.LookupProfile("m2", "b")
+	if got, want := profile.Root(), "r2"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestInstallProfile(t *testing.T) {
 	pdb := profiles.NewDB()
-	pdb.InstallProfile("a", "root1")
-	pdb.InstallProfile("a", "root2")
-	profile := pdb.LookupProfile("a")
+	pdb.InstallProfile("test", "a", "root1")
+	pdb.InstallProfile("test", "a", "root2")
+	profile := pdb.LookupProfile("test", "a")
 	if got, want := profile.Root(), "root1"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -194,12 +275,12 @@ func TestReadingV0(t *testing.T) {
 
 	var t1 profiles.Target
 	t1.Set("cpu-os@1")
-	pdb.InstallProfile("__first", "")
-	if err := pdb.AddProfileTarget("__first", t1); err != nil {
+	pdb.InstallProfile("", "__first", "")
+	if err := pdb.AddProfileTarget("", "__first", t1); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := pdb.Write(jirix, filename); err != nil {
+	if err := pdb.Write(jirix, "", filename); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,12 +288,12 @@ func TestReadingV0(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := pdb.SchemaVersion(), profiles.V4; got != want {
+	if got, want := pdb.SchemaVersion(), profiles.V5; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	nprofiles := pdb.Profiles()
 	if got, want := len(nprofiles), 6; got != want {
-		t.Errorf("got %v, want %v", got, want)
+		t.Fatalf("got %v, want %v", got, want)
 	}
 
 	if got, want := nprofiles[0].Name(), "__first"; got != want {
@@ -248,15 +329,49 @@ func TestReadingV3AndV4(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		p := pdb.LookupProfile("a")
+		p := pdb.LookupProfile("", "a")
 		// We need to expand the variable here for a V4 profile if we want
 		// to get the full absolute path.
 		if got, want := p.Root(), c.variable+"/an/absolute/root"; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
-		lt := pdb.LookupProfileTarget("a", target)
+		lt := pdb.LookupProfileTarget("", "a", target)
 		if got, want := lt.InstallationDir, c.variable+"/an/absolute/dir"; got != want {
 			t.Errorf("%d: got %v, want %v", i, got, want)
 		}
 	}
+}
+
+func TestQualifiedNames(t *testing.T) {
+	for i, c := range []struct{ i, p, e string }{
+		{"a", "b", "a:b"},
+		{"a", ":b", "a:b"},
+		{"a", "", "a:"},
+		{"", "b", "b"},
+		{"", "", ""},
+	} {
+		if got, want := profiles.QualifiedProfileName(c.i, c.p), c.e; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+	}
+	for i, c := range []struct{ q, i, p string }{
+		{"aa:bb", "aa", "bb"},
+		{":bb", "", "bb"},
+		{"bb", "", "bb"},
+		{"", "", ""},
+		{":bb", "", "bb"},
+	} {
+		gi, gp := profiles.SplitProfileName(c.q)
+		if got, want := gi, c.i; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+		if got, want := gp, c.p; got != want {
+			t.Errorf("%d: got %v, want %v", i, got, want)
+		}
+	}
+
+	if got, want := profiles.QualifiedProfileName("new", "old:bar"), "new:bar"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
 }

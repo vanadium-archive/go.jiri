@@ -1,13 +1,13 @@
-<profiles version="5" installer="test">
+<profiles version="4">
   <profile name="a" root="">
-    <target arch="cpu1" os="os1" installation-directory="" version="1">
+    <target tag="" arch="cpu1" os="os1" installation-directory="" version="1">
       <envvars></envvars>
       <command-line>
         <var>A=B</var>
         <var>C=D</var>
       </command-line>
     </target>
-    <target arch="cpu2" os="os2" installation-directory="bar" version="bar">
+    <target tag="" arch="cpu2" os="os2" installation-directory="bar" version="bar">
       <envvars></envvars>
       <command-line>
         <var>A=B</var>
@@ -16,14 +16,14 @@
     </target>
   </profile>
   <profile name="b" root="">
-    <target arch="cpu1" os="os1" installation-directory="" version="1">
+    <target tag="" arch="cpu1" os="os1" installation-directory="" version="1">
       <envvars></envvars>
       <command-line>
         <var>A=B</var>
         <var>C=D</var>
       </command-line>
     </target>
-    <target arch="cpu2" os="os2" installation-directory="bar" version="bar">
+    <target tag="" arch="cpu2" os="os2" installation-directory="bar" version="bar">
       <envvars></envvars>
       <command-line>
         <var>A=B</var>

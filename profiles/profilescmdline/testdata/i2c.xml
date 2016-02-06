@@ -1,0 +1,8 @@
+<profiles version="5" installer="i2">
+  <profile name="eg" root=".jiri_root/profiles/i2">
+    <target arch="arch" os="os" installation-directory=".jiri_root/profiles/i2" version="3" date="2016-02-01T20:42:52.020934573-08:00">
+      <envvars></envvars>
+      <command-line></command-line>
+    </target>
+  </profile>
+</profiles>

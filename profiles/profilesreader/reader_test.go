@@ -32,7 +32,7 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rd.MergeEnvFromProfiles(profilesreader.JiriMergePolicies(), native, "go", "syncbase")
+	rd.MergeEnvFromProfiles(profilesreader.JiriMergePolicies(), native, "test::go", "test::syncbase")
 	if got, want := rd.Get("CGO_CFLAGS"), "-IX -IY -IA -IB"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -42,19 +42,19 @@ func TestEnvFromTarget(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	pdb := profiles.NewDB()
-	pdb.InstallProfile("a", "root")
-	pdb.InstallProfile("b", "root")
+	pdb.InstallProfile("test", "a", "root")
+	pdb.InstallProfile("test", "b", "root")
 	t1, t2 := &profiles.Target{}, &profiles.Target{}
 
 	t1.Set("cpu1-os1@1")
 	t1.Env.Set("A=B C=D,B=C Z=Z")
 	t2.Set("cpu1-os1@1")
 	t2.Env.Set("A=Z,B=Z,Z=Z1")
-	pdb.AddProfileTarget("a", *t1)
-	pdb.AddProfileTarget("b", *t2)
-	pdb.Write(fake.X, "profile-manifest")
+	pdb.AddProfileTarget("test", "a", *t1)
+	pdb.AddProfileTarget("test", "b", *t2)
+	pdb.Write(fake.X, "test", "profile-manifest")
 	filename := filepath.Join(fake.X.Root, "profile-manifest")
-	if err := pdb.Write(fake.X, filename); err != nil {
+	if err := pdb.Write(fake.X, "test", filename); err != nil {
 		t.Fatal(err)
 	}
 	rd, err := profilesreader.NewReader(fake.X, profilesreader.UseProfiles, filename)
@@ -70,7 +70,7 @@ func TestEnvFromTarget(t *testing.T) {
 		"A": profilesreader.AppendFlag,
 		"B": profilesreader.UseLast,
 		"Z": profilesreader.IgnoreBaseUseLast},
-		t1Target, "a", "b")
+		t1Target, "test::a", "test::b")
 	vars := rd.ToMap()
 	if got, want := len(vars), 3; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -163,7 +163,7 @@ func testSetPathHelper(t *testing.T, name string) {
 		config = util.NewConfig(util.VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
 	}
 
-	if err := pdb.Write(fake.X, filepath.Join(fake.X.Root, "profiles-manifest")); err != nil {
+	if err := pdb.Write(fake.X, "test", filepath.Join(fake.X.Root, "profiles-manifest")); err != nil {
 		t.Fatal(err)
 	}
 

@@ -193,6 +193,7 @@ func Unzip(jirix *jiri.X, srcFile, dstDir string) error {
 		}
 		file, err := s.OpenFile(fileDst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zFile.Mode())
 		if err != nil {
+
 			return err
 		}
 		defer file.Close()

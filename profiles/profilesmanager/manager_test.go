@@ -18,22 +18,30 @@ import (
 )
 
 type myNewProfileMgr struct {
-	name, root  string
-	versionInfo *profiles.VersionInfo
-	profile     *profiles.Profile
+	installer, name, root string
+	versionInfo           *profiles.VersionInfo
+	profile               *profiles.Profile
 }
 
-func newProfileMgr(name string) *myNewProfileMgr {
+func newProfileMgr(installer, name string) *myNewProfileMgr {
 	supported := map[string]interface{}{
 		"2": nil,
 		"4": nil,
 		"3": nil,
 	}
-	return &myNewProfileMgr{name: name, versionInfo: profiles.NewVersionInfo("test", supported, "3")}
+	return &myNewProfileMgr{
+		installer:   installer,
+		name:        name,
+		versionInfo: profiles.NewVersionInfo("test", supported, "3"),
+	}
 }
 
 func (p *myNewProfileMgr) Name() string {
 	return p.name
+}
+
+func (p *myNewProfileMgr) Installer() string {
+	return p.installer
 }
 
 func (p *myNewProfileMgr) Info() string {
@@ -57,12 +65,12 @@ func (p *myNewProfileMgr) AddFlags(*flag.FlagSet, profiles.Action) {
 }
 
 func (p *myNewProfileMgr) Install(jirix *jiri.X, pdb *profiles.DB, root jiri.RelPath, target profiles.Target) error {
-	p.profile = pdb.InstallProfile(p.name, "root")
-	return pdb.AddProfileTarget(p.name, target)
+	p.profile = pdb.InstallProfile(p.name, "", "root")
+	return pdb.AddProfileTarget(p.name, "", target)
 }
 
 func (p *myNewProfileMgr) Uninstall(jirix *jiri.X, pdb *profiles.DB, root jiri.RelPath, target profiles.Target) error {
-	if pdb.RemoveProfileTarget(p.name, target) {
+	if pdb.RemoveProfileTarget(p.name, "", target) {
 		p.profile = nil
 	}
 	return nil
@@ -78,12 +86,14 @@ func tmpFile() string {
 
 func ExampleManager() {
 	pdb := profiles.NewDB()
+	myInstaller := "myProject"
 	myProfile := "myNewProfile"
+	profileName := profiles.QualifiedProfileName(myInstaller, myProfile)
 	var target profiles.Target
 
 	init := func() {
-		mgr := newProfileMgr(myProfile)
-		profilesmanager.Register(myProfile, mgr)
+		mgr := newProfileMgr(myInstaller, myProfile)
+		profilesmanager.Register(mgr)
 		flags := flag.NewFlagSet("example", flag.ContinueOnError)
 		profiles.RegisterTargetAndEnvFlags(flags, &target)
 		flags.Parse([]string{"--target=arm-linux@1", "--env=A=B,C=D", "--env=E=F"})
@@ -91,15 +101,15 @@ func ExampleManager() {
 	init()
 
 	profileRoot := jiri.NewRelPath("profiles")
-	mgr := profilesmanager.LookupManager(myProfile)
+	mgr := profilesmanager.LookupManager(profileName)
 	if mgr == nil {
-		panic("manager not found for: " + myProfile)
+		panic("manager not found for: " + profileName)
 	}
 
 	jirix := &jiri.X{Context: tool.NewDefaultContext()}
 	// Install myNewProfile for target.
 	if err := mgr.Install(jirix, pdb, profileRoot, target); err != nil {
-		panic("failed to find manager for: " + myProfile)
+		panic("failed to find manager for: " + profileName)
 	}
 
 	fmt.Println(mgr.String())
@@ -107,7 +117,7 @@ func ExampleManager() {
 	filename := tmpFile()
 	defer os.RemoveAll(filepath.Dir(filename))
 
-	if err := pdb.Write(jirix, filename); err != nil {
+	if err := pdb.Write(jirix, "test", filename); err != nil {
 		panic(err)
 	}
 
@@ -116,9 +126,9 @@ func ExampleManager() {
 	// Read the profile database.
 	pdb.Read(jirix, filename)
 
-	mgr = profilesmanager.LookupManager(myProfile)
+	mgr = profilesmanager.LookupManager(profileName)
 	if mgr == nil {
-		panic("manager not found for: " + myProfile)
+		panic("manager not found for: " + profileName)
 	}
 	fmt.Println(mgr.String())
 	mgr.Uninstall(jirix, pdb, profileRoot, target)

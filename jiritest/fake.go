@@ -97,6 +97,12 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		t.Fatal(err)
 	}
 
+	// Create the profiles database directory.
+	profilesDB := filepath.Join(jirix.Root, ".jiri_root", "profile_db")
+	if err := s.MkdirAll(profilesDB, os.FileMode(0700)).Done(); err != nil {
+		t.Fatal(err)
+	}
+
 	return fake, func() {
 		cleanup()
 		if err := fake.X.NewSeq().RemoveAll(fake.remote).Done(); err != nil {

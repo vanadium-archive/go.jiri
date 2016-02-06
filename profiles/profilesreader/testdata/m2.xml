@@ -1,4 +1,4 @@
-<profiles version="2">
+<profiles version="5" installer="test">
   <profile name="go" root="/Volumes/code2/vanadium/darwin/r_3/profiles/go">
     <target tag="native" arch="amd64" os="darwin" installation-directory="" version="1.5">
       <envvars>

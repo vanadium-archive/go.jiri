@@ -101,5 +101,4 @@ func TestSubcommandFlags(t *testing.T) {
 	if err := p.Children[0].Flags.Parse(args); err != nil {
 		t.Error(err)
 	}
-
 }

@@ -28,17 +28,18 @@ var (
 // Register is used to register a profile manager. It is an error
 // to call Registerr more than once with the same name, though it
 // is possible to register the same Manager using different names.
-func Register(name string, mgr profiles.Manager) {
+func Register(mgr profiles.Manager) {
 	registry.Lock()
 	defer registry.Unlock()
-	if _, present := registry.managers[name]; present {
-		panic("a profile manager is already registered for: " + name)
+	qualifiedName := profiles.QualifiedProfileName(mgr.Installer(), mgr.Name())
+	if _, present := registry.managers[qualifiedName]; present {
+		panic("a profile manager is already registered for: " + qualifiedName)
 	}
-	registry.managers[name] = mgr
+	registry.managers[qualifiedName] = mgr
 }
 
 // Names returns the names, in lexicographic order, of all of the currently
-// available profile managers.
+// available in-process, profile managers.
 func Managers() []string {
 	registry.Lock()
 	defer registry.Unlock()
@@ -50,8 +51,8 @@ func Managers() []string {
 	return names
 }
 
-// LookupManager returns the manager for the named profile or nil if one is
-// not found.
+// LookupManager returns the manager for the named, in-process, profile or nil
+// if one is not found.
 func LookupManager(name string) profiles.Manager {
 	registry.Lock()
 	defer registry.Unlock()

@@ -19,11 +19,14 @@ import (
 )
 
 const (
-	RootEnv          = "JIRI_ROOT"
-	RootMetaDir      = ".jiri_root"
-	ProjectMetaDir   = ".jiri"
-	ProjectMetaFile  = "metadata.v2"
-	JiriManifestFile = ".jiri_manifest"
+	RootEnv              = "JIRI_ROOT"
+	RootMetaDir          = ".jiri_root"
+	ProjectMetaDir       = ".jiri"
+	ProjectMetaFile      = "metadata.v2"
+	LegacyProfilesDBFile = ".jiri_v23_profiles"
+	ProfilesDBDir        = RootMetaDir + string(filepath.Separator) + "profile_db"
+	ProfilesRootDir      = RootMetaDir + string(filepath.Separator) + "profiles"
+	JiriManifestFile     = ".jiri_manifest"
 )
 
 // X holds the execution environment for the jiri tool and related tools.  This
@@ -134,6 +137,11 @@ func (x *X) BinDir() string {
 // UpdateHistoryDir returns the path to the update history directory.
 func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
+}
+
+// ProfilesDBDir returns the path to the profiles data base directory.
+func (x *X) ProfilesDBDir() string {
+	return filepath.Join(x.RootMetaDir(), "profile_db")
 }
 
 // UpdateHistoryLatestLink returns the path to a symlink that points to the

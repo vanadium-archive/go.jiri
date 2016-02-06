@@ -157,11 +157,13 @@ func (rd *Reader) Profiles() []*profiles.Profile {
 }
 
 func (rd *Reader) LookupProfile(name string) *profiles.Profile {
-	return rd.pdb.LookupProfile(name)
+	installer, profile := profiles.SplitProfileName(name)
+	return rd.pdb.LookupProfile(installer, profile)
 }
 
 func (rd *Reader) LookupProfileTarget(name string, target profiles.Target) *profiles.Target {
-	return rd.pdb.LookupProfileTarget(name, target)
+	installer, profile := profiles.SplitProfileName(name)
+	return rd.pdb.LookupProfileTarget(installer, profile, target)
 }
 
 // MergeEnv merges the embedded environment with the environment
@@ -174,7 +176,8 @@ func (rd *Reader) MergeEnv(policies map[string]MergePolicy, vars ...[]string) {
 // profile and target. It returns nil if the target and/or profile could not
 // be found.
 func (rd *Reader) EnvFromProfile(name string, target profiles.Target) []string {
-	return rd.pdb.EnvFromProfile(name, target)
+	installer, profile := profiles.SplitProfileName(name)
+	return rd.pdb.EnvFromProfile(installer, profile, target)
 }
 
 // MergeEnvFromProfiles merges the embedded environment with the environment
@@ -184,12 +187,13 @@ func (rd *Reader) EnvFromProfile(name string, target profiles.Target) []string {
 // expand all instances of ${JIRI_ROOT} in the returned environment.
 func (rd *Reader) MergeEnvFromProfiles(policies map[string]MergePolicy, target profiles.Target, profileNames ...string) {
 	envs := [][]string{}
-	for _, profile := range profileNames {
+	for _, name := range profileNames {
 		var e []string
-		if profile == "jiri" {
+		if name == "jiri" {
 			e = rd.JiriProfile()
 		} else {
-			e = rd.pdb.EnvFromProfile(profile, target)
+			installer, profile := profiles.SplitProfileName(name)
+			e = rd.pdb.EnvFromProfile(installer, profile, target)
 		}
 		if e == nil {
 			continue
@@ -213,12 +217,13 @@ func (rd *Reader) ValidateRequestedProfilesAndTarget(profileNames []string, targ
 	if rd.SkippingProfiles() {
 		return nil
 	}
-	for _, n := range profileNames {
-		if n == "jiri" {
+	for _, name := range profileNames {
+		if name == "jiri" {
 			continue
 		}
-		if rd.pdb.LookupProfileTarget(n, target) == nil {
-			return fmt.Errorf("%q for %q is not available or not installed, use the \"list\" command to see the installed/available profiles.", target, n)
+		installer, profile := profiles.SplitProfileName(name)
+		if rd.pdb.LookupProfileTarget(installer, profile, target) == nil {
+			return fmt.Errorf("%q for %q is not available or not installed, use the \"list\" command to see the installed/available profiles.", target, name)
 		}
 	}
 	return nil

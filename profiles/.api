@@ -1,9 +1,11 @@
 pkg profiles, const Install Action
+pkg profiles, const InstallerSeparator ideal-string
 pkg profiles, const Original Version
 pkg profiles, const Uninstall Action
 pkg profiles, const V2 Version
 pkg profiles, const V3 Version
 pkg profiles, const V4 Version
+pkg profiles, const V5 Version
 pkg profiles, func DefaultTarget() Target
 pkg profiles, func FindTarget(Targets, *Target) *Target
 pkg profiles, func FindTargetWithDefault(Targets, *Target) *Target
@@ -12,27 +14,27 @@ pkg profiles, func NativeTarget() Target
 pkg profiles, func NewDB() *DB
 pkg profiles, func NewTarget(string, ...string) (Target, error)
 pkg profiles, func NewVersionInfo(string, map[string]interface{}, string) *VersionInfo
+pkg profiles, func QualifiedProfileName(string, string) string
 pkg profiles, func RegisterProfilesFlag(*flag.FlagSet, *string)
 pkg profiles, func RegisterTargetAndEnvFlags(*flag.FlagSet, *Target)
 pkg profiles, func RegisterTargetFlag(*flag.FlagSet, *Target)
 pkg profiles, func RemoveTarget(Targets, *Target) Targets
-pkg profiles, method (*DB) AddProfileTarget(string, Target) error
-pkg profiles, method (*DB) EnvFromProfile(string, Target) []string
-pkg profiles, method (*DB) Filename() string
-pkg profiles, method (*DB) InstallProfile(string, string) *Profile
-pkg profiles, method (*DB) LookupProfile(string) *Profile
-pkg profiles, method (*DB) LookupProfileTarget(string, Target) *Target
+pkg profiles, func SplitProfileName(string) (string, string)
+pkg profiles, method (*DB) AddProfileTarget(string, string, Target) error
+pkg profiles, method (*DB) EnvFromProfile(string, string, Target) []string
+pkg profiles, method (*DB) InstallProfile(string, string, string) *Profile
+pkg profiles, method (*DB) LookupProfile(string, string) *Profile
+pkg profiles, method (*DB) LookupProfileTarget(string, string, Target) *Target
 pkg profiles, method (*DB) Names() []string
+pkg profiles, method (*DB) Path() string
 pkg profiles, method (*DB) Profiles() []*Profile
 pkg profiles, method (*DB) Read(*jiri.X, string) error
-pkg profiles, method (*DB) RemoveProfileTarget(string, Target) bool
+pkg profiles, method (*DB) RemoveProfileTarget(string, string, Target) bool
 pkg profiles, method (*DB) SchemaVersion() Version
-pkg profiles, method (*DB) UpdateProfileTarget(string, Target) error
-pkg profiles, method (*DB) Write(*jiri.X, string) error
+pkg profiles, method (*DB) UpdateProfileTarget(string, string, Target) error
+pkg profiles, method (*DB) Write(*jiri.X, string, string) error
 pkg profiles, method (*Environment) Get() interface{}
 pkg profiles, method (*Environment) Set(string) error
-pkg profiles, method (*Environment) String() string
-pkg profiles, method (*Environment) Usage() string
 pkg profiles, method (*Profile) Name() string
 pkg profiles, method (*Profile) Root() string
 pkg profiles, method (*Profile) Targets() Targets
@@ -52,6 +54,8 @@ pkg profiles, method (*VersionInfo) Lookup(string, interface{}) error
 pkg profiles, method (*VersionInfo) Select(string) (string, error)
 pkg profiles, method (*VersionInfo) String() string
 pkg profiles, method (*VersionInfo) Supported() []string
+pkg profiles, method (Environment) String() string
+pkg profiles, method (Environment) Usage() string
 pkg profiles, method (Target) CommandLineEnv() Environment
 pkg profiles, method (Target) CrossCompiling() bool
 pkg profiles, method (Target) DebugString() string
@@ -67,10 +71,11 @@ pkg profiles, type Action int
 pkg profiles, type DB struct
 pkg profiles, type Environment struct
 pkg profiles, type Environment struct, Vars []string
-pkg profiles, type Manager interface { AddFlags, Info, Install, Name, String, Uninstall, VersionInfo }
+pkg profiles, type Manager interface { AddFlags, Info, Install, Installer, Name, String, Uninstall, VersionInfo }
 pkg profiles, type Manager interface, AddFlags(*flag.FlagSet, Action)
 pkg profiles, type Manager interface, Info() string
 pkg profiles, type Manager interface, Install(*jiri.X, *DB, jiri.RelPath, Target) error
+pkg profiles, type Manager interface, Installer() string
 pkg profiles, type Manager interface, Name() string
 pkg profiles, type Manager interface, String() string
 pkg profiles, type Manager interface, Uninstall(*jiri.X, *DB, jiri.RelPath, Target) error

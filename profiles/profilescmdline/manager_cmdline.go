@@ -2,15 +2,33 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package profilescmdline provides a command line driver (for v.io/x/lib/cmdline)
-// for implementing jiri 'profile' subcommands. The intent is to support
-// project specific instances of such profiles for managing software
-// dependencies.
+// Package profilescmdline provides a command line driver
+// (for v.io/x/lib/cmdline) for implementing jiri 'profile' subcommands.
+// The intent is to support project specific instances of such profiles
+// for managing software dependencies.
+//
+// There are two ways of using the cmdline support, one is to read profile
+// information, via RegisterReaderCommands and
+// RegisterReaderCommandsUsingParent; the other is to manage profile
+// installations via the RegisterManagementCommands function. The management
+// commands can manage profiles that are linked into the binary itself
+// or invoke external commands that implement the profile management. These
+// external 'installer' commands are accessed by specifing them as a prefix
+// to the profile name. For example myproject::go will invoke the external
+// command jiri-profile-myproject with "go" as the profile name. Thus the
+// following invocations are equivalent:
+// jiri profile install myproject::go
+// jiri profile-myproject install go
+//
+// Regardless of which is used, the profile name, as seen by profile
+// database readers will be myproject::go.
 package profilescmdline
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"v.io/jiri/jiri"
@@ -19,44 +37,62 @@ import (
 	"v.io/x/lib/cmdline"
 )
 
-// cmdInstall represents the "profile install" command.
-var cmdInstall = &cmdline.Command{
-	Runner:   jiri.RunnerFunc(runInstall),
-	Name:     "install",
-	Short:    "Install the given profiles",
-	Long:     "Install the given profiles.",
-	ArgsName: "<profiles>",
-	ArgsLong: "<profiles> is a list of profiles to install.",
+// newCmdInstall represents the "profile install" command.
+func newCmdInstall() *cmdline.Command {
+	return &cmdline.Command{
+		Runner:   jiri.RunnerFunc(runInstall),
+		Name:     "install",
+		Short:    "Install the given profiles",
+		Long:     "Install the given profiles.",
+		ArgsName: "<profiles>",
+		ArgsLong: "<profiles> is a list of profiles to install.",
+	}
 }
 
-// cmdUpdate represents the "profile update" command.
-var cmdUpdate = &cmdline.Command{
-	Runner:   jiri.RunnerFunc(runUpdate),
-	Name:     "update",
-	Short:    "Install the latest default version of the given profiles",
-	Long:     "Install the latest default version of the given profiles.",
-	ArgsName: "<profiles>",
-	ArgsLong: "<profiles> is a list of profiles to update, if omitted all profiles are updated.",
+// newCmdUninstall represents the "profile uninstall" command.
+func newCmdUninstall() *cmdline.Command {
+	return &cmdline.Command{
+		Runner:   jiri.RunnerFunc(runUninstall),
+		Name:     "uninstall",
+		Short:    "Uninstall the given profiles",
+		Long:     "Uninstall the given profiles.",
+		ArgsName: "<profiles>",
+		ArgsLong: "<profiles> is a list of profiles to uninstall.",
+	}
 }
 
-// cmdCleanup represents the "profile cleanup" command.
-var cmdCleanup = &cmdline.Command{
-	Runner:   jiri.RunnerFunc(runCleanup),
-	Name:     "cleanup",
-	Short:    "Cleanup the locally installed profiles",
-	Long:     "Cleanup the locally installed profiles. This is generally required when recovering from earlier bugs or when preparing for a subsequent change to the profiles implementation.",
-	ArgsName: "<profiles>",
-	ArgsLong: "<profiles> is a list of profiles to cleanup, if omitted all profiles are cleaned.",
+// newCmdUpdate represents the "profile update" command.
+func newCmdUpdate() *cmdline.Command {
+	return &cmdline.Command{
+		Runner:   jiri.RunnerFunc(runUpdate),
+		Name:     "update",
+		Short:    "Install the latest default version of the given profiles",
+		Long:     "Install the latest default version of the given profiles.",
+		ArgsName: "<profiles>",
+		ArgsLong: "<profiles> is a list of profiles to update, if omitted all profiles are updated.",
+	}
 }
 
-// cmdUninstall represents the "profile uninstall" command.
-var cmdUninstall = &cmdline.Command{
-	Runner:   jiri.RunnerFunc(runUninstall),
-	Name:     "uninstall",
-	Short:    "Uninstall the given profiles",
-	Long:     "Uninstall the given profiles.",
-	ArgsName: "<profiles>",
-	ArgsLong: "<profiles> is a list of profiles to uninstall.",
+// newCmdCleanup represents the "profile cleanup" command.
+func newCmdCleanup() *cmdline.Command {
+	return &cmdline.Command{
+		Runner:   jiri.RunnerFunc(runCleanup),
+		Name:     "cleanup",
+		Short:    "Cleanup the locally installed profiles",
+		Long:     "Cleanup the locally installed profiles. This is generally required when recovering from earlier bugs or when preparing for a subsequent change to the profiles implementation.",
+		ArgsName: "<profiles>",
+		ArgsLong: "<profiles> is a list of profiles to cleanup, if omitted all profiles are cleaned.",
+	}
+}
+
+// newCmdAvailable represents the "profile available" command.
+func newCmdAvailable() *cmdline.Command {
+	return &cmdline.Command{
+		Runner: jiri.RunnerFunc(runAvailable),
+		Name:   "available",
+		Short:  "List the available profiles",
+		Long:   "List the available profiles.",
+	}
 }
 
 func runUpdate(jirix *jiri.X, args []string) error {
@@ -75,11 +111,26 @@ func runUninstall(jirix *jiri.X, args []string) error {
 	return uninstallImpl(jirix, &uninstallFlags, args)
 }
 
+func runAvailable(jirix *jiri.X, args []string) error {
+	return availableImpl(jirix, &availableFlags, args)
+}
+
 type commonFlagValues struct {
 	// The value of --profiles-db
-	dbFilename string
-	// The value of --profile-root
+	dbPath string
+	// The value of --profiles-dir
 	root string
+}
+
+func initCommon(flags *flag.FlagSet, c *commonFlagValues, installer, defaultDBPath, defaultProfilesPath string) {
+	RegisterDBPathFlag(flags, &c.dbPath, defaultDBPath)
+	flags.StringVar(&c.root, "profiles-dir", defaultProfilesPath, "the directory, relative to JIRI_ROOT, that profiles are installed in")
+}
+
+func (cv *commonFlagValues) args() []string {
+	a := append([]string{}, "--profiles-db="+cv.dbPath)
+	a = append(a, "--profiles-dir="+cv.root)
+	return a
 }
 
 type installFlagValues struct {
@@ -88,6 +139,26 @@ type installFlagValues struct {
 	target profiles.Target
 	// The value of --force
 	force bool
+}
+
+func initInstallCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
+	initCommon(flags, &installFlags.commonFlagValues, installer, defaultDBPath, defaultProfilesPath)
+	profiles.RegisterTargetAndEnvFlags(flags, &installFlags.target)
+	flags.BoolVar(&installFlags.force, "force", false, "force install the profile even if it is already installed")
+	for _, name := range profilesmanager.Managers() {
+		profilesmanager.LookupManager(name).AddFlags(flags, profiles.Install)
+	}
+}
+
+func (iv *installFlagValues) args() []string {
+	a := iv.commonFlagValues.args()
+	if t := iv.target.String(); t != "" {
+		a = append(a, "--target="+t)
+	}
+	if e := iv.target.CommandLineEnv().String(); e != "" {
+		a = append(a, "--target="+e)
+	}
+	return append(a, fmt.Sprintf("--%s=%v", "force", iv.force))
 }
 
 type uninstallFlagValues struct {
@@ -101,60 +172,8 @@ type uninstallFlagValues struct {
 	// TODO(cnicolaou): add a flag to remove the profile only from the DB.
 }
 
-type updateFlagValues struct {
-	commonFlagValues
-	// The value of --v
-	verbose bool
-}
-
-type cleanupFlagValues struct {
-	commonFlagValues
-	// The value of --gc
-	gc bool
-	// The value of --ensure-specific-versions-are-set
-	ensureSpecificVersions bool
-	// The value of --rewrite-profiles-manifest
-	rewriteManifest bool
-	// The value of --rm-all
-	rmAll bool
-	// The value of --v
-	verbose bool
-}
-
-var (
-	installFlags   installFlagValues
-	uninstallFlags uninstallFlagValues
-	cleanupFlags   cleanupFlagValues
-	updateFlags    updateFlagValues
-)
-
-// RegisterManagementCommands registers the management subcommands:
-// uninstall, install, update and cleanup.
-//
-func RegisterManagementCommands(parent *cmdline.Command, defaultDBFilename string) {
-	initInstallCommand(&cmdInstall.Flags, defaultDBFilename)
-	initUninstallCommand(&cmdUninstall.Flags, defaultDBFilename)
-	initUpdateCommand(&cmdUpdate.Flags, defaultDBFilename)
-	initCleanupCommand(&cmdCleanup.Flags, defaultDBFilename)
-	parent.Children = append(parent.Children, cmdInstall, cmdUninstall, cmdUpdate, cmdCleanup)
-}
-
-func initCommon(flags *flag.FlagSet, c *commonFlagValues, defaultDBFilename string) {
-	RegisterDBFilenameFlag(flags, &c.dbFilename, defaultDBFilename)
-	flags.StringVar(&c.root, "profile-dir", "profiles", "the directory, relative to JIRI_ROOT, that profiles are installed in")
-}
-
-func initInstallCommand(flags *flag.FlagSet, defaultDBFilename string) {
-	initCommon(flags, &installFlags.commonFlagValues, defaultDBFilename)
-	profiles.RegisterTargetAndEnvFlags(flags, &installFlags.target)
-	flags.BoolVar(&installFlags.force, "force", false, "force install the profile even if it is already installed")
-	for _, name := range profilesmanager.Managers() {
-		profilesmanager.LookupManager(name).AddFlags(flags, profiles.Install)
-	}
-}
-
-func initUninstallCommand(flags *flag.FlagSet, defaultDBFilename string) {
-	initCommon(flags, &uninstallFlags.commonFlagValues, defaultDBFilename)
+func initUninstallCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
+	initCommon(flags, &uninstallFlags.commonFlagValues, installer, defaultDBPath, defaultProfilesPath)
 	profiles.RegisterTargetFlag(flags, &uninstallFlags.target)
 	flags.BoolVar(&uninstallFlags.allTargets, "all-targets", false, "apply to all targets for the specified profile(s)")
 	flags.BoolVar(&uninstallFlags.verbose, "v", false, "print more detailed information")
@@ -163,210 +182,162 @@ func initUninstallCommand(flags *flag.FlagSet, defaultDBFilename string) {
 	}
 }
 
-func initUpdateCommand(flags *flag.FlagSet, defaultDBFilename string) {
-	initCommon(flags, &updateFlags.commonFlagValues, defaultDBFilename)
-	flags.BoolVar(&updateFlags.verbose, "v", false, "print more detailed information")
+func (uv *uninstallFlagValues) args() []string {
+	a := uv.commonFlagValues.args()
+	if uv.target.String() != "" {
+		a = append(a, "--target="+uv.target.String())
+	}
+	a = append(a, fmt.Sprintf("--%s=%v", "all-targets", uv.allTargets))
+	return append(a, fmt.Sprintf("--%s=%v", "v", uv.verbose))
 }
 
-func initCleanupCommand(flags *flag.FlagSet, defaultDBFilename string) {
-	initCommon(flags, &cleanupFlags.commonFlagValues, defaultDBFilename)
+type cleanupFlagValues struct {
+	commonFlagValues
+	// The value of --gc
+	gc bool
+	// The value of --rewrite-profiles-db
+	rewriteDB bool
+	// The value of --rm-all
+	rmAll bool
+	// The value of --v
+	verbose bool
+}
+
+func initCleanupCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
+	initCommon(flags, &cleanupFlags.commonFlagValues, installer, defaultDBPath, defaultProfilesPath)
 	flags.BoolVar(&cleanupFlags.gc, "gc", false, "uninstall profile targets that are older than the current default")
-	flags.BoolVar(&cleanupFlags.ensureSpecificVersions, "ensure-specific-versions-are-set", false, "ensure that profile targets have a specific version set")
-	flags.BoolVar(&cleanupFlags.rmAll, "rm-all", false, "remove profiles manifest and all profile generated output files.")
-	flags.BoolVar(&cleanupFlags.rewriteManifest, "rewrite-profiles-manifest", false, "rewrite the profiles manifest file to use the latest schema version")
+	flags.BoolVar(&cleanupFlags.rmAll, "rm-all", false, "remove profiles database and all profile generated output files.")
+	flags.BoolVar(&cleanupFlags.rewriteDB, "rewrite-profiles-db", false, "rewrite the profiles database to use the latest schema version")
 	flags.BoolVar(&cleanupFlags.verbose, "v", false, "print more detailed information")
 }
 
-// init a command that takes a list of profile managers as its arguments.
-func initProfileManagersCommand(jirix *jiri.X, dbfile string, args []string) ([]string, *profiles.DB, error) {
-	if len(args) == 0 {
-		args = profilesmanager.Managers()
-	} else {
-		for _, n := range args {
-			if mgr := profilesmanager.LookupManager(n); mgr == nil {
-				avail := profilesmanager.Managers()
-				return nil, nil, fmt.Errorf("profile %v is not one of the available ones: %s", n, strings.Join(avail, ", "))
-			}
-		}
-	}
-	db := profiles.NewDB()
-	if err := db.Read(jirix, dbfile); err != nil {
-		fmt.Fprintf(jirix.Stderr(), "Failed to read profiles database %q: %v", dbfile, err)
-		return nil, nil, err
-	}
-	return args, db, nil
+func (cv *cleanupFlagValues) args() []string {
+	return append(cv.commonFlagValues.args(),
+		fmt.Sprintf("--%s=%v", "gc", cv.gc),
+		fmt.Sprintf("--%s=%v", "rewrite-profiles-db", cv.rewriteDB),
+		fmt.Sprintf("--%s=%v", "v", cv.verbose))
 }
 
-// init a command that takes a list of profiles (already installed) as
-// its arguments.
-func initProfilesCommand(jirix *jiri.X, dbfile string, args []string) ([]string, *profiles.DB, error) {
-	db := profiles.NewDB()
-	if err := db.Read(jirix, dbfile); err != nil {
-		fmt.Fprintf(jirix.Stderr(), "Failed to read profiles database %q: %v", dbfile, err)
-		return nil, nil, err
-	}
-	if len(args) == 0 {
-		args = db.Names()
-	} else {
-		for _, n := range args {
-			if p := db.LookupProfile(n); p == nil {
-				avail := db.Names()
-				return nil, nil, fmt.Errorf("profile %v is not one of the installed ones: %s", n, strings.Join(avail, ", "))
-			}
-		}
-	}
-	return args, db, nil
+type updateFlagValues struct {
+	commonFlagValues
+	// The value of --v
+	verbose bool
 }
 
-func updateImpl(jirix *jiri.X, cl *updateFlagValues, args []string) error {
-	verbose := cl.verbose
-	args, db, err := initProfileManagersCommand(jirix, cl.dbFilename, args)
-	if err != nil {
-		return err
-	}
-	for _, n := range args {
-		mgr := profilesmanager.LookupManager(n)
-		profile := db.LookupProfile(n)
-		if profile == nil {
-			continue
-		}
-		vi := mgr.VersionInfo()
-		for _, target := range profile.Targets() {
-			if vi.IsTargetOlderThanDefault(target.Version()) {
-				if verbose {
-					fmt.Fprintf(jirix.Stdout(), "Updating %s %s from %q to %s\n", n, target, target.Version(), vi)
-				}
-				target.SetVersion(vi.Default())
-				err := mgr.Install(jirix, db, jiri.NewRelPath(cl.root), *target)
-				logResult(jirix, "Update", mgr, *target, err)
-				if err != nil {
-					return err
-				}
-			} else {
-				if verbose {
-					fmt.Fprintf(jirix.Stdout(), "%s %s at %q is up to date(%s)\n", n, target, target.Version(), vi)
-				}
-			}
-		}
-	}
-	return db.Write(jirix, cl.dbFilename)
+func initUpdateCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
+	initCommon(flags, &updateFlags.commonFlagValues, installer, defaultDBPath, defaultProfilesPath)
+	flags.BoolVar(&updateFlags.verbose, "v", false, "print more detailed information")
 }
 
-func cleanupGC(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, args []string) error {
-	for _, name := range args {
-		mgr := profilesmanager.LookupManager(name)
-		if mgr == nil {
-			fmt.Fprintf(jirix.Stderr(), "%s is not linked into this binary", name)
-			continue
-		}
-		vi := mgr.VersionInfo()
-		profile := db.LookupProfile(name)
-		for _, target := range profile.Targets() {
-			if vi.IsTargetOlderThanDefault(target.Version()) {
-				err := mgr.Uninstall(jirix, db, root, *target)
-				logResult(jirix, "gc", mgr, *target, err)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+func (uv *updateFlagValues) args() []string {
+	return append(uv.commonFlagValues.args(), fmt.Sprintf("--%s=%v", "v", uv.verbose))
 }
 
-func cleanupEnsureVersionsAreSet(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, args []string) error {
-	for _, name := range args {
-		mgr := profilesmanager.LookupManager(name)
-		if mgr == nil {
-			fmt.Fprintf(jirix.Stderr(), "%s is not linked into this binary", name)
-			continue
-		}
-		profile := db.LookupProfile(name)
-		for _, target := range profile.Targets() {
-			if len(target.Version()) == 0 {
-				prior := *target
-				version, err := mgr.VersionInfo().Select(target.Version())
-				if err != nil {
-					return err
-				}
-				target.SetVersion(version)
-				db.RemoveProfileTarget(name, prior)
-				if err := db.AddProfileTarget(name, *target); err != nil {
-					return err
-				}
-				if verbose {
-					fmt.Fprintf(jirix.Stdout(), "%s %s had no version, now set to: %s\n", name, prior, target)
-				}
-			}
-		}
-	}
-	return nil
+type availableFlagValues struct {
+	// The value of --v
+	verbose bool
 }
 
-func cleanupRmAll(jirix *jiri.X, db *profiles.DB, root jiri.RelPath, verbose bool, args []string) error {
+func initAvailableCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
+	flags.BoolVar(&availableFlags.verbose, "v", false, "print more detailed information")
+}
+
+func (av *availableFlagValues) args() []string {
+	return []string{fmt.Sprintf("--%s=%v", "v", av.verbose)}
+}
+
+var (
+	installFlags     installFlagValues
+	uninstallFlags   uninstallFlagValues
+	cleanupFlags     cleanupFlagValues
+	updateFlags      updateFlagValues
+	availableFlags   availableFlagValues
+	profileInstaller string
+)
+
+// RegisterManagementCommands registers the management subcommands:
+// uninstall, install, update and cleanup.
+func RegisterManagementCommands(parent *cmdline.Command, installer, defaultDBPath, defaultProfilesPath string) {
+	cmdInstall := newCmdInstall()
+	cmdUninstall := newCmdUninstall()
+	cmdUpdate := newCmdUpdate()
+	cmdCleanup := newCmdCleanup()
+	cmdAvailable := newCmdAvailable()
+	initInstallCommand(&cmdInstall.Flags, installer, defaultDBPath, defaultProfilesPath)
+	initUninstallCommand(&cmdUninstall.Flags, installer, defaultDBPath, defaultProfilesPath)
+	initUpdateCommand(&cmdUpdate.Flags, installer, defaultDBPath, defaultProfilesPath)
+	initCleanupCommand(&cmdCleanup.Flags, installer, defaultDBPath, defaultProfilesPath)
+	initAvailableCommand(&cmdAvailable.Flags, installer, defaultDBPath, defaultProfilesPath)
+	parent.Children = append(parent.Children, cmdInstall, cmdUninstall, cmdUpdate, cmdCleanup, cmdAvailable)
+	profileInstaller = installer
+}
+
+func findProfileSubcommands(jirix *jiri.X) []string {
+	env := cmdline.EnvFromOS()
+	env.Vars["PATH"] = jirix.Env()["PATH"]
+	return env.LookPathAll("jiri-profile", map[string]bool{})
+}
+
+func allAvailableManagers(jirix *jiri.X) ([]string, error) {
+	names := profilesmanager.Managers()
+	if profileInstaller != "" {
+		return names, nil
+	}
+	subcommands := findProfileSubcommands(jirix)
 	s := jirix.NewSeq()
-	if err := s.AssertFileExists(db.Filename()).Remove(db.Filename()).Done(); err != nil {
-		return err
+	for _, sc := range subcommands {
+		var out bytes.Buffer
+		args := []string{"available"}
+		if err := s.Capture(&out, nil).Last(sc, args...); err != nil {
+			fmt.Fprintf(jirix.Stderr(), "failed to run %s %s: %v", sc, strings.Join(args, " "), err)
+			return nil, err
+		}
+		mgrs := strings.TrimSpace(out.String())
+		names = append(names, strings.Split(mgrs, ",")...)
 	}
-	d := root.Abs(jirix)
-	return s.AssertDirExists(d).
-		Run("chmod", "-R", "u+w", d).
-		RemoveAll(d).
-		Done()
+	return names, nil
 }
 
-func cleanupImpl(jirix *jiri.X, cl *cleanupFlagValues, args []string) error {
-	args, db, err := initProfilesCommand(jirix, cl.dbFilename, args)
-	if err != nil {
-		return err
+// availableProfileManagers creates a profileManager for all available
+// profiles, whether in this process or in a sub command.
+func availableProfileManagers(jirix *jiri.X, dbpath string, args []string) ([]profileManager, *profiles.DB, error) {
+	db := profiles.NewDB()
+	if err := db.Read(jirix, dbpath); err != nil {
+		fmt.Fprintf(jirix.Stderr(), "Failed to read profiles database %q: %v\n", dbpath, err)
+		return nil, nil, err
 	}
-	verbose := cl.verbose
-	root := jiri.NewRelPath(cl.root)
-	dirty := false
-	if cl.ensureSpecificVersions {
-		if verbose {
-			fmt.Fprintf(jirix.Stdout(), "Ensuring that all targets have a specific version set for %s\n", args)
+	mgrs := []profileManager{}
+	names := args
+	if len(names) == 0 {
+		var err error
+		names, err = allAvailableManagers(jirix)
+		if err != nil {
+			return nil, nil, err
 		}
-		if err := cleanupEnsureVersionsAreSet(jirix, db, root, verbose, args); err != nil {
-			return fmt.Errorf("ensure-specific-versions-are-set: %v", err)
-		}
-		dirty = true
 	}
-	if cl.gc {
-		if verbose {
-			fmt.Fprintf(jirix.Stdout(), "Removing targets older than the default version for %s\n", args)
-		}
-		if err := cleanupGC(jirix, db, root, verbose, args); err != nil {
-			return fmt.Errorf("gc: %v", err)
-		}
-		dirty = true
+	for _, name := range names {
+		mgrs = append(mgrs, newProfileManager(name, db))
 	}
-	if cl.rmAll {
-		if verbose {
-			fmt.Fprintf(jirix.Stdout(), "Removing profile manifest and all profile output files\n")
-		}
-		if err := cleanupRmAll(jirix, db, root, verbose, args); err != nil {
-			return err
-		}
-		// Don't write out the profiles manifest file again.
-		return nil
-	}
-	if cl.rewriteManifest {
-		dirty = true
-	}
-	if !dirty {
-		return fmt.Errorf("at least one option must be specified")
-	}
-	return db.Write(jirix, cl.dbFilename)
+	return mgrs, db, nil
 }
 
-func logResult(jirix *jiri.X, action string, mgr profiles.Manager, target profiles.Target, err error) {
-	fmt.Fprintf(jirix.Stdout(), "%s: %s %s: ", action, mgr.Name(), target)
-	if err == nil {
-		fmt.Fprintf(jirix.Stdout(), "success\n")
-	} else {
-		fmt.Fprintf(jirix.Stdout(), "%v\n", err)
+// installedProfileManagers creates a profileManager for all installed
+// profiles, whether in this process or in a sub command.
+func installedProfileManagers(jirix *jiri.X, dbpath string, args []string) ([]profileManager, *profiles.DB, error) {
+	db := profiles.NewDB()
+	if err := db.Read(jirix, dbpath); err != nil {
+		fmt.Fprintf(jirix.Stderr(), "Failed to read profiles database %q: %v\n", dbpath, err)
+		return nil, nil, err
 	}
+	mgrs := []profileManager{}
+	names := args
+	if len(names) == 0 {
+		names = db.Names()
+	}
+	for _, name := range names {
+		mgrs = append(mgrs, newProfileManager(name, db))
+	}
+	return mgrs, db, nil
 }
 
 func targetAtDefaultVersion(mgr profiles.Manager, target profiles.Target) (profiles.Target, error) {
@@ -379,73 +350,156 @@ func targetAtDefaultVersion(mgr profiles.Manager, target profiles.Target) (profi
 	return def, nil
 }
 
-func installImpl(jirix *jiri.X, cl *installFlagValues, args []string) error {
-	args, db, err := initProfileManagersCommand(jirix, cl.dbFilename, args)
+func writeDB(jirix *jiri.X, db *profiles.DB, installer, path string) error {
+	// If path is a directory and installer is empty, then do nothing,
+	// otherwise write out the file.
+	isdir := false
+	fi, err := os.Stat(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		isdir = fi.IsDir()
+	}
+	if isdir {
+		if installer != "" {
+			// New setup with installers writing their own file in a directory
+			return db.Write(jirix, installer, path)
+		} else {
+			// New setup, no installer, so don't write out the file.
+			return nil
+		}
+	}
+	if !isdir && installer == "" {
+		// Old setup with no installers and writing to a file.
+		return db.Write(jirix, installer, path)
+	}
+	return fmt.Errorf("Can't write a database file (%v) and specify an installer (%v)", path, installer)
+}
+
+func updateImpl(jirix *jiri.X, cl *updateFlagValues, args []string) error {
+	mgrs, db, err := availableProfileManagers(jirix, cl.dbPath, args)
 	if err != nil {
 		return err
 	}
-	root := jiri.NewRelPath(cl.root)
+	root := jiri.NewRelPath(cl.root).Join(profileInstaller)
+	for _, mgr := range mgrs {
+		if err := mgr.update(jirix, cl, root); err != nil {
+			return err
+		}
+	}
+	return writeDB(jirix, db, profileInstaller, cl.dbPath)
+}
+
+func cleanupImpl(jirix *jiri.X, cl *cleanupFlagValues, args []string) error {
+	count := 0
+	if cl.gc {
+		count++
+	}
+	if cl.rewriteDB {
+		count++
+	}
+	if cl.rmAll {
+		count++
+	}
+	if count != 1 {
+		fmt.Errorf("exactly one option must be specified")
+	}
+	mgrs, db, err := installedProfileManagers(jirix, cl.dbPath, args)
+	if err != nil {
+		return err
+	}
+	root := jiri.NewRelPath(cl.root).Join(profileInstaller)
+	for _, mgr := range mgrs {
+		if err := mgr.cleanup(jirix, cl, root); err != nil {
+			return err
+		}
+	}
+	if !cl.rmAll {
+		return writeDB(jirix, db, profileInstaller, cl.dbPath)
+	}
+	return nil
+}
+
+func installImpl(jirix *jiri.X, cl *installFlagValues, args []string) error {
+	mgrs, db, err := availableProfileManagers(jirix, cl.dbPath, args)
+	if err != nil {
+		return err
+	}
 	cl.target.UseCommandLineEnv()
-	names := []string{}
-	if cl.force {
-		names = args
-	} else {
-		for _, name := range args {
-			if p := db.LookupProfileTarget(name, cl.target); p != nil {
+	newMgrs := []profileManager{}
+	for _, mgr := range mgrs {
+		name := mgr.mgrName()
+		if !cl.force {
+			installer, profile := profiles.SplitProfileName(name)
+			if p := db.LookupProfileTarget(installer, profile, cl.target); p != nil {
 				fmt.Fprintf(jirix.Stdout(), "%v %v is already installed as %v\n", name, cl.target, p)
 				continue
 			}
-			names = append(names, name)
 		}
+		newMgrs = append(newMgrs, mgr)
 	}
-	for _, name := range names {
-		mgr := profilesmanager.LookupManager(name)
-		def, err := targetAtDefaultVersion(mgr, cl.target)
-		if err != nil {
-			return err
-		}
-		err = mgr.Install(jirix, db, root, def)
-		logResult(jirix, "Install:", mgr, def, err)
-		if err != nil {
+	root := jiri.NewRelPath(cl.root).Join(profileInstaller)
+	for _, mgr := range newMgrs {
+		if err := mgr.install(jirix, cl, root); err != nil {
 			return err
 		}
 	}
-	return db.Write(jirix, cl.dbFilename)
+	return writeDB(jirix, db, profileInstaller, cl.dbPath)
 }
 
 func uninstallImpl(jirix *jiri.X, cl *uninstallFlagValues, args []string) error {
-	args, db, err := initProfileManagersCommand(jirix, cl.dbFilename, args)
+	mgrs, db, err := availableProfileManagers(jirix, cl.dbPath, args)
 	if err != nil {
 		return err
 	}
-	root := jiri.NewRelPath(cl.root)
 	if cl.allTargets && cl.target.IsSet() {
 		fmt.Fprintf(jirix.Stdout(), "ignore target (%v) when used in conjunction with --all-targets\n", cl.target)
 	}
-	for _, name := range args {
-		profile := db.LookupProfile(name)
-		if profile == nil {
-			continue
-		}
-		mgr := profilesmanager.LookupManager(name)
-		var targets []*profiles.Target
-		if cl.allTargets {
-			targets = profile.Targets()
-		} else {
-			def, err := targetAtDefaultVersion(mgr, cl.target)
-			if err != nil {
-				return err
-			}
-			targets = []*profiles.Target{&def}
-		}
-		for _, target := range targets {
-			if err := mgr.Uninstall(jirix, db, root, *target); err != nil {
-				logResult(jirix, "Uninstall", mgr, *target, err)
-				return err
-			}
-			logResult(jirix, "Uninstall", mgr, *target, nil)
-
+	root := jiri.NewRelPath(cl.root).Join(profileInstaller)
+	for _, mgr := range mgrs {
+		if err := mgr.uninstall(jirix, cl, root); err != nil {
+			return err
 		}
 	}
-	return db.Write(jirix, cl.dbFilename)
+	return writeDB(jirix, db, profileInstaller, cl.dbPath)
+}
+
+func availableImpl(jirix *jiri.X, cl *availableFlagValues, args []string) error {
+	if profileInstaller == "" {
+		subcommands := findProfileSubcommands(jirix)
+		if cl.verbose {
+			fmt.Fprintf(jirix.Stdout(), "Available Subcommands: %s\n", strings.Join(subcommands, ", "))
+		}
+		s := jirix.NewSeq()
+		args := []string{"available"}
+		args = append(args, fmt.Sprintf("-v=%v", cl.verbose))
+		out := bytes.Buffer{}
+		for _, sc := range subcommands {
+			if err := s.Capture(&out, nil).Last(sc, args...); err != nil {
+				return err
+			}
+		}
+		fmt.Fprintln(jirix.Stdout(), out.String())
+	}
+	mgrs := profilesmanager.Managers()
+	if len(mgrs) == 0 {
+		return nil
+	}
+	if cl.verbose {
+		scname := ""
+		if profileInstaller != "" {
+			scname = profileInstaller + ": "
+		}
+		fmt.Fprintf(jirix.Stdout(), "%sAvailable Profiles:\n", scname)
+		for _, name := range mgrs {
+			mgr := profilesmanager.LookupManager(name)
+			vi := mgr.VersionInfo()
+			fmt.Fprintf(jirix.Stdout(), "%s: versions: %s\n", name, vi)
+		}
+	} else {
+		fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(mgrs, ", "))
+	}
+	return nil
 }

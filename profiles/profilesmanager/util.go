@@ -13,7 +13,7 @@ import (
 
 // ensureAction ensures that the requested profile and target
 // is installed/uninstalled, installing/uninstalling it if and only if necessary.
-func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, profile string, root jiri.RelPath, target profiles.Target) error {
+func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, installer, profile string, root jiri.RelPath, target profiles.Target) error {
 	verb := ""
 	switch action {
 	case profiles.Install:
@@ -26,7 +26,7 @@ func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, profi
 	if jirix.Verbose() || jirix.DryRun() {
 		fmt.Fprintf(jirix.Stdout(), "%s %v %s\n", verb, action, target)
 	}
-	if t := pdb.LookupProfileTarget(profile, target); t != nil {
+	if t := pdb.LookupProfileTarget(installer, profile, target); t != nil {
 		if jirix.Verbose() {
 			fmt.Fprintf(jirix.Stdout(), "%v %v is already %sed as %v\n", profile, target, verb, t)
 		}
@@ -52,12 +52,12 @@ func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, profi
 
 // EnsureProfileTargetIsInstalled ensures that the requested profile and target
 // is installed, installing it if only if necessary.
-func EnsureProfileTargetIsInstalled(jirix *jiri.X, pdb *profiles.DB, profile string, root jiri.RelPath, target profiles.Target) error {
-	return ensureAction(jirix, pdb, profiles.Install, profile, root, target)
+func EnsureProfileTargetIsInstalled(jirix *jiri.X, pdb *profiles.DB, installer, profile string, root jiri.RelPath, target profiles.Target) error {
+	return ensureAction(jirix, pdb, profiles.Install, installer, profile, root, target)
 }
 
 // EnsureProfileTargetIsUninstalled ensures that the requested profile and target
 // are no longer installed.
-func EnsureProfileTargetIsUninstalled(jirix *jiri.X, pdb *profiles.DB, profile string, root jiri.RelPath, target profiles.Target) error {
-	return ensureAction(jirix, pdb, profiles.Uninstall, profile, root, target)
+func EnsureProfileTargetIsUninstalled(jirix *jiri.X, pdb *profiles.DB, installer, profile string, root jiri.RelPath, target profiles.Target) error {
+	return ensureAction(jirix, pdb, profiles.Uninstall, installer, profile, root, target)
 }

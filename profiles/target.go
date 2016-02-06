@@ -280,12 +280,12 @@ func (e *Environment) Set(val string) error {
 }
 
 // String implements flag.Getter.
-func (e *Environment) String() string {
+func (e Environment) String() string {
 	return strings.Join(e.Vars, ",")
 }
 
 // Usage returns the usage string for Environment.
-func (e *Environment) Usage() string {
+func (e Environment) Usage() string {
 	return "specify an environment variable in the form: <var>=[<val>],..."
 }
 

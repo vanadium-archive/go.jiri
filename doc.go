@@ -15,6 +15,7 @@ The jiri commands are:
    cl           Manage project changelists
    contributors List project contributors
    import       Adds imports to .jiri_manifest file
+   profile      Display information about installed profiles
    project      Manage the jiri projects
    rebuild      Rebuild all jiri tools
    snapshot     Manage project snapshots
@@ -255,6 +256,239 @@ The jiri import flags are:
    Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
+
+Jiri profile - Display information about installed profiles
+
+Display information about installed profiles and their configuration.
+
+Usage:
+   jiri profile [flags] <command>
+
+The jiri profile commands are:
+   list        List available or installed profiles
+   env         Display profile environment variables
+   install     Install the given profiles
+   uninstall   Uninstall the given profiles
+   update      Install the latest default version of the given profiles
+   cleanup     Cleanup the locally installed profiles
+   available   List the available profiles
+
+The jiri profile flags are:
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri profile list - List available or installed profiles
+
+List available or installed profiles.
+
+Usage:
+   jiri profile list [flags] [<profiles>]
+
+<profiles> is a list of profiles to list, defaulting to all profiles if none are
+specifically requested.
+
+The jiri profile list flags are:
+ -available=false
+   print the list of available profiles
+ -env=
+   specify an environment variable in the form: <var>=[<val>],...
+ -info=
+   The following fields for use with --profile-info are available:
+   	SchemaVersion - the version of the profiles implementation.
+   	Target.InstallationDir - the installation directory of the requested profile.
+   	Target.CommandLineEnv - the environment variables specified via the command line when installing this profile target.
+   	Target.Env - the environment variables computed by the profile installation process for this target.
+   	Target.Command - a command that can be used to create this profile.
+   	Note: if no --target is specified then the requested field will be displayed for all targets.
+   	Profile.Description - description of the requested profile.
+   	Profile.Root - the root directory of the requested profile.
+   	Profile.Versions - the set of supported versions for this profile.
+   	Profile.DefaultVersion - the default version of the requested profile.
+   	Profile.LatestVersion - the latest version available for the requested profile.
+   	Note: if no profiles are specified then the requested field will be displayed for all profiles.
+ -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
+   specify policies for merging environment variables
+ -profiles=base,jiri
+   a comma separated list of profiles to use
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   specify the profiles database directory or file.
+ -show-profiles-db=false
+   print out the profiles database file
+ -skip-profiles=false
+   if set, no profiles will be used
+ -target=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: <arch>-<os>[@<version>]
+ -v=false
+   print more detailed information
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+
+Jiri profile env - Display profile environment variables
+
+List profile specific and target specific environment variables. If the
+requested environment variable name ends in = then only the value will be
+printed, otherwise both name and value are printed, i.e. GOPATH="foo" vs just
+"foo".
+
+If no environment variable names are requested then all will be printed in
+<name>=<val> format.
+
+Usage:
+   jiri profile env [flags] [<environment variable names>]
+
+[<environment variable names>] is an optional list of environment variables to
+display
+
+The jiri profile env flags are:
+ -env=
+   specify an environment variable in the form: <var>=[<val>],...
+ -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
+   specify policies for merging environment variables
+ -profiles=base,jiri
+   a comma separated list of profiles to use
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   specify the profiles database directory or file.
+ -skip-profiles=false
+   if set, no profiles will be used
+ -target=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: <arch>-<os>[@<version>]
+ -v=false
+   print more detailed information
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+
+Jiri profile install - Install the given profiles
+
+Install the given profiles.
+
+Usage:
+   jiri profile install [flags] <profiles>
+
+<profiles> is a list of profiles to install.
+
+The jiri profile install flags are:
+ -env=
+   specify an environment variable in the form: <var>=[<val>],...
+ -force=false
+   force install the profile even if it is already installed
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   specify the profiles database directory or file.
+ -profiles-dir=.jiri_root/profiles
+   the directory, relative to JIRI_ROOT, that profiles are installed in
+ -target=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: <arch>-<os>[@<version>]
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri profile uninstall - Uninstall the given profiles
+
+Uninstall the given profiles.
+
+Usage:
+   jiri profile uninstall [flags] <profiles>
+
+<profiles> is a list of profiles to uninstall.
+
+The jiri profile uninstall flags are:
+ -all-targets=false
+   apply to all targets for the specified profile(s)
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   specify the profiles database directory or file.
+ -profiles-dir=.jiri_root/profiles
+   the directory, relative to JIRI_ROOT, that profiles are installed in
+ -target=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: <arch>-<os>[@<version>]
+ -v=false
+   print more detailed information
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+
+Jiri profile update - Install the latest default version of the given profiles
+
+Install the latest default version of the given profiles.
+
+Usage:
+   jiri profile update [flags] <profiles>
+
+<profiles> is a list of profiles to update, if omitted all profiles are updated.
+
+The jiri profile update flags are:
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   specify the profiles database directory or file.
+ -profiles-dir=.jiri_root/profiles
+   the directory, relative to JIRI_ROOT, that profiles are installed in
+ -v=false
+   print more detailed information
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+
+Jiri profile cleanup - Cleanup the locally installed profiles
+
+Cleanup the locally installed profiles. This is generally required when
+recovering from earlier bugs or when preparing for a subsequent change to the
+profiles implementation.
+
+Usage:
+   jiri profile cleanup [flags] <profiles>
+
+<profiles> is a list of profiles to cleanup, if omitted all profiles are
+cleaned.
+
+The jiri profile cleanup flags are:
+ -gc=false
+   uninstall profile targets that are older than the current default
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   specify the profiles database directory or file.
+ -profiles-dir=.jiri_root/profiles
+   the directory, relative to JIRI_ROOT, that profiles are installed in
+ -rewrite-profiles-db=false
+   rewrite the profiles database to use the latest schema version
+ -rm-all=false
+   remove profiles database and all profile generated output files.
+ -v=false
+   print more detailed information
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+
+Jiri profile available - List the available profiles
+
+List the available profiles.
+
+Usage:
+   jiri profile available [flags]
+
+The jiri profile available flags are:
+ -v=false
+   print more detailed information
+
+ -color=true
+   Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
 
 Jiri project - Manage the jiri projects
 

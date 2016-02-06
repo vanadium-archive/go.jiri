@@ -25,14 +25,25 @@
 // including a database format (in XML) that is used to store the state of
 // the currently installed profiles.
 //
-// The profiles/manager package provides a registry for profile implementations
-// to register themselves (by calling manager.Register from an init function
-// for example).
+// The profilesmanager sub-package provides a registry for profile
+// implementations to register themselves (by calling manager.Register
+// from an init function for example).
 //
-// The profiles/reader package provides support for reading the profiles
+// The profilesreader sub-package provides support for reading the profiles
 // database and performing common operations on it.
 // profiles/commandline provides an easy to use command line environment for
 // tools that need to read and/or write profiles.
+//
+// The profilescmdline sub-package provides support for implementing
+// command line clients that implement profile installation and for
+// reading profile information. It also provides support for invoking
+// sub-commands to manage families of profiles which uses the notion
+// of a 'qualified' profile name where the profile name includes a prefix
+// (separated by InstallSeparator) which identifies the sub-command responsible
+// for managing that profile.
+//
+// The profilesutil sub-package provides some utility routines intended
+// for use by profile implementers.
 //
 // Profiles may be installed, updated or removed. When doing so, the name of
 // the profile is required, but the other components of the target are optional
@@ -43,19 +54,57 @@ package profiles
 
 import (
 	"flag"
+	"strings"
 
 	"v.io/jiri/jiri"
 )
 
+// InstallerSeparator is the string used to separate the installer
+// and profile name for qualified profile names.
+const InstallerSeparator = ":"
+
 // Profile represents an installed profile and its associated targets.
 type Profile struct {
-	name, root string
-	targets    Targets
+	name, root, installer string
+	targets               Targets
 }
 
-// Name returns the name of this profile.
+func clean(n string) string {
+	return strings.TrimRight(strings.TrimLeft(n, InstallerSeparator), InstallerSeparator)
+}
+
+// SplitProfileName returns the installer and profile name in the
+// case where the name is qualified (see QualifiedProfileName) or just
+// the profile name if it is not so qualified.
+func SplitProfileName(name string) (string, string) {
+	if pos := strings.Index(name, InstallerSeparator); pos >= 0 {
+		return name[:pos], name[pos+len(InstallerSeparator):]
+	}
+	return "", name
+}
+
+// QualifiedProfileName returns the name of a profile qualified by
+// the name of its installer, if any. If the installer is "myproject"
+// and the profile name is "bar" then then returned string is
+// "myproject" + InstallerSeparator + "bar". If the installer is not
+// specified then the unqualified name, without InstallerSeparator is returned.
+// If the supplied name is already qualified then the existing qualifier
+// will be removed and the supplied one used instead.
+// Any leading colons in name will be stripped.
+func QualifiedProfileName(installer, name string) string {
+	name = clean(name)
+	installer = clean(installer)
+	if installer != "" {
+		// Strip any existing installer.
+		_, n := SplitProfileName(name)
+		return installer + InstallerSeparator + n
+	}
+	return name
+}
+
+// Name returns the qualified name of this profile.
 func (p *Profile) Name() string {
-	return p.name
+	return QualifiedProfileName(p.installer, p.name)
 }
 
 // Root returns the directory, relative to the jiri root, that this
@@ -86,8 +135,11 @@ const (
 // Manager is the interface that must be implemented in order to
 // manage (i.e. install/uninstall) and describe a profile.
 type Manager interface {
-	// Name returns the name of this profile.
+	// Name returns the unqualified name of this profile.
 	Name() string
+
+	// Installer returns the installer for this profile.
+	Installer() string
 
 	// Info returns an informative description of the profile.
 	Info() string
@@ -95,8 +147,8 @@ type Manager interface {
 	// VersionInfo returns the VersionInfo instance for this profile.
 	VersionInfo() *VersionInfo
 
-	// String returns a string representation of the profile, conventionally this
-	// is its name and version.
+	// String returns a string representation of the profile, conventionally
+	// this is its qualified name and version.
 	String() string
 
 	// AddFlags allows the profile manager to add profile specific flags
@@ -106,8 +158,7 @@ type Manager interface {
 
 	// Install installs the profile for the specified build target.
 	Install(jirix *jiri.X, pdb *DB, root jiri.RelPath, target Target) error
-	// Uninstall uninstalls the profile for the specified build target. When
-	// the last target for any given profile is uninstalled, then the profile
-	// itself (i.e. the source code) will be uninstalled.
+
+	// Uninstall uninstalls the profile for the specified build target.
 	Uninstall(jirix *jiri.X, pdb *DB, root jiri.RelPath, target Target) error
 }

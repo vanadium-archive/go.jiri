@@ -124,11 +124,11 @@ var (
 	envFlags  envFlagValues
 )
 
-// RegisterDBFilenameFlag registers the --profiles-db flag with the supplied FlagSet.
-func RegisterDBFilenameFlag(flags *flag.FlagSet, manifest *string, defaultManifest string) {
+// RegisterDBPathFlag registers the --profiles-db flag with the supplied FlagSet.
+func RegisterDBPathFlag(flags *flag.FlagSet, manifest *string, defaultDBPath string) {
 	root := jiri.FindRoot()
-	flags.StringVar(manifest, "profiles-db", filepath.Join(root, defaultManifest), "specify the profiles XML manifest filename.")
-	flags.Lookup("profiles-db").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
+	flags.StringVar(manifest, "profiles-db", filepath.Join(root, defaultDBPath), "specify the profiles database directory or file.")
+	flags.Lookup("profiles-db").DefValue = filepath.Join("$JIRI_ROOT", defaultDBPath)
 }
 
 // RegisterProfilesFlag registers the --profiles flag
@@ -150,19 +150,19 @@ func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *profilesreader.Mer
 //  --profiles
 //  --merge-policies
 //  --target and --env
-func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBFilename string) {
+func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBLocation string) {
 	flags.Var(&fv.ProfilesMode, "skip-profiles", "if set, no profiles will be used")
-	RegisterDBFilenameFlag(flags, &fv.DBFilename, defaultDBFilename)
+	RegisterDBPathFlag(flags, &fv.DBFilename, defaultDBLocation)
 	RegisterProfilesFlag(flags, &fv.Profiles)
 	fv.MergePolicies = profilesreader.JiriMergePolicies()
 	RegisterMergePoliciesFlag(flags, &fv.MergePolicies)
 	profiles.RegisterTargetAndEnvFlags(flags, &fv.Target)
 }
 
-func initializeReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBFilename string) {
+func initializeReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBLocation string) {
 	envFlags.ReaderFlagValues = fv
 	listFlags.ReaderFlagValues = fv
-	RegisterReaderFlags(flags, fv, defaultDBFilename)
+	RegisterReaderFlags(flags, fv, defaultDBLocation)
 }
 
 // RegisterReaderCommandsUsingParent registers the 'reader' flags
@@ -171,18 +171,18 @@ func initializeReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBF
 // the supplied ReaderFlagValues struct.
 // RegisterReaderCommandsUsingParent results in a command line of the form:
 // <parent> <reader-flags> [list|env] <list/env specific commands>
-func RegisterReaderCommandsUsingParent(parent *cmdline.Command, fv *ReaderFlagValues, defaultDBFilename string) {
-	initializeReaderFlags(&parent.Flags, fv, defaultDBFilename)
-	RegisterReaderCommands(parent, defaultDBFilename)
+func RegisterReaderCommandsUsingParent(parent *cmdline.Command, fv *ReaderFlagValues, defaultDBLocation string) {
+	initializeReaderFlags(&parent.Flags, fv, defaultDBLocation)
+	RegisterReaderCommands(parent, defaultDBLocation)
 }
 
 // RegisterReaderCommands registers the list and env subcommands. The
 // subcommands will host the 'reader' flags (see RegisterReaderFlags)
 // resulting in a command line of the form:
 // <parent> [list|env] <reader-flags> <list/env specific specific commands>
-func RegisterReaderCommands(parent *cmdline.Command, defaultDBFilename string) {
-	registerListCommand(parent, defaultDBFilename)
-	registerEnvCommand(parent, defaultDBFilename)
+func RegisterReaderCommands(parent *cmdline.Command, defaultDBLocation string) {
+	registerListCommand(parent, defaultDBLocation)
+	registerEnvCommand(parent, defaultDBLocation)
 }
 
 func newReaderFlags() *ReaderFlagValues {
@@ -191,11 +191,11 @@ func newReaderFlags() *ReaderFlagValues {
 
 // registerListCommand the profiles list subcommand and returns it
 // and a struct containing  the values of the command line flags.
-func registerListCommand(parent *cmdline.Command, defaultDBFilename string) {
+func registerListCommand(parent *cmdline.Command, defaultDBLocation string) {
 	parent.Children = append(parent.Children, cmdList)
 	if listFlags.ReaderFlagValues == nil {
 		listFlags.ReaderFlagValues = newReaderFlags()
-		RegisterReaderFlags(&cmdList.Flags, listFlags.ReaderFlagValues, defaultDBFilename)
+		RegisterReaderFlags(&cmdList.Flags, listFlags.ReaderFlagValues, defaultDBLocation)
 	}
 	cmdList.Flags.BoolVar(&listFlags.Verbose, "v", false, "print more detailed information")
 	cmdList.Flags.BoolVar(&listFlags.showProfilesDB, "show-profiles-db", false, "print out the profiles database file")
@@ -205,11 +205,11 @@ func registerListCommand(parent *cmdline.Command, defaultDBFilename string) {
 
 // registerEnvCommand the profiles env subcommand and returns it and a
 // struct containing the values of the command line flags.
-func registerEnvCommand(parent *cmdline.Command, defaultDBFilename string) {
+func registerEnvCommand(parent *cmdline.Command, defaultDBLocation string) {
 	parent.Children = append(parent.Children, cmdEnv)
 	if envFlags.ReaderFlagValues == nil {
 		envFlags.ReaderFlagValues = newReaderFlags()
-		RegisterReaderFlags(&cmdEnv.Flags, envFlags.ReaderFlagValues, defaultDBFilename)
+		RegisterReaderFlags(&cmdEnv.Flags, envFlags.ReaderFlagValues, defaultDBLocation)
 	}
 	cmdEnv.Flags.BoolVar(&envFlags.Verbose, "v", false, "print more detailed information")
 }
@@ -227,15 +227,22 @@ func runList(jirix *jiri.X, args []string) error {
 		fmt.Fprintf(jirix.Stdout(), "Profiles Database Filename: %s\n", listFlags.DBFilename)
 	}
 	if listFlags.available {
+		managers := profilesmanager.Managers()
+		// TODO(cnicolaou): this will need to run the external
+		// profile installer subcommands to obtain the list of
+		// profiles that can be installed by them. For now it
+		// just assumes they are all linked into this binary.
 		if listFlags.Verbose {
 			fmt.Fprintf(jirix.Stdout(), "Available Profiles:\n")
-			for _, name := range profilesmanager.Managers() {
+			for _, name := range managers {
 				mgr := profilesmanager.LookupManager(name)
 				vi := mgr.VersionInfo()
 				fmt.Fprintf(jirix.Stdout(), "%s: versions: %s\n", name, vi)
 			}
 		} else {
-			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(profilesmanager.Managers(), ", "))
+			if len(managers) > 0 {
+				fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(managers, ", "))
+			}
 		}
 	}
 	rd, err := profilesreader.NewReader(jirix, listFlags.ProfilesMode, listFlags.DBFilename)

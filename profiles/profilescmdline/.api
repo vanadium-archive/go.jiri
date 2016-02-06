@@ -1,8 +1,8 @@
 pkg profilescmdline, const DefaultProfiles ideal-string
 pkg profilescmdline, func HelpMsg() string
 pkg profilescmdline, func IsFlagSet(*flag.FlagSet, string) bool
-pkg profilescmdline, func RegisterDBFilenameFlag(*flag.FlagSet, *string, string)
-pkg profilescmdline, func RegisterManagementCommands(*cmdline.Command, string)
+pkg profilescmdline, func RegisterDBPathFlag(*flag.FlagSet, *string, string)
+pkg profilescmdline, func RegisterManagementCommands(*cmdline.Command, string, string, string)
 pkg profilescmdline, func RegisterMergePoliciesFlag(*flag.FlagSet, *profilesreader.MergePolicies)
 pkg profilescmdline, func RegisterProfilesFlag(*flag.FlagSet, *string)
 pkg profilescmdline, func RegisterReaderCommands(*cmdline.Command, string)

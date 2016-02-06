@@ -1,0 +1,11 @@
+<profiles version="5" installer="m1">
+  <profile name="a" root="root">
+    <target tag="" arch="cpu1" os="os1" installation-directory="" version="1">
+      <envvars></envvars>
+      <command-line>
+        <var>A=B</var>
+        <var>C=D</var>
+      </command-line>
+    </target>
+  </profile>
+</profiles>
