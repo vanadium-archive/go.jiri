@@ -189,6 +189,12 @@ func (g *Git) CommitMessages(branch, baseBranch string) (string, error) {
 	return strings.Join(out, "\n"), nil
 }
 
+// CommitNoVerify commits all files in staging with the given
+// message and skips all git-hooks.
+func (g *Git) CommitNoVerify(message string) error {
+	return g.run("commit", "--allow-empty", "--allow-empty-message", "--no-verify", "-m", message)
+}
+
 // CommitWithMessage commits all files in staging with the given
 // message.
 func (g *Git) CommitWithMessage(message string) error {

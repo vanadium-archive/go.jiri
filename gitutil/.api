@@ -14,6 +14,7 @@ pkg gitutil, method (*Git) CommitAmendWithMessage(string) error
 pkg gitutil, method (*Git) CommitAndEdit() error
 pkg gitutil, method (*Git) CommitFile(string, string) error
 pkg gitutil, method (*Git) CommitMessages(string, string) (string, error)
+pkg gitutil, method (*Git) CommitNoVerify(string) error
 pkg gitutil, method (*Git) CommitWithMessage(string) error
 pkg gitutil, method (*Git) CommitWithMessageAndEdit(string) error
 pkg gitutil, method (*Git) Committers() ([]string, error)
