@@ -1,7 +1,7 @@
 pkg project, const FastScan ScanMode
 pkg project, const FullScan ScanMode
 pkg project, func ApplyToLocalMaster(*jiri.X, Projects, func() error) error
-pkg project, func BuildTools(*jiri.X, Tools, string) error
+pkg project, func BuildTools(*jiri.X, Projects, Tools, string) error
 pkg project, func CleanupProjects(*jiri.X, Projects, bool) error
 pkg project, func CreateSnapshot(*jiri.X, string) error
 pkg project, func CurrentManifest(*jiri.X) (*Manifest, error)

@@ -1007,16 +1007,12 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 
 // BuildTools builds the given tools and places the resulting binaries into the
 // given directory.
-func BuildTools(jirix *jiri.X, tools Tools, outputDir string) error {
+func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string) error {
 	jirix.TimerPush("build tools")
 	defer jirix.TimerPop()
 	if len(tools) == 0 {
 		// Nothing to do here...
 		return nil
-	}
-	projects, err := LocalProjects(jirix, FastScan)
-	if err != nil {
-		return err
 	}
 	toolPkgs := []string{}
 	workspaceSet := map[string]bool{}
@@ -1096,7 +1092,7 @@ func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputD
 
 	updateFn := func() error {
 		return ApplyToLocalMaster(jirix, toolProjects, func() error {
-			return BuildTools(jirix, toolsToBuild, outputDir)
+			return BuildTools(jirix, projects, toolsToBuild, outputDir)
 		})
 	}
 

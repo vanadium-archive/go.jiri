@@ -29,7 +29,7 @@ Run "jiri help manifest" for details on manifests.
 }
 
 func runRebuild(jirix *jiri.X, args []string) (e error) {
-	_, tools, err := project.LoadManifest(jirix)
+	projects, tools, err := project.LoadManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func runRebuild(jirix *jiri.X, args []string) (e error) {
 	}
 
 	// Build and install tools.
-	if err := project.BuildTools(jirix, tools, tmpDir); err != nil {
+	if err := project.BuildTools(jirix, projects, tools, tmpDir); err != nil {
 		return err
 	}
 	return project.InstallTools(jirix, tmpDir)
