@@ -1036,6 +1036,7 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
 
 	s := jirix.NewSeq()
+	git := gitutil.New(s)
 
 	// Loop through all projects, checking out master and stashing any unstaged
 	// changes.
@@ -1046,15 +1047,15 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 		}
 		switch p.Protocol {
 		case "git":
-			branch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+			branch, err := git.CurrentBranchName()
 			if err != nil {
 				return err
 			}
-			stashed, err := gitutil.New(jirix.NewSeq()).Stash()
+			stashed, err := git.Stash()
 			if err != nil {
 				return err
 			}
-			if err := gitutil.New(jirix.NewSeq()).CheckoutBranch("master"); err != nil {
+			if err := git.CheckoutBranch("master"); err != nil {
 				return err
 			}
 			// After running the function, return to this project's directory,
@@ -1063,11 +1064,11 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 				if err := s.Chdir(p.Path).Done(); err != nil {
 					return err
 				}
-				if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(branch); err != nil {
+				if err := git.CheckoutBranch(branch); err != nil {
 					return err
 				}
 				if stashed {
-					return gitutil.New(jirix.NewSeq()).StashPop()
+					return git.StashPop()
 				}
 				return nil
 			}, &e)
@@ -2347,10 +2348,10 @@ func computeOp(local, remote *Project, gc bool, root string) operation {
 	}
 }
 
-// ParseNames identifies the set of projects that a jiri command should
-// be applied to.
+// ParseNames identifies the set of projects that a jiri command should be
+// applied to.
 func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{}) (Projects, error) {
-	manifestProjects, _, err := LoadManifest(jirix)
+	localProjects, err := LocalProjects(jirix, FullScan)
 	if err != nil {
 		return nil, err
 	}
@@ -2360,11 +2361,11 @@ func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{
 		args = set.String.ToSlice(defaultProjects)
 	}
 	for _, name := range args {
-		projects := manifestProjects.Find(name)
+		projects := localProjects.Find(name)
 		if len(projects) == 0 {
 			// Issue a warning if the target project does not exist in the
 			// project manifest.
-			fmt.Fprintf(jirix.Stderr(), "project %q does not exist in the project manifest\n", name)
+			fmt.Fprintf(jirix.Stderr(), "project %q does not exist locally\n", name)
 		}
 		for _, project := range projects {
 			result[project.Key()] = project
