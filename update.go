@@ -5,10 +5,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
-	"time"
-
 	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/retry"
@@ -61,37 +57,7 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 	if err := retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
-	// Create a snapshot of the current state of all projects and write it to the
-	// update history directory.
-	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
-		return err
-	}
-
-	latestLink, secondLatestLink := jirix.UpdateHistoryLatestLink(), jirix.UpdateHistorySecondLatestLink()
-
-	// If the "latest" symlink exists, point the "second-latest" symlink to its value.
-	latestLinkExists, err := seq.IsFile(latestLink)
-	if err != nil {
-		return err
-	}
-	if latestLinkExists {
-		latestFile, err := os.Readlink(latestLink)
-		if err != nil {
-			return err
-		}
-		if err := seq.RemoveAll(secondLatestLink).Symlink(latestFile, secondLatestLink).Done(); err != nil {
-			return err
-		}
-	}
-
-	// Point the "latest" update history symlink to the new snapshot file.  Try
-	// to keep the symlink relative, to make it easy to move or copy the entire
-	// update_history directory.
-	if rel, err := filepath.Rel(filepath.Dir(latestLink), snapshotFile); err == nil {
-		snapshotFile = rel
-	}
-	if err := seq.RemoveAll(latestLink).Symlink(snapshotFile, latestLink).Done(); err != nil {
+	if err := project.WriteUpdateHistorySnapshot(jirix); err != nil {
 		return err
 	}
 

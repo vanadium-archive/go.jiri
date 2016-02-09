@@ -630,6 +630,7 @@ Usage:
    jiri snapshot [flags] <command>
 
 The jiri snapshot commands are:
+   checkout    Checkout a project snapshot
    create      Create a new project snapshot
    list        List existing project snapshots
 
@@ -639,6 +640,29 @@ The jiri snapshot flags are:
 
  -color=true
    Use color to format output.
+ -n=false
+   Show what commands will run but do not execute them.
+ -v=false
+   Print verbose output.
+
+Jiri snapshot checkout - Checkout a project snapshot
+
+The "jiri snapshot checkout <snapshot>" command restores local project state to
+the state in the given snapshot manifest.
+
+Usage:
+   jiri snapshot checkout [flags] <snapshot>
+
+<snapshot> is the snapshot manifest file.
+
+The jiri snapshot checkout flags are:
+ -gc=false
+   Garbage collect obsolete repositories.
+
+ -color=true
+   Use color to format output.
+ -dir=
+   Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
  -n=false
    Show what commands will run but do not execute them.
  -v=false

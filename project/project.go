@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"v.io/jiri/collect"
 	"v.io/jiri/gitutil"
@@ -613,6 +614,28 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 	return manifest.ToFile(jirix, path)
 }
 
+// CheckoutSnapshot updates project state to the state specified in the given
+// snapshot file.  Note that the snapshot file must not contain remote imports.
+func CheckoutSnapshot(jirix *jiri.X, manifest string, gc bool) error {
+	// Find all local projects.
+	scanMode := FastScan
+	if gc {
+		scanMode = FullScan
+	}
+	localProjects, err := LocalProjects(jirix, scanMode)
+	if err != nil {
+		return err
+	}
+	remoteProjects, remoteTools, err := loadManifestFile(jirix, manifest, nil)
+	if err != nil {
+		return err
+	}
+	if err := updateTo(jirix, localProjects, remoteProjects, remoteTools, gc); err != nil {
+		return err
+	}
+	return WriteUpdateHistorySnapshot(jirix)
+}
+
 // CurrentManifest returns a manifest that identifies the result of
 // the most recent "jiri update" invocation.
 func CurrentManifest(jirix *jiri.X) (*Manifest, error) {
@@ -827,6 +850,11 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 // If the user is still using old-style manifests, it uses the old
 // ResolveManifestPath logic to determine the initial manifest file, since the
 // .jiri_manifest doesn't exist.
+//
+// WARNING: LoadManifest cannot be run multiple times in parallel!  It invokes
+// git operations which require a lock on the filesystem.  If you see errors
+// about ".git/index.lock exists", you are likely calling LoadManifest in
+// parallel.
 func LoadManifest(jirix *jiri.X) (Projects, Tools, error) {
 	jirix.TimerPush("load manifest")
 	defer jirix.TimerPop()
@@ -918,8 +946,8 @@ func loadUpdatedManifestDeprecated(jirix *jiri.X) (Projects, Tools, error) {
 func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	jirix.TimerPush("update universe")
 	defer jirix.TimerPop()
-	// 0. Load the manifest, updating all manifest projects to match their remote
-	// counterparts.
+
+	// Find all local projects.
 	scanMode := FastScan
 	if gc {
 		scanMode = FullScan
@@ -928,6 +956,9 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	if err != nil {
 		return err
 	}
+
+	// Load the manifest, updating all manifest projects to match their remote
+	// counterparts.
 	s := jirix.NewSeq()
 	remoteProjects, remoteTools, tmpLoadDir, err := loadUpdatedManifest(jirix, localProjects)
 	if tmpLoadDir != "" {
@@ -936,7 +967,14 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	if err != nil {
 		return err
 	}
-	// 1. Update all local projects to match their remote counterparts.
+	return updateTo(jirix, localProjects, remoteProjects, remoteTools, gc)
+}
+
+// updateTo updates the local projects and tools to the state specified in
+// remoteProjects and remoteTools.
+func updateTo(jirix *jiri.X, localProjects, remoteProjects Projects, remoteTools Tools, gc bool) (e error) {
+	s := jirix.NewSeq()
+	// 1. Update all local projects to match the specified projects argument.
 	if err := updateProjects(jirix, localProjects, remoteProjects, gc); err != nil {
 		return err
 	}
@@ -951,6 +989,41 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	}
 	// 3. Install the tools into $JIRI_ROOT/.jiri_root/bin.
 	return InstallTools(jirix, tmpToolsDir)
+}
+
+// WriteUpdateHistorySnapshot creates a snapshot of the current state of all
+// projects and writes it to the update history directory.
+func WriteUpdateHistorySnapshot(jirix *jiri.X) error {
+	seq := jirix.NewSeq()
+	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
+	if err := CreateSnapshot(jirix, snapshotFile); err != nil {
+		return err
+	}
+
+	latestLink, secondLatestLink := jirix.UpdateHistoryLatestLink(), jirix.UpdateHistorySecondLatestLink()
+
+	// If the "latest" symlink exists, point the "second-latest" symlink to its value.
+	latestLinkExists, err := seq.IsFile(latestLink)
+	if err != nil {
+		return err
+	}
+	if latestLinkExists {
+		latestFile, err := os.Readlink(latestLink)
+		if err != nil {
+			return err
+		}
+		if err := seq.RemoveAll(secondLatestLink).Symlink(latestFile, secondLatestLink).Done(); err != nil {
+			return err
+		}
+	}
+
+	// Point the "latest" update history symlink to the new snapshot file.  Try
+	// to keep the symlink relative, to make it easy to move or copy the entire
+	// update_history directory.
+	if rel, err := filepath.Rel(filepath.Dir(latestLink), snapshotFile); err == nil {
+		snapshotFile = rel
+	}
+	return seq.RemoveAll(latestLink).Symlink(snapshotFile, latestLink).Done()
 }
 
 // ApplyToLocalMaster applies an operation expressed as the given function to

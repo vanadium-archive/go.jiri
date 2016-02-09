@@ -26,13 +26,15 @@ const (
 )
 
 var (
-	snapshotDirFlag string
 	pushRemoteFlag  bool
+	snapshotDirFlag string
+	snapshotGcFlag  bool
 	timeFormatFlag  string
 )
 
 func init() {
 	cmdSnapshot.Flags.StringVar(&snapshotDirFlag, "dir", "", "Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.")
+	cmdSnapshotCheckout.Flags.BoolVar(&snapshotGcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdSnapshotCreate.Flags.BoolVar(&pushRemoteFlag, "push-remote", false, "Commit and push snapshot upstream.")
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
 }
@@ -45,7 +47,7 @@ The "jiri snapshot" command can be used to manage project snapshots.
 In particular, it can be used to create new snapshots and to list
 existing snapshots.
 `,
-	Children: []*cmdline.Command{cmdSnapshotCreate, cmdSnapshotList},
+	Children: []*cmdline.Command{cmdSnapshotCheckout, cmdSnapshotCreate, cmdSnapshotList},
 }
 
 // cmdSnapshotCreate represents the "jiri snapshot create" command.
@@ -178,20 +180,45 @@ func commitAndPushChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string
 		return err
 	}
 	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	if err := gitutil.New(jirix.NewSeq()).Add(relativeSnapshotPath); err != nil {
+	git := gitutil.New(jirix.NewSeq())
+	// Pull from master so we are up-to-date.
+	if err := git.Pull("origin", "master"); err != nil {
 		return err
 	}
-	if err := gitutil.New(jirix.NewSeq()).Add(label); err != nil {
+	if err := git.Add(relativeSnapshotPath); err != nil {
+		return err
+	}
+	if err := git.Add(label); err != nil {
 		return err
 	}
 	name := strings.TrimPrefix(snapshotFile, snapshotDir)
-	if err := gitutil.New(jirix.NewSeq()).CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
+	if err := git.CommitWithMessage(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
 		return err
 	}
-	if err := gitutil.New(jirix.NewSeq()).Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
+	if err := git.Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
 		return err
 	}
 	return nil
+}
+
+// cmdSnapshotCheckout represents the "jiri snapshot checkout" command.
+var cmdSnapshotCheckout = &cmdline.Command{
+	Runner: jiri.RunnerFunc(runSnapshotCheckout),
+	Name:   "checkout",
+	Short:  "Checkout a project snapshot",
+	Long: `
+The "jiri snapshot checkout <snapshot>" command restores local project state to
+the state in the given snapshot manifest.
+`,
+	ArgsName: "<snapshot>",
+	ArgsLong: "<snapshot> is the snapshot manifest file.",
+}
+
+func runSnapshotCheckout(jirix *jiri.X, args []string) error {
+	if len(args) != 1 {
+		return jirix.UsageErrorf("unexpected number of arguments")
+	}
+	return project.CheckoutSnapshot(jirix, args[0], snapshotGcFlag)
 }
 
 // cmdSnapshotList represents the "jiri snapshot list" command.
