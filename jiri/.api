@@ -1,11 +1,11 @@
 pkg jiri, const JiriManifestFile ideal-string
-pkg jiri, const LegacyProfilesDBFile ideal-string
 pkg jiri, const ProfilesDBDir ideal-string
 pkg jiri, const ProfilesRootDir ideal-string
 pkg jiri, const ProjectMetaDir ideal-string
 pkg jiri, const ProjectMetaFile ideal-string
 pkg jiri, const RootEnv ideal-string
 pkg jiri, const RootMetaDir ideal-string
+pkg jiri, func DefaultProfilesDBPath() string
 pkg jiri, func ExpandEnv(*X, *envvar.Vars)
 pkg jiri, func FindRoot() string
 pkg jiri, func NewRelPath(...string) RelPath

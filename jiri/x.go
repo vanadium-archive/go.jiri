@@ -23,7 +23,7 @@ const (
 	RootMetaDir          = ".jiri_root"
 	ProjectMetaDir       = ".jiri"
 	ProjectMetaFile      = "metadata.v2"
-	LegacyProfilesDBFile = ".jiri_v23_profiles"
+	legacyProfilesDBFile = ".jiri_v23_profiles"
 	ProfilesDBDir        = RootMetaDir + string(filepath.Separator) + "profile_db"
 	ProfilesRootDir      = RootMetaDir + string(filepath.Separator) + "profiles"
 	JiriManifestFile     = ".jiri_manifest"
@@ -90,6 +90,19 @@ func findJiriRoot(timer *timing.Timer) (string, error) {
 func FindRoot() string {
 	root, _ := findJiriRoot(nil)
 	return root
+}
+
+// DefaultProfilesDBPath returns the appropriate profiles database to use
+// based on whether profile-v23 has been run. It will be removed once
+// transition to profile-v23 is complete.
+// TODO(cnicolaou): delete this and use ProfilesDBDir in the client apps.
+func DefaultProfilesDBPath() string {
+	root := FindRoot()
+	fi, err := os.Stat(filepath.Join(root, ProfilesDBDir))
+	if err == nil && fi.IsDir() {
+		return ProfilesRootDir
+	}
+	return legacyProfilesDBFile
 }
 
 // Clone returns a clone of the environment.

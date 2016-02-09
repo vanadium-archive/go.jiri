@@ -29,6 +29,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"v.io/jiri/jiri"
@@ -273,9 +274,13 @@ func RegisterManagementCommands(parent *cmdline.Command, installer, defaultDBPat
 }
 
 func findProfileSubcommands(jirix *jiri.X) []string {
-	env := cmdline.EnvFromOS()
-	env.Vars["PATH"] = jirix.Env()["PATH"]
-	return env.LookPathAll("jiri-profile", map[string]bool{})
+	fi, err := os.Stat(filepath.Join(jirix.Root, jiri.ProfilesDBDir))
+	if err == nil && fi.IsDir() {
+		env := cmdline.EnvFromOS()
+		env.Vars["PATH"] = jirix.Env()["PATH"]
+		return env.LookPathAll("jiri-profile", map[string]bool{})
+	}
+	return []string{}
 }
 
 func allAvailableManagers(jirix *jiri.X) ([]string, error) {

@@ -102,8 +102,11 @@ func run(sh *gosh.Shell, dir, bin string, args ...string) string {
 }
 
 func TestManagerAvailable(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 	dir, sh := buildInstallers(t), newShell(t)
-	sh.Vars["PATH"] = dir
+	sh.Vars["JIRI_ROOT"] = fake.X.Root
+	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
 	stdout := run(sh, dir, "jiri", "profile", "available", "-v")
 	for _, installer := range []string{"i1", "i2"} {
 		re := regexp.MustCompile("Available Subcommands:.*profile-" + installer + ".*\n")
@@ -113,6 +116,11 @@ func TestManagerAvailable(t *testing.T) {
 		if got, want := stdout, installer+":eg"; !strings.Contains(got, want) {
 			t.Errorf("%v does not contain %v\n", got, want)
 		}
+	}
+	os.RemoveAll(filepath.Join(fake.X.Root, jiri.ProfilesDBDir))
+	stdout = run(sh, dir, "jiri", "profile", "available", "-v")
+	if got, want := strings.TrimSpace(stdout), "Available Subcommands:"; got != want {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
