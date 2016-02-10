@@ -100,7 +100,7 @@ func DefaultProfilesDBPath() string {
 	root := FindRoot()
 	fi, err := os.Stat(filepath.Join(root, ProfilesDBDir))
 	if err == nil && fi.IsDir() {
-		return ProfilesRootDir
+		return ProfilesDBDir
 	}
 	return legacyProfilesDBFile
 }

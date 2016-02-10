@@ -32,7 +32,7 @@ func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, insta
 		}
 		return nil
 	}
-	mgr := LookupManager(profile)
+	mgr := LookupManager(profiles.QualifiedProfileName(installer, profile))
 	if mgr == nil {
 		return fmt.Errorf("profile %v is not supported", profile)
 	}

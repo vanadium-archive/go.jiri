@@ -376,11 +376,15 @@ func writeDB(jirix *jiri.X, db *profiles.DB, installer, path string) error {
 			return nil
 		}
 	}
-	if !isdir && installer == "" {
+	if installer == "" {
 		// Old setup with no installers and writing to a file.
 		return db.Write(jirix, installer, path)
 	}
-	return fmt.Errorf("Can't write a database file (%v) and specify an installer (%v)", path, installer)
+	// New setup, but the directory doesn't exist yet.
+	if err := os.MkdirAll(path, os.FileMode(0755)); err != nil {
+		return err
+	}
+	return db.Write(jirix, installer, path)
 }
 
 func updateImpl(jirix *jiri.X, cl *updateFlagValues, args []string) error {
@@ -486,7 +490,9 @@ func availableImpl(jirix *jiri.X, cl *availableFlagValues, args []string) error 
 				return err
 			}
 		}
-		fmt.Fprintln(jirix.Stdout(), out.String())
+		if s := strings.TrimSpace(out.String()); s != "" {
+			fmt.Fprintln(jirix.Stdout(), s)
+		}
 	}
 	mgrs := profilesmanager.Managers()
 	if len(mgrs) == 0 {
