@@ -570,14 +570,13 @@ func (e UnsupportedProtocolErr) Error() string {
 // project names to a collections of commits.
 type Update map[string][]CL
 
-// CreateSnapshot creates a manifest that encodes the current state of
-// master branches of all projects and writes this snapshot out to the
-// given file.
-func CreateSnapshot(jirix *jiri.X, path string) error {
+// CreateSnapshot creates a manifest that encodes the current state of master
+// branches of all projects and writes this snapshot out to the given file.
+func CreateSnapshot(jirix *jiri.X, path, label string) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
-	manifest := Manifest{}
+	manifest := Manifest{Label: label}
 
 	// Add all local projects to manifest.
 	localProjects, err := LocalProjects(jirix, FullScan)
@@ -996,7 +995,7 @@ func updateTo(jirix *jiri.X, localProjects, remoteProjects Projects, remoteTools
 func WriteUpdateHistorySnapshot(jirix *jiri.X) error {
 	seq := jirix.NewSeq()
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile, "update-history"); err != nil {
 		return err
 	}
 
