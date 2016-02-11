@@ -913,7 +913,6 @@ func TestManifestToFromBytes(t *testing.T) {
 		},
 		{
 			project.Manifest{
-				Label: "label",
 				Imports: []project.Import{
 					{
 						Manifest:     "manifest1",
@@ -965,7 +964,7 @@ func TestManifestToFromBytes(t *testing.T) {
 					},
 				},
 			},
-			`<manifest label="label">
+			`<manifest>
   <imports>
     <import manifest="manifest1" name="remoteimport1" remote="remote1"/>
     <import manifest="manifest2" name="remoteimport2" remote="remote2" remotebranch="branch2"/>

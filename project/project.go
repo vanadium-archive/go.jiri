@@ -44,10 +44,12 @@ type CL struct {
 type Manifest struct {
 	Imports      []Import      `xml:"imports>import"`
 	LocalImports []LocalImport `xml:"imports>localimport"`
-	Label        string        `xml:"label,attr,omitempty"`
 	Projects     []Project     `xml:"projects>project"`
 	Tools        []Tool        `xml:"tools>tool"`
-	XMLName      struct{}      `xml:"manifest"`
+	// SnapshotPath is the relative path to the snapshot file from JIRI_ROOT.
+	// It is only set when running "jiri snapshot checkout <path>".
+	SnapshotPath string   `xml:"snapshotpath,attr,omitempty"`
+	XMLName      struct{} `xml:"manifest"`
 }
 
 // ManifestFromBytes returns a manifest parsed from data, with defaults filled
@@ -97,7 +99,7 @@ var (
 // deepCopy returns a deep copy of Manifest.
 func (m *Manifest) deepCopy() *Manifest {
 	x := new(Manifest)
-	x.Label = m.Label
+	x.SnapshotPath = m.SnapshotPath
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.LocalImports = append([]LocalImport(nil), m.LocalImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
@@ -476,6 +478,15 @@ func (p *Project) validate() error {
 // Projects maps ProjectKeys to Projects.
 type Projects map[ProjectKey]Project
 
+// toSlice returns a slice of Projects in the Projects map.
+func (ps Projects) toSlice() []Project {
+	var pSlice []Project
+	for _, p := range ps {
+		pSlice = append(pSlice, p)
+	}
+	return pSlice
+}
+
 // Find returns all projects in Projects with the given key or name.
 func (ps Projects) Find(keyOrName string) Projects {
 	projects := Projects{}
@@ -511,6 +522,15 @@ func (ps Projects) FindUnique(keyOrName string) (Project, error) {
 
 // Tools maps jiri tool names, to their detailed description.
 type Tools map[string]Tool
+
+// toSlice returns a slice of Tools in the Tools map.
+func (ts Tools) toSlice() []Tool {
+	var tSlice []Tool
+	for _, t := range ts {
+		tSlice = append(tSlice, t)
+	}
+	return tSlice
+}
 
 // Tool represents a jiri tool.
 type Tool struct {
@@ -572,11 +592,11 @@ type Update map[string][]CL
 
 // CreateSnapshot creates a manifest that encodes the current state of master
 // branches of all projects and writes this snapshot out to the given file.
-func CreateSnapshot(jirix *jiri.X, path, label string) error {
+func CreateSnapshot(jirix *jiri.X, path string) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
-	manifest := Manifest{Label: label}
+	manifest := Manifest{}
 
 	// Add all local projects to manifest.
 	localProjects, err := LocalProjects(jirix, FullScan)
@@ -615,7 +635,7 @@ func CreateSnapshot(jirix *jiri.X, path, label string) error {
 
 // CheckoutSnapshot updates project state to the state specified in the given
 // snapshot file.  Note that the snapshot file must not contain remote imports.
-func CheckoutSnapshot(jirix *jiri.X, manifest string, gc bool) error {
+func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 	// Find all local projects.
 	scanMode := FastScan
 	if gc {
@@ -625,14 +645,35 @@ func CheckoutSnapshot(jirix *jiri.X, manifest string, gc bool) error {
 	if err != nil {
 		return err
 	}
-	remoteProjects, remoteTools, err := loadManifestFile(jirix, manifest, nil)
+	remoteProjects, remoteTools, err := loadManifestFile(jirix, snapshot, nil)
 	if err != nil {
 		return err
 	}
 	if err := updateTo(jirix, localProjects, remoteProjects, remoteTools, gc); err != nil {
 		return err
 	}
-	return WriteUpdateHistorySnapshot(jirix)
+	if err := WriteUpdateHistorySnapshot(jirix); err != nil {
+		return err
+	}
+
+	// Get a clean, symlink-free, relative path to the snapshot.
+	snapshotPath := filepath.Clean(snapshot)
+	evaledSnapshotPath, err := filepath.EvalSymlinks(snapshotPath)
+	if err != nil {
+		evaledSnapshotPath = snapshotPath
+
+	}
+	relSnapshotPath, err := filepath.Rel(jirix.Root, evaledSnapshotPath)
+	if err != nil {
+		relSnapshotPath = evaledSnapshotPath
+	}
+	// Write current manifest, including the SnapshotPath.
+	manifest := &Manifest{
+		SnapshotPath: relSnapshotPath,
+		Projects:     remoteProjects.toSlice(),
+		Tools:        remoteTools.toSlice(),
+	}
+	return writeCurrentManifest(jirix, manifest)
 }
 
 // CurrentManifest returns a manifest that identifies the result of
@@ -995,7 +1036,7 @@ func updateTo(jirix *jiri.X, localProjects, remoteProjects Projects, remoteTools
 func WriteUpdateHistorySnapshot(jirix *jiri.X) error {
 	seq := jirix.NewSeq()
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile, "update-history"); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
 
@@ -1756,7 +1797,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 		}
 	}
 	failed := false
-	manifest := &Manifest{Label: jirix.Manifest()}
+	manifest := &Manifest{}
 	s := jirix.NewSeq()
 	for _, op := range ops {
 		updateFn := func() error { return op.Run(jirix, manifest) }
