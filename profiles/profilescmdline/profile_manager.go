@@ -6,6 +6,7 @@ package profilescmdline
 
 import (
 	"fmt"
+	"strings"
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
@@ -25,6 +26,7 @@ type profileManager interface {
 
 func newProfileManager(name string, db *profiles.DB) profileManager {
 	installer, profile := profiles.SplitProfileName(name)
+	installer = strings.TrimSpace(installer)
 	if len(installer) == 0 || installer == profileInstaller {
 		return &inproc{installer, profile, name, db}
 	}

@@ -297,8 +297,10 @@ func allAvailableManagers(jirix *jiri.X) ([]string, error) {
 			fmt.Fprintf(jirix.Stderr(), "failed to run %s %s: %v", sc, strings.Join(args, " "), err)
 			return nil, err
 		}
-		mgrs := strings.TrimSpace(out.String())
-		names = append(names, strings.Split(mgrs, ",")...)
+		mgrs := out.String()
+		for _, m := range strings.Split(mgrs, ",") {
+			names = append(names, strings.TrimSpace(m))
+		}
 	}
 	return names, nil
 }
