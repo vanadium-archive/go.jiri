@@ -44,6 +44,7 @@ pkg gitutil, method (*Git) Pull(string, string) error
 pkg gitutil, method (*Git) Push(string, string, ...PushOpt) error
 pkg gitutil, method (*Git) Rebase(string) error
 pkg gitutil, method (*Git) RebaseAbort() error
+pkg gitutil, method (*Git) RefExistsOnBranch(string, string) bool
 pkg gitutil, method (*Git) RemoteUrl(string) (string, error)
 pkg gitutil, method (*Git) Remove(...string) error
 pkg gitutil, method (*Git) RemoveUntrackedFiles() error

@@ -1462,13 +1462,20 @@ func resetProjectCurrentBranch(jirix *jiri.X, project Project) error {
 	}
 	switch project.Protocol {
 	case "git":
-		// Having a specific revision trumps everything else.
+		git := gitutil.New(jirix.NewSeq())
+		remoteBranch := "origin/" + project.RemoteBranch
+
+		// If a specific revision is set, make sure it exists on the specified
+		// remote branch, and reset to that revision.
 		if project.Revision != "HEAD" {
-			return gitutil.New(jirix.NewSeq()).Reset(project.Revision)
+			if !git.RefExistsOnBranch(project.Revision, remoteBranch) {
+				return fmt.Errorf("revision %q does not exist on remote branch %q", project.Revision, remoteBranch)
+			}
+			return git.Reset(project.Revision)
 		}
-		// If no revision, reset to the configured remote branch, or master
-		// if no remote branch.
-		return gitutil.New(jirix.NewSeq()).Reset("origin/" + project.RemoteBranch)
+
+		// If no revision is set, reset to the remote branch.
+		return git.Reset(remoteBranch)
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
 	}
@@ -2065,10 +2072,6 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		if err := s.Chdir(tmpDir).Done(); err != nil {
 			return err
 		}
-		// TODO(toddw): Why call Reset here, when resetProject is called just below?
-		if err := gitutil.New(jirix.NewSeq()).Reset(op.project.Revision); err != nil {
-			return err
-		}
 	default:
 		return UnsupportedProtocolErr(op.project.Protocol)
 	}
@@ -2193,7 +2196,7 @@ func (op moveOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 }
 
 func (op moveOperation) String() string {
-	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q", op.project.Name, op.source, op.destination, fmtRevision(op.project.Revision))
+	return fmt.Sprintf("move project %q located in %q to %q and advance it to %q of %q", op.project.Name, op.source, op.destination, fmtRevision(op.project.Revision), op.project.RemoteBranch)
 }
 
 func (op moveOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
@@ -2237,7 +2240,7 @@ func (op updateOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 }
 
 func (op updateOperation) String() string {
-	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, fmtRevision(op.project.Revision))
+	return fmt.Sprintf("advance project %q located in %q to %q of %q", op.project.Name, op.source, fmtRevision(op.project.Revision), op.project.RemoteBranch)
 }
 
 func (op updateOperation) Test(jirix *jiri.X, _ *fsUpdates) error {

@@ -536,6 +536,15 @@ func (g *Git) RebaseAbort() error {
 	return g.run("rebase", "--abort")
 }
 
+// RefExistsOnBranch returns true if the given ref exists on the given branch.
+func (g *Git) RefExistsOnBranch(ref, branch string) bool {
+	args := []string{"merge-base", "--is-ancestor", ref, branch}
+	if err := g.run(args...); err != nil {
+		return false
+	}
+	return true
+}
+
 // Remove removes the given files.
 func (g *Git) Remove(fileNames ...string) error {
 	args := []string{"rm"}

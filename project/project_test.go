@@ -172,7 +172,7 @@ func currentRevision(t *testing.T, jirix *jiri.X, name string) string {
 	return revision
 }
 
-// Fix the revision in the manifest file.
+// Set the revision in the manifest file.
 func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, name, revision string) {
 	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
 	if err != nil {
@@ -188,7 +188,28 @@ func setRevisionForProject(t *testing.T, jirix *jiri.X, manifestDir, name, revis
 		}
 	}
 	if !updated {
-		t.Fatalf("failed to fix revision for project %v", name)
+		t.Fatalf("failed to set revision for project %v", name)
+	}
+	commitManifest(t, jirix, m, manifestDir)
+}
+
+// Set the remote branch in the manifest file.
+func setRemoteBranchForProject(t *testing.T, jirix *jiri.X, manifestDir, name, remoteBranch string) {
+	m, err := project.ManifestFromFile(jirix, filepath.Join(manifestDir, "v2", "default"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := false
+	for i, p := range m.Projects {
+		if p.Name == name {
+			p.RemoteBranch = remoteBranch
+			m.Projects[i] = p
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		t.Fatalf("failed to fix remote branch for project %v", name)
 	}
 	commitManifest(t, jirix, m, manifestDir)
 }
@@ -523,14 +544,26 @@ func TestUpdateUniverse(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Commit to a non-master branch of a remote project and check that
-	// UpdateUniverse() can update the local project to point to a revision on
-	// that branch.
+	// Commit to master and non-master branches of a remote project.
+	nonMasterBranch := "non_master"
 	writeReadme(t, jirix, remoteProjects[5], "master commit")
-	createAndCheckoutBranch(t, jirix, remoteProjects[5], "non_master")
+	createAndCheckoutBranch(t, jirix, remoteProjects[5], nonMasterBranch)
 	writeReadme(t, jirix, remoteProjects[5], "non master commit")
 	remoteBranchRevision := currentRevision(t, jirix, remoteProjects[5])
+
+	// Set the revision to the non-master revision, but keep the remote branch
+	// set to master.
 	setRevisionForProject(t, jirix, remoteManifest, remoteProjects[5], remoteBranchRevision)
+	// Check that UpdateUniverse() fails when updating to a revision that does
+	// not occur on the remote branch (master).
+	if err := project.UpdateUniverse(jirix, true); err == nil {
+		t.Fatalf("expected project.UpdateUniverse() with revision that does not occur on remote branch to fail, but it did not")
+	}
+
+	// Set the project remote branch to the non-master branch with the revision.
+	setRemoteBranchForProject(t, jirix, remoteManifest, remoteProjects[5], nonMasterBranch)
+	// Check that UpdateUniverse() can update the local project to point to a
+	// revision on the non-master remote branch.
 	if err := project.UpdateUniverse(jirix, true); err != nil {
 		t.Fatalf("%v", err)
 	}
