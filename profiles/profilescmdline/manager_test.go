@@ -30,7 +30,7 @@ import (
 func TestManagerArgs(t *testing.T) {
 	profilescmdline.Reset()
 	p := parent
-	profilescmdline.RegisterManagementCommands(&p, "", "", jiri.ProfilesRootDir)
+	profilescmdline.RegisterManagementCommands(&p, false, "", "", jiri.ProfilesRootDir)
 	if got, want := len(p.Children), 5; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}

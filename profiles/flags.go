@@ -19,11 +19,6 @@ func RegisterTargetAndEnvFlags(flags *flag.FlagSet, target *Target) {
 	flags.Var(&target.commandLineEnv, "env", target.commandLineEnv.Usage())
 }
 
-// RegisterProfilesFlag registers the --profiles flag
-func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
-	flags.StringVar(profiles, "profiles", "base,jiri", "a comma separated list of profiles to use")
-}
-
 // RegisterTargetFlag registers the commonly used --target flag with
 // the supplied FlagSet.
 func RegisterTargetFlag(flags *flag.FlagSet, target *Target) {

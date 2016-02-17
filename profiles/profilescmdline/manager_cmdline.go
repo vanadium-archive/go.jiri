@@ -254,11 +254,12 @@ var (
 	updateFlags      updateFlagValues
 	availableFlags   availableFlagValues
 	profileInstaller string
+	runSubcommands   bool
 )
 
 // RegisterManagementCommands registers the management subcommands:
 // uninstall, install, update and cleanup.
-func RegisterManagementCommands(parent *cmdline.Command, installer, defaultDBPath, defaultProfilesPath string) {
+func RegisterManagementCommands(parent *cmdline.Command, useSubcommands bool, installer, defaultDBPath, defaultProfilesPath string) {
 	cmdInstall := newCmdInstall()
 	cmdUninstall := newCmdUninstall()
 	cmdUpdate := newCmdUpdate()
@@ -271,9 +272,13 @@ func RegisterManagementCommands(parent *cmdline.Command, installer, defaultDBPat
 	initAvailableCommand(&cmdAvailable.Flags, installer, defaultDBPath, defaultProfilesPath)
 	parent.Children = append(parent.Children, cmdInstall, cmdUninstall, cmdUpdate, cmdCleanup, cmdAvailable)
 	profileInstaller = installer
+	runSubcommands = useSubcommands
 }
 
 func findProfileSubcommands(jirix *jiri.X) []string {
+	if !runSubcommands {
+		return []string{}
+	}
 	fi, err := os.Stat(filepath.Join(jirix.Root, jiri.ProfilesDBDir))
 	if err == nil && fi.IsDir() {
 		env := cmdline.EnvFromOS()

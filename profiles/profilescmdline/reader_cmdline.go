@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -23,8 +24,6 @@ import (
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/textutil"
 )
-
-const DefaultProfiles = "base,jiri"
 
 // IsFlagSet returns true if the specified flag has been set on
 // the command line.
@@ -133,7 +132,17 @@ func RegisterDBPathFlag(flags *flag.FlagSet, manifest *string, defaultDBPath str
 
 // RegisterProfilesFlag registers the --profiles flag
 func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
-	flags.StringVar(profiles, "profiles", DefaultProfiles, "a comma separated list of profiles to use")
+	// TODO(cnicolaou): delete this when the new profiles are in use.
+	root := jiri.FindRoot()
+	fi, err := os.Stat(filepath.Join(root, jiri.ProfilesDBDir))
+	defaultProfiles := "base,jiri"
+	if err == nil && fi.IsDir() {
+		// TODO(cnicolaou): we need a better way of setting the default profiles,
+		// ideally via the profiles db, or some other config. Provide a command
+		// line tool for setting the default profiles.
+		defaultProfiles = "v23:base,jiri"
+	}
+	flags.StringVar(profiles, "profiles", defaultProfiles, "a comma separated list of profiles to use")
 }
 
 // RegisterMergePoliciesFlag registers the --merge-policies flag
