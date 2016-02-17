@@ -21,7 +21,6 @@ pkg tool, method (Context) Verbose() bool
 pkg tool, type Context struct
 pkg tool, type ContextOpts struct
 pkg tool, type ContextOpts struct, Color *bool
-pkg tool, type ContextOpts struct, DryRun *bool
 pkg tool, type ContextOpts struct, Env map[string]string
 pkg tool, type ContextOpts struct, Manifest *string
 pkg tool, type ContextOpts struct, Stderr io.Writer
@@ -30,7 +29,6 @@ pkg tool, type ContextOpts struct, Stdout io.Writer
 pkg tool, type ContextOpts struct, Timer *timing.Timer
 pkg tool, type ContextOpts struct, Verbose *bool
 pkg tool, var ColorFlag bool
-pkg tool, var DryRunFlag bool
 pkg tool, var ManifestFlag string
 pkg tool, var Name string
 pkg tool, var VerboseFlag bool
