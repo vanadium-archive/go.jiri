@@ -278,7 +278,7 @@ func findProfileSubcommands(jirix *jiri.X) []string {
 	if err == nil && fi.IsDir() {
 		env := cmdline.EnvFromOS()
 		env.Vars["PATH"] = jirix.Env()["PATH"]
-		return env.LookPathAll("jiri-profile", map[string]bool{})
+		return env.LookPathPrefix("jiri-profile", map[string]bool{})
 	}
 	return []string{}
 }
