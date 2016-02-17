@@ -22,7 +22,6 @@ import (
 	"v.io/jiri/googlesource"
 	"v.io/jiri/jiri"
 	"v.io/jiri/runutil"
-	"v.io/x/lib/cmdline"
 	"v.io/x/lib/set"
 )
 
@@ -1184,7 +1183,6 @@ func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string)
 // function does not perform any version control operation on the master
 // branch.
 func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputDir string) error {
-	failed := false
 	toolsToBuild, toolProjects := Tools{}, Projects{}
 	toolNames := []string{} // Used for logging purposes.
 	for _, tool := range tools {
@@ -1210,16 +1208,11 @@ func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputD
 		})
 	}
 
-	// Always log the output of updateFn, irrespective of
-	// the value of the verbose flag.
-	if err := jirix.NewSeq().Verbose(true).Call(updateFn, "build tools: %v", strings.Join(toolNames, " ")).Done(); err != nil {
-		fmt.Fprintf(jirix.Stderr(), "%v\n", err)
-		failed = true
-	}
-	if failed {
-		return cmdline.ErrExitCode(2)
-	}
-	return nil
+	// Always log the output of updateFn, irrespective of the value of the
+	// verbose flag.
+	return jirix.NewSeq().Verbose(true).
+		Call(updateFn, "build tools: %v", strings.Join(toolNames, " ")).
+		Done()
 }
 
 // CleanupProjects restores the given jiri projects back to their master
@@ -1367,7 +1360,6 @@ func InstallTools(jirix *jiri.X, dir string) error {
 	if err := jirix.NewSeq().MkdirAll(binDir, 0755).Done(); err != nil {
 		return fmt.Errorf("MkdirAll(%v) failed: %v", binDir, err)
 	}
-	failed := false
 	s := jirix.NewSeq()
 	for _, fi := range fis {
 		installFn := func() error {
@@ -1376,12 +1368,8 @@ func InstallTools(jirix *jiri.X, dir string) error {
 			return jirix.NewSeq().Rename(src, dst).Done()
 		}
 		if err := s.Verbose(true).Call(installFn, "install tool %q", fi.Name()).Done(); err != nil {
-			fmt.Fprintf(jirix.Stderr(), "%v\n", err)
-			failed = true
+			return fmt.Errorf("error installing tool %q: %v", fi.Name(), err)
 		}
-	}
-	if failed {
-		return cmdline.ErrExitCode(2)
 	}
 	return nil
 }
@@ -1796,7 +1784,6 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 			return err
 		}
 	}
-	failed := false
 	manifest := &Manifest{}
 	s := jirix.NewSeq()
 	for _, op := range ops {
@@ -1804,31 +1791,22 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 		// Always log the output of updateFn, irrespective of
 		// the value of the verbose flag.
 		if err := s.Verbose(true).Call(updateFn, "%v", op).Done(); err != nil {
-			fmt.Fprintf(jirix.Stderr(), "%v\n", err)
-			failed = true
+			return fmt.Errorf("error updating project %q: %v", op.Project().Name, err)
 		}
 	}
-	if failed {
-		return cmdline.ErrExitCode(2)
-	}
-
-	// Run all RunHook scripts, apply githooks, and write the current manifest.
-	// TODO(toddw): What's the significance of exit code 2?
-	if !runHooks(jirix, ops) {
-		return cmdline.ErrExitCode(2)
+	if err := runHooks(jirix, ops); err != nil {
+		return err
 	}
 	if err := applyGitHooks(jirix, ops); err != nil {
-		return cmdline.ErrExitCode(2)
+		return err
 	}
 	return writeCurrentManifest(jirix, manifest)
 }
 
-// runHooks runs all hooks for the given operations.  It returns true iff all
-// hooks run successfully.
-func runHooks(jirix *jiri.X, ops []operation) bool {
+// runHooks runs all hooks for the given operations.
+func runHooks(jirix *jiri.X, ops []operation) error {
 	jirix.TimerPush("run hooks")
 	defer jirix.TimerPop()
-	ok := true
 	for _, op := range ops {
 		if op.Project().RunHook == "" {
 			continue
@@ -1843,11 +1821,10 @@ func runHooks(jirix *jiri.X, ops []operation) bool {
 		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(hook, op.Kind()); err != nil {
 			// TODO(nlacasse): Should we delete projectDir or perform some
 			// other cleanup in the event of a hook failure?
-			fmt.Fprintf(jirix.Stderr(), "error running hook for project %q: %v\n", op.Project().Name, err)
-			ok = false
+			return fmt.Errorf("error running hook for project %q: %v", op.Project().Name, err)
 		}
 	}
-	return ok
+	return nil
 }
 
 func applyGitHooks(jirix *jiri.X, ops []operation) error {
