@@ -153,7 +153,7 @@ func getSnapshotDir(jirix *jiri.X) (string, error) {
 func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) error {
 	// Create a snapshot that encodes the current state of master
 	// branches for all local projects.
-	if err := project.CreateSnapshot(jirix, snapshotFile); err != nil {
+	if err := project.CreateSnapshot(jirix, snapshotFile, ""); err != nil {
 		return err
 	}
 

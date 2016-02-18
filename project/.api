@@ -4,8 +4,7 @@ pkg project, func ApplyToLocalMaster(*jiri.X, Projects, func() error) error
 pkg project, func BuildTools(*jiri.X, Projects, Tools, string) error
 pkg project, func CheckoutSnapshot(*jiri.X, string, bool) error
 pkg project, func CleanupProjects(*jiri.X, Projects, bool) error
-pkg project, func CreateSnapshot(*jiri.X, string) error
-pkg project, func CurrentManifest(*jiri.X) (*Manifest, error)
+pkg project, func CreateSnapshot(*jiri.X, string, string) error
 pkg project, func CurrentProjectKey(*jiri.X) (ProjectKey, error)
 pkg project, func DataDirPath(*jiri.X, string) (string, error)
 pkg project, func GetProjectStates(*jiri.X, bool) (map[ProjectKey]*ProjectState, error)
@@ -21,7 +20,7 @@ pkg project, func ProjectAtPath(*jiri.X, string) (Project, error)
 pkg project, func ProjectFromFile(*jiri.X, string) (*Project, error)
 pkg project, func TransitionBinDir(*jiri.X) error
 pkg project, func UpdateUniverse(*jiri.X, bool) error
-pkg project, func WriteUpdateHistorySnapshot(*jiri.X) error
+pkg project, func WriteUpdateHistorySnapshot(*jiri.X, string) error
 pkg project, method (*Import) ProjectKey() ProjectKey
 pkg project, method (*Manifest) ToBytes() ([]byte, error)
 pkg project, method (*Manifest) ToFile(*jiri.X, string) error

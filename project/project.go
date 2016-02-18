@@ -46,7 +46,7 @@ type Manifest struct {
 	Projects     []Project     `xml:"projects>project"`
 	Tools        []Tool        `xml:"tools>tool"`
 	// SnapshotPath is the relative path to the snapshot file from JIRI_ROOT.
-	// It is only set when running "jiri snapshot checkout <path>".
+	// It is only set when creating a snapshot.
 	SnapshotPath string   `xml:"snapshotpath,attr,omitempty"`
 	XMLName      struct{} `xml:"manifest"`
 }
@@ -591,11 +591,27 @@ type Update map[string][]CL
 
 // CreateSnapshot creates a manifest that encodes the current state of master
 // branches of all projects and writes this snapshot out to the given file.
-func CreateSnapshot(jirix *jiri.X, path string) error {
+func CreateSnapshot(jirix *jiri.X, file, snapshotPath string) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
-	manifest := Manifest{}
+	// If snapshotPath is empty, use the file as the path.
+	if snapshotPath == "" {
+		snapshotPath = file
+	}
+
+	// Get a clean, symlink-free, relative path to the snapshot.
+	snapshotPath = filepath.Clean(snapshotPath)
+	if evaledSnapshotPath, err := filepath.EvalSymlinks(snapshotPath); err == nil {
+		snapshotPath = evaledSnapshotPath
+	}
+	if relSnapshotPath, err := filepath.Rel(jirix.Root, snapshotPath); err == nil {
+		snapshotPath = relSnapshotPath
+	}
+
+	manifest := Manifest{
+		SnapshotPath: snapshotPath,
+	}
 
 	// Add all local projects to manifest.
 	localProjects, err := LocalProjects(jirix, FullScan)
@@ -629,7 +645,7 @@ func CreateSnapshot(jirix *jiri.X, path string) error {
 	for _, tool := range tools {
 		manifest.Tools = append(manifest.Tools, tool)
 	}
-	return manifest.ToFile(jirix, path)
+	return manifest.ToFile(jirix, file)
 }
 
 // CheckoutSnapshot updates project state to the state specified in the given
@@ -651,50 +667,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 	if err := updateTo(jirix, localProjects, remoteProjects, remoteTools, gc); err != nil {
 		return err
 	}
-	if err := WriteUpdateHistorySnapshot(jirix); err != nil {
-		return err
-	}
-
-	// Get a clean, symlink-free, relative path to the snapshot.
-	snapshotPath := filepath.Clean(snapshot)
-	evaledSnapshotPath, err := filepath.EvalSymlinks(snapshotPath)
-	if err != nil {
-		evaledSnapshotPath = snapshotPath
-
-	}
-	relSnapshotPath, err := filepath.Rel(jirix.Root, evaledSnapshotPath)
-	if err != nil {
-		relSnapshotPath = evaledSnapshotPath
-	}
-	// Write current manifest, including the SnapshotPath.
-	manifest := &Manifest{
-		SnapshotPath: relSnapshotPath,
-		Projects:     remoteProjects.toSlice(),
-		Tools:        remoteTools.toSlice(),
-	}
-	return writeCurrentManifest(jirix, manifest)
-}
-
-// CurrentManifest returns a manifest that identifies the result of
-// the most recent "jiri update" invocation.
-func CurrentManifest(jirix *jiri.X) (*Manifest, error) {
-	filename := filepath.Join(jirix.Root, ".current_manifest")
-	m, err := ManifestFromFile(jirix, filename)
-	if runutil.IsNotExist(err) {
-		fmt.Fprintf(jirix.Stderr(), `WARNING: Could not find %s.
-The contents of this file are stored as metadata in binaries the jiri
-tool builds. To fix this problem, please run "jiri update".
-`, filename)
-		return &Manifest{}, nil
-	}
-	return m, err
-}
-
-// writeCurrentManifest writes the given manifest to a file that
-// stores the result of the most recent "jiri update" invocation.
-func writeCurrentManifest(jirix *jiri.X, manifest *Manifest) error {
-	filename := filepath.Join(jirix.Root, ".current_manifest")
-	return manifest.ToFile(jirix, filename)
+	return WriteUpdateHistorySnapshot(jirix, snapshot)
 }
 
 // CurrentProjectKey gets the key of the current project from the current
@@ -1032,10 +1005,10 @@ func updateTo(jirix *jiri.X, localProjects, remoteProjects Projects, remoteTools
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
 // projects and writes it to the update history directory.
-func WriteUpdateHistorySnapshot(jirix *jiri.X) error {
+func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string) error {
 	seq := jirix.NewSeq()
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile, snapshotPath); err != nil {
 		return err
 	}
 
@@ -1791,10 +1764,9 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 			return err
 		}
 	}
-	manifest := &Manifest{}
 	s := jirix.NewSeq()
 	for _, op := range ops {
-		updateFn := func() error { return op.Run(jirix, manifest) }
+		updateFn := func() error { return op.Run(jirix) }
 		// Always log the output of updateFn, irrespective of
 		// the value of the verbose flag.
 		if err := s.Verbose(true).Call(updateFn, "%v", op).Done(); err != nil {
@@ -1804,10 +1776,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 	if err := runHooks(jirix, ops); err != nil {
 		return err
 	}
-	if err := applyGitHooks(jirix, ops); err != nil {
-		return err
-	}
-	return writeCurrentManifest(jirix, manifest)
+	return applyGitHooks(jirix, ops)
 }
 
 // runHooks runs all hooks for the given operations.
@@ -1918,39 +1887,6 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	return project.ToFile(jirix, metadataFile)
 }
 
-// addProjectToManifest records the information about the given
-// project in the given manifest. The function is used to create a
-// manifest that records the current state of jiri projects, which
-// can be used to restore this state at some later point.
-//
-// NOTE: The function assumes that the the given project is on a
-// master branch.
-func addProjectToManifest(jirix *jiri.X, manifest *Manifest, project Project) error {
-	if manifest == nil {
-		return nil
-	}
-	// If the project uses relative revision, replace it with an absolute one.
-	switch project.Protocol {
-	case "git":
-		if project.Revision == "HEAD" {
-			revision, err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).CurrentRevision()
-			if err != nil {
-				return err
-			}
-			project.Revision = revision
-		}
-	default:
-		return UnsupportedProtocolErr(project.Protocol)
-	}
-	relPath, err := filepath.Rel(jirix.Root, project.Path)
-	if err != nil {
-		return err
-	}
-	project.Path = relPath
-	manifest.Projects = append(manifest.Projects, project)
-	return nil
-}
-
 // fsUpdates is used to track filesystem updates made by operations.
 // TODO(nlacasse): Currently we only use fsUpdates to track deletions so that
 // jiri can delete and create a project in the same directory in one update.
@@ -1984,7 +1920,7 @@ type operation interface {
 	// Root returns the operation's root directory, relative to JIRI_ROOT.
 	Root() string
 	// Run executes the operation.
-	Run(jirix *jiri.X, manifest *Manifest) error
+	Run(jirix *jiri.X) error
 	// String returns a string representation of the operation.
 	String() string
 	// Test checks whether the operation would fail.
@@ -2022,7 +1958,7 @@ func (op createOperation) Kind() string {
 	return "create"
 }
 
-func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
+func (op createOperation) Run(jirix *jiri.X) (e error) {
 	s := jirix.NewSeq()
 
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
@@ -2059,10 +1995,7 @@ func (op createOperation) Run(jirix *jiri.X, manifest *Manifest) (e error) {
 		Rename(tmpDir, op.destination).Done(); err != nil {
 		return err
 	}
-	if err := syncProjectMaster(jirix, op.project); err != nil {
-		return err
-	}
-	return addProjectToManifest(jirix, manifest, op.project)
+	return syncProjectMaster(jirix, op.project)
 }
 
 func (op createOperation) String() string {
@@ -2092,7 +2025,7 @@ type deleteOperation struct {
 func (op deleteOperation) Kind() string {
 	return "delete"
 }
-func (op deleteOperation) Run(jirix *jiri.X, _ *Manifest) error {
+func (op deleteOperation) Run(jirix *jiri.X) error {
 	s := jirix.NewSeq()
 	if op.gc {
 		// Never delete projects with non-master branches, uncommitted
@@ -2154,7 +2087,7 @@ type moveOperation struct {
 func (op moveOperation) Kind() string {
 	return "move"
 }
-func (op moveOperation) Run(jirix *jiri.X, manifest *Manifest) error {
+func (op moveOperation) Run(jirix *jiri.X) error {
 	s := jirix.NewSeq()
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	if err := s.MkdirAll(path, perm).Rename(op.source, op.destination).Done(); err != nil {
@@ -2166,10 +2099,7 @@ func (op moveOperation) Run(jirix *jiri.X, manifest *Manifest) error {
 	if err := syncProjectMaster(jirix, op.project); err != nil {
 		return err
 	}
-	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
-		return err
-	}
-	return addProjectToManifest(jirix, manifest, op.project)
+	return writeMetadata(jirix, op.project, op.project.Path)
 }
 
 func (op moveOperation) String() string {
@@ -2203,17 +2133,14 @@ type updateOperation struct {
 func (op updateOperation) Kind() string {
 	return "update"
 }
-func (op updateOperation) Run(jirix *jiri.X, manifest *Manifest) error {
+func (op updateOperation) Run(jirix *jiri.X) error {
 	if err := reportNonMaster(jirix, op.project); err != nil {
 		return err
 	}
 	if err := syncProjectMaster(jirix, op.project); err != nil {
 		return err
 	}
-	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
-		return err
-	}
-	return addProjectToManifest(jirix, manifest, op.project)
+	return writeMetadata(jirix, op.project, op.project.Path)
 }
 
 func (op updateOperation) String() string {
@@ -2234,11 +2161,8 @@ func (op nullOperation) Kind() string {
 	return "null"
 }
 
-func (op nullOperation) Run(jirix *jiri.X, manifest *Manifest) error {
-	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
-		return err
-	}
-	return addProjectToManifest(jirix, manifest, op.project)
+func (op nullOperation) Run(jirix *jiri.X) error {
+	return writeMetadata(jirix, op.project, op.project.Path)
 }
 
 func (op nullOperation) String() string {

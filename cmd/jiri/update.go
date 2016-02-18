@@ -57,7 +57,7 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 	if err := retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
-	if err := project.WriteUpdateHistorySnapshot(jirix); err != nil {
+	if err := project.WriteUpdateHistorySnapshot(jirix, ""); err != nil {
 		return err
 	}
 
