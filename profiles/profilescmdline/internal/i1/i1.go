@@ -28,7 +28,7 @@ var commandLineDriver = &cmdline.Command{
 
 func main() {
 	profilesmanager.Register(example.New("i1", "eg"))
-	profilescmdline.RegisterManagementCommands(commandLineDriver, "i1", jiri.ProfilesDBDir, jiri.ProfilesRootDir)
+	profilescmdline.RegisterManagementCommands(commandLineDriver, true, "i1", jiri.ProfilesDBDir, jiri.ProfilesRootDir)
 	tool.InitializeRunFlags(&commandLineDriver.Flags)
 	cmdline.Main(commandLineDriver)
 }

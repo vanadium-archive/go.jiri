@@ -15,7 +15,6 @@ pkg profiles, func NewDB() *DB
 pkg profiles, func NewTarget(string, ...string) (Target, error)
 pkg profiles, func NewVersionInfo(string, map[string]interface{}, string) *VersionInfo
 pkg profiles, func QualifiedProfileName(string, string) string
-pkg profiles, func RegisterProfilesFlag(*flag.FlagSet, *string)
 pkg profiles, func RegisterTargetAndEnvFlags(*flag.FlagSet, *Target)
 pkg profiles, func RegisterTargetFlag(*flag.FlagSet, *Target)
 pkg profiles, func RemoveTarget(Targets, *Target) Targets
