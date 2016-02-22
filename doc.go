@@ -31,8 +31,6 @@ The jiri additional help topics are:
 The jiri flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -58,8 +56,6 @@ The jiri cl commands are:
 The jiri cl flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -83,8 +79,6 @@ The jiri cl cleanup flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -130,8 +124,6 @@ The jiri cl mail flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -152,8 +144,6 @@ Usage:
 The jiri cl new flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -181,8 +171,6 @@ The jiri cl sync flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -252,8 +240,6 @@ The jiri import flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -276,8 +262,6 @@ The jiri profile commands are:
 The jiri profile flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -327,8 +311,6 @@ The jiri profile list flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
 
 Jiri profile env - Display profile environment variables
 
@@ -364,8 +346,6 @@ The jiri profile env flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
 
 Jiri profile install - Install the given profiles
 
@@ -390,8 +370,6 @@ The jiri profile install flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -418,8 +396,6 @@ The jiri profile uninstall flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
 
 Jiri profile update - Install the latest default version of the given profiles
 
@@ -440,8 +416,6 @@ The jiri profile update flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
 
 Jiri profile cleanup - Cleanup the locally installed profiles
 
@@ -471,8 +445,6 @@ The jiri profile cleanup flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
 
 Jiri profile available - List the available profiles
 
@@ -487,8 +459,6 @@ The jiri profile available flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
 
 Jiri project - Manage the jiri projects
 
@@ -506,8 +476,6 @@ The jiri project commands are:
 The jiri project flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -527,8 +495,6 @@ The jiri project clean flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -548,8 +514,6 @@ The jiri project list flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -573,8 +537,6 @@ The jiri project shell-prompt flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -595,8 +557,6 @@ The jiri project poll flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -615,8 +575,6 @@ Usage:
 The jiri rebuild flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -640,8 +598,6 @@ The jiri snapshot flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -663,8 +619,6 @@ The jiri snapshot checkout flags are:
    Use color to format output.
  -dir=
    Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -710,8 +664,6 @@ The jiri snapshot create flags are:
    Use color to format output.
  -dir=
    Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -731,8 +683,6 @@ The jiri snapshot list flags are:
    Use color to format output.
  -dir=
    Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -759,8 +709,6 @@ The jiri update flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -804,8 +752,6 @@ The jiri upgrade flags are:
 
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
@@ -831,8 +777,6 @@ Usage:
 The jiri which flags are:
  -color=true
    Use color to format output.
- -n=false
-   Show what commands will run but do not execute them.
  -v=false
    Print verbose output.
 
