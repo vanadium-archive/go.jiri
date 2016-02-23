@@ -57,9 +57,5 @@ elif [[ ! -x "${JIRI_ROOT}/.jiri_root/bin/jiri" ]]; then
   fatal "${JIRI_ROOT}/.jiri_root/bin/jiri is not executable"
 fi
 
-# Add $JIRI_ROOT/.jiri_root/bin to PATH, so that the jiri binary can find the
-# subcommand binaries.
-export PATH="${JIRI_ROOT}/.jiri_root/bin:${PATH}"
-
 # Execute the jiri binary.
 exec "${JIRI_ROOT}/.jiri_root/bin/jiri" "$@"
