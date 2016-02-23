@@ -40,7 +40,7 @@ func removeTimestamps(t *testing.T, buffer *bytes.Buffer) string {
 
 func TestCommandOK(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	if err := e.run(forever, e.opts, "go", "run", "./testdata/ok_hello.go"); err != nil {
 		t.Fatalf(`Command("go run ./testdata/ok_hello.go") failed: %v`, err)
 	}
@@ -51,7 +51,7 @@ func TestCommandOK(t *testing.T) {
 
 func TestCommandFail(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	if err := e.run(forever, e.opts, "go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`Command("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
@@ -62,7 +62,7 @@ func TestCommandFail(t *testing.T) {
 
 func TestCommandWithOptsOK(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
 	opts := e.opts
 	opts.stdout = &cmdOut
 	if err := e.run(forever, opts, "go", "run", "./testdata/ok_hello.go"); err != nil {
@@ -78,7 +78,7 @@ func TestCommandWithOptsOK(t *testing.T) {
 
 func TestCommandWithOptsFail(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
 	opts := e.opts
 	opts.stdout = &cmdOut
 	if err := e.run(forever, opts, "go", "run", "./testdata/fail_hello.go"); err == nil {
@@ -94,7 +94,7 @@ func TestCommandWithOptsFail(t *testing.T) {
 
 func TestTimedCommandOK(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	if err := e.run(10*time.Second, e.opts, "go", "run", "./testdata/fast_hello.go"); err != nil {
 		t.Fatalf(`TimedCommand("go run ./testdata/fast_hello.go") failed: %v`, err)
 	}
@@ -105,7 +105,7 @@ func TestTimedCommandOK(t *testing.T) {
 
 func TestTimedCommandFail(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	bin, err := buildTestProgram(e, "slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -125,7 +125,7 @@ func TestTimedCommandFail(t *testing.T) {
 
 func TestTimedCommandWithOptsOK(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
 	opts := e.opts
 	opts.stdout = &cmdOut
 	if err := e.run(10*time.Second, opts, "go", "run", "./testdata/fast_hello.go"); err != nil {
@@ -141,7 +141,7 @@ func TestTimedCommandWithOptsOK(t *testing.T) {
 
 func TestTimedCommandWithOptsFail(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
 	bin, err := buildTestProgram(e, "slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -166,7 +166,7 @@ func TestTimedCommandWithOptsFail(t *testing.T) {
 
 func TestFunctionOK(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/ok_hello.go")
 		cmd.Stdout = &out
@@ -182,7 +182,7 @@ func TestFunctionOK(t *testing.T) {
 
 func TestFunctionFail(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/fail_hello.go")
 		cmd.Stdout = &out
@@ -201,7 +201,7 @@ func TestFunctionFail(t *testing.T) {
 
 func TestFunctionWithOptsOK(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, false)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false)
 	opts := e.opts
 	opts.verbose = true
 	fn := func() error {
@@ -222,7 +222,7 @@ func TestFunctionWithOptsOK(t *testing.T) {
 
 func TestFunctionWithOptsFail(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, false)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false)
 	opts := e.opts
 	opts.verbose = true
 	fn := func() error {
@@ -243,7 +243,7 @@ func TestFunctionWithOptsFail(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	e.output(e.opts, []string{"hello", "world"})
 	if got, want := removeTimestamps(t, &out), ">> hello\n>> world\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
@@ -252,7 +252,7 @@ func TestOutput(t *testing.T) {
 
 func TestOutputWithOpts(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, false)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false)
 	opts := e.opts
 	opts.verbose = true
 	e.output(opts, []string{"hello", "world"})
@@ -263,7 +263,7 @@ func TestOutputWithOpts(t *testing.T) {
 
 func TestNested(t *testing.T) {
 	var out bytes.Buffer
-	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, false, true)
+	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
 	fn := func() error {
 		e.output(e.opts, []string{"hello", "world"})
 		return nil

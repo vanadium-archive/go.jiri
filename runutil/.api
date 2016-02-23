@@ -20,7 +20,6 @@ pkg runutil, method (Sequence) Copy(io.Writer, io.Reader) (int64, error)
 pkg runutil, method (Sequence) Create(string) (*os.File, error)
 pkg runutil, method (Sequence) Dir(string) Sequence
 pkg runutil, method (Sequence) Done() error
-pkg runutil, method (Sequence) DryRun(bool) Sequence
 pkg runutil, method (Sequence) Env(map[string]string) Sequence
 pkg runutil, method (Sequence) Error() error
 pkg runutil, method (Sequence) Fprintf(io.Writer, string, ...interface{}) Sequence

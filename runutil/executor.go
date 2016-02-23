@@ -25,7 +25,6 @@ const (
 type opts struct {
 	color   bool
 	dir     string
-	dryRun  bool
 	env     map[string]string
 	stdin   io.Reader
 	stdout  io.Writer
@@ -38,7 +37,7 @@ type executor struct {
 	opts   opts
 }
 
-func newExecutor(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) *executor {
+func newExecutor(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, verbose bool) *executor {
 	if color {
 		term := os.Getenv("TERM")
 		switch term {
@@ -50,7 +49,6 @@ func newExecutor(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 		indent: 0,
 		opts: opts{
 			color:   color,
-			dryRun:  dryRun,
 			env:     env,
 			stdin:   stdin,
 			stdout:  stdout,
@@ -115,28 +113,8 @@ func (e *executor) logLine(line string) {
 }
 
 // call executes the given Go standard library function,
-// encapsulated as a closure, respecting the "dry run" option.
+// encapsulated as a closure.
 func (e *executor) call(fn func() error, format string, args ...interface{}) error {
-	if opts := e.opts; opts.dryRun {
-		opts.verbose = true
-		return e.function(opts, func() error { return nil }, format, args...)
-	}
-	return e.function(e.opts, fn, format, args...)
-}
-
-// alwaysRun executes the given Go standard library function, encapsulated as a
-// closure, but translating "dry run" into "verbose" for this particular
-// command so that the command can execute and thus allow subsequent
-// commands to complete. It is generally used for testing/making files/directories
-// that affect subsequent behaviour.
-func (e *executor) alwaysRun(fn func() error, format string, args ...interface{}) error {
-	if opts := e.opts; opts.dryRun {
-		// Disable the dry run option as this function has no effect and
-		// doing so results in more informative "dry run" output.
-		opts.dryRun = false
-		opts.verbose = true
-		return e.function(opts, fn, format, args...)
-	}
 	return e.function(e.opts, fn, format, args...)
 }
 
@@ -168,7 +146,7 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 	command.Stdout = opts.stdout
 	command.Stderr = opts.stderr
 	command.Env = envvar.MapToSlice(opts.env)
-	if opts.verbose || opts.dryRun {
+	if opts.verbose {
 		args := []string{}
 		for _, arg := range command.Args {
 			// Quote any arguments that contain '"', ''', '|', or ' '.
@@ -179,10 +157,6 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 			}
 		}
 		e.printf(e.opts.stdout, strings.Replace(strings.Join(args, " "), "%", "%%", -1))
-	}
-	if opts.dryRun {
-		e.printf(e.opts.stdout, "OK")
-		return nil, nil
 	}
 
 	if wait {
