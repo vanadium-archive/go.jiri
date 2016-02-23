@@ -65,8 +65,8 @@ mkdir -p "${tmp_dir}" "${bin_dir}" "${scripts_dir}"
 
 # Go get the jiri source files, build the jiri binary, and copy the jiri shim
 # script from the sources.
-GOPATH="${tmp_dir}" go get -d v.io/jiri
-GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" v.io/jiri
+GOPATH="${tmp_dir}" go get -d v.io/jiri/cmd/jiri
+GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" v.io/jiri/cmd/jiri
 cp "${tmp_dir}/src/v.io/jiri/scripts/jiri" "${scripts_dir}/jiri"
 
 # Clean up the tmp_dir.
