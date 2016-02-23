@@ -201,7 +201,7 @@ func TestUpgrade(t *testing.T) {
 	opts := gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf}
 	sh := gosh.NewShell(opts)
 	defer sh.Cleanup()
-	jiriTool := sh.BuildGoPkg("v.io/jiri")
+	jiriTool := sh.BuildGoPkg("v.io/jiri/cmd/jiri")
 	for _, test := range tests {
 		if err := testUpgrade(opts, jiriTool, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)
@@ -264,7 +264,7 @@ func TestUpgradeRevert(t *testing.T) {
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
 	sh.Pushd(jiriRoot)
-	jiriTool := sh.BuildGoPkg("v.io/jiri")
+	jiriTool := sh.BuildGoPkg("v.io/jiri/cmd/jiri")
 	localData := `<manifest/>`
 	jiriData := `<manifest>
   <imports>

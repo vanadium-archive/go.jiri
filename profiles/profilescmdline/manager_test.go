@@ -76,7 +76,7 @@ func buildInstallers(t *testing.T) string {
 	buildInstallersOnce.Do(func() {
 		sh := newShell(t)
 		prefix := "v.io/jiri/profiles/profilescmdline/internal/"
-		sh.BuildGoPkg("v.io/jiri", "-o", "jiri")
+		sh.BuildGoPkg("v.io/jiri/cmd/jiri", "-o", "jiri")
 		sh.BuildGoPkg(prefix+"i1", "-o", "jiri-profile-i1")
 		sh.BuildGoPkg(prefix+"i2", "-o", "jiri-profile-i2")
 		buildInstallersBindir = sh.Opts.BinDir
@@ -87,7 +87,7 @@ func buildInstallers(t *testing.T) string {
 func buildJiri(t *testing.T) string {
 	buildJiriOnce.Do(func() {
 		sh := newShell(t)
-		sh.BuildGoPkg("v.io/jiri", "-o", "jiri")
+		sh.BuildGoPkg("v.io/jiri/cmd/jiri", "-o", "jiri")
 		buildJiriBindir = sh.Opts.BinDir
 	})
 	return buildJiriBindir

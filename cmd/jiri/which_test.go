@@ -16,7 +16,7 @@ func TestWhich(t *testing.T) {
 	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
 	defer sh.Cleanup()
 
-	jiriBinary := sh.BuildGoPkg("v.io/jiri")
+	jiriBinary := sh.BuildGoPkg("v.io/jiri/cmd/jiri")
 	stdout, stderr := sh.Cmd(jiriBinary, []string{"which"}...).StdoutStderr()
 	if got, want := stdout, fmt.Sprintf("# binary\n%s\n", jiriBinary); got != want {
 		t.Errorf("stdout got %q, want %q", got, want)

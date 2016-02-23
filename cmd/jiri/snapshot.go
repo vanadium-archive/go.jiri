@@ -266,19 +266,18 @@ func runSnapshotList(jirix *jiri.X, args []string) error {
 	}
 
 	// Check that all labels exist.
-	failed := false
+	var notexist []string
 	for _, label := range args {
 		labelDir := filepath.Join(snapshotDir, "labels", label)
-		if _, err := jirix.NewSeq().Stat(labelDir); err != nil {
-			if !runutil.IsNotExist(err) {
-				return err
-			}
-			failed = true
-			fmt.Fprintf(jirix.Stderr(), "snapshot label %q not found", label)
+		switch _, err := jirix.NewSeq().Stat(labelDir); {
+		case runutil.IsNotExist(err):
+			notexist = append(notexist, label)
+		case err != nil:
+			return err
 		}
 	}
-	if failed {
-		return cmdline.ErrExitCode(2)
+	if len(notexist) > 0 {
+		return fmt.Errorf("snapshot labels %v not found", notexist)
 	}
 
 	// Print snapshots for all labels.
