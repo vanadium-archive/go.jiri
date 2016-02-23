@@ -212,7 +212,7 @@ func (g *Git) CommitWithMessageAndEdit(message string) error {
 // Committers returns a list of committers for the current repository
 // along with the number of their commits.
 func (g *Git) Committers() ([]string, error) {
-	out, err := g.runOutputNoDryRun("shortlog", "-s", "-n", "-e")
+	out, err := g.runOutput("shortlog", "-s", "-n", "-e")
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (g *Git) CountCommits(branch, base string) (int, error) {
 		args = append(args, "^"+base)
 	}
 	args = append(args, "--")
-	out, err := g.runOutputNoDryRun(args...)
+	out, err := g.runOutput(args...)
 	if err != nil {
 		return 0, err
 	}
@@ -260,7 +260,7 @@ func (g *Git) CreateBranchWithUpstream(branch, upstream string) error {
 
 // CurrentBranchName returns the name of the current branch.
 func (g *Git) CurrentBranchName() (string, error) {
-	out, err := g.runOutputNoDryRun("rev-parse", "--abbrev-ref", "HEAD")
+	out, err := g.runOutput("rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", err
 	}
@@ -277,7 +277,7 @@ func (g *Git) CurrentRevision() (string, error) {
 
 // CurrentRevisionOfBranch returns the current revision of the given branch.
 func (g *Git) CurrentRevisionOfBranch(branch string) (string, error) {
-	out, err := g.runOutputNoDryRun("rev-parse", branch)
+	out, err := g.runOutput("rev-parse", branch)
 	if err != nil {
 		return "", err
 	}
@@ -336,7 +336,7 @@ func (g *Git) FilesWithUncommittedChanges() ([]string, error) {
 // (e.g. --merged).
 func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	args = append([]string{"branch"}, args...)
-	out, err := g.runOutputNoDryRun(args...)
+	out, err := g.runOutput(args...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -555,7 +555,7 @@ func (g *Git) Remove(fileNames ...string) error {
 // RemoteUrl gets the url of the remote with the given name.
 func (g *Git) RemoteUrl(name string) (string, error) {
 	configKey := fmt.Sprintf("remote.%s.url", name)
-	out, err := g.runOutputNoDryRun("config", "--get", configKey)
+	out, err := g.runOutput("config", "--get", configKey)
 	if err != nil {
 		return "", err
 	}
@@ -630,7 +630,7 @@ func (g *Git) StashPop() error {
 // TopLevel returns the top level path of the current repository.
 func (g *Git) TopLevel() (string, error) {
 	// TODO(sadovsky): If g.rootDir is set, perhaps simply return that?
-	out, err := g.runOutputNoDryRun("rev-parse", "--show-toplevel")
+	out, err := g.runOutput("rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", err
 	}
@@ -657,7 +657,7 @@ func (g *Git) UntrackedFiles() ([]string, error) {
 
 // Version returns the major and minor git version.
 func (g *Git) Version() (int, int, error) {
-	out, err := g.runOutputNoDryRun("version")
+	out, err := g.runOutput("version")
 	if err != nil {
 		return 0, 0, err
 	}
@@ -703,21 +703,6 @@ func trimOutput(o string) []string {
 func (g *Git) runOutput(args ...string) ([]string, error) {
 	var stdout, stderr bytes.Buffer
 	fn := func(s runutil.Sequence) runutil.Sequence { return s.Capture(&stdout, &stderr) }
-	if err := g.runWithFn(fn, args...); err != nil {
-		return nil, Error(stdout.String(), stderr.String(), args...)
-	}
-	return trimOutput(stdout.String()), nil
-}
-
-func (g *Git) runOutputNoDryRun(args ...string) ([]string, error) {
-	var stdout, stderr bytes.Buffer
-	fn := func(s runutil.Sequence) runutil.Sequence {
-		dryrun, _ := s.RunOpts()
-		if dryrun {
-			return s.DryRun(false).Verbose(true).Capture(&stdout, &stderr)
-		}
-		return s.Capture(&stdout, &stderr)
-	}
 	if err := g.runWithFn(fn, args...); err != nil {
 		return nil, Error(stdout.String(), stderr.String(), args...)
 	}

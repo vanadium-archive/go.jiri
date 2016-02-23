@@ -358,24 +358,6 @@ hello
 		}
 		stdout.Reset()
 	}
-	for _, dryRun := range []bool{false, true} {
-		err := seq.DryRun(dryRun).Last("sh", "-c", "echo hello")
-		if err != nil {
-			t.Fatal(err)
-		}
-		out := sanitizeTimestampsAndPaths(stdout.String())
-		want := `[hh:mm:ss.xx] >> sh -c "echo hello"
-[hh:mm:ss.xx] >> OK
-`
-		if !dryRun {
-			want += `hello
-`
-		}
-		if got, want := out, want; got != want {
-			t.Errorf("dryRun: %t, got %v, want %v", dryRun, got, want)
-		}
-		stdout.Reset()
-	}
 }
 
 func TestSequenceOutputOnError(t *testing.T) {

@@ -94,7 +94,6 @@ type sequence struct {
 	defaultStdout, defaultStderr io.Writer
 	dirs                         []string
 	verbosity                    *bool
-	dryRun                       *bool
 	cmdDir                       string
 	timeout                      time.Duration
 	serializedWriterLock         sync.Mutex
@@ -110,7 +109,7 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 	}
 	s := Sequence{
 		&sequence{
-			r:            newExecutor(env, stdin, stdout, stderr, color, dryRun, verbose),
+			r:            newExecutor(env, stdin, stdout, stderr, color, verbose),
 			defaultStdin: stdin,
 		},
 	}
@@ -122,7 +121,7 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 // create this sequence.
 func (s Sequence) RunOpts() (dryRun bool, verbose bool) {
 	opts := s.getOpts()
-	return opts.dryRun, opts.verbose
+	return false, opts.verbose
 }
 
 // Capture arranges for the next call to Run or Last to write its stdout and
@@ -199,17 +198,6 @@ func (s Sequence) Dir(dir string) Sequence {
 		return s
 	}
 	s.cmdDir = dir
-	return s
-}
-
-// DryRun arranges for the next call to Run, Call, Start or Last to use the
-// specified dry run value. This will be cleared and not used for any calls
-// to Run, Call or Last beyond the next one.
-func (s Sequence) DryRun(dryRun bool) Sequence {
-	if s.err != nil {
-		return s
-	}
-	s.dryRun = &dryRun
 	return s
 }
 
@@ -334,7 +322,7 @@ func (s Sequence) setError(err error, detail string) {
 // reset all state except s.err
 func (s Sequence) reset() {
 	s.stdin, s.stdout, s.stderr, s.env = nil, nil, nil, nil
-	s.opts, s.verbosity, s.dryRun = nil, nil, nil
+	s.opts, s.verbosity = nil, nil
 	s.cmdDir = ""
 	s.reading = false
 	s.timeout = 0
@@ -421,9 +409,6 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 		if s.verbosity != nil {
 			opts.verbose = *s.verbosity
 		}
-		if s.dryRun != nil {
-			opts.dryRun = *s.dryRun
-		}
 		opts.dir = s.cmdDir
 		s.setOpts(opts)
 		if h != nil {
@@ -484,9 +469,6 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 	}
 	if s.verbosity != nil {
 		opts.verbose = *s.verbosity
-	}
-	if s.dryRun != nil {
-		opts.dryRun = *s.dryRun
 	}
 	opts.dir = s.cmdDir
 	s.setOpts(opts)
@@ -640,7 +622,7 @@ func (s Sequence) Done() error {
 	if len(s.dirs) > 0 {
 		cwd := s.dirs[0]
 		s.dirs = nil
-		err := s.r.alwaysRun(func() error {
+		err := s.r.call(func() error {
 			return os.Chdir(cwd)
 		}, fmt.Sprintf("sequence done popd %q", cwd))
 		if err != nil {
@@ -668,7 +650,7 @@ func (s Sequence) Pushd(dir string) Sequence {
 		return s
 	}
 	s.dirs = append(s.dirs, cwd)
-	err = s.r.alwaysRun(func() error {
+	err = s.r.call(func() error {
 		return os.Chdir(dir)
 	}, fmt.Sprintf("pushd %q", dir))
 	s.setError(err, "Pushd("+dir+")")
@@ -688,7 +670,7 @@ func (s Sequence) Popd() Sequence {
 	}
 	last := s.dirs[len(s.dirs)-1]
 	s.dirs = s.dirs[:len(s.dirs)-1]
-	err := s.r.alwaysRun(func() error {
+	err := s.r.call(func() error {
 		return os.Chdir(last)
 	}, fmt.Sprintf("popd %q", last))
 	s.setError(err, "Popd() -> "+last)
@@ -696,12 +678,12 @@ func (s Sequence) Popd() Sequence {
 }
 
 // Chdir is a wrapper around os.Chdir that handles options such as
-// "verbose" or "dry run".
+// "verbose".
 func (s Sequence) Chdir(dir string) Sequence {
 	if s.err != nil {
 		return s
 	}
-	err := s.r.alwaysRun(func() error {
+	err := s.r.call(func() error {
 		return os.Chdir(dir)
 	}, fmt.Sprintf("cd %q", dir))
 	s.setError(err, "Chdir("+dir+")")
@@ -710,7 +692,7 @@ func (s Sequence) Chdir(dir string) Sequence {
 }
 
 // Chmod is a wrapper around os.Chmod that handles options such as
-// "verbose" or "dry run".
+// "verbose".
 func (s Sequence) Chmod(dir string, mode os.FileMode) Sequence {
 	if s.err != nil {
 		return s
@@ -722,7 +704,7 @@ func (s Sequence) Chmod(dir string, mode os.FileMode) Sequence {
 }
 
 // MkdirAll is a wrapper around os.MkdirAll that handles options such
-// as "verbose" or "dry run".
+// as "verbose".
 func (s Sequence) MkdirAll(dir string, mode os.FileMode) Sequence {
 	if s.err != nil {
 		return s
@@ -733,7 +715,7 @@ func (s Sequence) MkdirAll(dir string, mode os.FileMode) Sequence {
 }
 
 // RemoveAll is a wrapper around os.RemoveAll that handles options
-// such as "verbose" or "dry run".
+// such as "verbose".
 func (s Sequence) RemoveAll(dir string) Sequence {
 	if s.err != nil {
 		return s
@@ -744,7 +726,7 @@ func (s Sequence) RemoveAll(dir string) Sequence {
 }
 
 // Remove is a wrapper around os.Remove that handles options
-// such as "verbose" or "dry run".
+// such as "verbose".
 func (s Sequence) Remove(file string) Sequence {
 	if s.err != nil {
 		return s
@@ -755,7 +737,7 @@ func (s Sequence) Remove(file string) Sequence {
 }
 
 // Rename is a wrapper around os.Rename that handles options such as
-// "verbose" or "dry run".
+// "verbose".
 func (s Sequence) Rename(src, dst string) Sequence {
 	if s.err != nil {
 		return s
@@ -785,7 +767,7 @@ func (s Sequence) Rename(src, dst string) Sequence {
 }
 
 // Symlink is a wrapper around os.Symlink that handles options such as
-// "verbose" or "dry run".
+// "verbose".
 func (s Sequence) Symlink(src, dst string) Sequence {
 	if s.err != nil {
 		return s
@@ -796,7 +778,7 @@ func (s Sequence) Symlink(src, dst string) Sequence {
 }
 
 // Open is a wrapper around os.Open that handles options such as
-// "verbose" or "dry run". Open is a terminating function.
+// "verbose". Open is a terminating function.
 func (s Sequence) Open(name string) (f *os.File, err error) {
 	if s.err != nil {
 		return nil, s.Done()
@@ -811,7 +793,7 @@ func (s Sequence) Open(name string) (f *os.File, err error) {
 }
 
 // OpenFile is a wrapper around os.OpenFile that handles options such as
-// "verbose" or "dry run". OpenFile is a terminating function.
+// "verbose". OpenFile is a terminating function.
 func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (f *os.File, err error) {
 	if s.err != nil {
 		return nil, s.Done()
@@ -826,7 +808,7 @@ func (s Sequence) OpenFile(name string, flag int, perm os.FileMode) (f *os.File,
 }
 
 // Create is a wrapper around os.Create that handles options such as "verbose"
-// or "dry run". Create is a terminating function.
+//. Create is a terminating function.
 func (s Sequence) Create(name string) (f *os.File, err error) {
 	if s.err != nil {
 		return nil, s.Done()
@@ -842,12 +824,12 @@ func (s Sequence) Create(name string) (f *os.File, err error) {
 }
 
 // ReadDir is a wrapper around ioutil.ReadDir that handles options
-// such as "verbose" or "dry run". ReadDir is a terminating function.
+// such as "verbose". ReadDir is a terminating function.
 func (s Sequence) ReadDir(dirname string) (fi []os.FileInfo, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	s.r.alwaysRun(func() error {
+	s.r.call(func() error {
 		fi, err = ioutil.ReadDir(dirname)
 		return err
 	}, fmt.Sprintf("ls %q", dirname))
@@ -857,13 +839,13 @@ func (s Sequence) ReadDir(dirname string) (fi []os.FileInfo, err error) {
 }
 
 // ReadFile is a wrapper around ioutil.ReadFile that handles options
-// such as "verbose" or "dry run". ReadFile is a terminating function.
+// such as "verbose". ReadFile is a terminating function.
 func (s Sequence) ReadFile(filename string) (bytes []byte, err error) {
 
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	s.r.alwaysRun(func() error {
+	s.r.call(func() error {
 		bytes, err = ioutil.ReadFile(filename)
 		return err
 	}, fmt.Sprintf("read %q", filename))
@@ -873,7 +855,7 @@ func (s Sequence) ReadFile(filename string) (bytes []byte, err error) {
 }
 
 // WriteFile is a wrapper around ioutil.WriteFile that handles options
-// such as "verbose" or "dry run".
+// such as "verbose".
 func (s Sequence) WriteFile(filename string, data []byte, perm os.FileMode) Sequence {
 	if s.err != nil {
 		return s
@@ -901,12 +883,12 @@ func (s Sequence) Copy(dst io.Writer, src io.Reader) (n int64, err error) {
 }
 
 // Stat is a wrapper around os.Stat that handles options such as
-// "verbose" or "dry run". Stat is a terminating function.
+// "verbose". Stat is a terminating function.
 func (s Sequence) Stat(name string) (fi os.FileInfo, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	s.r.alwaysRun(func() error {
+	s.r.call(func() error {
 		fi, err = os.Stat(name)
 		return err
 	}, fmt.Sprintf("stat %q", name))
@@ -916,12 +898,12 @@ func (s Sequence) Stat(name string) (fi os.FileInfo, err error) {
 }
 
 // Lstat is a wrapper around os.Lstat that handles options such as
-// "verbose" or "dry run". Lstat is a terminating function.
+// "verbose". Lstat is a terminating function.
 func (s Sequence) Lstat(name string) (fi os.FileInfo, err error) {
 	if s.err != nil {
 		return nil, s.Done()
 	}
-	s.r.alwaysRun(func() error {
+	s.r.call(func() error {
 		fi, err = os.Lstat(name)
 		return err
 	}, fmt.Sprintf("lstat %q", name))
@@ -931,12 +913,12 @@ func (s Sequence) Lstat(name string) (fi os.FileInfo, err error) {
 }
 
 // Readlink is a wrapper around os.Readlink that handles options such as
-// "verbose" or "dry run". Lstat is a terminating function.
+// "verbose". Lstat is a terminating function.
 func (s Sequence) Readlink(name string) (link string, err error) {
 	if s.err != nil {
 		return "", s.Done()
 	}
-	s.r.alwaysRun(func() error {
+	s.r.call(func() error {
 		link, err = os.Readlink(name)
 		return err
 	}, fmt.Sprintf("readlink %q", name))
@@ -946,7 +928,7 @@ func (s Sequence) Readlink(name string) (link string, err error) {
 }
 
 // TempDir is a wrapper around ioutil.TempDir that handles options
-// such as "verbose" or "dry run". TempDir is a terminating function.
+// such as "verbose". TempDir is a terminating function.
 func (s Sequence) TempDir(dir, prefix string) (tmpDir string, err error) {
 	if s.err != nil {
 		return "", s.Done()
@@ -965,7 +947,7 @@ func (s Sequence) TempDir(dir, prefix string) (tmpDir string, err error) {
 }
 
 // TempFile is a wrapper around ioutil.TempFile that handles options
-// such as "verbose" or "dry run".
+// such as "verbose".
 func (s Sequence) TempFile(dir, prefix string) (f *os.File, err error) {
 	if s.err != nil {
 		return nil, s.Done()
@@ -991,7 +973,7 @@ func (s Sequence) IsDir(dirname string) (bool, error) {
 	}
 	var fileInfo os.FileInfo
 	var err error
-	err = s.r.alwaysRun(func() error {
+	err = s.r.call(func() error {
 		fileInfo, err = os.Stat(dirname)
 		return err
 	}, fmt.Sprintf("isdir %q", dirname))
@@ -1014,7 +996,7 @@ func (s Sequence) IsFile(file string) (bool, error) {
 	}
 	var fileInfo os.FileInfo
 	var err error
-	err = s.r.alwaysRun(func() error {
+	err = s.r.call(func() error {
 		fileInfo, err = os.Stat(file)
 		return err
 	}, fmt.Sprintf("isfile %q", file))
