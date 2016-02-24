@@ -17,7 +17,6 @@ pkg jiri, method (*X) JiriManifestFile() string
 pkg jiri, method (*X) ProfilesDBDir() string
 pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
 pkg jiri, method (*X) RootMetaDir() string
-pkg jiri, method (*X) ScriptsDir() string
 pkg jiri, method (*X) UpdateHistoryDir() string
 pkg jiri, method (*X) UpdateHistoryLatestLink() string
 pkg jiri, method (*X) UpdateHistorySecondLatestLink() string
