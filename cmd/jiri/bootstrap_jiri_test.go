@@ -6,8 +6,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,6 +38,31 @@ func TestBootstrapJiri(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(rootDir, ".jiri_root", "scripts", "jiri")); err != nil {
 		t.Error(err)
 	}
+}
+
+// TestBuildJiriLocally checks that the jiri binary built in the bootstrap
+// script can be built locally.
+func TestBuildJiriLocally(t *testing.T) {
+	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
+	defer sh.Cleanup()
+
+	// Extract jiri package path from this line.
+	// GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" v.io/jiri/cmd/jiri
+	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
+	if err != nil {
+		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")
+	}
+	pkgRE := regexp.MustCompile(`.*go build.*\s([^\s]*)\n`)
+	content, err := ioutil.ReadFile(bootstrap)
+	if err != nil {
+		t.Fatalf("couldn't read bootstrap script: %v", err)
+	}
+	matches := pkgRE.FindStringSubmatch(string(content))
+	if len(matches) <= 1 {
+		t.Fatalf("couldn't find jiri package from the bootstrap_jiri script")
+	}
+	pkg := matches[1]
+	sh.Cmd("jiri", "go", "build", "-o", filepath.Join(sh.MakeTempDir(), "jiri"), pkg).Run()
 }
 
 func TestBootstrapJiriAlreadyExists(t *testing.T) {
