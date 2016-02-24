@@ -95,10 +95,17 @@ func TestCommandWithOptsFail(t *testing.T) {
 func TestTimedCommandOK(t *testing.T) {
 	var out bytes.Buffer
 	e := newExecutor(nil, os.Stdin, &out, ioutil.Discard, false, true)
-	if err := e.run(10*time.Second, e.opts, "go", "run", "./testdata/fast_hello.go"); err != nil {
+	bin, err := buildTestProgram(e, "fast_hello")
+	if bin != "" {
+		defer os.RemoveAll(filepath.Dir(bin))
+	}
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := e.run(2*time.Minute, e.opts, bin); err != nil {
 		t.Fatalf(`TimedCommand("go run ./testdata/fast_hello.go") failed: %v`, err)
 	}
-	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fast_hello.go\nhello\n>> OK\n"; got != want {
+	if got, want := removeTimestamps(t, &out), fmt.Sprintf(">> %s\nhello\n>> OK\n", bin); got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
 }
@@ -126,12 +133,19 @@ func TestTimedCommandFail(t *testing.T) {
 func TestTimedCommandWithOptsOK(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
 	e := newExecutor(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
+	bin, err := buildTestProgram(e, "fast_hello")
+	if bin != "" {
+		defer os.RemoveAll(filepath.Dir(bin))
+	}
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 	opts := e.opts
 	opts.stdout = &cmdOut
-	if err := e.run(10*time.Second, opts, "go", "run", "./testdata/fast_hello.go"); err != nil {
+	if err := e.run(2*time.Minute, opts, bin); err != nil {
 		t.Fatalf(`TimedCommandWithOpts("go run ./testdata/fast_hello.go") failed: %v`, err)
 	}
-	if got, want := removeTimestamps(t, &runOut), ">> go run ./testdata/fast_hello.go\n>> OK\n"; got != want {
+	if got, want := removeTimestamps(t, &runOut), fmt.Sprintf(">> %s\n>> OK\n", bin); got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
 	if got, want := strings.TrimSpace(cmdOut.String()), "hello"; got != want {
