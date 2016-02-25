@@ -19,7 +19,6 @@ import (
 
 	"v.io/jiri/jiri"
 	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesmanager"
 	"v.io/jiri/profiles/profilesreader"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/textutil"
@@ -104,10 +103,6 @@ type ReaderFlagValues struct {
 // listFlagValues contains the flag values expected by the list subcommand
 type listFlagValues struct {
 	*ReaderFlagValues
-	// The value of --show-profiles-db
-	showProfilesDB bool
-	// The value of --available
-	available bool
 	// The value of --info
 	info string
 }
@@ -126,7 +121,7 @@ var (
 // RegisterDBPathFlag registers the --profiles-db flag with the supplied FlagSet.
 func RegisterDBPathFlag(flags *flag.FlagSet, manifest *string, defaultDBPath string) {
 	root := jiri.FindRoot()
-	flags.StringVar(manifest, "profiles-db", filepath.Join(root, defaultDBPath), "specify the profiles database directory or file.")
+	flags.StringVar(manifest, "profiles-db", filepath.Join(root, defaultDBPath), "the path, relative to JIRI_ROOT, that contains the profiles database.")
 	flags.Lookup("profiles-db").DefValue = filepath.Join("$JIRI_ROOT", defaultDBPath)
 }
 
@@ -159,19 +154,13 @@ func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *profilesreader.Mer
 //  --profiles
 //  --merge-policies
 //  --target and --env
-func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBLocation string) {
+func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBPath string) {
 	flags.Var(&fv.ProfilesMode, "skip-profiles", "if set, no profiles will be used")
-	RegisterDBPathFlag(flags, &fv.DBFilename, defaultDBLocation)
+	RegisterDBPathFlag(flags, &fv.DBFilename, defaultDBPath)
 	RegisterProfilesFlag(flags, &fv.Profiles)
 	fv.MergePolicies = profilesreader.JiriMergePolicies()
 	RegisterMergePoliciesFlag(flags, &fv.MergePolicies)
 	profiles.RegisterTargetAndEnvFlags(flags, &fv.Target)
-}
-
-func initializeReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBLocation string) {
-	envFlags.ReaderFlagValues = fv
-	listFlags.ReaderFlagValues = fv
-	RegisterReaderFlags(flags, fv, defaultDBLocation)
 }
 
 // RegisterReaderCommandsUsingParent registers the 'reader' flags
@@ -180,18 +169,20 @@ func initializeReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBL
 // the supplied ReaderFlagValues struct.
 // RegisterReaderCommandsUsingParent results in a command line of the form:
 // <parent> <reader-flags> [list|env] <list/env specific commands>
-func RegisterReaderCommandsUsingParent(parent *cmdline.Command, fv *ReaderFlagValues, defaultDBLocation string) {
-	initializeReaderFlags(&parent.Flags, fv, defaultDBLocation)
-	RegisterReaderCommands(parent, defaultDBLocation)
+func RegisterReaderCommandsUsingParent(parent *cmdline.Command, fv *ReaderFlagValues, defaultDBPath string) {
+	envFlags.ReaderFlagValues = fv
+	listFlags.ReaderFlagValues = fv
+	RegisterReaderFlags(&parent.Flags, fv, defaultDBPath)
+	RegisterReaderCommands(parent, defaultDBPath)
 }
 
 // RegisterReaderCommands registers the list and env subcommands. The
 // subcommands will host the 'reader' flags (see RegisterReaderFlags)
 // resulting in a command line of the form:
 // <parent> [list|env] <reader-flags> <list/env specific specific commands>
-func RegisterReaderCommands(parent *cmdline.Command, defaultDBLocation string) {
-	registerListCommand(parent, defaultDBLocation)
-	registerEnvCommand(parent, defaultDBLocation)
+func RegisterReaderCommands(parent *cmdline.Command, defaultDBPath string) {
+	registerListCommand(parent, defaultDBPath)
+	registerEnvCommand(parent, defaultDBPath)
 }
 
 func newReaderFlags() *ReaderFlagValues {
@@ -200,59 +191,30 @@ func newReaderFlags() *ReaderFlagValues {
 
 // registerListCommand the profiles list subcommand and returns it
 // and a struct containing  the values of the command line flags.
-func registerListCommand(parent *cmdline.Command, defaultDBLocation string) {
+func registerListCommand(parent *cmdline.Command, defaultDBPath string) {
 	parent.Children = append(parent.Children, cmdList)
 	if listFlags.ReaderFlagValues == nil {
 		listFlags.ReaderFlagValues = newReaderFlags()
-		RegisterReaderFlags(&cmdList.Flags, listFlags.ReaderFlagValues, defaultDBLocation)
+		RegisterReaderFlags(&cmdList.Flags, listFlags.ReaderFlagValues, defaultDBPath)
 	}
 	cmdList.Flags.BoolVar(&listFlags.Verbose, "v", false, "print more detailed information")
-	cmdList.Flags.BoolVar(&listFlags.showProfilesDB, "show-profiles-db", false, "print out the profiles database file")
-	cmdList.Flags.BoolVar(&listFlags.available, "available", false, "print the list of available profiles")
 	cmdList.Flags.StringVar(&listFlags.info, "info", "", infoUsage())
 }
 
 // registerEnvCommand the profiles env subcommand and returns it and a
 // struct containing the values of the command line flags.
-func registerEnvCommand(parent *cmdline.Command, defaultDBLocation string) {
+func registerEnvCommand(parent *cmdline.Command, defaultDBPath string) {
 	parent.Children = append(parent.Children, cmdEnv)
 	if envFlags.ReaderFlagValues == nil {
 		envFlags.ReaderFlagValues = newReaderFlags()
-		RegisterReaderFlags(&cmdEnv.Flags, envFlags.ReaderFlagValues, defaultDBLocation)
+		RegisterReaderFlags(&cmdEnv.Flags, envFlags.ReaderFlagValues, defaultDBPath)
 	}
 	cmdEnv.Flags.BoolVar(&envFlags.Verbose, "v", false, "print more detailed information")
 }
 
 func runList(jirix *jiri.X, args []string) error {
-	if listFlags.showProfilesDB {
-		data, err := jirix.NewSeq().ReadFile(listFlags.DBFilename)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(jirix.Stdout(), string(data))
-		return nil
-	}
 	if listFlags.Verbose {
-		fmt.Fprintf(jirix.Stdout(), "Profiles Database Filename: %s\n", listFlags.DBFilename)
-	}
-	if listFlags.available {
-		managers := profilesmanager.Managers()
-		// TODO(cnicolaou): this will need to run the external
-		// profile installer subcommands to obtain the list of
-		// profiles that can be installed by them. For now it
-		// just assumes they are all linked into this binary.
-		if listFlags.Verbose {
-			fmt.Fprintf(jirix.Stdout(), "Available Profiles:\n")
-			for _, name := range managers {
-				mgr := profilesmanager.LookupManager(name)
-				vi := mgr.VersionInfo()
-				fmt.Fprintf(jirix.Stdout(), "%s: versions: %s\n", name, vi)
-			}
-		} else {
-			if len(managers) > 0 {
-				fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(managers, ", "))
-			}
-		}
+		fmt.Fprintf(jirix.Stdout(), "Profiles Database Path: %s\n", listFlags.DBFilename)
 	}
 	rd, err := profilesreader.NewReader(jirix, listFlags.ProfilesMode, listFlags.DBFilename)
 	if err != nil {
@@ -260,57 +222,58 @@ func runList(jirix *jiri.X, args []string) error {
 	}
 	profileNames := args
 	if len(args) == 0 {
-		if IsFlagSet(&cmdList.Flags, "profiles") {
+		if IsFlagSet(cmdList.ParsedFlags, "profiles") {
 			profileNames = strings.Split(listFlags.Profiles, ",")
 		} else {
 			profileNames = rd.ProfileNames()
 		}
 	}
-	availableNames := []string{}
-	for _, name := range profileNames {
-		if rd.LookupProfile(name) != nil {
-			availableNames = append(availableNames, name)
-		}
-	}
 	if listFlags.Verbose {
 		fmt.Fprintf(jirix.Stdout(), "Installed Profiles: ")
 		fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(rd.ProfileNames(), ", "))
-		for _, name := range availableNames {
+		for _, name := range profileNames {
 			profile := rd.LookupProfile(name)
 			fmt.Fprintf(jirix.Stdout(), "Profile: %s @ %s\n", profile.Name(), profile.Root())
 			for _, target := range profile.Targets() {
 				fmt.Fprintf(jirix.Stdout(), "\t%s\n", target.DebugString())
 			}
 		}
-	} else {
-		for _, name := range availableNames {
-			profile := rd.LookupProfile(name)
-			mgr := profilesmanager.LookupManager(name)
-			out := &bytes.Buffer{}
-			var targets profiles.Targets
-			if listFlags.Target.IsSet() {
-				targets = append(targets, rd.LookupProfileTarget(name, listFlags.Target))
-			} else {
-				targets = profile.Targets()
-			}
-			printHeader := len(availableNames) > 1 || len(targets) > 1 || len(listFlags.info) == 0
-			for _, target := range targets {
-				if printHeader {
-					out.WriteString(fmtHeader(name, target))
-					out.WriteString(" ")
-				}
-				r, err := fmtInfo(jirix, listFlags.info, rd, mgr, profile, target)
-				if err != nil {
-					return err
-				}
-				out.WriteString(r)
-				if printHeader {
-					out.WriteString("\n")
-				}
-			}
-			fmt.Fprint(jirix.Stdout(), out.String())
-		}
+		return nil
 	}
+	if listFlags.info == "" {
+		if len(profileNames) > 0 {
+			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(profileNames, ", "))
+		}
+		return nil
+	}
+	// Handle --info.
+	for _, name := range profileNames {
+		profile := rd.LookupProfile(name)
+		out := &bytes.Buffer{}
+		var targets profiles.Targets
+		if listFlags.Target.IsSet() {
+			targets = append(targets, rd.LookupProfileTarget(name, listFlags.Target))
+		} else {
+			targets = profile.Targets()
+		}
+		printHeader := len(profileNames) > 1 || len(targets) > 1 || len(listFlags.info) == 0
+		for _, target := range targets {
+			if printHeader {
+				out.WriteString(fmtHeader(name, target))
+				out.WriteString(" ")
+			}
+			r, err := fmtInfo(jirix, listFlags.info, rd, profile, target)
+			if err != nil {
+				return err
+			}
+			out.WriteString(r)
+			if printHeader {
+				out.WriteString("\n")
+			}
+		}
+		fmt.Fprint(jirix.Stdout(), out.String())
+	}
+
 	return nil
 }
 
@@ -323,6 +286,7 @@ func fmtHeader(name string, target *profiles.Target) string {
 
 type listInfo struct {
 	SchemaVersion profiles.Version
+	DBPath        string
 	Target        struct {
 		InstallationDir string
 		CommandLineEnv  []string
@@ -330,27 +294,27 @@ type listInfo struct {
 		Command         string
 	}
 	Profile struct {
-		Description    string
-		Root           string
-		DefaultVersion string
-		LatestVersion  string
-		Versions       []string
+		Root      string
+		Name      string
+		Installer string
+		DBPath    string
 	}
 }
 
 func infoUsage() string {
 	return `The following fields for use with --profile-info are available:
 	SchemaVersion - the version of the profiles implementation.
+	DBPath - the path for the profiles database.
 	Target.InstallationDir - the installation directory of the requested profile.
 	Target.CommandLineEnv - the environment variables specified via the command line when installing this profile target.
 	Target.Env - the environment variables computed by the profile installation process for this target.
 	Target.Command - a command that can be used to create this profile.
 	Note: if no --target is specified then the requested field will be displayed for all targets.
-	Profile.Description - description of the requested profile.
+
 	Profile.Root - the root directory of the requested profile.
-	Profile.Versions - the set of supported versions for this profile.
-	Profile.DefaultVersion - the default version of the requested profile.
-	Profile.LatestVersion - the latest version available for the requested profile.
+	Profile.Name - the qualified name of the profile.
+	Profile.Installer - the name of the profile installer.
+	Profile.DBPath - the path to the database file for this profile.
 	Note: if no profiles are specified then the requested field will be displayed for all profiles.`
 }
 
@@ -369,51 +333,49 @@ func fmtOutput(jirix *jiri.X, o string) string {
 	return out.String()
 }
 
-func fmtInfo(jirix *jiri.X, infoFmt string, rd *profilesreader.Reader, mgr profiles.Manager, profile *profiles.Profile, target *profiles.Target) (string, error) {
-	if len(infoFmt) > 0 {
-		// Populate an instance listInfo
-		info := &listInfo{}
-		name := ""
-		if mgr != nil {
-			// Format the description on its own, without any preceeding
-			// text so that the line breaks work correctly.
-			info.Profile.Description = "\n" + fmtOutput(jirix, mgr.Info()) + "\n"
-			vi := mgr.VersionInfo()
-			if supported := vi.Supported(); len(supported) > 0 {
-				info.Profile.Versions = supported
-				info.Profile.LatestVersion = supported[0]
-			}
-			info.Profile.DefaultVersion = vi.Default()
-			name = mgr.Name()
+func fmtInfo(jirix *jiri.X, infoFmt string, rd *profilesreader.Reader, profile *profiles.Profile, target *profiles.Target) (string, error) {
+	// Populate an instance listInfo
+	info := &listInfo{}
+	name := profile.Name()
+	installer, _ := profiles.SplitProfileName(name)
+	info.SchemaVersion = rd.SchemaVersion()
+	info.DBPath = rd.Path()
+	if target != nil {
+		info.Target.InstallationDir = jiri.NewRelPath(target.InstallationDir).Abs(jirix)
+		info.Target.CommandLineEnv = target.CommandLineEnv().Vars
+		info.Target.Env = target.Env.Vars
+		clenv := ""
+		if len(info.Target.CommandLineEnv) > 0 {
+			clenv = fmt.Sprintf(" --env=\"%s\" ", strings.Join(info.Target.CommandLineEnv, ","))
 		}
-		info.SchemaVersion = rd.SchemaVersion()
-		if target != nil {
-			info.Target.InstallationDir = jiri.NewRelPath(target.InstallationDir).Abs(jirix)
-			info.Target.CommandLineEnv = target.CommandLineEnv().Vars
-			info.Target.Env = target.Env.Vars
-			clenv := ""
-			if len(info.Target.CommandLineEnv) > 0 {
-				clenv = fmt.Sprintf(" --env=\"%s\" ", strings.Join(info.Target.CommandLineEnv, ","))
-			}
+		if installer != "" {
+			info.Target.Command = fmt.Sprintf("jiri profile install --target=%s %s%s", target, clenv, name)
+		} else {
+			// TODO(cnicolaou): remove this when the transition is complete.
 			info.Target.Command = fmt.Sprintf("jiri v23-profile install --target=%s %s%s", target, clenv, name)
 		}
-		if profile != nil {
-			rp := jiri.NewRelPath(profile.Root())
-			info.Profile.Root = rp.Abs(jirix)
-		}
-
-		// Use a template to print out any field in our instance of listInfo.
-		tmpl, err := template.New("list").Parse("{{ ." + infoFmt + "}}")
-		if err != nil {
-			return "", err
-		}
-		out := &bytes.Buffer{}
-		if err = tmpl.Execute(out, info); err != nil {
-			return "", fmt.Errorf("please specify a supported field:\n%s", infoUsage())
-		}
-		return out.String(), nil
 	}
-	return "", nil
+	if profile != nil {
+		rp := jiri.NewRelPath(profile.Root())
+		info.Profile.Root = rp.Abs(jirix)
+		info.Profile.Name = name
+		info.Profile.Installer = installer
+		info.Profile.DBPath = info.DBPath
+		if installer != "" {
+			info.Profile.DBPath = filepath.Join(info.DBPath, installer)
+		}
+	}
+
+	// Use a template to print out any field in our instance of listInfo.
+	tmpl, err := template.New("list").Parse("{{ ." + infoFmt + "}}")
+	if err != nil {
+		return "", err
+	}
+	out := &bytes.Buffer{}
+	if err = tmpl.Execute(out, info); err != nil {
+		return "", fmt.Errorf("please specify a supported field:\n%s", infoUsage())
+	}
+	return out.String(), nil
 }
 
 func runEnv(jirix *jiri.X, args []string) error {

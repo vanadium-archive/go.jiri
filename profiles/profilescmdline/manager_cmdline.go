@@ -237,14 +237,20 @@ func (uv *updateFlagValues) args() []string {
 type availableFlagValues struct {
 	// The value of --v
 	verbose bool
+	// The value of --describe
+	describe bool
 }
 
 func initAvailableCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
 	flags.BoolVar(&availableFlags.verbose, "v", false, "print more detailed information")
+	flags.BoolVar(&availableFlags.describe, "describe", false, "print the profile description")
 }
 
 func (av *availableFlagValues) args() []string {
-	return []string{fmt.Sprintf("--%s=%v", "v", av.verbose)}
+	return []string{
+		fmt.Sprintf("--%s=%v", "v", av.verbose),
+		fmt.Sprintf("--%s=%v", "describe", av.describe),
+	}
 }
 
 var (
@@ -482,7 +488,7 @@ func uninstallImpl(jirix *jiri.X, cl *uninstallFlagValues, args []string) error 
 	return writeDB(jirix, db, profileInstaller, cl.dbPath)
 }
 
-func availableImpl(jirix *jiri.X, cl *availableFlagValues, args []string) error {
+func availableImpl(jirix *jiri.X, cl *availableFlagValues, _ []string) error {
 	if profileInstaller == "" {
 		subcommands := findProfileSubcommands(jirix)
 		if cl.verbose {
@@ -490,7 +496,7 @@ func availableImpl(jirix *jiri.X, cl *availableFlagValues, args []string) error 
 		}
 		s := jirix.NewSeq()
 		args := []string{"available"}
-		args = append(args, fmt.Sprintf("-v=%v", cl.verbose))
+		args = append(args, cl.args()...)
 		out := bytes.Buffer{}
 		for _, sc := range subcommands {
 			if err := s.Capture(&out, nil).Last(sc, args...); err != nil {
@@ -517,7 +523,14 @@ func availableImpl(jirix *jiri.X, cl *availableFlagValues, args []string) error 
 			fmt.Fprintf(jirix.Stdout(), "%s: versions: %s\n", name, vi)
 		}
 	} else {
-		fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(mgrs, ", "))
+		if cl.describe {
+			for _, name := range mgrs {
+				mgr := profilesmanager.LookupManager(name)
+				fmt.Fprintf(jirix.Stdout(), "%s: %s\n", name, strings.Replace(strings.TrimSpace(mgr.Info()), "\n", " ", -1))
+			}
+		} else {
+			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(mgrs, ", "))
+		}
 	}
 	return nil
 }

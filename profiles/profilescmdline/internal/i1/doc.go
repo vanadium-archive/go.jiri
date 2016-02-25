@@ -112,7 +112,7 @@ The jiri profile-i1 install flags are:
  -force=false
    force install the profile even if it is already installed
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -target=<runtime.GOARCH>-<runtime.GOOS>
@@ -136,7 +136,7 @@ The jiri profile-i1 uninstall flags are:
  -all-targets=false
    apply to all targets for the specified profile(s)
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -target=<runtime.GOARCH>-<runtime.GOOS>
@@ -158,7 +158,7 @@ Usage:
 
 The jiri profile-i1 update flags are:
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -v=false
@@ -183,7 +183,7 @@ The jiri profile-i1 cleanup flags are:
  -gc=false
    uninstall profile targets that are older than the current default
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -rewrite-profiles-db=false
@@ -204,6 +204,8 @@ Usage:
    jiri profile-i1 available [flags]
 
 The jiri profile-i1 available flags are:
+ -describe=false
+   print the profile description
  -v=false
    print more detailed information
 

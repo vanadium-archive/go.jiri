@@ -118,7 +118,7 @@ func TestManagerAvailable(t *testing.T) {
 	defer cleanup()
 	dir, sh := buildInstallers(t), newShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
+	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
 	stdout := run(sh, dir, "jiri", "profile", "available", "-v")
 	for _, installer := range []string{"i1", "i2"} {
 		re := regexp.MustCompile("Available Subcommands:.*profile-" + installer + ".*\n")
@@ -190,17 +190,12 @@ func cmpFiles(t *testing.T, gotFilename, wantFilename string) {
 	}
 }
 
-func prependToPath(dir, path string) string {
-	existingPath := envvar.SplitTokens(path, ":")
-	return envvar.JoinTokens(append([]string{dir}, existingPath...), ":")
-}
-
 func TestManagerInstallUninstall(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	dir, sh := buildInstallers(t), newShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
+	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
 
 	run(sh, dir, "jiri", "profile", "list", "-v")
 
@@ -301,6 +296,6 @@ func TestJiriFakeRoot(t *testing.T) {
 
 	dir, sh := buildJiri(t), newShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
+	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
 	run(sh, dir, "jiri", "profile", "list", "-v")
 }

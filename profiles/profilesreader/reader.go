@@ -101,17 +101,18 @@ func GoEnvironmentFromOS() []string {
 type Reader struct {
 	*envvar.Vars
 	profilesMode bool
+	path         string
 	jirix        *jiri.X
 	config       *util.Config
 	projects     project.Projects
 	pdb          *profiles.DB
 }
 
-// NewReader creates a new profiles reader. If filename is of non-zero
-// length then that file will be read as a profiles manifest file, if not, the
+// NewReader creates a new profiles reader. If path is of non-zero
+// length then that path will be read as a profiles database, if not, the
 // existing, if any, in-memory profiles information will be used. If SkipProfiles
 // is specified for profilesMode, then no profiles are used.
-func NewReader(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*Reader, error) {
+func NewReader(jirix *jiri.X, profilesMode ProfilesMode, path string) (*Reader, error) {
 	config, err := util.LoadConfig(jirix)
 	if err != nil {
 		return nil, err
@@ -121,13 +122,14 @@ func NewReader(jirix *jiri.X, profilesMode ProfilesMode, filename string) (*Read
 		return nil, err
 	}
 	pdb := profiles.NewDB()
-	if profilesMode == UseProfiles && len(filename) > 0 {
-		if err := pdb.Read(jirix, filename); err != nil {
+	if profilesMode == UseProfiles && len(path) > 0 {
+		if err := pdb.Read(jirix, path); err != nil {
 			return nil, err
 		}
 	}
 	rd := &Reader{
 		jirix:        jirix,
+		path:         path,
 		config:       config,
 		projects:     projects,
 		profilesMode: bool(profilesMode),
@@ -146,6 +148,10 @@ do not set JIRI_PROFILE.`)
 
 func (rd *Reader) SchemaVersion() profiles.Version {
 	return rd.pdb.SchemaVersion()
+}
+
+func (rd *Reader) Path() string {
+	return rd.path
 }
 
 func (rd *Reader) ProfileNames() []string {

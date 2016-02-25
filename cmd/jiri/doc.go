@@ -276,32 +276,29 @@ Usage:
 specifically requested.
 
 The jiri profile list flags are:
- -available=false
-   print the list of available profiles
  -env=
    specify an environment variable in the form: <var>=[<val>],...
  -info=
    The following fields for use with --profile-info are available:
    	SchemaVersion - the version of the profiles implementation.
+   	DBPath - the path for the profiles database.
    	Target.InstallationDir - the installation directory of the requested profile.
    	Target.CommandLineEnv - the environment variables specified via the command line when installing this profile target.
    	Target.Env - the environment variables computed by the profile installation process for this target.
    	Target.Command - a command that can be used to create this profile.
    	Note: if no --target is specified then the requested field will be displayed for all targets.
-   	Profile.Description - description of the requested profile.
+
    	Profile.Root - the root directory of the requested profile.
-   	Profile.Versions - the set of supported versions for this profile.
-   	Profile.DefaultVersion - the default version of the requested profile.
-   	Profile.LatestVersion - the latest version available for the requested profile.
+   	Profile.Name - the qualified name of the profile.
+   	Profile.Installer - the name of the profile installer.
+   	Profile.DBPath - the path to the database file for this profile.
    	Note: if no profiles are specified then the requested field will be displayed for all profiles.
  -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
    specify policies for merging environment variables
  -profiles=base,jiri
    a comma separated list of profiles to use
- -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
- -show-profiles-db=false
-   print out the profiles database file
+ -profiles-db=$JIRI_ROOT/.jiri_v23_profiles
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -skip-profiles=false
    if set, no profiles will be used
  -target=<runtime.GOARCH>-<runtime.GOOS>
@@ -335,8 +332,8 @@ The jiri profile env flags are:
    specify policies for merging environment variables
  -profiles=base,jiri
    a comma separated list of profiles to use
- -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+ -profiles-db=$JIRI_ROOT/.jiri_v23_profiles
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -skip-profiles=false
    if set, no profiles will be used
  -target=<runtime.GOARCH>-<runtime.GOOS>
@@ -361,8 +358,8 @@ The jiri profile install flags are:
    specify an environment variable in the form: <var>=[<val>],...
  -force=false
    force install the profile even if it is already installed
- -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+ -profiles-db=$JIRI_ROOT/.jiri_v23_profiles
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -target=<runtime.GOARCH>-<runtime.GOOS>
@@ -385,8 +382,8 @@ Usage:
 The jiri profile uninstall flags are:
  -all-targets=false
    apply to all targets for the specified profile(s)
- -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+ -profiles-db=$JIRI_ROOT/.jiri_v23_profiles
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -target=<runtime.GOARCH>-<runtime.GOOS>
@@ -407,8 +404,8 @@ Usage:
 <profiles> is a list of profiles to update, if omitted all profiles are updated.
 
 The jiri profile update flags are:
- -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+ -profiles-db=$JIRI_ROOT/.jiri_v23_profiles
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -v=false
@@ -432,8 +429,8 @@ cleaned.
 The jiri profile cleanup flags are:
  -gc=false
    uninstall profile targets that are older than the current default
- -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
-   specify the profiles database directory or file.
+ -profiles-db=$JIRI_ROOT/.jiri_v23_profiles
+   the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles
    the directory, relative to JIRI_ROOT, that profiles are installed in
  -rewrite-profiles-db=false
@@ -454,6 +451,8 @@ Usage:
    jiri profile available [flags]
 
 The jiri profile available flags are:
+ -describe=false
+   print the profile description
  -v=false
    print more detailed information
 
