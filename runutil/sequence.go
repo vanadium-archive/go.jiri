@@ -814,7 +814,6 @@ func (s Sequence) Create(name string) (f *os.File, err error) {
 		return nil, s.Done()
 	}
 	s.r.call(func() error {
-		var err error
 		f, err = os.Create(name)
 		return err
 	}, fmt.Sprintf("create %q", name))
