@@ -59,7 +59,7 @@ func TestManagerArgs(t *testing.T) {
 
 var (
 	buildInstallersOnce, buildJiriOnce     sync.Once
-	buildInstallersBindir, buildJiriBindir = "", ""
+	buildInstallersBinDir, buildJiriBinDir = "", ""
 )
 
 func newShell(t *testing.T) *gosh.Shell {
@@ -72,25 +72,37 @@ func newShell(t *testing.T) *gosh.Shell {
 	return gosh.NewShell(gosh.Opts{Fatalf: fatalf, Logf: t.Logf})
 }
 
+// TODO(sadovsky): This code leaves a lot of temp dirs behind. It would be nice
+// to restructure things so that all temporary artifacts get cleaned up.
 func buildInstallers(t *testing.T) string {
 	buildInstallersOnce.Do(func() {
+		binDir, err := ioutil.TempDir("", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 		sh := newShell(t)
+		defer sh.Cleanup()
 		prefix := "v.io/jiri/profiles/profilescmdline/internal/"
-		sh.BuildGoPkg("v.io/jiri/cmd/jiri", "-o", "jiri")
-		sh.BuildGoPkg(prefix+"i1", "-o", "jiri-profile-i1")
-		sh.BuildGoPkg(prefix+"i2", "-o", "jiri-profile-i2")
-		buildInstallersBindir = sh.Opts.BinDir
+		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
+		gosh.BuildGoPkg(sh, binDir, prefix+"i1", "-o", "jiri-profile-i1")
+		gosh.BuildGoPkg(sh, binDir, prefix+"i2", "-o", "jiri-profile-i2")
+		buildInstallersBinDir = binDir
 	})
-	return buildInstallersBindir
+	return buildInstallersBinDir
 }
 
 func buildJiri(t *testing.T) string {
 	buildJiriOnce.Do(func() {
+		binDir, err := ioutil.TempDir("", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 		sh := newShell(t)
-		sh.BuildGoPkg("v.io/jiri/cmd/jiri", "-o", "jiri")
-		buildJiriBindir = sh.Opts.BinDir
+		defer sh.Cleanup()
+		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
+		buildJiriBinDir = binDir
 	})
-	return buildJiriBindir
+	return buildJiriBinDir
 }
 
 func run(sh *gosh.Shell, dir, bin string, args ...string) string {

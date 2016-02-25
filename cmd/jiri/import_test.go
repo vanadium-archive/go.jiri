@@ -138,7 +138,7 @@ func TestImport(t *testing.T) {
 	opts := gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf}
 	sh := gosh.NewShell(opts)
 	defer sh.Cleanup()
-	jiriTool := sh.BuildGoPkg("v.io/jiri/cmd/jiri")
+	jiriTool := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "v.io/jiri/cmd/jiri")
 	for _, test := range tests {
 		if err := testImport(opts, jiriTool, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)
