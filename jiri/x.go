@@ -147,6 +147,11 @@ func (x *X) BinDir() string {
 	return filepath.Join(x.RootMetaDir(), "bin")
 }
 
+// ScriptsDir returns the path to the scripts directory.
+func (x *X) ScriptsDir() string {
+	return filepath.Join(x.RootMetaDir(), "scripts")
+}
+
 // UpdateHistoryDir returns the path to the update history directory.
 func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")

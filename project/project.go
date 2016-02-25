@@ -1000,7 +1000,17 @@ func updateTo(jirix *jiri.X, localProjects, remoteProjects Projects, remoteTools
 		return err
 	}
 	// 3. Install the tools into $JIRI_ROOT/.jiri_root/bin.
-	return InstallTools(jirix, tmpToolsDir)
+	if err := InstallTools(jirix, tmpToolsDir); err != nil {
+		return err
+	}
+	// 4. If we have the jiri project, then update the jiri script in
+	// $JIRI_ROOT/.jiri_root/scripts.
+	jiriProject, err := remoteProjects.FindUnique(JiriProject)
+	if err != nil {
+		// jiri project not found.  This happens often in tests.  Ok to ignore.
+		return nil
+	}
+	return updateJiriScript(jirix, jiriProject)
 }
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
@@ -1345,6 +1355,32 @@ func InstallTools(jirix *jiri.X, dir string) error {
 		}
 	}
 	return nil
+}
+
+// updateJiriScript copies the scripts/jiri script from the jiri repo to
+// JIRI_ROOT/.jiri_root/scripts/jiri.
+func updateJiriScript(jirix *jiri.X, jiriProject Project) error {
+	s := jirix.NewSeq()
+	updateFn := func() error {
+		return ApplyToLocalMaster(jirix, Projects{jiriProject.Key(): jiriProject}, func() error {
+			newJiriScriptPath := filepath.Join(jiriProject.Path, "scripts", "jiri")
+			newJiriScript, err := s.Open(newJiriScriptPath)
+			if err != nil {
+				return err
+			}
+			s.MkdirAll(jirix.ScriptsDir(), 0755)
+			jiriScriptOutPath := filepath.Join(jirix.ScriptsDir(), "jiri")
+			jiriScriptOut, err := s.Create(jiriScriptOutPath)
+			if err != nil {
+				return err
+			}
+			if _, err := s.Copy(jiriScriptOut, newJiriScript); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	return jirix.NewSeq().Verbose(true).Call(updateFn, "update jiri script").Done()
 }
 
 // TransitionBinDir handles the transition from the old location
