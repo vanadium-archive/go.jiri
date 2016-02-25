@@ -364,9 +364,9 @@ type Project struct {
 	// RemoteBranch is the name of the remote branch to track.  It doesn't affect
 	// the name of the local branch that jiri maintains, which is always "master".
 	RemoteBranch string `xml:"remotebranch,attr,omitempty"`
-	// Revision is the revision the project should be advanced to
-	// during "jiri update". If not set, "HEAD" is used as the
-	// default.
+	// Revision is the revision the project should be advanced to during "jiri
+	// update".  If Revision is set, RemoteBranch will be ignored.  If Revision
+	// is not set, "HEAD" is used as the default.
 	Revision string `xml:"revision,attr,omitempty"`
 	// GerritHost is the gerrit host where project CLs will be sent.
 	GerritHost string `xml:"gerrithost,attr,omitempty"`
@@ -1463,8 +1463,7 @@ func resetProjectCurrentBranch(jirix *jiri.X, project Project) error {
 		if project.Revision != "HEAD" {
 			return gitutil.New(jirix.NewSeq()).Reset(project.Revision)
 		}
-		// If no revision, reset to the configured remote branch, or master
-		// if no remote branch.
+		// If no revision, reset to the configured remote branch.
 		return gitutil.New(jirix.NewSeq()).Reset("origin/" + project.RemoteBranch)
 	default:
 		return UnsupportedProtocolErr(project.Protocol)
@@ -2012,10 +2011,6 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 		}
 		defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
 		if err := s.Chdir(tmpDir).Done(); err != nil {
-			return err
-		}
-		// TODO(toddw): Why call Reset here, when resetProject is called just below?
-		if err := gitutil.New(jirix.NewSeq()).Reset(op.project.Revision); err != nil {
 			return err
 		}
 	default:
