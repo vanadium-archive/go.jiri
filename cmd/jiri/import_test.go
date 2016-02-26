@@ -135,19 +135,18 @@ func TestImport(t *testing.T) {
 `,
 		},
 	}
-	opts := gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf}
-	sh := gosh.NewShell(opts)
+	sh := gosh.NewShell(t)
 	defer sh.Cleanup()
 	jiriTool := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "v.io/jiri/cmd/jiri")
 	for _, test := range tests {
-		if err := testImport(opts, jiriTool, test); err != nil {
+		if err := testImport(t, jiriTool, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)
 		}
 	}
 }
 
-func testImport(opts gosh.Opts, jiriTool string, test importTestCase) error {
-	sh := gosh.NewShell(opts)
+func testImport(t *testing.T, jiriTool string, test importTestCase) error {
+	sh := gosh.NewShell(t)
 	defer sh.Cleanup()
 	tmpDir := sh.MakeTempDir()
 	jiriRoot := filepath.Join(tmpDir, "root")

@@ -13,7 +13,8 @@ import (
 )
 
 func TestWhich(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
+	sh := gosh.NewShell(t)
+	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
 	jiriBinary := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "v.io/jiri/cmd/jiri")
@@ -28,7 +29,8 @@ func TestWhich(t *testing.T) {
 
 // TestWhichScript tests the behavior of "jiri which" for the shim script.
 func TestWhichScript(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
+	sh := gosh.NewShell(t)
+	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
 	jiriScript, err := filepath.Abs("./scripts/jiri")

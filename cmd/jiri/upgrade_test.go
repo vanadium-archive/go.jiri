@@ -198,20 +198,19 @@ func TestUpgrade(t *testing.T) {
 `,
 		},
 	}
-	opts := gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf}
-	sh := gosh.NewShell(opts)
+	sh := gosh.NewShell(t)
 	defer sh.Cleanup()
 	jiriTool := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "v.io/jiri/cmd/jiri")
 	for _, test := range tests {
-		if err := testUpgrade(opts, jiriTool, test); err != nil {
+		if err := testUpgrade(t, jiriTool, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)
 		}
 	}
 }
 
-func testUpgrade(opts gosh.Opts, jiriTool string, test upgradeTestCase) error {
-	opts.PropagateChildOutput = true
-	sh := gosh.NewShell(opts)
+func testUpgrade(t *testing.T, jiriTool string, test upgradeTestCase) error {
+	sh := gosh.NewShell(t)
+	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
 	sh.Pushd(jiriRoot)
@@ -260,7 +259,7 @@ func testUpgrade(opts gosh.Opts, jiriTool string, test upgradeTestCase) error {
 }
 
 func TestUpgradeRevert(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf})
+	sh := gosh.NewShell(t)
 	defer sh.Cleanup()
 	jiriRoot := sh.MakeTempDir()
 	sh.Pushd(jiriRoot)

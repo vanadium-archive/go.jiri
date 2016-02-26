@@ -62,16 +62,6 @@ var (
 	buildInstallersBinDir, buildJiriBinDir = "", ""
 )
 
-func newShell(t *testing.T) *gosh.Shell {
-	fatalf := func(format string, args ...interface{}) {
-		_, file, line, _ := runtime.Caller(3)
-		loc := fmt.Sprintf("%s:%d: ", filepath.Base(file), line)
-		fmt.Fprintf(os.Stderr, loc+format+"\n", args...)
-		t.FailNow()
-	}
-	return gosh.NewShell(gosh.Opts{Fatalf: fatalf, Logf: t.Logf})
-}
-
 // TODO(sadovsky): This code leaves a lot of temp dirs behind. It would be nice
 // to restructure things so that all temporary artifacts get cleaned up.
 func buildInstallers(t *testing.T) string {
@@ -80,7 +70,7 @@ func buildInstallers(t *testing.T) string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sh := newShell(t)
+		sh := gosh.NewShell(t)
 		defer sh.Cleanup()
 		prefix := "v.io/jiri/profiles/profilescmdline/internal/"
 		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
@@ -97,7 +87,7 @@ func buildJiri(t *testing.T) string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sh := newShell(t)
+		sh := gosh.NewShell(t)
 		defer sh.Cleanup()
 		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
 		buildJiriBinDir = binDir
@@ -116,7 +106,7 @@ func run(sh *gosh.Shell, dir, bin string, args ...string) string {
 func TestManagerAvailable(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	dir, sh := buildInstallers(t), newShell(t)
+	dir, sh := buildInstallers(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
 	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
 	stdout := run(sh, dir, "jiri", "profile", "available", "-v")
@@ -198,7 +188,7 @@ func prependToPath(dir, path string) string {
 func TestManagerInstallUninstall(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	dir, sh := buildInstallers(t), newShell(t)
+	dir, sh := buildInstallers(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
 	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
 
@@ -251,7 +241,7 @@ func TestManagerInstallUninstall(t *testing.T) {
 func TestManagerUpdate(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	dir, sh := buildInstallers(t), newShell(t)
+	dir, sh := buildInstallers(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
 	sh.Vars["PATH"] = dir
 
@@ -299,7 +289,7 @@ func TestJiriFakeRoot(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	dir, sh := buildJiri(t), newShell(t)
+	dir, sh := buildJiri(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
 	sh.Vars["PATH"] = prependToPath(dir, os.Getenv("PATH"))
 	run(sh, dir, "jiri", "profile", "list", "-v")

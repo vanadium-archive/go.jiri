@@ -17,7 +17,8 @@ import (
 )
 
 func TestBootstrapJiri(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
+	sh := gosh.NewShell(t)
+	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
 	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
@@ -43,7 +44,8 @@ func TestBootstrapJiri(t *testing.T) {
 // TestBuildJiriLocally checks that the jiri binary built in the bootstrap
 // script can be built locally.
 func TestBuildJiriLocally(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
+	sh := gosh.NewShell(t)
+	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
 	// Extract jiri package path from this line.
@@ -66,7 +68,8 @@ func TestBuildJiriLocally(t *testing.T) {
 }
 
 func TestBootstrapJiriAlreadyExists(t *testing.T) {
-	sh := gosh.NewShell(gosh.Opts{Fatalf: t.Fatalf, Logf: t.Logf, PropagateChildOutput: true})
+	sh := gosh.NewShell(t)
+	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
 	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
