@@ -17,6 +17,6 @@ var cmdProfile = &cmdline.Command{
 }
 
 func init() {
-	profilescmdline.RegisterReaderCommands(cmdProfile, jiri.ProfilesDBDir)
-	profilescmdline.RegisterManagementCommands(cmdProfile, true, "", jiri.ProfilesDBDir, jiri.ProfilesRootDir)
+	profilescmdline.RegisterReaderCommands(cmdProfile, jiri.DefaultProfilesDBPath())
+	profilescmdline.RegisterManagementCommands(cmdProfile, true, "", jiri.DefaultProfilesDBPath(), jiri.ProfilesRootDir)
 }

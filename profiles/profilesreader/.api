@@ -34,6 +34,7 @@ pkg profilesreader, method (*Reader) LookupProfile(string) *profiles.Profile
 pkg profilesreader, method (*Reader) LookupProfileTarget(string, profiles.Target) *profiles.Target
 pkg profilesreader, method (*Reader) MergeEnv(map[string]MergePolicy, ...[]string)
 pkg profilesreader, method (*Reader) MergeEnvFromProfiles(map[string]MergePolicy, profiles.Target, ...string)
+pkg profilesreader, method (*Reader) Path() string
 pkg profilesreader, method (*Reader) PrependToPATH(string)
 pkg profilesreader, method (*Reader) ProfileNames() []string
 pkg profilesreader, method (*Reader) Profiles() []*profiles.Profile
