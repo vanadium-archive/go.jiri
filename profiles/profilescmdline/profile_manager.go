@@ -93,12 +93,18 @@ func (ip *inproc) update(jirix *jiri.X, cl *updateFlagValues, root jiri.RelPath)
 	vi := mgr.VersionInfo()
 	for _, target := range profile.Targets() {
 		if vi.IsTargetOlderThanDefault(target.Version()) {
+			// Check if default target is already installed.
+			defTarget := *target
+			defTarget.SetVersion(vi.Default())
+			if profiles.FindTarget(profile.Targets(), &defTarget) != nil {
+				// Default target is already installed.  Skip.
+				continue
+			}
 			if cl.verbose {
 				fmt.Fprintf(jirix.Stdout(), "Updating %s %s from %q to %s\n", ip.qname, target, target.Version(), vi)
 			}
-			target.SetVersion(vi.Default())
-			err := mgr.Install(jirix, ip.db, root, *target)
-			logResult(jirix, "Update", mgr, *target, err)
+			err := mgr.Install(jirix, ip.db, root, defTarget)
+			logResult(jirix, "Update", mgr, defTarget, err)
 			if err != nil {
 				return err
 			}
