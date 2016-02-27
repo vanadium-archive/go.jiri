@@ -1,0 +1,76 @@
+#!/bin/bash
+# Copyright 2015 The Vanadium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+# bootstrap_jiri initializes a root directory for jiri.  The following
+# directories and files will be created:
+#   <root_dir>                         - root directory (picked by user)
+#   <root_dir>/.jiri_root              - root metadata directory
+#   <root_dir>/.jiri_root/bin/jiri     - jiri binary
+#   <root_dir>/.jiri_root/scripts/jiri - jiri script
+#
+# The jiri sources are downloaded and built into a temp directory, which is
+# always deleted when this script finishes.  The <root_dir> is deleted on any
+# failure.
+
+set -euf -o pipefail
+
+# fatal prints an error message, followed by the usage string, and then exits.
+fatal() {
+  usage='
+
+Usage:
+   bootstrap_jiri <root_dir>
+
+A typical bootstrap workflow looks like this:
+
+$ curl -s https://raw.githubusercontent.com/vanadium/go.jiri/master/scripts/bootstrap_jiri | bash -s myroot
+$ export PATH=myroot/.jiri_root/scripts:$PATH
+$ cd myroot
+$ jiri import public https://vanadium.googlesource.com/manifest
+$ jiri update'
+  echo "ERROR: $@${usage}" 1>&2
+  exit 1
+}
+
+# toabs converts the possibly relative argument into an absolute path.  Run in a
+# subshell to avoid changing the caller's working directory.
+toabs() (
+  cd $(dirname $1)
+  echo ${PWD}/$(basename $1)
+)
+
+# Check the <root_dir> argument is supplied and doesn't already exist.
+if [[ $# -ne 1 ]]; then
+  fatal "need <root_dir> argument"
+fi
+mkdir -p $(dirname $1)
+root_dir=$(toabs $1)
+if [[ -e ${root_dir} ]]; then
+  fatal "${root_dir} already exists"
+fi
+# Check that go is on the PATH.
+if ! go version >& /dev/null ; then
+  fatal 'ERROR: "go" tool not found, see https://golang.org/doc/install'
+fi
+
+trap "rm -rf ${root_dir}" INT TERM EXIT
+
+# Make the output directories.
+tmp_dir="${root_dir}/.jiri_root/tmp"
+bin_dir="${root_dir}/.jiri_root/bin"
+scripts_dir="${root_dir}/.jiri_root/scripts"
+mkdir -p "${tmp_dir}" "${bin_dir}" "${scripts_dir}"
+
+# Go get the jiri source files, build the jiri binary, and copy the jiri shim
+# script from the sources.
+GOPATH="${tmp_dir}" go get -d v.io/jiri/cmd/jiri
+GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" v.io/jiri/cmd/jiri
+cp "${tmp_dir}/src/v.io/jiri/cmd/jiri/scripts/jiri" "${scripts_dir}/jiri"
+
+# Clean up the tmp_dir.
+rm -rf "${tmp_dir}"
+
+echo "Please add ${scripts_dir} to your PATH."
+trap - EXIT
