@@ -33,7 +33,7 @@ func TestWhichScript(t *testing.T) {
 	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
-	jiriScript, err := filepath.Abs("./scripts/jiri")
+	jiriScript, err := filepath.Abs("../../scripts/jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to jiri script")
 	}

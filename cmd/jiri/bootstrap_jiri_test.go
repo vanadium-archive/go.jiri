@@ -21,7 +21,7 @@ func TestBootstrapJiri(t *testing.T) {
 	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
-	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
+	bootstrap, err := filepath.Abs("../../scripts/bootstrap_jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")
 	}
@@ -50,7 +50,7 @@ func TestBuildJiriLocally(t *testing.T) {
 
 	// Extract jiri package path from this line.
 	// GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" v.io/jiri/cmd/jiri
-	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
+	bootstrap, err := filepath.Abs("../../scripts/bootstrap_jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")
 	}
@@ -72,7 +72,7 @@ func TestBootstrapJiriAlreadyExists(t *testing.T) {
 	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
-	bootstrap, err := filepath.Abs("./scripts/bootstrap_jiri")
+	bootstrap, err := filepath.Abs("../../scripts/bootstrap_jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")
 	}
