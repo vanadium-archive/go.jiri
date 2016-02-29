@@ -15,6 +15,7 @@ import (
 
 	"v.io/jiri/tool"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/envvar"
 	"v.io/x/lib/timing"
 )
 
@@ -41,17 +42,33 @@ type X struct {
 }
 
 // NewX returns a new execution environment, given a cmdline env.
+// It also prepends $JIRI_ROOT/.jiri_root/bin to the PATH.
 func NewX(env *cmdline.Env) (*X, error) {
 	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())
 	if err != nil {
 		return nil, err
 	}
-	return &X{
+
+	// Prepend $JIRI_ROOT/.jiri_root/bin to the PATH, so execing a binary will
+	// invoke the one in that directory, if it exists.  This is crucial for
+	// jiri subcommands, where we want to invoke the binary that jiri
+	// installed, not whatever is in the user's PATH.
+	//
+	// Note that we must modify the actual os env variable with os.SetEnv and
+	// also the ctx.env, so that execing a binary through the os/exec package
+	// and with ctx.Run both have the correct behavior.
+	x := &X{
 		Context: ctx,
 		Root:    root,
 		Usage:   env.UsageErrorf,
-	}, nil
+	}
+	newPath := envvar.PrependUniqueToken(ctx.Env()["PATH"], string(os.PathListSeparator), x.BinDir())
+	ctx.Env()["PATH"] = newPath
+	if err := os.Setenv("PATH", newPath); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
 
 func findJiriRoot(timer *timing.Timer) (string, error) {
