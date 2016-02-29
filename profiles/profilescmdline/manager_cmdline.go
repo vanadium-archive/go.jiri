@@ -216,7 +216,8 @@ func (cv *cleanupFlagValues) args() []string {
 	return append(cv.commonFlagValues.args(),
 		fmt.Sprintf("--%s=%v", "gc", cv.gc),
 		fmt.Sprintf("--%s=%v", "rewrite-profiles-db", cv.rewriteDB),
-		fmt.Sprintf("--%s=%v", "v", cv.verbose))
+		fmt.Sprintf("--%s=%v", "v", cv.verbose),
+		fmt.Sprintf("--%s=%v", "rm-all", cv.rmAll))
 }
 
 type updateFlagValues struct {

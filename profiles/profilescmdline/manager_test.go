@@ -7,6 +7,7 @@ package profilescmdline_test
 import (
 	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -62,8 +63,7 @@ var (
 	buildInstallersBinDir, buildJiriBinDir = "", ""
 )
 
-// TODO(sadovsky): This code leaves a lot of temp dirs behind. It would be nice
-// to restructure things so that all temporary artifacts get cleaned up.
+// TestMain must cleanup these directories created by this function.
 func buildInstallers(t *testing.T) string {
 	buildInstallersOnce.Do(func() {
 		binDir, err := ioutil.TempDir("", "")
@@ -79,6 +79,21 @@ func buildInstallers(t *testing.T) string {
 		buildInstallersBinDir = binDir
 	})
 	return buildInstallersBinDir
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	r := m.Run()
+	if buildInstallersBinDir != "" {
+		os.RemoveAll(buildInstallersBinDir)
+	}
+	os.Exit(r)
+}
+
+func createProfilesDB(t *testing.T, jirix *jiri.X) {
+	if err := os.MkdirAll(jirix.ProfilesDBDir(), os.FileMode(0755)); err != nil {
+		t.Fatalf("%s:%s", loc(), err)
+	}
 }
 
 func buildJiri(t *testing.T) string {
@@ -107,6 +122,7 @@ func TestManagerAvailable(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	dir, sh := buildInstallers(t), gosh.NewShell(t)
+	createProfilesDB(t, fake.X)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
 	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
 	stdout := run(sh, dir, "jiri", "profile", "available", "-v")
@@ -169,11 +185,11 @@ func removeDate(s string) string {
 func cmpFiles(t *testing.T, gotFilename, wantFilename string) {
 	g, err := ioutil.ReadFile(gotFilename)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%s: %s", loc(), err)
 	}
 	w, err := ioutil.ReadFile(wantFilename)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%s: %s", loc(), err)
 	}
 	if got, want := removeDate(strings.TrimSpace(string(g))), removeDate(strings.TrimSpace(string(w))); got != want {
 		t.Errorf("%s: got %v, want %v from %q and %q", loc(), got, want, gotFilename, wantFilename)
@@ -184,6 +200,7 @@ func TestManagerInstallUninstall(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	dir, sh := buildInstallers(t), gosh.NewShell(t)
+	createProfilesDB(t, fake.X)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
 	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
 
@@ -237,11 +254,12 @@ func TestManagerUpdate(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	dir, sh := buildInstallers(t), gosh.NewShell(t)
+	createProfilesDB(t, fake.X)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = dir
+	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
 
-	i1 := filepath.Join(fake.X.Root, ".jiri_root/profile_db/i1")
-	i2 := filepath.Join(fake.X.Root, ".jiri_root/profile_db/i2")
+	i1 := filepath.Join(fake.X.ProfilesDBDir(), "i1")
+	i2 := filepath.Join(fake.X.ProfilesDBDir(), "i2")
 
 	run(sh, dir, "jiri", "profile", "install", "--target=arch-os@2", "i1:eg", "i2:eg")
 	cmpFiles(t, i1, filepath.Join("testdata", "i1d.xml"))
@@ -254,6 +272,28 @@ func TestManagerUpdate(t *testing.T) {
 	run(sh, dir, "jiri", "profile", "cleanup", "-gc")
 	cmpFiles(t, i1, filepath.Join("testdata", "i1f.xml"))
 	cmpFiles(t, i2, filepath.Join("testdata", "i2f.xml"))
+
+	run(sh, dir, "jiri", "profile", "cleanup", "-rm-all")
+	profiledir := filepath.Join(fake.X.Root, jiri.ProfilesRootDir)
+	for _, dir := range []string{
+		fake.X.ProfilesDBDir(),
+		filepath.Join(profiledir, "i1"),
+		filepath.Join(profiledir, "i2"),
+	} {
+		_, err := os.Stat(dir)
+		if !os.IsNotExist(err) {
+			t.Errorf("%v still exists: %v", dir, err)
+		}
+	}
+	// Start over, make sure update is idempotent.
+	createProfilesDB(t, fake.X)
+	run(sh, dir, "jiri", "profile", "install", "--target=arch-os@2", "i1:eg")
+	run(sh, dir, "jiri", "profile", "update")
+	run(sh, dir, "jiri", "profile", "update")
+	cmpFiles(t, i1, filepath.Join("testdata", "i1g.xml"))
+	run(sh, dir, "jiri", "profile", "install", "--target=arch-os@4", "i1:eg")
+	run(sh, dir, "jiri", "profile", "update")
+	cmpFiles(t, i1, filepath.Join("testdata", "i1h.xml"))
 }
 
 // Test using a fake jiri root.
