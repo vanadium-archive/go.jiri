@@ -108,7 +108,7 @@ func TestManagerAvailable(t *testing.T) {
 	defer cleanup()
 	dir, sh := buildInstallers(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
+	sh.Vars["PATH"] = envvar.PrependUniqueToken(sh.Vars["PATH"], ":", dir)
 	stdout := run(sh, dir, "jiri", "profile", "available", "-v")
 	for _, installer := range []string{"i1", "i2"} {
 		re := regexp.MustCompile("Available Subcommands:.*profile-" + installer + ".*\n")
@@ -185,7 +185,7 @@ func TestManagerInstallUninstall(t *testing.T) {
 	defer cleanup()
 	dir, sh := buildInstallers(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
+	sh.Vars["PATH"] = envvar.PrependUniqueToken(sh.Vars["PATH"], ":", dir)
 
 	run(sh, dir, "jiri", "profile", "list", "-v")
 
@@ -286,6 +286,6 @@ func TestJiriFakeRoot(t *testing.T) {
 
 	dir, sh := buildJiri(t), gosh.NewShell(t)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = envvar.PrependUsingSeparator(dir, os.Getenv("PATH"), ":")
+	sh.Vars["PATH"] = envvar.PrependUniqueToken(sh.Vars["PATH"], ":", dir)
 	run(sh, dir, "jiri", "profile", "list", "-v")
 }
