@@ -162,6 +162,11 @@ func (x *X) ProfilesDBDir() string {
 	return filepath.Join(x.RootMetaDir(), "profile_db")
 }
 
+// ProfilesRootDir returns the path to the root of the profiles installation.
+func (x *X) ProfilesRootDir() string {
+	return filepath.Join(x.RootMetaDir(), "profiles")
+}
+
 // UpdateHistoryLatestLink returns the path to a symlink that points to the
 // latest update in the update history directory.
 func (x *X) UpdateHistoryLatestLink() string {

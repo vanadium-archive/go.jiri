@@ -142,13 +142,16 @@ func cleanupRmAll(jirix *jiri.X, db *profiles.DB, root jiri.RelPath) error {
 	s := jirix.NewSeq()
 	if err := s.AssertFileExists(db.Path()).Remove(db.Path()).Done(); err != nil && !runutil.IsNotExist(err) {
 		return err
+	} else {
+		if err := s.AssertDirExists(db.Path()).RemoveAll(db.Path()).Done(); err != nil && !runutil.IsNotExist(err) {
+			return err
+		}
 	}
 	d := root.Abs(jirix)
 	err := s.AssertDirExists(d).
 		Run("chmod", "-R", "u+w", d).
 		RemoveAll(d).
 		Done()
-	fmt.Fprintf(jirix.Stdout(), "Cleanup: -rm-all: ")
 	if err == nil || runutil.IsNotExist(err) {
 		fmt.Fprintf(jirix.Stdout(), "success\n")
 		return nil
