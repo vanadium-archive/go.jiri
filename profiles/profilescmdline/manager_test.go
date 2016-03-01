@@ -256,7 +256,7 @@ func TestManagerUpdate(t *testing.T) {
 	dir, sh := buildInstallers(t), gosh.NewShell(t)
 	createProfilesDB(t, fake.X)
 	sh.Vars["JIRI_ROOT"] = fake.X.Root
-	sh.Vars["PATH"] = envvar.PrependUniqueToken(os.Getenv("PATH"), ":", dir)
+	sh.Vars["PATH"] = envvar.PrependUniqueToken(sh.Vars["PATH"], ":", dir)
 
 	i1 := filepath.Join(fake.X.ProfilesDBDir(), "i1")
 	i2 := filepath.Join(fake.X.ProfilesDBDir(), "i2")
