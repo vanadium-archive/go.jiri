@@ -1,4 +1,5 @@
 pkg jiri, const JiriManifestFile ideal-string
+pkg jiri, const PreservePathEnv ideal-string
 pkg jiri, const ProfilesDBDir ideal-string
 pkg jiri, const ProfilesRootDir ideal-string
 pkg jiri, const ProjectMetaDir ideal-string

@@ -28,6 +28,11 @@ const (
 	ProfilesDBDir        = RootMetaDir + string(filepath.Separator) + "profile_db"
 	ProfilesRootDir      = RootMetaDir + string(filepath.Separator) + "profiles"
 	JiriManifestFile     = ".jiri_manifest"
+
+	// PreservePathEnv is the name of the environment variable that, when set to a
+	// non-empty value, causes jiri tools to use the existing PATH variable,
+	// rather than mutating it.
+	PreservePathEnv = "JIRI_PRESERVE_PATH"
 )
 
 // X holds the execution environment for the jiri tool and related tools.  This
@@ -49,24 +54,25 @@ func NewX(env *cmdline.Env) (*X, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Prepend $JIRI_ROOT/.jiri_root/bin to the PATH, so execing a binary will
-	// invoke the one in that directory, if it exists.  This is crucial for
-	// jiri subcommands, where we want to invoke the binary that jiri
-	// installed, not whatever is in the user's PATH.
-	//
-	// Note that we must modify the actual os env variable with os.SetEnv and
-	// also the ctx.env, so that execing a binary through the os/exec package
-	// and with ctx.Run both have the correct behavior.
 	x := &X{
 		Context: ctx,
 		Root:    root,
 		Usage:   env.UsageErrorf,
 	}
-	newPath := envvar.PrependUniqueToken(ctx.Env()["PATH"], string(os.PathListSeparator), x.BinDir())
-	ctx.Env()["PATH"] = newPath
-	if err := os.Setenv("PATH", newPath); err != nil {
-		return nil, err
+	if ctx.Env()[PreservePathEnv] == "" {
+		// Prepend $JIRI_ROOT/.jiri_root/bin to the PATH, so execing a binary will
+		// invoke the one in that directory, if it exists.  This is crucial for jiri
+		// subcommands, where we want to invoke the binary that jiri installed, not
+		// whatever is in the user's PATH.
+		//
+		// Note that we must modify the actual os env variable with os.SetEnv and
+		// also the ctx.env, so that execing a binary through the os/exec package
+		// and with ctx.Run both have the correct behavior.
+		newPath := envvar.PrependUniqueToken(ctx.Env()["PATH"], string(os.PathListSeparator), x.BinDir())
+		ctx.Env()["PATH"] = newPath
+		if err := os.Setenv("PATH", newPath); err != nil {
+			return nil, err
+		}
 	}
 	return x, nil
 }
