@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"v.io/jiri/runutil"
-	"v.io/x/lib/envvar"
 )
 
 func rmLineNumbers(s string) string {
@@ -601,11 +600,7 @@ func TestDirModifier(t *testing.T) {
 
 func TestStart(t *testing.T) {
 	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false, true)
-	path, err := runutil.LookPath("sleep", envvar.SliceToMap(os.Environ()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	h, err := s.Start(path, "100")
+	h, err := s.Start("sh", "-c", "sleep 100")
 	if err != nil {
 		t.Fatal(err)
 	}

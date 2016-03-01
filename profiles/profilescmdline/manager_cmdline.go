@@ -36,6 +36,7 @@ import (
 	"v.io/jiri/profiles"
 	"v.io/jiri/profiles/profilesmanager"
 	"v.io/x/lib/cmdline"
+	"v.io/x/lib/lookpath"
 )
 
 // newCmdInstall represents the "profile install" command.
@@ -284,15 +285,14 @@ func RegisterManagementCommands(parent *cmdline.Command, useSubcommands bool, in
 
 func findProfileSubcommands(jirix *jiri.X) []string {
 	if !runSubcommands {
-		return []string{}
+		return nil
 	}
 	fi, err := os.Stat(filepath.Join(jirix.Root, jiri.ProfilesDBDir))
 	if err == nil && fi.IsDir() {
-		env := cmdline.EnvFromOS()
-		env.Vars["PATH"] = jirix.Env()["PATH"]
-		return env.LookPathPrefix("jiri-profile", map[string]bool{})
+		cmds, _ := lookpath.LookPrefix(jirix.Env(), "jiri-profile-", nil)
+		return cmds
 	}
-	return []string{}
+	return nil
 }
 
 func allAvailableManagers(jirix *jiri.X) ([]string, error) {

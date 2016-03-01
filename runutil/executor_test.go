@@ -55,7 +55,7 @@ func TestCommandFail(t *testing.T) {
 	if err := e.run(forever, e.opts, "go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`Command("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
-	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\nhello\n>> FAILED\n"; got != want {
+	if got, want := removeTimestamps(t, &out), ">> go run ./testdata/fail_hello.go\nhello\n>> FAILED: exit status 1\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
 }
@@ -84,7 +84,7 @@ func TestCommandWithOptsFail(t *testing.T) {
 	if err := e.run(forever, opts, "go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`CommandWithOpts("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
-	if got, want := removeTimestamps(t, &runOut), ">> go run ./testdata/fail_hello.go\n>> FAILED\n"; got != want {
+	if got, want := removeTimestamps(t, &runOut), ">> go run ./testdata/fail_hello.go\n>> FAILED: exit status 1\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
 	}
 	if got, want := strings.TrimSpace(cmdOut.String()), "hello"; got != want {
