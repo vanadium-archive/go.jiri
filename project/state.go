@@ -7,8 +7,8 @@ package project
 import (
 	"path/filepath"
 
+	"v.io/jiri"
 	"v.io/jiri/gitutil"
-	"v.io/jiri/jiri"
 	"v.io/jiri/runutil"
 	"v.io/jiri/tool"
 )

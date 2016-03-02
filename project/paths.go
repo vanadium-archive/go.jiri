@@ -7,7 +7,7 @@ package project
 import (
 	"path/filepath"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 )
 
 // DataDirPath returns the path to the data directory of the given tool.

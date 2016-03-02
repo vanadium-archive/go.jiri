@@ -16,7 +16,7 @@ import (
 	"runtime"
 	"strings"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/tool"
 )
 

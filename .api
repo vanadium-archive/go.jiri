@@ -1,0 +1,35 @@
+pkg jiri, const JiriManifestFile ideal-string
+pkg jiri, const PreservePathEnv ideal-string
+pkg jiri, const ProfilesDBDir ideal-string
+pkg jiri, const ProfilesRootDir ideal-string
+pkg jiri, const ProjectMetaDir ideal-string
+pkg jiri, const ProjectMetaFile ideal-string
+pkg jiri, const RootEnv ideal-string
+pkg jiri, const RootMetaDir ideal-string
+pkg jiri, func DefaultProfilesDBPath() string
+pkg jiri, func ExpandEnv(*X, *envvar.Vars)
+pkg jiri, func FindRoot() string
+pkg jiri, func NewRelPath(...string) RelPath
+pkg jiri, func NewX(*cmdline.Env) (*X, error)
+pkg jiri, func RunnerFunc(func(*X, []string) error) cmdline.Runner
+pkg jiri, method (*X) BinDir() string
+pkg jiri, method (*X) Clone(tool.ContextOpts) *X
+pkg jiri, method (*X) JiriManifestFile() string
+pkg jiri, method (*X) ProfilesDBDir() string
+pkg jiri, method (*X) ProfilesRootDir() string
+pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
+pkg jiri, method (*X) RootMetaDir() string
+pkg jiri, method (*X) ScriptsDir() string
+pkg jiri, method (*X) UpdateHistoryDir() string
+pkg jiri, method (*X) UpdateHistoryLatestLink() string
+pkg jiri, method (*X) UpdateHistorySecondLatestLink() string
+pkg jiri, method (*X) UsageErrorf(string, ...interface{}) error
+pkg jiri, method (*X) UsingOldManifests() bool
+pkg jiri, method (RelPath) Abs(*X) string
+pkg jiri, method (RelPath) Join(...string) RelPath
+pkg jiri, method (RelPath) Symbolic() string
+pkg jiri, type RelPath string
+pkg jiri, type X struct
+pkg jiri, type X struct, Root string
+pkg jiri, type X struct, Usage func(string, ...interface{}) error
+pkg jiri, type X struct, embedded *tool.Context

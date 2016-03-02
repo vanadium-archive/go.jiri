@@ -56,7 +56,7 @@ import (
 	"flag"
 	"strings"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 )
 
 // InstallerSeparator is the string used to separate the installer

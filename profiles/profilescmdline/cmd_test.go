@@ -5,7 +5,7 @@
 package profilescmdline
 
 import (
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 )
 
 func Reset() {

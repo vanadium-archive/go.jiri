@@ -17,7 +17,7 @@ import (
 	"strings"
 	"text/template"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/profiles/profilesreader"
 	"v.io/x/lib/cmdline"

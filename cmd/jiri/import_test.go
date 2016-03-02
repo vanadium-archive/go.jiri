@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/x/lib/gosh"
 )
 

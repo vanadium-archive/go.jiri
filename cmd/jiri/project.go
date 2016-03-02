@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/tool"
 	"v.io/jiri/util"
