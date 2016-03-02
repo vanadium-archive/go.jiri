@@ -3,7 +3,6 @@ pkg runutil, func IsExist(error) bool
 pkg runutil, func IsNotExist(error) bool
 pkg runutil, func IsPermission(error) bool
 pkg runutil, func IsTimeout(error) bool
-pkg runutil, func LookPath(string, map[string]string) (string, error)
 pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) Sequence
 pkg runutil, func TranslateExitCode(error) error
 pkg runutil, method (*Handle) Kill() error

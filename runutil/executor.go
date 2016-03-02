@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"v.io/x/lib/envvar"
+	"v.io/x/lib/lookpath"
 )
 
 const (
@@ -82,16 +83,17 @@ func (e *executor) function(opts opts, fn func() error, format string, args ...i
 		e.printf(e.opts.stdout, format, args...)
 	}
 	err := fn()
-	if err != nil {
-		if opts.verbose {
-			e.printf(e.opts.stdout, "FAILED: %v", err)
-		}
-		return err
-	}
 	if opts.verbose {
-		e.printf(e.opts.stdout, "OK")
+		e.printf(e.opts.stdout, okOrFailed(err))
 	}
-	return nil
+	return err
+}
+
+func okOrFailed(err error) string {
+	if err != nil {
+		return fmt.Sprintf("FAILED: %v", err)
+	}
+	return "OK"
 }
 
 // output logs the given list of lines using the given
@@ -128,8 +130,7 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 
 	// Check if <path> identifies a binary in the PATH environment
 	// variable of the opts.Env.
-	binary, err := LookPath(path, opts.env)
-	if err == nil {
+	if binary, err := lookpath.Look(opts.env, path); err == nil {
 		// If so, make sure to execute this binary. This step
 		// enables us to "shadow" binaries included in the
 		// PATH environment variable of the host OS (which
@@ -159,31 +160,21 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 		e.printf(e.opts.stdout, strings.Replace(strings.Join(args, " "), "%", "%%", -1))
 	}
 
-	if wait {
-		if timeout == 0 {
-			if err = command.Run(); err != nil {
-				if opts.verbose {
-					e.printf(e.opts.stdout, "FAILED")
-				}
-			} else {
-				if opts.verbose {
-					e.printf(e.opts.stdout, "OK")
-				}
-			}
-		} else {
-			err = e.timedCommand(timeout, opts, command)
-		}
-	} else {
+	var err error
+	switch {
+	case !wait:
 		err = command.Start()
-		if err != nil {
-			if opts.verbose {
-				e.printf(e.opts.stdout, "FAILED")
-			}
-		} else {
-			if opts.verbose {
-				e.printf(e.opts.stdout, "OK")
-			}
+		if opts.verbose {
+			e.printf(e.opts.stdout, okOrFailed(err))
 		}
+	case timeout == 0:
+		err = command.Run()
+		if opts.verbose {
+			e.printf(e.opts.stdout, okOrFailed(err))
+		}
+	default:
+		err = e.timedCommand(timeout, opts, command)
+		// Verbose output handled in timedCommand.
 	}
 	return command, err
 }
@@ -204,7 +195,7 @@ func (e *executor) timedCommand(timeout time.Duration, opts opts, command *exec.
 	}()
 	if err := command.Start(); err != nil {
 		if opts.verbose {
-			e.printf(e.opts.stdout, "FAILED")
+			e.printf(e.opts.stdout, "FAILED: %v", err)
 		}
 		return err
 	}
@@ -223,14 +214,8 @@ func (e *executor) timedCommand(timeout time.Duration, opts opts, command *exec.
 		}
 		return commandTimedOutErr
 	case err := <-done:
-		if err != nil {
-			if opts.verbose {
-				e.printf(e.opts.stdout, "FAILED")
-			}
-		} else {
-			if opts.verbose {
-				e.printf(e.opts.stdout, "OK")
-			}
+		if opts.verbose {
+			e.printf(e.opts.stdout, okOrFailed(err))
 		}
 		return err
 	}
