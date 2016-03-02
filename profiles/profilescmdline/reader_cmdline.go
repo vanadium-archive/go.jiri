@@ -359,7 +359,7 @@ func fmtOutput(jirix *jiri.X, o string) string {
 		return o
 	}
 	out := &bytes.Buffer{}
-	w := textutil.NewUTF8LineWriter(out, width)
+	w := textutil.NewUTF8WrapWriter(out, width)
 	fmt.Fprint(w, o)
 	w.Flush()
 	return out.String()
