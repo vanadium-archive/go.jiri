@@ -616,14 +616,12 @@ func (review *review) createReviewBranch(message string) (e error) {
 	}, &e)
 
 	// Report an error if the CL is empty.
-	if !review.jirix.DryRun() {
-		hasDiff, err := gitutil.New(review.jirix.NewSeq()).BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
-		if err != nil {
-			return err
-		}
-		if !hasDiff {
-			return emptyChangeError(struct{}{})
-		}
+	hasDiff, err := gitutil.New(review.jirix.NewSeq()).BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
+	if err != nil {
+		return err
+	}
+	if !hasDiff {
+		return emptyChangeError(struct{}{})
 	}
 
 	// If <message> is empty, replace it with the default message.
@@ -861,10 +859,8 @@ func (review *review) run() (e error) {
 
 // send mails the current branch out for review.
 func (review *review) send() error {
-	if !review.jirix.DryRun() {
-		if err := review.ensureChangeID(); err != nil {
-			return err
-		}
+	if err := review.ensureChangeID(); err != nil {
+		return err
 	}
 	if err := gerrit.Push(review.jirix.NewSeq(), review.CLOpts); err != nil {
 		return gerritError(err.Error())

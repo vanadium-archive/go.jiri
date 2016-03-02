@@ -114,11 +114,6 @@ func (ctx Context) Color() bool {
 	return *ctx.opts.Color
 }
 
-// DryRun returns the dry run setting of the context.
-func (ctx Context) DryRun() bool {
-	return false
-}
-
 // Env returns the environment of the context.
 func (ctx Context) Env() map[string]string {
 	return ctx.opts.Env
@@ -143,7 +138,7 @@ func (ctx Context) Manifest() string {
 // NewSeq returns a new instance of Sequence initialized using the options
 // stored in the context.
 func (ctx Context) NewSeq() runutil.Sequence {
-	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Color, false, *ctx.opts.Verbose)
+	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Color, *ctx.opts.Verbose)
 }
 
 // Stdin returns the standard input of the context.
