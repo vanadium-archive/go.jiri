@@ -8,7 +8,7 @@
 package main
 
 import (
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/profiles/profilescmdline"
 	"v.io/jiri/profiles/profilesmanager"
 	"v.io/jiri/tool"

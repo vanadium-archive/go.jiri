@@ -7,7 +7,7 @@ package profilesmanager
 import (
 	"fmt"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/profiles"
 )
 

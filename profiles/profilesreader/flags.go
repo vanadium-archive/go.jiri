@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 )
 
 // RegisterReaderFlags registers the flags commonly used with a profiles.Reader.

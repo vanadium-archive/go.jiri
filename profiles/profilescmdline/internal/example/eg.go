@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/profiles/profilesutil"
 )

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/runutil"
 )
 

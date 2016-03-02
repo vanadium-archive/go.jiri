@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/x/lib/set"
 )
 

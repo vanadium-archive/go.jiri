@@ -7,8 +7,8 @@ package main
 import (
 	"fmt"
 
+	"v.io/jiri"
 	"v.io/jiri/collect"
-	"v.io/jiri/jiri"
 	"v.io/jiri/project"
 	"v.io/x/lib/cmdline"
 )

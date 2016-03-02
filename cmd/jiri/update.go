@@ -5,7 +5,7 @@
 package main
 
 import (
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/project"
 	"v.io/jiri/retry"
 	"v.io/jiri/tool"

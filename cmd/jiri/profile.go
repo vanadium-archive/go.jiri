@@ -5,7 +5,7 @@
 package main
 
 import (
-	"v.io/jiri/jiri"
+	"v.io/jiri"
 	"v.io/jiri/profiles/profilescmdline"
 	"v.io/x/lib/cmdline"
 )
