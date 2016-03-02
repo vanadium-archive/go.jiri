@@ -59,7 +59,10 @@ func newCmdList() *cmdline.Command {
 		Short:    "List available or installed profiles",
 		Long:     "List available or installed profiles.",
 		ArgsName: "[<profiles>]",
-		ArgsLong: "<profiles> is a list of profiles to list, defaulting to all profiles if none are specifically requested.",
+		ArgsLong: `<profiles> is a list of profiles to list, defaulting to all
+profiles if none are specifically requested. List can also be used
+to test for the presence of a specific target for the requested profiles.
+If the target is not installed, it will exit with an error.`,
 	}
 }
 
@@ -212,6 +215,19 @@ func registerEnvCommand(parent *cmdline.Command, defaultDBPath string) {
 	cmdEnv.Flags.BoolVar(&envFlags.Verbose, "v", false, "print more detailed information")
 }
 
+func matchingTargets(rd *profilesreader.Reader, profile *profiles.Profile) profiles.Targets {
+	var targets profiles.Targets
+	if IsFlagSet(cmdList.ParsedFlags, "target") {
+		if t := rd.LookupProfileTarget(profile.Name(), listFlags.Target); t != nil {
+			targets = profiles.Targets{t}
+		}
+	} else {
+		targets = profile.Targets()
+	}
+	targets.Sort()
+	return targets
+}
+
 func runList(jirix *jiri.X, args []string) error {
 	if listFlags.Verbose {
 		fmt.Fprintf(jirix.Stdout(), "Profiles Database Path: %s\n", listFlags.DBFilename)
@@ -220,7 +236,12 @@ func runList(jirix *jiri.X, args []string) error {
 	if err != nil {
 		return err
 	}
-	profileNames := args
+	profileNames := []string{}
+	for _, a := range args {
+		if a != "" {
+			profileNames = append(profileNames, a)
+		}
+	}
 	if len(args) == 0 {
 		if IsFlagSet(cmdList.ParsedFlags, "profiles") {
 			profileNames = strings.Split(listFlags.Profiles, ",")
@@ -228,34 +249,42 @@ func runList(jirix *jiri.X, args []string) error {
 			profileNames = rd.ProfileNames()
 		}
 	}
+
 	if listFlags.Verbose {
 		fmt.Fprintf(jirix.Stdout(), "Installed Profiles: ")
 		fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(rd.ProfileNames(), ", "))
 		for _, name := range profileNames {
 			profile := rd.LookupProfile(name)
 			fmt.Fprintf(jirix.Stdout(), "Profile: %s @ %s\n", profile.Name(), profile.Root())
-			for _, target := range profile.Targets() {
+			for _, target := range matchingTargets(rd, profile) {
 				fmt.Fprintf(jirix.Stdout(), "\t%s\n", target.DebugString())
 			}
 		}
 		return nil
 	}
 	if listFlags.info == "" {
-		if len(profileNames) > 0 {
-			fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(profileNames, ", "))
+		matchingNames := []string{}
+		for _, name := range profileNames {
+			profile := rd.LookupProfile(name)
+			if len(matchingTargets(rd, profile)) > 0 {
+				matchingNames = append(matchingNames, name)
+			}
+		}
+		if len(matchingNames) > 0 {
+			fmt.Fprintln(jirix.Stdout(), strings.Join(matchingNames, ", "))
+		} else {
+			if IsFlagSet(cmdList.ParsedFlags, "target") {
+				return fmt.Errorf("no matching targets for %s", listFlags.Target)
+			}
 		}
 		return nil
 	}
-	// Handle --info.
+	// Handle --info
+	found := false
 	for _, name := range profileNames {
 		profile := rd.LookupProfile(name)
+		targets := matchingTargets(rd, profile)
 		out := &bytes.Buffer{}
-		var targets profiles.Targets
-		if listFlags.Target.IsSet() {
-			targets = append(targets, rd.LookupProfileTarget(name, listFlags.Target))
-		} else {
-			targets = profile.Targets()
-		}
 		printHeader := len(profileNames) > 1 || len(targets) > 1 || len(listFlags.info) == 0
 		for _, target := range targets {
 			if printHeader {
@@ -270,10 +299,13 @@ func runList(jirix *jiri.X, args []string) error {
 			if printHeader {
 				out.WriteString("\n")
 			}
+			found = true
 		}
 		fmt.Fprint(jirix.Stdout(), out.String())
 	}
-
+	if !found {
+		return fmt.Errorf("no matching targets for %s", listFlags.Target)
+	}
 	return nil
 }
 
@@ -302,7 +334,7 @@ type listInfo struct {
 }
 
 func infoUsage() string {
-	return `The following fields for use with --profile-info are available:
+	return `The following fields for use with -info are available:
 	SchemaVersion - the version of the profiles implementation.
 	DBPath - the path for the profiles database.
 	Target.InstallationDir - the installation directory of the requested profile.

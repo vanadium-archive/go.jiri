@@ -115,7 +115,7 @@ func run(sh *gosh.Shell, dir, bin string, args ...string) string {
 	if testing.Verbose() {
 		cmd.PropagateOutput = true
 	}
-	return cmd.Stdout()
+	return cmd.CombinedOutput()
 }
 
 func TestManagerAvailable(t *testing.T) {
@@ -296,12 +296,38 @@ func TestManagerUpdate(t *testing.T) {
 	cmpFiles(t, i1, filepath.Join("testdata", "i1h.xml"))
 }
 
+func TestList(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+	dir, sh := buildInstallers(t), gosh.NewShell(t)
+	sh.Vars["JIRI_ROOT"] = fake.X.Root
+	sh.Vars["PATH"] = envvar.PrependUniqueToken(os.Getenv("PATH"), ":", dir)
+	run(sh, dir, "jiri", "profile", "install", "--target=arch-os@2", "i1:eg", "i2:eg")
+	if got, want := run(sh, dir, "jiri", "profile", "list", "--target=arch-os"),
+		"i1:eg, i2:eg\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := run(sh, dir, "jiri", "profile", "list"), "i1:eg, i2:eg\n"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	for _, arg := range []string{"", "--info=SchemaVersion"} {
+		sh.ContinueOnError = true
+		sh.Err = nil
+		got := run(sh, dir, "jiri", "profile", "list", "--target=no-suchtarget", arg)
+		if sh.Err == nil {
+			t.Errorf("expected an error for: jiri profile list --target=no-suchtarget %s", arg)
+		}
+		if want := "ERROR: no matching targets for no-suchtarget@\n"; got != want {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	}
+}
+
 // Test using a fake jiri root.
 func TestJiriFakeRoot(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	profilesDBDir := filepath.Join(fake.X.Root, jiri.ProfilesDBDir)
-	_ = cleanup
 	pdb := profiles.NewDB()
 	t1, err := profiles.NewTarget("cpu1-os1@1", "A=B,C=D")
 	if err != nil {
