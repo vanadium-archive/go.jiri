@@ -9,7 +9,71 @@ It supports:
 * restoring local project state from a snapshot, and
 * facilitating sending change lists to [Gerrit][gerrit].
 
+Jiri has an extensible plugin model, making it easy to create new sub-commands.
+
 Jiri is open-source.  See the contributor guidelines [here][contributing].
+
+## Jiri Basics
+Jiri organizes a set of repositories on your local filesystem according to a
+[manifest][manifests].  These repositories are referred to as "projects", and
+are all contained within a single directory called the "jiri root" which is
+assumed to be set in the `JIRI_ROOT` environment variable.
+
+The manifest file specifies the relative location of each project within the
+jiri root, and also includes other metadata about the project such as its
+remote url, the remote branch it should track, and more.
+
+The `jiri update` command syncs the master branch of all local projects to the
+revision and remote branch specified in the manifest for each project.  Jiri
+will create the project locally if it does not exist, and if run with the `-gc`
+flag, jiri will "garbage collect" any projects that are not listed in the
+manifest by deleting them locally.
+
+The `.jiri_manifest` file in the jiri root describes which project jiri should
+sync.  Typically the `.jiri_manifest` file will import other manifests, but it
+can also contain a list of projects.
+
+For example, here is a simple `.jiri_manifest` with just two projects, "foo"
+and "bar", which are hosted on github and bitbucket respectively.
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <projects>
+    <project name="foo-project"
+             remote="https://github.com/my-org/foo"
+             path="foo"/>
+    <project name="bar"
+             remote="https://bitbucket.com/other-org/bar"
+             path="bar"/>
+  </projects>
+</manifest>
+```
+When you run `jiri update` for the first time, the "foo" and "bar" repos will
+be cloned into `$JIRI_ROOT/foo` and `$JIRI_ROOT/bar` respectively.  Running
+`jiri update` again will sync the master branch of these repos with the remote
+master branch.
+
+Note that the project paths do not need to be immediate children of the jiri
+root.  We could have decided to set the `path` attribute for the "bar" project
+to "third_party/bar", or even nest "bar" inside the "foo" project by setting
+the `path` to  "foo/bar" (assuming no files in the foo repo conflict with bar).
+
+Because manifest files also need to be kept in sync between various team
+members, it often makes sense to keep your team's manifests in a version
+controlled repository.
+
+Jiri makes it easy to "import" a remote manifest from your local
+`.jiri_manifest` file with the `jiri import` command.  For example, running the
+following command will create a `.jiri_manifest` file (or append to an existing
+one) with an `import` tag that imports the minimal manifest from the
+https://github.com/vanadium/manifest repo.
+
+ ```
+ jiri import -name="manifest" minimal https://github.com/vanadium/manifest
+```
+
+The next time you run `jiri update`, jiri will sync all projects listed in the
+Vanadium minimal manifest.
 
 ## Quickstart
 
@@ -169,17 +233,17 @@ http://godoc.org/v.io/jiri.
 
 ## Filesystem
 
-TODO(nlacasse): There's a pretty good description of the filesystem layout at
-`jiri help filesystem`.  Do we want to keep those docs there, or move them
-here?  Maybe figure out a way to include them in both places but only have a
-single copy in source control.
+<!-- TODO(nlacasse): Figure out a way to keep the canonical documentation in
+one place but mirror it to the README and cmdline docs. -->
+
+See the jiri [filesystem godocs](https://godoc.org/v.io/jiri/cmd/jiri#hdr-Jiri_filesystem___Description_of_jiri_file_system_layout).
 
 ## Manifests<a name="manifests"></a>
 
-TODO(nlacasse): There's a brief description of manifests in `jiri help
-manifest`, but it needs a lot of improvement.  Do we want to keep those docs
-there, or move them here?  Maybe figure out a way to include them in both
-places but only have a single copy in source control.
+<!-- TODO(nlacasse): Figure out a way to keep the canonical documentation in
+one place but mirror it to the README and cmdline docs. -->
+
+See the jiri [manifest godocs](https://godoc.org/v.io/jiri/cmd/jiri#hdr-Jiri_manifest___Description_of_manifest_files).
 
 ## Snapshots
 
@@ -220,10 +284,10 @@ remote counterpart.  All development should take place on a non-master
 the remote master via the Gerrit code review system.  The change can then be
 merged into the local master branch with `jiri update`.
 
-TODO(nlacasse): dje is changing this behavior.  The plan is that "master" will
-be the default reserved branch for each repo, but that can be overridden with
-the `localbranch` attribute in the manifest.  Update this section once this
-change lands.
+<!-- TODO(nlacasse): dje is changing this behavior.  The plan is that "master"
+will be the default reserved branch for each repo, but that can be overridden
+with the `localbranch` attribute in the manifest.  Update this section once
+this change lands. -->
 
 ### Creating a new CL
 
@@ -343,9 +407,39 @@ you do `git branch -d <branch-name>`.  You *can* use `git branch -D
 has not been merged into master yet.  For this reason, we recommend using `jiri
 cl cleanup` to delete the feature branch safely.
 
-## FAQ
+### Dependent CLs
+If you have changes A and B, and B depends on A, you can still submit distinct
+CLs for A and B that can be reviewed and submitted independently (although A
+must be submitted before B).
 
-TODO(nlacasse): Answer these.
+First, create your feature branch for A, make your change, and upload the CL
+for review according to the instructions above.
+
+Then, while still on the feature branch for A, create your feature branch for B.
+```
+jiri cl new feature-B
+```
+Then make your change and upload the CL for review according to the
+instructions above.
+
+You can respond to review comments by submitting new patch sets as normal.
+
+After the CL for A has been submitted, make sure to clean up A's feature branch
+and upload a new patch set for feature B.
+```
+jiri update # fetch update that includes feature A
+git checkout feature-B
+jiri cl cleanup feature-A
+git merge master # merge feature A into feature B branch
+jiri cl mail # send new patch set for feature B
+```
+The CL for feature B can now be submitted.
+
+This process can be extended for more than 2 CLs.  You must keep two things in mind:
+* always create the dependent feature branch with `jiri cl new` from the parent feature branch, and
+* after a parent feature has been submitted, cleanup the parent feature branch with `jiri cl cleanup`, and merge master into all dependent CLs and upload new patch sets.
+
+## FAQ
 
 ### Why the name "jiri"?
 [Jiří][jiri-wiki] is a very popular boys name in the Czech Republic.
@@ -355,11 +449,16 @@ We pronounce "jiri" like "yiree".
 
 The actual Czech name [Jiří][jiri-wiki] is pronounced something like "yirzhee".
 
-### Why not repo/gclient/etc?
-
 ### Why can't I commit to my master branch?
 
+Jiri keeps the master branch of each project in the state described in the
+manifest.  Any changes that are made to the master branch would be lost during
+the next `jiri update`.
+
+<!-- TODO(nlacasse): Answer these.
+### Why not repo/gclient/etc?
 ### How can I test changes to a manifest without pushing it upstream?
+-->
 
 [android repo]: https://source.android.com/source/using-repo.html "Repo command reference"
 [bootstrap_jiri]: scripts/bootstrap_jiri "bootstrap_jiri"
