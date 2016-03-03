@@ -103,7 +103,7 @@ type sequence struct {
 // environment, stdin, stderr, stdout and other supported options.
 // If the environment parameter is nil or empty then the current value of
 // os.Environ() will be used instead.
-func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, dryRun, verbose bool) Sequence {
+func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, verbose bool) Sequence {
 	if len(env) == 0 {
 		env = envvar.SliceToMap(os.Environ())
 	}
@@ -117,11 +117,11 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 	return s
 }
 
-// RunOpts returns the values of dryRun and verbose that were used to
+// RunOpts returns the value of verbose that was used to
 // create this sequence.
-func (s Sequence) RunOpts() (dryRun bool, verbose bool) {
+func (s Sequence) RunOpts() (verbose bool) {
 	opts := s.getOpts()
-	return false, opts.verbose
+	return opts.verbose
 }
 
 // Capture arranges for the next call to Run or Last to write its stdout and
@@ -866,8 +866,8 @@ func (s Sequence) WriteFile(filename string, data []byte, perm os.FileMode) Sequ
 	return s
 }
 
-// Copy is a wrapper around io.Copy that handles options such as "verbose" or
-// "dry run". Copy is a terminating function.
+// Copy is a wrapper around io.Copy that handles options such as "verbose".
+// Copy is a terminating function.
 func (s Sequence) Copy(dst io.Writer, src io.Reader) (n int64, err error) {
 	if s.err != nil {
 		return 0, s.Done()

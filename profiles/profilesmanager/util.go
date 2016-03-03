@@ -23,7 +23,7 @@ func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, insta
 	default:
 		return fmt.Errorf("unrecognised action %v", action)
 	}
-	if jirix.Verbose() || jirix.DryRun() {
+	if jirix.Verbose() {
 		fmt.Fprintf(jirix.Stdout(), "%s %v %s\n", verb, action, target)
 	}
 	if t := pdb.LookupProfileTarget(installer, profile, target); t != nil {
@@ -41,7 +41,7 @@ func ensureAction(jirix *jiri.X, pdb *profiles.DB, action profiles.Action, insta
 		return err
 	}
 	target.SetVersion(version)
-	if jirix.Verbose() || jirix.DryRun() {
+	if jirix.Verbose() {
 		fmt.Fprintf(jirix.Stdout(), "%s %s %s\n", verb, profile, target.DebugString())
 	}
 	if action == profiles.Install {

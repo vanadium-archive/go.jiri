@@ -1331,10 +1331,6 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 func InstallTools(jirix *jiri.X, dir string) error {
 	jirix.TimerPush("install tools")
 	defer jirix.TimerPop()
-	if jirix.DryRun() {
-		// In "dry run" mode, no binaries are built.
-		return nil
-	}
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)

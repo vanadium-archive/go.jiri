@@ -3,7 +3,7 @@ pkg runutil, func IsExist(error) bool
 pkg runutil, func IsNotExist(error) bool
 pkg runutil, func IsPermission(error) bool
 pkg runutil, func IsTimeout(error) bool
-pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool, bool) Sequence
+pkg runutil, func NewSequence(map[string]string, io.Reader, io.Writer, io.Writer, bool, bool) Sequence
 pkg runutil, func TranslateExitCode(error) error
 pkg runutil, method (*Handle) Kill() error
 pkg runutil, method (*Handle) Pid() int
@@ -40,7 +40,7 @@ pkg runutil, method (Sequence) Remove(string) Sequence
 pkg runutil, method (Sequence) RemoveAll(string) Sequence
 pkg runutil, method (Sequence) Rename(string, string) Sequence
 pkg runutil, method (Sequence) Run(string, ...string) Sequence
-pkg runutil, method (Sequence) RunOpts() (bool, bool)
+pkg runutil, method (Sequence) RunOpts() bool
 pkg runutil, method (Sequence) SetEnv(map[string]string) Sequence
 pkg runutil, method (Sequence) Start(string, ...string) (*Handle, error)
 pkg runutil, method (Sequence) Stat(string) (os.FileInfo, error)
