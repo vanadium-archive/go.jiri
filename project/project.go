@@ -1373,6 +1373,10 @@ func updateJiriScript(jirix *jiri.X, jiriProject Project) error {
 			if _, err := s.Copy(jiriScriptOut, newJiriScript); err != nil {
 				return err
 			}
+			if err := s.Chmod(jiriScriptOutPath, 0750).Done(); err != nil {
+				return err
+			}
+
 			return nil
 		})
 	}
