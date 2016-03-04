@@ -1199,21 +1199,17 @@ func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputD
 }
 
 // CleanupProjects restores the given jiri projects back to their master
-// branches and gets rid of all the local changes. If "cleanupBranches" is
-// true, it will also delete all the non-master branches.
+// branches, resets to the specified revision if there is one, and gets rid of
+// all the local changes. If "cleanupBranches" is true, it will also delete all
+// the non-master branches.
 func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
 	defer collect.Error(func() error { return jirix.NewSeq().Chdir(wd).Done() }, &e)
-	s := jirix.NewSeq()
 	for _, project := range projects {
-		localProjectDir := project.Path
-		if err := s.Chdir(localProjectDir).Done(); err != nil {
-			return err
-		}
-		if err := resetLocalProject(jirix, cleanupBranches, project.RemoteBranch); err != nil {
+		if err := resetLocalProject(jirix, project, cleanupBranches); err != nil {
 			return err
 		}
 	}
@@ -1222,26 +1218,30 @@ func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e 
 
 // resetLocalProject checks out the master branch, cleans up untracked files
 // and uncommitted changes, and optionally deletes all the other branches.
-func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string) error {
-	// Check out master and clean up changes.
-	curBranchName, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+func resetLocalProject(jirix *jiri.X, project Project, cleanupBranches bool) error {
+	git := gitutil.New(jirix.NewSeq())
+	if err := jirix.NewSeq().Chdir(project.Path).Done(); err != nil {
+		return err
+	}
+	// Check out master.
+	curBranchName, err := git.CurrentBranchName()
 	if err != nil {
 		return err
 	}
 	if curBranchName != "master" {
-		if err := gitutil.New(jirix.NewSeq()).CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
+		if err := git.CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
-	if err := gitutil.New(jirix.NewSeq()).RemoveUntrackedFiles(); err != nil {
+	// Cleanup changes.
+	if err := git.RemoveUntrackedFiles(); err != nil {
 		return err
 	}
-	// Discard any uncommitted changes.
-	if remoteBranch == "" {
-		remoteBranch = "master"
-	}
-	if err := gitutil.New(jirix.NewSeq()).Reset("origin/" + remoteBranch); err != nil {
+	if err := resetProjectCurrentBranch(jirix, project); err != nil {
 		return err
+	}
+	if !cleanupBranches {
+		return nil
 	}
 
 	// Delete all the other branches.
@@ -1254,13 +1254,10 @@ func resetLocalProject(jirix *jiri.X, cleanupBranches bool, remoteBranch string)
 		if branch == "master" {
 			continue
 		}
-		if cleanupBranches {
-			if err := gitutil.New(jirix.NewSeq()).DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
-				return nil
-			}
+		if err := git.DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
