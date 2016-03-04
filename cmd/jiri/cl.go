@@ -140,28 +140,29 @@ stops. Otherwise, it deletes the given branches.
 }
 
 func cleanupCL(jirix *jiri.X, branches []string) (e error) {
-	originalBranch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	git := gitutil.New(jirix.NewSeq())
+	originalBranch, err := git.CurrentBranchName()
 	if err != nil {
 		return err
 	}
-	stashed, err := gitutil.New(jirix.NewSeq()).Stash()
+	stashed, err := git.Stash()
 	if err != nil {
 		return err
 	}
 	if stashed {
-		defer collect.Error(func() error { return gitutil.New(jirix.NewSeq()).StashPop() }, &e)
+		defer collect.Error(func() error { return git.StashPop() }, &e)
 	}
-	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(remoteBranchFlag); err != nil {
+	if err := git.CheckoutBranch(remoteBranchFlag); err != nil {
 		return err
 	}
 	checkoutOriginalBranch := true
 	defer collect.Error(func() error {
 		if checkoutOriginalBranch {
-			return gitutil.New(jirix.NewSeq()).CheckoutBranch(originalBranch)
+			return git.CheckoutBranch(originalBranch)
 		}
 		return nil
 	}, &e)
-	if err := gitutil.New(jirix.NewSeq()).FetchRefspec("origin", remoteBranchFlag); err != nil {
+	if err := git.FetchRefspec("origin", remoteBranchFlag); err != nil {
 		return err
 	}
 	s := jirix.NewSeq()
@@ -178,15 +179,16 @@ func cleanupCL(jirix *jiri.X, branches []string) (e error) {
 }
 
 func cleanupBranch(jirix *jiri.X, branch string) error {
-	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(branch); err != nil {
+	git := gitutil.New(jirix.NewSeq())
+	if err := git.CheckoutBranch(branch); err != nil {
 		return err
 	}
 	if !forceFlag {
 		trackingBranch := "origin/" + remoteBranchFlag
-		if err := gitutil.New(jirix.NewSeq()).Merge(trackingBranch); err != nil {
+		if err := git.Merge(trackingBranch); err != nil {
 			return err
 		}
-		files, err := gitutil.New(jirix.NewSeq()).ModifiedFiles(trackingBranch, branch)
+		files, err := git.ModifiedFiles(trackingBranch, branch)
 		if err != nil {
 			return err
 		}
@@ -194,20 +196,20 @@ func cleanupBranch(jirix *jiri.X, branch string) error {
 			return fmt.Errorf("unmerged changes in\n%s", strings.Join(files, "\n"))
 		}
 	}
-	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(remoteBranchFlag); err != nil {
+	if err := git.CheckoutBranch(remoteBranchFlag); err != nil {
 		return err
 	}
-	if err := gitutil.New(jirix.NewSeq()).DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
+	if err := git.DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 		return err
 	}
 	reviewBranch := branch + "-REVIEW"
-	if gitutil.New(jirix.NewSeq()).BranchExists(reviewBranch) {
-		if err := gitutil.New(jirix.NewSeq()).DeleteBranch(reviewBranch, gitutil.ForceOpt(true)); err != nil {
+	if git.BranchExists(reviewBranch) {
+		if err := git.DeleteBranch(reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	// Delete branch metadata.
-	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
+	topLevel, err := git.TopLevel()
 	if err != nil {
 		return err
 	}
@@ -358,6 +360,25 @@ func currentProject(jirix *jiri.X) (project.Project, error) {
 
 // runCLMail is a wrapper that sets up and runs a review instance.
 func runCLMail(jirix *jiri.X, _ []string) error {
+	// Check that working dir exist on remote branch.  Otherwise checking out
+	// remote branch will break the users working dir.
+	git := gitutil.New(jirix.NewSeq())
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	topLevel, err := git.TopLevel()
+	if err != nil {
+		return err
+	}
+	relWd, err := filepath.Rel(topLevel, wd)
+	if err != nil {
+		return err
+	}
+	if !git.DirExistsOnBranch(relWd, remoteBranchFlag) {
+		return fmt.Errorf("directory %q does not exist on branch %q.\nPlease run 'jiri cl mail' from root directory of this repo.", relWd, remoteBranchFlag)
+	}
+
 	// Sanity checks for the <presubmitFlag> flag.
 	if !checkPresubmitFlag() {
 		return jirix.UsageErrorf("invalid value for the -presubmit flag. Valid values: %s.",
@@ -564,16 +585,17 @@ func (review *review) confirmFlagChanges() (bool, error) {
 
 // cleanup cleans up after the review.
 func (review *review) cleanup(stashed bool) error {
-	if err := gitutil.New(review.jirix.NewSeq()).CheckoutBranch(review.CLOpts.Branch); err != nil {
+	git := gitutil.New(review.jirix.NewSeq())
+	if err := git.CheckoutBranch(review.CLOpts.Branch); err != nil {
 		return err
 	}
-	if gitutil.New(review.jirix.NewSeq()).BranchExists(review.reviewBranch) {
-		if err := gitutil.New(review.jirix.NewSeq()).DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
+	if git.BranchExists(review.reviewBranch) {
+		if err := git.DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	if stashed {
-		if err := gitutil.New(review.jirix.NewSeq()).StashPop(); err != nil {
+		if err := git.StashPop(); err != nil {
 			return err
 		}
 	}
@@ -588,35 +610,36 @@ func (review *review) cleanup(stashed bool) error {
 // <commitMessageFileName>, while the <message> argument is used as
 // the commit message for the last commit.
 func (review *review) createReviewBranch(message string) (e error) {
+	git := gitutil.New(review.jirix.NewSeq())
 	// Create the review branch.
-	if err := gitutil.New(review.jirix.NewSeq()).FetchRefspec("origin", review.CLOpts.RemoteBranch); err != nil {
+	if err := git.FetchRefspec("origin", review.CLOpts.RemoteBranch); err != nil {
 		return err
 	}
-	if gitutil.New(review.jirix.NewSeq()).BranchExists(review.reviewBranch) {
-		if err := gitutil.New(review.jirix.NewSeq()).DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
+	if git.BranchExists(review.reviewBranch) {
+		if err := git.DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	upstream := "origin/" + review.CLOpts.RemoteBranch
-	if err := gitutil.New(review.jirix.NewSeq()).CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
+	if err := git.CreateBranchWithUpstream(review.reviewBranch, upstream); err != nil {
 		return err
 	}
-	if err := gitutil.New(review.jirix.NewSeq()).CheckoutBranch(review.reviewBranch); err != nil {
+	if err := git.CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
 	// Register a cleanup handler in case of subsequent errors.
 	cleanup := true
 	defer collect.Error(func() error {
 		if !cleanup {
-			return gitutil.New(review.jirix.NewSeq()).CheckoutBranch(review.CLOpts.Branch)
+			return git.CheckoutBranch(review.CLOpts.Branch)
 		}
-		gitutil.New(review.jirix.NewSeq()).CheckoutBranch(review.CLOpts.Branch, gitutil.ForceOpt(true))
-		gitutil.New(review.jirix.NewSeq()).DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true))
+		git.CheckoutBranch(review.CLOpts.Branch, gitutil.ForceOpt(true))
+		git.DeleteBranch(review.reviewBranch, gitutil.ForceOpt(true))
 		return nil
 	}, &e)
 
 	// Report an error if the CL is empty.
-	hasDiff, err := gitutil.New(review.jirix.NewSeq()).BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
+	hasDiff, err := git.BranchesDiffer(review.CLOpts.Branch, review.reviewBranch)
 	if err != nil {
 		return err
 	}
@@ -656,6 +679,7 @@ func (review *review) createReviewBranch(message string) (e error) {
 // TODO(jsimsa): Consider using "git rebase --onto" to avoid having to
 // deal with merge conflicts.
 func (review *review) squashBranches(branches []string, message string) (e error) {
+	git := gitutil.New(review.jirix.NewSeq())
 	for i := 1; i < len(branches); i++ {
 		// We want to merge the <branches[i]> branch on top of the review
 		// branch, forcing all conflicts to be reviewed in favor of the
@@ -664,7 +688,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		// here is based on:
 		//
 		// http://stackoverflow.com/questions/173919/is-there-a-theirs-version-of-git-merge-s-ours
-		if err := gitutil.New(review.jirix.NewSeq()).Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("ours")); err != nil {
+		if err := git.Merge(branches[i], gitutil.SquashOpt(true), gitutil.StrategyOpt("ours")); err != nil {
 			return changeConflictError{
 				localBranch:  branches[i],
 				remoteBranch: review.CLOpts.RemoteBranch,
@@ -678,7 +702,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		// this was not the case, consecutive invocations of "jiri cl mail"
 		// could fail if some, but not all, of the dependent CLs submitted
 		// to Gerrit have changed.
-		output, err := gitutil.New(review.jirix.NewSeq()).Log(branches[i], branches[i]+"^", "%ad%n%cd")
+		output, err := git.Log(branches[i], branches[i]+"^", "%ad%n%cd")
 		if err != nil {
 			return err
 		}
@@ -687,7 +711,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		}
 		authorDate := gitutil.AuthorDateOpt(output[0][0])
 		committer := gitutil.CommitterDateOpt(output[0][1])
-		git := gitutil.New(review.jirix.NewSeq(), authorDate, committer)
+		git = gitutil.New(review.jirix.NewSeq(), authorDate, committer)
 		if i < len(branches)-1 {
 			file, err := getCommitMessageFileName(review.jirix, branches[i])
 			if err != nil {
@@ -711,7 +735,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 			return err
 		}
 		defer collect.Error(func() error {
-			return gitutil.New(review.jirix.NewSeq()).DeleteBranch(tmpBranch, gitutil.ForceOpt(true))
+			return git.DeleteBranch(tmpBranch, gitutil.ForceOpt(true))
 		}, &e)
 		if err := git.Reset(branches[i]); err != nil {
 			return err
@@ -783,8 +807,9 @@ func (review *review) processLabels(message string) string {
 // run implements checks that the review passes all local checks
 // and then mails it to Gerrit.
 func (review *review) run() (e error) {
+	git := gitutil.New(review.jirix.NewSeq())
 	if uncommittedFlag {
-		changes, err := gitutil.New(review.jirix.NewSeq()).FilesWithUncommittedChanges()
+		changes, err := git.FilesWithUncommittedChanges()
 		if err != nil {
 			return err
 		}
@@ -795,16 +820,16 @@ func (review *review) run() (e error) {
 	if review.CLOpts.Branch == remoteBranchFlag {
 		return fmt.Errorf("cannot do a review from the %q branch.", remoteBranchFlag)
 	}
-	stashed, err := gitutil.New(review.jirix.NewSeq()).Stash()
+	stashed, err := git.Stash()
 	if err != nil {
 		return err
 	}
+	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("Getwd() failed: %v", err)
 	}
-	defer collect.Error(func() error { return review.jirix.NewSeq().Chdir(wd).Done() }, &e)
-	topLevel, err := gitutil.New(review.jirix.NewSeq()).TopLevel()
+	topLevel, err := git.TopLevel()
 	if err != nil {
 		return err
 	}
@@ -812,7 +837,7 @@ func (review *review) run() (e error) {
 	if err := s.Chdir(topLevel).Done(); err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return review.cleanup(stashed) }, &e)
+	defer collect.Error(func() error { return review.jirix.NewSeq().Chdir(wd).Done() }, &e)
 	file, err := getCommitMessageFileName(review.jirix, review.CLOpts.Branch)
 	if err != nil {
 		return err
@@ -904,10 +929,11 @@ func (review *review) setTopic() error {
 
 // updateReviewMessage writes the commit message to the given file.
 func (review *review) updateReviewMessage(file string) error {
-	if err := gitutil.New(review.jirix.NewSeq()).CheckoutBranch(review.reviewBranch); err != nil {
+	git := gitutil.New(review.jirix.NewSeq())
+	if err := git.CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
-	newMessage, err := gitutil.New(review.jirix.NewSeq()).LatestCommitMessage()
+	newMessage, err := git.LatestCommitMessage()
 	if err != nil {
 		return err
 	}
@@ -920,14 +946,14 @@ func (review *review) updateReviewMessage(file string) error {
 	if _, err := s.Stat(file); err != nil {
 		if runutil.IsNotExist(err) {
 			newMessage = review.processLabels(newMessage)
-			if err := gitutil.New(review.jirix.NewSeq()).CommitAmendWithMessage(newMessage); err != nil {
+			if err := git.CommitAmendWithMessage(newMessage); err != nil {
 				return err
 			}
 		} else {
 			return err
 		}
 	}
-	topLevel, err := gitutil.New(review.jirix.NewSeq()).TopLevel()
+	topLevel, err := git.TopLevel()
 	if err != nil {
 		return err
 	}
@@ -964,18 +990,19 @@ func runCLNew(jirix *jiri.X, args []string) error {
 }
 
 func newCL(jirix *jiri.X, args []string) error {
-	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
+	git := gitutil.New(jirix.NewSeq())
+	topLevel, err := git.TopLevel()
 	if err != nil {
 		return err
 	}
-	originalBranch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	originalBranch, err := git.CurrentBranchName()
 	if err != nil {
 		return err
 	}
 
 	// Create a new branch using the current branch.
 	newBranch := args[0]
-	if err := gitutil.New(jirix.NewSeq()).CreateAndCheckoutBranch(newBranch); err != nil {
+	if err := git.CreateAndCheckoutBranch(newBranch); err != nil {
 		return err
 	}
 
@@ -983,8 +1010,8 @@ func newCL(jirix *jiri.X, args []string) error {
 	cleanup := true
 	defer func() {
 		if cleanup {
-			gitutil.New(jirix.NewSeq()).CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
-			gitutil.New(jirix.NewSeq()).DeleteBranch(newBranch, gitutil.ForceOpt(true))
+			git.CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
+			git.DeleteBranch(newBranch, gitutil.ForceOpt(true))
 		}
 	}()
 
@@ -1040,17 +1067,18 @@ func runCLSync(jirix *jiri.X, _ []string) error {
 }
 
 func syncCL(jirix *jiri.X) (e error) {
-	stashed, err := gitutil.New(jirix.NewSeq()).Stash()
+	git := gitutil.New(jirix.NewSeq())
+	stashed, err := git.Stash()
 	if err != nil {
 		return err
 	}
 	if stashed {
-		defer collect.Error(func() error { return gitutil.New(jirix.NewSeq()).StashPop() }, &e)
+		defer collect.Error(func() error { return git.StashPop() }, &e)
 	}
 
 	// Register a cleanup handler in case of subsequent errors.
 	forceOriginalBranch := true
-	originalBranch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	originalBranch, err := git.CurrentBranchName()
 	if err != nil {
 		return err
 	}
@@ -1061,14 +1089,14 @@ func syncCL(jirix *jiri.X) (e error) {
 
 	defer func() {
 		if forceOriginalBranch {
-			gitutil.New(jirix.NewSeq()).CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
+			git.CheckoutBranch(originalBranch, gitutil.ForceOpt(true))
 		}
 		jirix.NewSeq().Chdir(originalWd)
 	}()
 
 	s := jirix.NewSeq()
 	// Switch to an existing directory in master so we can run commands.
-	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
+	topLevel, err := git.TopLevel()
 	if err != nil {
 		return err
 	}
@@ -1085,20 +1113,20 @@ func syncCL(jirix *jiri.X) (e error) {
 	branches = append(branches, originalBranch)
 
 	// Sync from upstream.
-	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(branches[0]); err != nil {
+	if err := git.CheckoutBranch(branches[0]); err != nil {
 		return err
 	}
-	if err := gitutil.New(jirix.NewSeq()).Pull("origin", branches[0]); err != nil {
+	if err := git.Pull("origin", branches[0]); err != nil {
 		return err
 	}
 
 	// Bring all CLs in the sequence of dependent CLs leading to the
 	// current branch up to date with the <remoteBranchFlag> branch.
 	for i := 1; i < len(branches); i++ {
-		if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(branches[i]); err != nil {
+		if err := git.CheckoutBranch(branches[i]); err != nil {
 			return err
 		}
-		if err := gitutil.New(jirix.NewSeq()).Merge(branches[i-1]); err != nil {
+		if err := git.Merge(branches[i-1]); err != nil {
 			return fmt.Errorf(`Failed to automatically merge branch %v into branch %v: %v
 The following steps are needed before the operation can be retried:
 $ git checkout %v

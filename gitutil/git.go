@@ -306,6 +306,19 @@ func (g *Git) DeleteBranch(branch string, opts ...DeleteBranchOpt) error {
 	return g.run(args...)
 }
 
+// DirExistsOnBranch returns true if a directory with the given name
+// exists on the branch.  If branch is empty it defaults to "master".
+func (g *Git) DirExistsOnBranch(dir, branch string) bool {
+	if dir == "." {
+		dir = ""
+	}
+	if branch == "" {
+		branch = "master"
+	}
+	args := []string{"ls-tree", "-d", branch + ":" + dir}
+	return g.run(args...) == nil
+}
+
 // Fetch fetches refs and tags from the given remote.
 func (g *Git) Fetch(remote string) error {
 	return g.run("fetch", remote)
