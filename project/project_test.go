@@ -1012,7 +1012,7 @@ func TestProjectToFromFile(t *testing.T) {
 			// Default fields are dropped when marshaled, and added when unmarshaled.
 			project.Project{
 				Name:         "project1",
-				Path:         "path1",
+				Path:         filepath.Join(jirix.Root, "path1"),
 				Protocol:     "git",
 				Remote:       "remote1",
 				RemoteBranch: "master",
@@ -1024,13 +1024,15 @@ func TestProjectToFromFile(t *testing.T) {
 		{
 			project.Project{
 				Name:         "project2",
-				Path:         "path2",
+				Path:         filepath.Join(jirix.Root, "path2"),
+				GitHooks:     filepath.Join(jirix.Root, "git-hooks"),
+				RunHook:      filepath.Join(jirix.Root, "run-hook"),
 				Protocol:     "git",
 				Remote:       "remote2",
 				RemoteBranch: "branch2",
 				Revision:     "rev2",
 			},
-			`<project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
+			`<project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2" githooks="git-hooks" runhook="run-hook"/>
 `,
 		},
 	}
@@ -1069,7 +1071,7 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 			`<Project name="project" path="path" remote="remote"/>`,
 			project.Project{
 				Name:         "project",
-				Path:         "path",
+				Path:         filepath.Join(jirix.Root, "path"),
 				Protocol:     "git",
 				Remote:       "remote",
 				RemoteBranch: "master",
@@ -1081,7 +1083,7 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 			`<Project name="project" path="path" remote="remote"></Project>`,
 			project.Project{
 				Name:         "project",
-				Path:         "path",
+				Path:         filepath.Join(jirix.Root, "path"),
 				Protocol:     "git",
 				Remote:       "remote",
 				RemoteBranch: "master",
@@ -1093,7 +1095,7 @@ func TestProjectFromFileBackwardsCompatible(t *testing.T) {
 			`<Project this_attribute_should_be_ignored="junk" name="project" path="path" remote="remote" remotebranch="branch" revision="rev"></Project>`,
 			project.Project{
 				Name:         "project",
-				Path:         "path",
+				Path:         filepath.Join(jirix.Root, "path"),
 				Protocol:     "git",
 				Remote:       "remote",
 				RemoteBranch: "branch",
