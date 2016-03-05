@@ -26,6 +26,7 @@ pkg gitutil, method (*Git) CurrentBranchName() (string, error)
 pkg gitutil, method (*Git) CurrentRevision() (string, error)
 pkg gitutil, method (*Git) CurrentRevisionOfBranch(string) (string, error)
 pkg gitutil, method (*Git) DeleteBranch(string, ...DeleteBranchOpt) error
+pkg gitutil, method (*Git) DirExistsOnBranch(string, string) bool
 pkg gitutil, method (*Git) Fetch(string) error
 pkg gitutil, method (*Git) FetchRefspec(string, string) error
 pkg gitutil, method (*Git) FilesWithUncommittedChanges() ([]string, error)
