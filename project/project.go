@@ -66,6 +66,12 @@ func ManifestFromBytes(data []byte) (*Manifest, error) {
 
 // ManifestFromFile returns a manifest parsed from the contents of filename,
 // with defaults filled in.
+//
+// Note that unlike ProjectFromFile, ManifestFromFile does not convert project
+// paths to absolute paths because it's possible to load a manifest with a
+// specific root directory different from jirix.Root.  The usual way to load a
+// manifest is through LoadManifest, which does absolutize the paths, and uses
+// the correct root directory.
 func ManifestFromFile(jirix *jiri.X, filename string) (*Manifest, error) {
 	data, err := jirix.NewSeq().ReadFile(filename)
 	if err != nil {
@@ -140,9 +146,16 @@ func safeWriteFile(jirix *jiri.X, filename string, data []byte) error {
 		Done()
 }
 
-// ToFile writes the manifest m to a file with the given filename, with defaults
-// unfilled.
+// ToFile writes the manifest m to a file with the given filename, with
+// defaults unfilled and all project paths relative to the jiri root.
 func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
+	// Replace absolute paths with relative paths to make it possible to move
+	// the $JIRI_ROOT directory locally.
+	for _, project := range m.Projects {
+		if err := project.relativizePaths(jirix.Root); err != nil {
+			return err
+		}
+	}
 	data, err := m.ToBytes()
 	if err != nil {
 		return err
@@ -388,7 +401,7 @@ var (
 )
 
 // ProjectFromFile returns a project parsed from the contents of filename,
-// with defaults filled in.
+// with defaults filled in and all paths absolute.
 func ProjectFromFile(jirix *jiri.X, filename string) (*Project, error) {
 	data, err := jirix.NewSeq().ReadFile(filename)
 	if err != nil {
@@ -412,13 +425,19 @@ func ProjectFromFile(jirix *jiri.X, filename string) (*Project, error) {
 	if err := p.fillDefaults(); err != nil {
 		return nil, err
 	}
+	p.absolutizePaths(jirix.Root)
 	return p, nil
 }
 
 // ToFile writes the project p to a file with the given filename, with defaults
-// unfilled.
+// unfilled and all paths relative to the jiri root.
 func (p Project) ToFile(jirix *jiri.X, filename string) error {
 	if err := p.unfillDefaults(); err != nil {
+		return err
+	}
+	// Replace absolute paths with relative paths to make it possible to move
+	// the $JIRI_ROOT directory locally.
+	if err := p.relativizePaths(jirix.Root); err != nil {
 		return err
 	}
 	data, err := xml.Marshal(p)
@@ -431,6 +450,45 @@ func (p Project) ToFile(jirix *jiri.X, filename string) error {
 		data = append(data, '\n')
 	}
 	return safeWriteFile(jirix, filename, data)
+}
+
+// absolutizePaths makes all relative paths absolute by prepending basepath.
+func (p *Project) absolutizePaths(basepath string) {
+	if p.Path != "" && !filepath.IsAbs(p.Path) {
+		p.Path = filepath.Join(basepath, p.Path)
+	}
+	if p.GitHooks != "" && !filepath.IsAbs(p.GitHooks) {
+		p.GitHooks = filepath.Join(basepath, p.GitHooks)
+	}
+	if p.RunHook != "" && !filepath.IsAbs(p.RunHook) {
+		p.RunHook = filepath.Join(basepath, p.RunHook)
+	}
+}
+
+// relativizePaths makes all absolute paths relative to basepath.
+func (p *Project) relativizePaths(basepath string) error {
+	if filepath.IsAbs(p.Path) {
+		relPath, err := filepath.Rel(basepath, p.Path)
+		if err != nil {
+			return err
+		}
+		p.Path = relPath
+	}
+	if filepath.IsAbs(p.GitHooks) {
+		relGitHooks, err := filepath.Rel(basepath, p.GitHooks)
+		if err != nil {
+			return err
+		}
+		p.GitHooks = relGitHooks
+	}
+	if filepath.IsAbs(p.RunHook) {
+		relRunHook, err := filepath.Rel(basepath, p.RunHook)
+		if err != nil {
+			return err
+		}
+		p.RunHook = relRunHook
+	}
+	return nil
 }
 
 // Key returns the unique ProjectKey for the project.
@@ -619,11 +677,6 @@ func CreateSnapshot(jirix *jiri.X, file, snapshotPath string) error {
 		return err
 	}
 	for _, project := range localProjects {
-		relPath, err := filepath.Rel(jirix.Root, project.Path)
-		if err != nil {
-			return err
-		}
-		project.Path = relPath
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
@@ -660,7 +713,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 	if err != nil {
 		return err
 	}
-	remoteProjects, remoteTools, err := loadManifestFile(jirix, snapshot, nil)
+	remoteProjects, remoteTools, err := LoadSnapshotFile(jirix, snapshot)
 	if err != nil {
 		return err
 	}
@@ -668,6 +721,12 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 		return err
 	}
 	return WriteUpdateHistorySnapshot(jirix, snapshot)
+}
+
+// LoadSnapshotFile loads the specified snapshot manifest.  If the snapshot
+// manifest contains a remote import, an error will be returned.
+func LoadSnapshotFile(jirix *jiri.X, file string) (Projects, Tools, error) {
+	return loadManifestFile(jirix, file, nil)
 }
 
 // CurrentProjectKey gets the key of the current project from the current
@@ -730,7 +789,7 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 		// An error will be returned if the snapshot contains remote imports, since
 		// that would cause an infinite loop; we'd need local projects, in order to
 		// load the snapshot, in order to determine the local projects.
-		snapshotProjects, _, err := loadManifestFile(jirix, latestSnapshot, nil)
+		snapshotProjects, _, err := LoadSnapshotFile(jirix, latestSnapshot)
 		if err != nil {
 			return nil, err
 		}
@@ -801,7 +860,7 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 
 	// Compute difference between local and remote.
 	update := Update{}
-	ops := computeOperations(localProjects, remoteProjects, false, "")
+	ops := computeOperations(localProjects, remoteProjects, false)
 	s := jirix.NewSeq()
 	for _, op := range ops {
 		name := op.Project().Name
@@ -891,6 +950,11 @@ func LoadManifest(jirix *jiri.X) (Projects, Tools, error) {
 // loadManifestFile loads the manifest starting with the given file, resolving
 // remote and local imports.  Local projects are used to resolve remote imports;
 // if nil, encountering any remote import will result in an error.
+//
+// WARNING: loadManifestFile cannot be run multiple times in parallel!  It
+// invokes git operations which require a lock on the filesystem.  If you see
+// errors about ".git/index.lock exists", you are likely calling
+// loadManifestFile in parallel.
 func loadManifestFile(jirix *jiri.X, file string, localProjects Projects) (Projects, Tools, error) {
 	ld := newManifestLoader(localProjects, false)
 	if err := ld.Load(jirix, "", file, ""); err != nil {
@@ -1283,7 +1347,6 @@ func ProjectAtPath(jirix *jiri.X, path string) (Project, error) {
 	if err != nil {
 		return Project{}, err
 	}
-	project.Path = filepath.Join(jirix.Root, project.Path)
 	return *project, nil
 }
 
@@ -1646,7 +1709,8 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 	}
 	// Collect projects.
 	for _, project := range m.Projects {
-		project.Path = filepath.Join(jirix.Root, root, project.Path)
+		// Make paths absolute by prepending JIRI_ROOT/<root>.
+		project.absolutizePaths(filepath.Join(jirix.Root, root))
 		key := project.Key()
 		if dup, ok := ld.Projects[key]; ok && dup != project {
 			// TODO(toddw): Tell the user the other conflicting file.
@@ -1782,7 +1846,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 	defer jirix.TimerPop()
 
 	getRemoteHeadRevisions(jirix, remoteProjects)
-	ops := computeOperations(localProjects, remoteProjects, gc, "")
+	ops := computeOperations(localProjects, remoteProjects, gc)
 	updates := newFsUpdates()
 	for _, op := range ops {
 		if err := op.Test(jirix, updates); err != nil {
@@ -1817,9 +1881,7 @@ func runHooks(jirix *jiri.X, ops []operation) error {
 		}
 		s := jirix.NewSeq()
 		s.Verbose(true).Output([]string{fmt.Sprintf("running hook for project %q", op.Project().Name)})
-		rootDir := filepath.Join(jirix.Root, op.Root())
-		hook := filepath.Join(rootDir, op.Project().RunHook)
-		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(hook, op.Kind()); err != nil {
+		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(op.Project().RunHook, op.Kind()); err != nil {
 			// TODO(nlacasse): Should we delete projectDir or perform some
 			// other cleanup in the event of a hook failure?
 			return fmt.Errorf("error running hook for project %q: %v", op.Project().Name, err)
@@ -1855,7 +1917,6 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 		// Apply git hooks, overwriting any existing hooks.  Jiri is in control of
 		// writing all hooks.
 		gitHooksDstDir := filepath.Join(op.Project().Path, ".git", "hooks")
-		gitHooksSrcDir := filepath.Join(jirix.Root, op.Root(), op.Project().GitHooks)
 		// Copy the specified GitHooks directory into the project's git
 		// hook directory.  We walk the file system, creating directories
 		// and copying files as we encounter them.
@@ -1863,7 +1924,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 			if err != nil {
 				return err
 			}
-			relPath, err := filepath.Rel(gitHooksSrcDir, path)
+			relPath, err := filepath.Rel(op.Project().GitHooks, path)
 			if err != nil {
 				return err
 			}
@@ -1878,7 +1939,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 			// The file *must* be executable to be picked up by git.
 			return s.WriteFile(dst, src, 0755).Done()
 		}
-		if err := filepath.Walk(gitHooksSrcDir, copyFn); err != nil {
+		if err := filepath.Walk(op.Project().GitHooks, copyFn); err != nil {
 			return err
 		}
 	}
@@ -1900,14 +1961,6 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 		Chdir(metadataDir).Done(); err != nil {
 		return err
 	}
-
-	// Replace absolute project paths with relative paths to make it
-	// possible to move the $JIRI_ROOT directory locally.
-	relPath, err := filepath.Rel(jirix.Root, project.Path)
-	if err != nil {
-		return err
-	}
-	project.Path = relPath
 	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
 	return project.ToFile(jirix, metadataFile)
 }
@@ -1942,8 +1995,6 @@ type operation interface {
 	Project() Project
 	// Kind returns the kind of operation.
 	Kind() string
-	// Root returns the operation's root directory, relative to JIRI_ROOT.
-	Root() string
 	// Run executes the operation.
 	Run(jirix *jiri.X) error
 	// String returns a string representation of the operation.
@@ -1962,16 +2013,10 @@ type commonOperation struct {
 	destination string
 	// source is the current project path.
 	source string
-	// root is the directory inside JIRI_ROOT where this operation will run.
-	root string
 }
 
 func (op commonOperation) Project() Project {
 	return op.project
-}
-
-func (op commonOperation) Root() string {
-	return op.root
 }
 
 // createOperation represents the creation of a project.
@@ -2247,7 +2292,7 @@ func (ops operations) Swap(i, j int) {
 // system and manifest file respectively) and outputs a collection of
 // operations that describe the actions needed to update the target
 // projects.
-func computeOperations(localProjects, remoteProjects Projects, gc bool, root string) operations {
+func computeOperations(localProjects, remoteProjects Projects, gc bool) operations {
 	result := operations{}
 	allProjects := map[ProjectKey]bool{}
 	for _, p := range localProjects {
@@ -2264,27 +2309,25 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool, root str
 		if project, ok := remoteProjects[key]; ok {
 			remote = &project
 		}
-		result = append(result, computeOp(local, remote, gc, root))
+		result = append(result, computeOp(local, remote, gc))
 	}
 	sort.Sort(result)
 	return result
 }
 
-func computeOp(local, remote *Project, gc bool, root string) operation {
+func computeOp(local, remote *Project, gc bool) operation {
 	switch {
 	case local == nil && remote != nil:
 		return createOperation{commonOperation{
 			destination: remote.Path,
 			project:     *remote,
 			source:      "",
-			root:        root,
 		}}
 	case local != nil && remote == nil:
 		return deleteOperation{commonOperation{
 			destination: "",
 			project:     *local,
 			source:      local.Path,
-			root:        root,
 		}, gc}
 	case local != nil && remote != nil:
 		switch {
@@ -2295,21 +2338,18 @@ func computeOp(local, remote *Project, gc bool, root string) operation {
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,
-				root:        root,
 			}}
 		case local.Revision != remote.Revision:
 			return updateOperation{commonOperation{
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,
-				root:        root,
 			}}
 		default:
 			return nullOperation{commonOperation{
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,
-				root:        root,
 			}}
 		}
 	default:
