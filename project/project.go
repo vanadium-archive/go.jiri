@@ -151,11 +151,14 @@ func safeWriteFile(jirix *jiri.X, filename string, data []byte) error {
 func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
 	// Replace absolute paths with relative paths to make it possible to move
 	// the $JIRI_ROOT directory locally.
+	projects := []Project{}
 	for _, project := range m.Projects {
 		if err := project.relativizePaths(jirix.Root); err != nil {
 			return err
 		}
+		projects = append(projects, project)
 	}
+	m.Projects = projects
 	data, err := m.ToBytes()
 	if err != nil {
 		return err
