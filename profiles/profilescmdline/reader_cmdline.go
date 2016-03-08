@@ -255,6 +255,9 @@ func runList(jirix *jiri.X, args []string) error {
 		fmt.Fprintf(jirix.Stdout(), "%s\n", strings.Join(rd.ProfileNames(), ", "))
 		for _, name := range profileNames {
 			profile := rd.LookupProfile(name)
+			if profile == nil {
+				continue
+			}
 			fmt.Fprintf(jirix.Stdout(), "Profile: %s @ %s\n", profile.Name(), profile.Root())
 			for _, target := range matchingTargets(rd, profile) {
 				fmt.Fprintf(jirix.Stdout(), "\t%s\n", target.DebugString())
@@ -266,6 +269,9 @@ func runList(jirix *jiri.X, args []string) error {
 		matchingNames := []string{}
 		for _, name := range profileNames {
 			profile := rd.LookupProfile(name)
+			if profile == nil {
+				continue
+			}
 			if len(matchingTargets(rd, profile)) > 0 {
 				matchingNames = append(matchingNames, name)
 			}
@@ -283,6 +289,9 @@ func runList(jirix *jiri.X, args []string) error {
 	found := false
 	for _, name := range profileNames {
 		profile := rd.LookupProfile(name)
+		if profile == nil {
+			continue
+		}
 		targets := matchingTargets(rd, profile)
 		out := &bytes.Buffer{}
 		printHeader := len(profileNames) > 1 || len(targets) > 1 || len(listFlags.info) == 0
@@ -303,7 +312,7 @@ func runList(jirix *jiri.X, args []string) error {
 		}
 		fmt.Fprint(jirix.Stdout(), out.String())
 	}
-	if !found {
+	if !found && IsFlagSet(cmdList.ParsedFlags, "target") {
 		return fmt.Errorf("no matching targets for %s", listFlags.Target)
 	}
 	return nil
