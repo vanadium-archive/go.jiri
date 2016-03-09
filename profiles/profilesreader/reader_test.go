@@ -36,6 +36,13 @@ func TestReader(t *testing.T) {
 	if got, want := rd.Get("CGO_CFLAGS"), "-IX -IY -IA -IB"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
+	if got, want := rd.DebugString(), "Root: "+fake.X.Root+`
+Path: testdata/m2.xml
+test:go: amd64-darwin@1.5 dir: --env= envvars:[CGO_ENABLED=1 GOARCH=amd64 GOOS=darwin GOROOT=/goroot CGO_CFLAGS=-IX -IY]
+test:syncbase: amd64-darwin@1 dir: --env= envvars:[CGO_CFLAGS=-IA -IB CGO_LDFLAGS=-LA -LB]
+`; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }
 
 func TestEnvFromTarget(t *testing.T) {

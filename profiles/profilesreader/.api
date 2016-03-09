@@ -27,6 +27,7 @@ pkg profilesreader, method (*ProfilesMode) Get() interface{}
 pkg profilesreader, method (*ProfilesMode) IsBoolFlag() bool
 pkg profilesreader, method (*ProfilesMode) Set(string) error
 pkg profilesreader, method (*ProfilesMode) String() string
+pkg profilesreader, method (*Reader) DebugString() string
 pkg profilesreader, method (*Reader) EnvFromProfile(string, profiles.Target) []string
 pkg profilesreader, method (*Reader) GoPath() string
 pkg profilesreader, method (*Reader) JiriProfile() []string

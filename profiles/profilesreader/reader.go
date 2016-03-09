@@ -162,6 +162,18 @@ func (rd *Reader) Profiles() []*profiles.Profile {
 	return rd.pdb.Profiles()
 }
 
+func (rd *Reader) DebugString() string {
+	var buf bytes.Buffer
+	buf.WriteString("Root: " + rd.jirix.Root + "\n")
+	buf.WriteString("Path: " + rd.path + "\n")
+	for _, p := range rd.pdb.Profiles() {
+		for _, t := range p.Targets() {
+			buf.WriteString(p.Name() + ": " + t.DebugString() + "\n")
+		}
+	}
+	return buf.String()
+}
+
 func (rd *Reader) LookupProfile(name string) *profiles.Profile {
 	installer, profile := profiles.SplitProfileName(name)
 	return rd.pdb.LookupProfile(installer, profile)
