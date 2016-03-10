@@ -20,14 +20,13 @@ import (
 )
 
 const (
-	RootEnv              = "JIRI_ROOT"
-	RootMetaDir          = ".jiri_root"
-	ProjectMetaDir       = ".jiri"
-	ProjectMetaFile      = "metadata.v2"
-	legacyProfilesDBFile = ".jiri_v23_profiles"
-	ProfilesDBDir        = RootMetaDir + string(filepath.Separator) + "profile_db"
-	ProfilesRootDir      = RootMetaDir + string(filepath.Separator) + "profiles"
-	JiriManifestFile     = ".jiri_manifest"
+	RootEnv          = "JIRI_ROOT"
+	RootMetaDir      = ".jiri_root"
+	ProjectMetaDir   = ".jiri"
+	ProjectMetaFile  = "metadata.v2"
+	ProfilesDBDir    = RootMetaDir + string(filepath.Separator) + "profile_db"
+	ProfilesRootDir  = RootMetaDir + string(filepath.Separator) + "profiles"
+	JiriManifestFile = ".jiri_manifest"
 
 	// PreservePathEnv is the name of the environment variable that, when set to a
 	// non-empty value, causes jiri tools to use the existing PATH variable,
@@ -113,19 +112,6 @@ func findJiriRoot(timer *timing.Timer) (string, error) {
 func FindRoot() string {
 	root, _ := findJiriRoot(nil)
 	return root
-}
-
-// DefaultProfilesDBPath returns the appropriate profiles database to use
-// based on whether profile-v23 has been run. It will be removed once
-// transition to profile-v23 is complete.
-// TODO(cnicolaou): delete this and use ProfilesDBDir in the client apps.
-func DefaultProfilesDBPath() string {
-	root := FindRoot()
-	fi, err := os.Stat(filepath.Join(root, ProfilesDBDir))
-	if err == nil && fi.IsDir() {
-		return ProfilesDBDir
-	}
-	return legacyProfilesDBFile
 }
 
 // Clone returns a clone of the environment.
