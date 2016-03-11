@@ -1647,7 +1647,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 			// Old-style named imports handled in loop below.
 			continue
 		}
-		nextRoot, nextFile := filepath.Join(root, remote.Root), ""
+		nextRoot := filepath.Join(root, remote.Root)
 		key := remote.ProjectKey()
 		p, ok := ld.localProjects[key]
 		if !ok {
@@ -1673,14 +1673,12 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 			}
 			ld.localProjects[key] = p
 		}
-		// Reset the project to its specified branch and load the next file.  Note
-		// that we call load() recursively, so multiple files may be loaded by
-		// resetAndLoad.
-		if strings.HasPrefix(p.Path, ld.TmpDir) {
-			nextFile = filepath.Join(p.Path, remote.Manifest)
-		} else {
-			nextFile = filepath.Join(jirix.Root, nextRoot, p.Path, remote.Manifest)
-		}
+		// Reset the project to its specified branch and load the next file.
+		// Note that we call load() recursively, so multiple files may be
+		// loaded by resetAndLoad.
+		p.Revision = "HEAD"
+		p.RemoteBranch = remote.RemoteBranch
+		nextFile := filepath.Join(p.Path, remote.Manifest)
 		if err := ld.resetAndLoad(jirix, nextRoot, nextFile, remote.cycleKey(), p); err != nil {
 			return err
 		}
