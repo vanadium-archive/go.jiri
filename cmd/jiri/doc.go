@@ -20,7 +20,6 @@ The jiri commands are:
    rebuild      Rebuild all jiri tools
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
-   upgrade      Upgrade jiri to new-style manifests
    which        Show path to the jiri tool
    help         Display help for commands or topics
 
@@ -707,49 +706,6 @@ The jiri update flags are:
    Garbage collect obsolete repositories.
  -manifest=
    Name of the project manifest.
-
- -color=true
-   Use color to format output.
- -v=false
-   Print verbose output.
-
-Jiri upgrade - Upgrade jiri to new-style manifests
-
-Upgrades jiri to use new-style manifests.
-
-The old (deprecated) behavior only allowed a single manifest repository, located
-in $JIRI_ROOT/.manifest.  The initial manifest file is located as follows:
-  1) Use -manifest flag, if non-empty.  If it's empty...
-  2) Use $JIRI_ROOT/.local_manifest file.  If it doesn't exist...
-  3) Use $JIRI_ROOT/.manifest/v2/default.
-
-The new behavior allows multiple manifest repositories, by allowing imports to
-specify project attributes describing the remote repository.  The -manifest flag
-is no longer allowed to be set; the initial manifest file is always located in
-$JIRI_ROOT/.jiri_manifest.  The .local_manifest file is ignored.
-
-During the transition phase, both old and new behaviors are supported.  The jiri
-tool uses the existence of the $JIRI_ROOT/.jiri_manifest file as the signal; if
-it exists we run the new behavior, otherwise we run the old behavior.
-
-The new behavior includes a "jiri import" command, which writes or updates the
-.jiri_manifest file.  The new bootstrap procedure runs "jiri import", and it is
-intended as a regular command to add imports to your jiri environment.
-
-This upgrade command eases the transition by writing an initial .jiri_manifest
-file for you.  If you have an existing .local_manifest file, its contents will
-be incorporated into the new .jiri_manifest file, and it will be renamed to
-.local_manifest.BACKUP.  The -revert flag deletes the .jiri_manifest file, and
-restores the .local_manifest file.
-
-Usage:
-   jiri upgrade [flags] <kind>
-
-<kind> specifies the kind of upgrade, one of "v23" or "fuchsia".
-
-The jiri upgrade flags are:
- -revert=false
-   Revert the upgrade by deleting the $JIRI_ROOT/.jiri_manifest file.
 
  -color=true
    Use color to format output.

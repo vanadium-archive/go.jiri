@@ -307,7 +307,7 @@ func TestCreatePushRemote(t *testing.T) {
 	fake.EnableRemoteManifestPush()
 	defer fake.DisableRemoteManifestPush()
 
-	manifestDir := filepath.Join(fake.X.Root, ".manifest")
+	manifestDir := filepath.Join(fake.X.Root, "manifest")
 	snapshotDir := filepath.Join(manifestDir, "snapshot")
 	label := "test"
 
