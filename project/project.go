@@ -1233,7 +1233,7 @@ func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string)
 // function does not perform any version control operation on the master
 // branch.
 func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputDir string) error {
-	toolsToBuild, toolProjects := Tools{}, Projects{}
+	toolsToBuild := Tools{}
 	toolNames := []string{} // Used for logging purposes.
 	for _, tool := range tools {
 		// Skip tools with no package specified. Besides increasing
@@ -1243,17 +1243,12 @@ func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputD
 		if tool.Package == "" {
 			continue
 		}
-		project, err := projects.FindUnique(tool.Project)
-		if err != nil {
-			return err
-		}
-		toolProjects[project.Key()] = project
 		toolsToBuild[tool.Name] = tool
 		toolNames = append(toolNames, tool.Name)
 	}
 
 	updateFn := func() error {
-		return ApplyToLocalMaster(jirix, toolProjects, func() error {
+		return ApplyToLocalMaster(jirix, projects, func() error {
 			return BuildTools(jirix, projects, toolsToBuild, outputDir)
 		})
 	}
