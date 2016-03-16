@@ -92,6 +92,7 @@ type sequence struct {
 	opts                         *opts
 	defaultStdin                 io.Reader
 	defaultStdout, defaultStderr io.Writer
+	oneDefaultStream             bool
 	dirs                         []string
 	verbosity                    *bool
 	cmdDir                       string
@@ -113,6 +114,7 @@ func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Write
 			defaultStdin: stdin,
 		},
 	}
+	s.oneDefaultStream = stdout == stderr
 	s.defaultStdout, s.defaultStderr = s.serializeWriter(stdout), s.serializeWriter(stderr)
 	return s
 }
@@ -426,7 +428,7 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 			if s.err != nil {
 				writeOutput(true, filename, useIfNotNil(s.defaultStderr, os.Stderr))
 			}
-			if opts.verbose && s.defaultStderr != s.defaultStdout {
+			if opts.verbose && !s.oneDefaultStream {
 				writeOutput(false, filename, useIfNotNil(s.defaultStdout, os.Stdout))
 			}
 		}
@@ -480,7 +482,7 @@ func (s Sequence) initAndDefer(h *Handle) func() {
 	}
 	return func() {
 		if err := cleanup(wStdout, wStderr, stdinCh, stderrCh); err != nil && s.err == nil {
-			// If we haven't already encountered an error and we fail to
+			// If we haven't already encountered an errorm and we fail to
 			// cleanup then record the error from the cleanup
 			s.err = err
 		}
