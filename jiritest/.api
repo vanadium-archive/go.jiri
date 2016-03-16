@@ -5,10 +5,10 @@ pkg jiritest, method (FakeJiriRoot) AddTool(project.Tool) error
 pkg jiritest, method (FakeJiriRoot) CreateRemoteProject(string) error
 pkg jiritest, method (FakeJiriRoot) DisableRemoteManifestPush() error
 pkg jiritest, method (FakeJiriRoot) EnableRemoteManifestPush() error
-pkg jiritest, method (FakeJiriRoot) ReadLocalManifest() (*project.Manifest, error)
+pkg jiritest, method (FakeJiriRoot) ReadJiriManifest() (*project.Manifest, error)
 pkg jiritest, method (FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error)
 pkg jiritest, method (FakeJiriRoot) UpdateUniverse(bool) error
-pkg jiritest, method (FakeJiriRoot) WriteLocalManifest(*project.Manifest) error
+pkg jiritest, method (FakeJiriRoot) WriteJiriManifest(*project.Manifest) error
 pkg jiritest, method (FakeJiriRoot) WriteRemoteManifest(*project.Manifest) error
 pkg jiritest, type FakeJiriRoot struct
 pkg jiritest, type FakeJiriRoot struct, Projects map[string]string

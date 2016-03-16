@@ -220,13 +220,6 @@ type Import struct {
 	Manifest string `xml:"manifest,attr,omitempty"`
 	// Name is the name of the remote manifest project, used to determine the
 	// project key.
-	//
-	// If Remote and Manifest are empty, it is the old-style name of the manifest
-	// to import, similar to localimport. This is deprecated behavior, and will be
-	// removed.
-	//
-	// TODO(toddw): Remove the old behavior when the transition to new-style
-	// manifests is complete.
 	Name string `xml:"name,attr,omitempty"`
 	// Protocol is the version control protocol used by the remote manifest
 	// project. If not set, "git" is used as the default.
@@ -243,47 +236,28 @@ type Import struct {
 }
 
 func (i *Import) fillDefaults() error {
-	if i.Remote != "" {
-		if i.Protocol == "" {
-			i.Protocol = "git"
-		}
-		if i.RemoteBranch == "" {
-			i.RemoteBranch = "master"
-		}
+	if i.Protocol == "" {
+		i.Protocol = "git"
+	}
+	if i.RemoteBranch == "" {
+		i.RemoteBranch = "master"
 	}
 	return i.validate()
 }
 
 func (i *Import) unfillDefaults() error {
-	if i.Remote != "" {
-		if i.Protocol == "git" {
-			i.Protocol = ""
-		}
-		if i.RemoteBranch == "master" {
-			i.RemoteBranch = ""
-		}
+	if i.Protocol == "git" {
+		i.Protocol = ""
+	}
+	if i.RemoteBranch == "master" {
+		i.RemoteBranch = ""
 	}
 	return i.validate()
 }
 
 func (i *Import) validate() error {
-	// After our transition is done, the "import" element will always denote
-	// remote imports, and the "remote" and "manifest" attributes will be
-	// required.  During the transition we allow old-style local imports, which
-	// only set the "name" attribute.
-	//
-	// This is a bit tricky, since the "name" attribute is allowed in both old and
-	// new styles, but have different semantics.  We distinguish between old and
-	// new styles based on the existence of the "remote" attribute.
-	oldStyle := *i
-	oldStyle.Name = ""
-	switch {
-	case i.Name != "" && oldStyle == Import{}:
-		// Only "name" is set, this is the old-style.
-	case i.Remote != "" && i.Manifest != "":
-		// At least "remote" and "manifest" are set, this is the new-style.
-	default:
-		return fmt.Errorf("bad import: neither old style (only name is set) or new style (at least remote and manifest are set): %+v", *i)
+	if i.Manifest == "" || i.Remote == "" {
+		return fmt.Errorf("bad import: both manifest and remote must be specified")
 	}
 	return nil
 }
@@ -396,13 +370,6 @@ type Project struct {
 	XMLName struct{} `xml:"project"`
 }
 
-var (
-	startUpperProjectBytes = []byte("<Project")
-	startLowerProjectBytes = []byte("<project")
-	endUpperProjectBytes   = []byte("</Project>")
-	endLowerProjectBytes   = []byte("</project>")
-)
-
 // ProjectFromFile returns a project parsed from the contents of filename,
 // with defaults filled in and all paths absolute.
 func ProjectFromFile(jirix *jiri.X, filename string) (*Project, error) {
@@ -410,16 +377,6 @@ func ProjectFromFile(jirix *jiri.X, filename string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Previous versions of the jiri tool had a bug where the project start and
-	// end elements were in upper-case, since the XMLName field was missing.  That
-	// bug is now fixed, but the xml.Unmarshal call is case-sensitive, and will
-	// fail if it sees the upper-case version.  This hack rewrites the elements to
-	// the lower-case version.
-	//
-	// TODO(toddw): Remove when the transition to new manifests is complete.
-	data = bytes.Replace(data, startUpperProjectBytes, startLowerProjectBytes, -1)
-	data = bytes.Replace(data, endUpperProjectBytes, endLowerProjectBytes, -1)
 
 	p := new(Project)
 	if err := xml.Unmarshal(data, p); err != nil {
@@ -684,17 +641,11 @@ func CreateSnapshot(jirix *jiri.X, file, snapshotPath string) error {
 	}
 
 	// Add all tools from the current manifest to the snapshot manifest.
-	var tools Tools
-	if jirix.UsingOldManifests() {
-		// TODO(nlacasse): Remove this logic when the transition to new manifests is done.
-		_, tools, err = LoadManifest(jirix)
-	} else {
-		// We can't just call LoadManifest here, since that determines the
-		// local projects using FastScan, but if we're calling CreateSnapshot
-		// during "jiri update" and we added some new projects, they won't be
-		// found anymore.
-		_, tools, err = loadManifestFile(jirix, jirix.JiriManifestFile(), localProjects)
-	}
+	// We can't just call LoadManifest here, since that determines the
+	// local projects using FastScan, but if we're calling CreateSnapshot
+	// during "jiri update" and we added some new projects, they won't be
+	// found anymore.
+	_, tools, err := loadManifestFile(jirix, jirix.JiriManifestFile(), localProjects)
 	if err != nil {
 		return err
 	}
@@ -921,10 +872,6 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 // resolving remote and local imports.  Returns the projects and tools specified
 // by the manifest.
 //
-// If the user is still using old-style manifests, it uses the old
-// ResolveManifestPath logic to determine the initial manifest file, since the
-// .jiri_manifest doesn't exist.
-//
 // WARNING: LoadManifest cannot be run multiple times in parallel!  It invokes
 // git operations which require a lock on the filesystem.  If you see errors
 // about ".git/index.lock exists", you are likely calling LoadManifest in
@@ -932,18 +879,8 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 func LoadManifest(jirix *jiri.X) (Projects, Tools, error) {
 	jirix.TimerPush("load manifest")
 	defer jirix.TimerPop()
-	var (
-		file          string
-		localProjects Projects
-		err           error
-	)
-	// TODO(toddw): Remove old manifest logic when the transition is complete.
-	if jirix.UsingOldManifests() {
-		file, err = jirix.ResolveManifestPath(jirix.Manifest())
-	} else {
-		file = jirix.JiriManifestFile()
-		localProjects, err = LocalProjects(jirix, FastScan)
-	}
+	file := jirix.JiriManifestFile()
+	localProjects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -983,39 +920,11 @@ func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 func loadUpdatedManifest(jirix *jiri.X, localProjects Projects) (Projects, Tools, string, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
-	if jirix.UsingOldManifests() {
-		projects, tools, err := loadUpdatedManifestDeprecated(jirix)
-		return projects, tools, "", err
-	}
 	ld := newManifestLoader(localProjects, true)
 	if err := ld.Load(jirix, "", jirix.JiriManifestFile(), ""); err != nil {
 		return nil, nil, ld.TmpDir, err
 	}
 	return ld.Projects, ld.Tools, ld.TmpDir, nil
-}
-
-// TODO(toddw): Remove this logic when the transition to new manifests is done.
-func loadUpdatedManifestDeprecated(jirix *jiri.X) (Projects, Tools, error) {
-	manifestPath := filepath.Join(jirix.Root, ".manifest")
-	manifestRemote, err := getManifestRemote(jirix, manifestPath)
-	if err != nil {
-		return nil, nil, err
-	}
-	project := Project{
-		Path:   manifestPath,
-		Remote: manifestRemote,
-	}
-	if err := project.fillDefaults(); err != nil {
-		return nil, nil, err
-	}
-	if err := syncProjectMaster(jirix, project); err != nil {
-		return nil, nil, err
-	}
-	file, err := jirix.ResolveManifestPath(jirix.Manifest())
-	if err != nil {
-		return nil, nil, err
-	}
-	return loadManifestFile(jirix, file, nil)
 }
 
 // UpdateUniverse updates all local projects and tools to match the remote
@@ -1638,10 +1547,6 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 	}
 	// Process remote imports.
 	for _, remote := range m.Imports {
-		if remote.Remote == "" {
-			// Old-style named imports handled in loop below.
-			continue
-		}
 		nextRoot := filepath.Join(root, remote.Root)
 		key := remote.ProjectKey()
 		p, ok := ld.localProjects[key]
@@ -1668,29 +1573,13 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 			}
 			ld.localProjects[key] = p
 		}
-		// Reset the project to its specified branch and load the next file.
-		// Note that we call load() recursively, so multiple files may be
-		// loaded by resetAndLoad.
+		// Reset the project to its specified branch and load the next file.  Note
+		// that we call load() recursively, so multiple files may be loaded by
+		// resetAndLoad.
 		p.Revision = "HEAD"
 		p.RemoteBranch = remote.RemoteBranch
 		nextFile := filepath.Join(p.Path, remote.Manifest)
 		if err := ld.resetAndLoad(jirix, nextRoot, nextFile, remote.cycleKey(), p); err != nil {
-			return err
-		}
-	}
-	// Process old-style named imports.
-	//
-	// TODO(toddw): Remove this logic when the manifest transition is done.
-	for _, named := range m.Imports {
-		if named.Remote != "" {
-			// New-style remote imports handled in loop above.
-			continue
-		}
-		nextFile, err := jirix.ResolveManifestPath(named.Name)
-		if err != nil {
-			return err
-		}
-		if err := ld.Load(jirix, root, nextFile, ""); err != nil {
 			return err
 		}
 	}

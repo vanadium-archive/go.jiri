@@ -24,11 +24,10 @@ type FakeJiriRoot struct {
 }
 
 const (
-	defaultDataDir  = "data"
-	defaultManifest = "default"
-	manifestProject = ".manifest"
-	manifestVersion = "v2"
-	toolsProject    = "tools"
+	defaultDataDir      = "data"
+	manifestFileName    = "public"
+	manifestProjectName = "manifest"
+	manifestProjectPath = "manifest"
 )
 
 // NewFakeJiriRoot returns a new FakeJiriRoot and a cleanup closure.  The
@@ -48,40 +47,34 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
 	fake.remote = remoteDir
-	if err := fake.CreateRemoteProject(manifestProject); err != nil {
+	if err := fake.CreateRemoteProject(manifestProjectPath); err != nil {
 		t.Fatal(err)
 	}
-	if err := fake.CreateRemoteProject(toolsProject); err != nil {
-		t.Fatal(err)
-	}
-
 	// Create a fake manifest.
-	manifestDir := filepath.Join(remoteDir, manifestProject, manifestVersion)
+	manifestDir := filepath.Join(remoteDir, manifestProjectPath)
 	if err := s.MkdirAll(manifestDir, os.FileMode(0700)).Done(); err != nil {
 		t.Fatal(err)
 	}
 	if err := fake.WriteRemoteManifest(&project.Manifest{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitutil.New(jirix.NewSeq()).CloneRecursive(fake.Projects[manifestProject], filepath.Join(jirix.Root, manifestProject)); err != nil {
-		t.Fatal(err)
-	}
-
-	// Add the "tools" project and a fake "jiri" tool to the
-	// manifests. This is necessary to make sure that the commonly
-	// invoked DataDirPath() function, which uses the "jiri" tool
-	// configuration for its default, works.
+	// Add the "manifest" project to the manifest.
 	if err := fake.AddProject(project.Project{
-		Name:   toolsProject,
-		Path:   toolsProject,
-		Remote: fake.Projects[toolsProject],
+		Name:   manifestProjectName,
+		Path:   manifestProjectPath,
+		Remote: fake.Projects[manifestProjectName],
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := fake.AddTool(project.Tool{
-		Name:    "jiri",
-		Data:    defaultDataDir,
-		Project: toolsProject,
+	// Create a .jiri_manifest file which imports the manifest created above.
+	if err := fake.WriteJiriManifest(&project.Manifest{
+		Imports: []project.Import{
+			project.Import{
+				Manifest: manifestFileName,
+				Name:     manifestProjectName,
+				Remote:   filepath.Join(fake.remote, manifestProjectPath),
+			},
+		},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +133,7 @@ func (fake FakeJiriRoot) AddTool(tool project.Tool) error {
 // DisableRemoteManifestPush disables pushes to the remote manifest
 // repository.
 func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
-	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProject))
+	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProjectPath))
 	if err := gitutil.New(fake.X.NewSeq(), dir).CheckoutBranch("master"); err != nil {
 		return err
 	}
@@ -150,7 +143,7 @@ func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 // EnableRemoteManifestPush enables pushes to the remote manifest
 // repository.
 func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
-	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProject))
+	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProjectPath))
 	if !gitutil.New(fake.X.NewSeq(), dir).BranchExists("non-master") {
 		if err := gitutil.New(fake.X.NewSeq(), dir).CreateBranch("non-master"); err != nil {
 			return err
@@ -178,23 +171,9 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	return nil
 }
 
-func getManifest(jirix *jiri.X) string {
-	manifest := jirix.Manifest()
-	if manifest != "" {
-		return manifest
-	}
-	return defaultManifest
-}
-
-// ReadLocalManifest read a manifest from the local manifest project.
-func (fake FakeJiriRoot) ReadLocalManifest() (*project.Manifest, error) {
-	path := filepath.Join(fake.X.Root, manifestProject, manifestVersion, getManifest(fake.X))
-	return project.ManifestFromFile(fake.X, path)
-}
-
 // ReadRemoteManifest read a manifest from the remote manifest project.
 func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
-	path := filepath.Join(fake.remote, manifestProject, manifestVersion, getManifest(fake.X))
+	path := filepath.Join(fake.remote, manifestProjectPath, manifestFileName)
 	return project.ManifestFromFile(fake.X, path)
 }
 
@@ -212,30 +191,33 @@ func (fake FakeJiriRoot) UpdateUniverse(gc bool) error {
 	return nil
 }
 
-// WriteLocalManifest writes the given manifest to the local
-// manifest project.
-func (fake FakeJiriRoot) WriteLocalManifest(manifest *project.Manifest) error {
-	dir := filepath.Join(fake.X.Root, manifestProject)
-	path := filepath.Join(dir, manifestVersion, getManifest(fake.X))
-	return fake.writeManifest(manifest, dir, path)
+// ReadJiriManifest reads the .jiri_manifest manifest.
+func (fake FakeJiriRoot) ReadJiriManifest() (*project.Manifest, error) {
+	return project.ManifestFromFile(fake.X, fake.X.JiriManifestFile())
+}
+
+// WriteJiriManifest writes the given manifest to the .jiri_manifest file.
+func (fake FakeJiriRoot) WriteJiriManifest(manifest *project.Manifest) error {
+	return manifest.ToFile(fake.X, fake.X.JiriManifestFile())
 }
 
 // WriteRemoteManifest writes the given manifest to the remote
 // manifest project.
 func (fake FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
-	dir := filepath.Join(fake.remote, manifestProject)
-	path := filepath.Join(dir, manifestVersion, getManifest(fake.X))
+	dir := filepath.Join(fake.remote, manifestProjectPath)
+	path := filepath.Join(dir, manifestFileName)
 	return fake.writeManifest(manifest, dir, path)
 }
 
 func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path string) error {
+	git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
 	if err := manifest.ToFile(fake.X, path); err != nil {
 		return err
 	}
-	if err := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir)).Add(path); err != nil {
+	if err := git.Add(path); err != nil {
 		return err
 	}
-	if err := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir)).Commit(); err != nil {
+	if err := git.Commit(); err != nil {
 		return err
 	}
 	return nil

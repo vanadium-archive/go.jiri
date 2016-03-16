@@ -16,14 +16,12 @@ pkg jiri, method (*X) Clone(tool.ContextOpts) *X
 pkg jiri, method (*X) JiriManifestFile() string
 pkg jiri, method (*X) ProfilesDBDir() string
 pkg jiri, method (*X) ProfilesRootDir() string
-pkg jiri, method (*X) ResolveManifestPath(string) (string, error)
 pkg jiri, method (*X) RootMetaDir() string
 pkg jiri, method (*X) ScriptsDir() string
 pkg jiri, method (*X) UpdateHistoryDir() string
 pkg jiri, method (*X) UpdateHistoryLatestLink() string
 pkg jiri, method (*X) UpdateHistorySecondLatestLink() string
 pkg jiri, method (*X) UsageErrorf(string, ...interface{}) error
-pkg jiri, method (*X) UsingOldManifests() bool
 pkg jiri, method (RelPath) Abs(*X) string
 pkg jiri, method (RelPath) Join(...string) RelPath
 pkg jiri, method (RelPath) Symbolic() string
