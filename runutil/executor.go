@@ -7,6 +7,7 @@ package runutil
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -79,13 +80,9 @@ func (e *executor) start(timeout time.Duration, opts opts, path string, args ...
 func (e *executor) function(opts opts, fn func() error, format string, args ...interface{}) error {
 	e.increaseIndent()
 	defer e.decreaseIndent()
-	if opts.verbose {
-		e.printf(e.opts.stdout, format, args...)
-	}
+	e.printf(e.verboseStdout(opts), format, args...)
 	err := fn()
-	if opts.verbose {
-		e.printf(e.opts.stdout, okOrFailed(err))
-	}
+	e.printf(e.verboseStdout(opts), okOrFailed(err))
 	return err
 }
 
@@ -94,6 +91,23 @@ func okOrFailed(err error) string {
 		return fmt.Sprintf("FAILED: %v", err)
 	}
 	return "OK"
+}
+
+func (e *executor) verboseStdout(opts opts) io.Writer {
+	if opts.verbose || e.opts.verbose && (e.opts.stdout != nil) {
+		return e.opts.stdout
+	}
+	return ioutil.Discard
+}
+
+func (e *executor) stderrFromOpts(opts opts) io.Writer {
+	if opts.stderr != nil {
+		return opts.stderr
+	}
+	if e.opts.stderr != nil {
+		return e.opts.stderr
+	}
+	return ioutil.Discard
 }
 
 // output logs the given list of lines using the given
@@ -147,7 +161,7 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 	command.Stdout = opts.stdout
 	command.Stderr = opts.stderr
 	command.Env = envvar.MapToSlice(opts.env)
-	if opts.verbose {
+	if out := e.verboseStdout(opts); out != ioutil.Discard {
 		args := []string{}
 		for _, arg := range command.Args {
 			// Quote any arguments that contain '"', ''', '|', or ' '.
@@ -157,21 +171,18 @@ func (e *executor) execute(wait bool, timeout time.Duration, opts opts, path str
 				args = append(args, arg)
 			}
 		}
-		e.printf(e.opts.stdout, strings.Replace(strings.Join(args, " "), "%", "%%", -1))
+		e.printf(out, strings.Replace(strings.Join(args, " "), "%", "%%", -1))
 	}
 
 	var err error
 	switch {
 	case !wait:
 		err = command.Start()
-		if opts.verbose {
-			e.printf(e.opts.stdout, okOrFailed(err))
-		}
+		e.printf(e.verboseStdout(opts), okOrFailed(err))
+
 	case timeout == 0:
 		err = command.Run()
-		if opts.verbose {
-			e.printf(e.opts.stdout, okOrFailed(err))
-		}
+		e.printf(e.verboseStdout(opts), okOrFailed(err))
 	default:
 		err = e.timedCommand(timeout, opts, command)
 		// Verbose output handled in timedCommand.
@@ -191,12 +202,10 @@ func (e *executor) timedCommand(timeout time.Duration, opts opts, command *exec.
 	signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 	go func() {
 		<-sigchan
-		e.terminateProcessGroup(command)
+		e.terminateProcessGroup(opts, command)
 	}()
 	if err := command.Start(); err != nil {
-		if opts.verbose {
-			e.printf(e.opts.stdout, "FAILED: %v", err)
-		}
+		e.printf(e.verboseStdout(opts), "FAILED: %v", err)
 		return err
 	}
 	done := make(chan error, 1)
@@ -206,31 +215,27 @@ func (e *executor) timedCommand(timeout time.Duration, opts opts, command *exec.
 	select {
 	case <-time.After(timeout):
 		// The command has timed out.
-		e.terminateProcessGroup(command)
+		e.terminateProcessGroup(opts, command)
 		// Allow goroutine to exit.
 		<-done
-		if opts.verbose {
-			e.printf(e.opts.stdout, "TIMED OUT")
-		}
+		e.printf(e.verboseStdout(opts), "TIMED OUT")
 		return commandTimedOutErr
 	case err := <-done:
-		if opts.verbose {
-			e.printf(e.opts.stdout, okOrFailed(err))
-		}
+		e.printf(e.verboseStdout(opts), okOrFailed(err))
 		return err
 	}
 }
 
 // terminateProcessGroup sends SIGQUIT followed by SIGKILL to the
 // process group (the negative value of the process's pid).
-func (e *executor) terminateProcessGroup(command *exec.Cmd) {
+func (e *executor) terminateProcessGroup(opts opts, command *exec.Cmd) {
 	pid := -command.Process.Pid
 	// Use SIGQUIT in order to get a stack dump of potentially hanging
 	// commands.
 	if err := syscall.Kill(pid, syscall.SIGQUIT); err != nil {
-		fmt.Fprintf(e.opts.stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGQUIT, err)
+		e.printf(e.stderrFromOpts(opts), "Kill(%v, %v) failed: %v", pid, syscall.SIGQUIT, err)
 	}
-	fmt.Fprintf(e.opts.stderr, "Waiting for command to exit: %q\n", command.Args)
+	e.printf(e.stderrFromOpts(opts), "Waiting for command to exit: %q", command.Args)
 	// Give the process some time to shut down cleanly.
 	for i := 0; i < 50; i++ {
 		if err := syscall.Kill(pid, 0); err != nil {
@@ -241,7 +246,7 @@ func (e *executor) terminateProcessGroup(command *exec.Cmd) {
 	// If it still exists, send SIGKILL to it.
 	if err := syscall.Kill(pid, 0); err == nil {
 		if err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL); err != nil {
-			fmt.Fprintf(e.opts.stderr, "Kill(%v, %v) failed: %v\n", pid, syscall.SIGKILL, err)
+			e.printf(e.stderrFromOpts(opts), "Kill(%v, %v) failed: %v", pid, syscall.SIGKILL, err)
 		}
 	}
 }
@@ -254,8 +259,8 @@ func (e *executor) increaseIndent() {
 	e.indent++
 }
 
-func (e *executor) printf(stdout io.Writer, format string, args ...interface{}) {
+func (e *executor) printf(out io.Writer, format string, args ...interface{}) {
 	timestamp := time.Now().Format("15:04:05.00")
 	args = append([]interface{}{timestamp, strings.Repeat(prefix, e.indent)}, args...)
-	fmt.Fprintf(stdout, "[%s] %v "+format+"\n", args...)
+	fmt.Fprintf(out, "[%s] %v "+format+"\n", args...)
 }

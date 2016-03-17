@@ -60,7 +60,7 @@ func sanitizeTimestampsAndPaths(s string) string {
 }
 
 func ExampleSequence() {
-	seq := runutil.NewSequence(nil, os.Stdin, ioutil.Discard, ioutil.Discard, false, true)
+	seq := runutil.NewSequence(nil, os.Stdin, ioutil.Discard, ioutil.Discard, false, false)
 	err := seq.
 		Capture(os.Stdout, nil).Run("echo", "a").
 		Capture(os.Stdout, nil).Last("echo", "b")
@@ -105,6 +105,7 @@ func TestStdoutStderr(t *testing.T) {
 [hh:mm:ss.xx] >> OK`
 			post := `[hh:mm:ss.xx] >> sleep 10000
 [hh:mm:ss.xx] >> TIMED OUT
+[hh:mm:ss.xx] >> Waiting for command to exit: ["/bin/sleep" "10000"]
 `
 			wantA = pre + `
 a
@@ -118,7 +119,7 @@ a
 		if got := sanitizeTimestampsAndPaths(cnstrStdout.String()); got != wantA && got != wantB {
 			t.Errorf("verbose: %t, got %v, want either %v or %v", verbose, got, wantA, wantB)
 		}
-		if got, want := sanitizePaths(cnstrStderr.String(), "sleep"), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
+		if got, want := sanitizeTimestampsAndPaths(sanitizePaths(cnstrStderr.String(), "sleep")), sanitizeTimestampsAndPaths("[hh:mm:ss.xx] >> Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"); want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
 	}
@@ -147,12 +148,13 @@ a
 [hh:mm:ss.xx] >> OK
 [hh:mm:ss.xx] >> sleep 10000
 [hh:mm:ss.xx] >> TIMED OUT
+[hh:mm:ss.xx] >> Waiting for command to exit: ["/bin/sleep" "10000"]
 `
 		}
 		if got := sanitizeTimestampsAndPaths(cnstrStdout.String()); want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
-		if got, want := sanitizePaths(cnstrStderr.String(), "sleep"), "Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"; want != got {
+		if got, want := sanitizeTimestampsAndPaths(sanitizePaths(cnstrStderr.String(), "sleep")), sanitizeTimestampsAndPaths("[hh:mm:ss.xx] >> Waiting for command to exit: [\"sleep\" \"10000\"]\n"+dir+"\n"); want != got {
 			t.Errorf("verbose: %t, got %v, want %v", verbose, got, want)
 		}
 		if got, want := captureStdout.String(), "a\n"; want != got {
@@ -186,7 +188,7 @@ a
 }
 
 func TestSequence(t *testing.T) {
-	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false)
 	if got, want := seq.Run("echo", "a").Done(), error(nil); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -242,7 +244,7 @@ func TestSequence(t *testing.T) {
 func TestSequenceEnv(t *testing.T) {
 	// Make sure env provided at construction time is used.
 	defaultEnv := map[string]string{"A": "dA", "B": "dB"}
-	seq := runutil.NewSequence(defaultEnv, os.Stdin, os.Stdout, os.Stderr, false, true)
+	seq := runutil.NewSequence(defaultEnv, os.Stdin, os.Stdout, os.Stderr, false, false)
 	var out bytes.Buffer
 	err := seq.Capture(&out, nil).Last("sh", "-c", "echo $A $B")
 	if err != nil {
@@ -294,7 +296,7 @@ func TestSequenceEnv(t *testing.T) {
 
 // Test that modifiers don't get applied beyond the first invocation of Run.
 func TestSequenceModifiers(t *testing.T) {
-	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false)
 	var out bytes.Buffer
 	env := map[string]string{
 		"MYTEST": "hi",
@@ -336,7 +338,7 @@ func TestSequenceModifiers(t *testing.T) {
 
 func TestMoreSequenceModifiers(t *testing.T) {
 	var stderr, stdout bytes.Buffer
-	seq := runutil.NewSequence(nil, os.Stdin, &stdout, &stderr, false, true)
+	seq := runutil.NewSequence(nil, os.Stdin, &stdout, &stderr, false, false)
 
 	for _, verbose := range []bool{false, true} {
 		err := seq.Verbose(verbose).Last("sh", "-c", "echo hello")
@@ -411,7 +413,7 @@ func (t *timestamped) Write(p []byte) (n int, err error) {
 }
 
 func TestSequenceStreaming(t *testing.T) {
-	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false)
 	ts := &timestamped{}
 	err := seq.
 		Capture(ts, nil).Last("sh", "-c", `
@@ -435,7 +437,7 @@ func TestSequenceStreaming(t *testing.T) {
 }
 
 func TestSequenceTerminatingMethod(t *testing.T) {
-	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+	seq := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false)
 	filename := "./test-file"
 	fi, err := os.Create(filename)
 	if err != nil {
@@ -559,7 +561,7 @@ func TestExists(t *testing.T) {
 func TestDirModifier(t *testing.T) {
 	noError := errors.New("no error")
 	runner := func(cwd, dir string, ech chan error) {
-		s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+		s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false)
 		var out bytes.Buffer
 		parent := filepath.Dir(dir)
 		if err := os.Chdir(parent); err != nil {
@@ -599,7 +601,7 @@ func TestDirModifier(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, false)
 	h, err := s.Start("sh", "-c", "sleep 100")
 	if err != nil {
 		t.Fatal(err)
@@ -629,8 +631,8 @@ func TestStartWithOutput(t *testing.T) {
 	}
 	dir := "Current Directory: " + cwd + "\n"
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, &out, false, true)
-	h, err := s.Verbose(false).Start("sh", "-c", "echo hello; echo world; sleep 1; echo wakeup; exit 1")
+	s := runutil.NewSequence(nil, os.Stdin, &out, &out, false, false)
+	h, err := s.Start("sh", "-c", "echo hello; echo world; sleep 1; echo wakeup; exit 1")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,7 +37,8 @@ import (
 // is encountered, in which case the output from the command that failed (both
 // stdout and stderr) is written to the stderr io.Writer specified via
 // NewSequence. In addition, in verbose mode, command execution logging
-// is written to the stdout an stderr io.Writers configured via NewSequence.
+// is written to the stdout and stderr io.Writers configured via NewSequence,
+// and never to the stdout specified via Capture if the command succeeded.
 //
 // Modifier methods are provided that influence the behaviour of the
 // next invocation of the Run method to set timeouts (Timed), to
