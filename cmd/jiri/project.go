@@ -139,7 +139,8 @@ var cmdProjectInfo = &cmdline.Command{
 Inspect the local filesystem and provide structured info on the existing projects
 and branches. Projects are specified using regular expressions that are matched
 against project keys. If no command line arguments are provided the project
-that the contains the current directory is used. The information to be
+that the contains the current directory is used, or if run from outside
+of a given project, all projects will be used. The information to be
 displayed is specified using a go template, supplied via the -f flag, that is
 executed against the v.io/jiri/project.ProjectState structure. This structure
 currently has the following fields: ` + fmt.Sprintf("%#v", project.ProjectState{}),
@@ -183,12 +184,21 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		}
 		state, err := project.GetProjectState(jirix, currentProjectKey, true)
 		if err != nil {
-			return err
+			// jiri was run from outside of a project so let's
+			// use all available projects.
+			states, err = project.GetProjectStates(jirix, dirty)
+			if err != nil {
+				return err
+			}
+			for key := range states {
+				keys = append(keys, key)
+			}
+		} else {
+			states = map[project.ProjectKey]*project.ProjectState{
+				currentProjectKey: state,
+			}
+			keys = append(keys, currentProjectKey)
 		}
-		states = map[project.ProjectKey]*project.ProjectState{
-			currentProjectKey: state,
-		}
-		keys = append(keys, currentProjectKey)
 	} else {
 		var err error
 		states, err = project.GetProjectStates(jirix, dirty)
