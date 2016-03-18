@@ -69,38 +69,6 @@ func projectName(i int) string {
 	return fmt.Sprintf("project-%d", i)
 }
 
-func setupNewProject(t *testing.T, jirix *jiri.X, dir, name string, ignore bool) string {
-	projectDir, perm := filepath.Join(dir, name), os.FileMode(0755)
-	s := jirix.NewSeq()
-	if err := s.MkdirAll(projectDir, perm).Done(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer jirix.NewSeq().Chdir(cwd)
-	if err := s.Chdir(projectDir).Done(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := gitutil.New(jirix.NewSeq()).Init(projectDir); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if ignore {
-		ignoreFile := filepath.Join(projectDir, ".gitignore")
-		if err := s.WriteFile(ignoreFile, []byte(jiri.ProjectMetaDir), os.FileMode(0644)).Done(); err != nil {
-			t.Fatalf("%v", err)
-		}
-		if err := gitutil.New(jirix.NewSeq()).Add(ignoreFile); err != nil {
-			t.Fatalf("%v", err)
-		}
-	}
-	if err := gitutil.New(jirix.NewSeq()).Commit(); err != nil {
-		t.Fatalf("%v", err)
-	}
-	return projectDir
-}
-
 func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
@@ -130,12 +98,27 @@ func TestLocalProjects(t *testing.T) {
 	// Create some projects.
 	numProjects, projectPaths := 3, []string{}
 	for i := 0; i < numProjects; i++ {
+		s := jirix.NewSeq()
 		name := projectName(i)
-		path := setupNewProject(t, jirix, jirix.Root, name, true)
+		path := filepath.Join(jirix.Root, name)
+		if err := s.MkdirAll(path, 0755).Done(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Initialize empty git repository.  The commit is necessary, otherwise
+		// "git rev-parse master" fails.
+		git := gitutil.New(s, gitutil.RootDirOpt(path))
+		if err := git.Init(path); err != nil {
+			t.Fatal(err)
+		}
+		if err := git.Commit(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Write project metadata.
 		p := project.Project{
-			Path:     path,
-			Name:     name,
-			Protocol: "git",
+			Path: path,
+			Name: name,
 		}
 		if err := project.InternalWriteMetadata(jirix, p, path); err != nil {
 			t.Fatalf("writeMetadata %v %v) failed: %v\n", p, path, err)
@@ -147,10 +130,8 @@ func TestLocalProjects(t *testing.T) {
 	manifest := project.Manifest{
 		Projects: []project.Project{
 			{
-				Name:     projectPaths[0],
-				Path:     projectName(0),
-				Protocol: "git",
-				Remote:   projectPaths[0],
+				Name: projectName(0),
+				Path: projectPaths[0],
 			},
 		},
 	}
@@ -522,13 +503,19 @@ func TestFileImportCycle(t *testing.T) {
 }
 
 func TestRemoteImportCycle(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	remoteDir := filepath.Join(jirix.Root, ".remote")
 
-	// Set up two remote manifest projects, remote1 and remote2.
-	remote1 := setupNewProject(t, jirix, remoteDir, "remote1", true)
-	remote2 := setupNewProject(t, jirix, remoteDir, "remote2", true)
+	// Set up two remote manifest projects, remote1 and remote1.
+	if err := fake.CreateRemoteProject("remote1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := fake.CreateRemoteProject("remote2"); err != nil {
+		t.Fatal(err)
+	}
+	remote1 := fake.Projects["remote1"]
+	remote2 := fake.Projects["remote2"]
+
 	fileA, fileB := filepath.Join(remote1, "A"), filepath.Join(remote2, "B")
 
 	// Set up the cycle .jiri_manifest -> remote1+A -> remote2+B -> remote1+A
@@ -547,33 +534,39 @@ func TestRemoteImportCycle(t *testing.T) {
 			{Manifest: "A", Name: "n3", Remote: remote1},
 		},
 	}
-	if err := jiriManifest.ToFile(jirix, jirix.JiriManifestFile()); err != nil {
+	if err := jiriManifest.ToFile(fake.X, fake.X.JiriManifestFile()); err != nil {
 		t.Fatal(err)
 	}
-	if err := manifestA.ToFile(jirix, fileA); err != nil {
+	if err := manifestA.ToFile(fake.X, fileA); err != nil {
 		t.Fatal(err)
 	}
-	if err := manifestB.ToFile(jirix, fileB); err != nil {
+	if err := manifestB.ToFile(fake.X, fileB); err != nil {
 		t.Fatal(err)
 	}
-	commitFile(t, jirix, remote1, fileA, "commit A")
-	commitFile(t, jirix, remote2, fileB, "commit B")
+	commitFile(t, fake.X, remote1, fileA, "commit A")
+	commitFile(t, fake.X, remote2, fileB, "commit B")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false)
+	err := project.UpdateUniverse(fake.X, false)
 	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
 }
 
 func TestFileAndRemoteImportCycle(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	remoteDir := filepath.Join(jirix.Root, ".remote")
 
 	// Set up two remote manifest projects, remote1 and remote2.
-	remote1 := setupNewProject(t, jirix, remoteDir, "remote1", true)
-	remote2 := setupNewProject(t, jirix, remoteDir, "remote2", true)
+	// Set up two remote manifest projects, remote1 and remote1.
+	if err := fake.CreateRemoteProject("remote1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := fake.CreateRemoteProject("remote2"); err != nil {
+		t.Fatal(err)
+	}
+	remote1 := fake.Projects["remote1"]
+	remote2 := fake.Projects["remote2"]
 	fileA, fileD := filepath.Join(remote1, "A"), filepath.Join(remote1, "D")
 	fileB, fileC := filepath.Join(remote2, "B"), filepath.Join(remote2, "C")
 
@@ -603,28 +596,28 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 			{File: "A"},
 		},
 	}
-	if err := jiriManifest.ToFile(jirix, jirix.JiriManifestFile()); err != nil {
+	if err := jiriManifest.ToFile(fake.X, fake.X.JiriManifestFile()); err != nil {
 		t.Fatal(err)
 	}
-	if err := manifestA.ToFile(jirix, fileA); err != nil {
+	if err := manifestA.ToFile(fake.X, fileA); err != nil {
 		t.Fatal(err)
 	}
-	if err := manifestB.ToFile(jirix, fileB); err != nil {
+	if err := manifestB.ToFile(fake.X, fileB); err != nil {
 		t.Fatal(err)
 	}
-	if err := manifestC.ToFile(jirix, fileC); err != nil {
+	if err := manifestC.ToFile(fake.X, fileC); err != nil {
 		t.Fatal(err)
 	}
-	if err := manifestD.ToFile(jirix, fileD); err != nil {
+	if err := manifestD.ToFile(fake.X, fileD); err != nil {
 		t.Fatal(err)
 	}
-	commitFile(t, jirix, remote1, fileA, "commit A")
-	commitFile(t, jirix, remote2, fileB, "commit B")
-	commitFile(t, jirix, remote2, fileC, "commit C")
-	commitFile(t, jirix, remote1, fileD, "commit D")
+	commitFile(t, fake.X, remote1, fileA, "commit A")
+	commitFile(t, fake.X, remote2, fileB, "commit B")
+	commitFile(t, fake.X, remote2, fileC, "commit C")
+	commitFile(t, fake.X, remote1, fileD, "commit D")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false)
+	err := project.UpdateUniverse(fake.X, false)
 	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
