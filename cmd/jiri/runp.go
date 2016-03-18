@@ -68,6 +68,7 @@ type runpFlagValues struct {
 	exitOnError      bool
 	collateOutput    bool
 	editMessage      bool
+	hasBranch        string
 }
 
 func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
@@ -75,13 +76,14 @@ func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
 	flags.BoolVar(&values.verbose, "v", false, "Print verbose logging information")
 	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project.")
 	flags.BoolVar(&values.hasUncommitted, "has-uncommitted", false, "If specified, match projects that have, or have no, uncommitted changes")
-	flags.BoolVar(&values.hasUntracked, "has-untracked", false, "if specified, match projects that have, or have no, untracked files")
+	flags.BoolVar(&values.hasUntracked, "has-untracked", false, "If specified, match projects that have, or have no, untracked files")
 	flags.BoolVar(&values.hasGerritMessage, "has-gerrit-message", false, "If specified, match branches that have, or have no, gerrit message")
 	flags.BoolVar(&values.interactive, "interactive", true, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
 	flags.BoolVar(&values.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-key-prefix or -collate-stdout.")
 	flags.BoolVar(&values.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix or -collate-stdout")
 	flags.BoolVar(&values.collateOutput, "collate-stdout", true, "Collate all stdout output from each parallel invocation and display it as if had been generated sequentially. This flag cannot be used with -show-name-prefix, -show-key-prefix or -interactive.")
 	flags.BoolVar(&values.exitOnError, "exit-on-error", false, "If set, all commands will killed as soon as one reports an error, otherwise, each will run to completion.")
+	flags.StringVar(&values.hasBranch, "has-branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
 }
 
 func init() {
@@ -306,13 +308,20 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		runpFlags.collateOutput = false
 	}
 
-	var keysRE *regexp.Regexp
+	var keysRE, branchRE *regexp.Regexp
 	var err error
 
 	if profilescmdline.IsFlagSet(cmd.ParsedFlags, "projects") {
 		keysRE, err = regexp.Compile(runpFlags.projectKeys)
 		if err != nil {
 			return fmt.Errorf("failed to compile projects regexp: %q: %v", runpFlags.projectKeys, err)
+		}
+	}
+
+	if profilescmdline.IsFlagSet(cmd.ParsedFlags, "has-branch") {
+		branchRE, err = regexp.Compile(runpFlags.hasBranch)
+		if err != nil {
+			return fmt.Errorf("failed to compile has-branch regexp: %q: %v", runpFlags.hasBranch, err)
 		}
 	}
 
@@ -347,6 +356,18 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 			}
 		} else {
 			if state.CurrentBranch != homeBranch {
+				continue
+			}
+		}
+		if branchRE != nil {
+			found := false
+			for _, br := range state.Branches {
+				if branchRE.MatchString(br.Name) {
+					found = true
+					break
+				}
+			}
+			if !found {
 				continue
 			}
 		}

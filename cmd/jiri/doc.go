@@ -794,12 +794,16 @@ The jiri runp flags are:
  -exit-on-error=false
    If set, all commands will killed as soon as one reports an error, otherwise,
    each will run to completion.
+ -has-branch=
+   A regular expression specifying branch names to use in matching projects. A
+   project will match if the specified branch exists, even if it is not checked
+   out.
  -has-gerrit-message=false
    If specified, match branches that have, or have no, gerrit message
  -has-uncommitted=false
    If specified, match projects that have, or have no, uncommitted changes
  -has-untracked=false
-   if specified, match projects that have, or have no, untracked files
+   If specified, match projects that have, or have no, untracked files
  -interactive=true
    If set, the command to be run is interactive and should not have its
    stdout/stderr manipulated. This flag cannot be used with -show-name-prefix,
