@@ -5,6 +5,7 @@
 package project
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"v.io/jiri"
@@ -93,4 +94,22 @@ func GetProjectStates(jirix *jiri.X, checkDirty bool) (map[ProjectKey]*ProjectSt
 		}
 	}
 	return states, nil
+}
+
+func GetProjectState(jirix *jiri.X, key ProjectKey, checkDirty bool) (*ProjectState, error) {
+	projects, err := LocalProjects(jirix, FastScan)
+	if err != nil {
+		return nil, err
+	}
+	sem := make(chan error, 1)
+	for k, project := range projects {
+		if k == key {
+			state := &ProjectState{
+				Project: project,
+			}
+			setProjectState(jirix, state, checkDirty, sem)
+			return state, <-sem
+		}
+	}
+	return nil, fmt.Errorf("failed to find project key %v", key)
 }

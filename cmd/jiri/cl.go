@@ -335,7 +335,7 @@ var defaultMessageHeader = `
 
 // currentProject returns the Project containing the current working directory.
 // The current working directory must be inside JIRI_ROOT.
-func currentProject(jirix *jiri.X) (project.Project, error) {
+func currentProject(jirix *jiri.X, cmd string) (project.Project, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return project.Project{}, fmt.Errorf("os.Getwd() failed: %v", err)
@@ -343,7 +343,7 @@ func currentProject(jirix *jiri.X) (project.Project, error) {
 
 	// Error if current working dir is not inside jirix.Root.
 	if !strings.HasPrefix(dir, jirix.Root) {
-		return project.Project{}, fmt.Errorf("'jiri cl mail' must be run from within a project in JIRI_ROOT")
+		return project.Project{}, fmt.Errorf("'%s' must be run from within a project in JIRI_ROOT", cmd)
 	}
 
 	// Walk up the path until we find a project at that path, or hit the jirix.Root.
@@ -385,7 +385,7 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
 
-	p, err := currentProject(jirix)
+	p, err := currentProject(jirix, "jiri cl mail")
 	if err != nil {
 		return err
 	}

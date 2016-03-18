@@ -21,6 +21,7 @@ The jiri commands are:
    snapshot     Manage project snapshots
    update       Update all jiri tools and projects
    which        Show path to the jiri tool
+   runp         Run a command in parallel across jiri projects
    help         Display help for commands or topics
 
 The jiri additional help topics are:
@@ -469,6 +470,8 @@ Usage:
 
 The jiri project commands are:
    clean        Restore jiri projects to their pristine state
+   info         Provided structured input for existing jiri projects and
+                branches
    list         List existing jiri projects and branches
    shell-prompt Print a succinct status of projects suitable for shell prompts
    poll         Poll existing jiri projects
@@ -492,6 +495,35 @@ Usage:
 The jiri project clean flags are:
  -branches=false
    Delete all non-master branches.
+
+ -color=true
+   Use color to format output.
+ -v=false
+   Print verbose output.
+
+Jiri project info - Provided structured input for existing jiri projects and branches
+
+Inspect the local filesystem and provide structured info on the existing
+projects and branches. Projects are specified using regular expressions that are
+matched against project keys. If no command line arguments are provided the
+project that the contains the current directory is used. The information to be
+displayed is specified using a go template, supplied via the -f flag, that is
+executed against the v.io/jiri/project.ProjectState structure. This structure
+currently has the following fields:
+project.ProjectState{Branches:[]project.BranchState(nil), CurrentBranch:"",
+HasUncommitted:false, HasUntracked:false, Project:project.Project{Name:"",
+Path:"", Protocol:"", Remote:"", RemoteBranch:"", Revision:"", GerritHost:"",
+GitHooks:"", RunHook:"", XMLName:struct {}{}}}
+
+Usage:
+   jiri project info [flags] <project-keys>...
+
+<project-keys>... a list of project keys, as regexps, to apply the specified
+format to
+
+The jiri project info flags are:
+ -f={{.Project.Name}}
+   The go template for the fields to display.
 
  -color=true
    Use color to format output.
@@ -736,6 +768,73 @@ The jiri which flags are:
    Use color to format output.
  -v=false
    Print verbose output.
+
+Jiri runp - Run a command in parallel across jiri projects
+
+Run a command in parallel across one or more jiri projects using the specified
+profile target's environment. Commands are run using the shell specified by the
+users $SHELL environment variable, or "sh" if that's not set. Thus commands are
+run as $SHELL -c "args..."
+
+Usage:
+   jiri runp [flags] <command line>
+
+A command line to be run in each project specified by the supplied command line
+flags. Any environment variables intended to be evaluated when the command line
+is run must be quoted to avoid expansion before being passed to runp by the
+shell.
+
+The jiri runp flags are:
+ -collate-stdout=true
+   Collate all stdout output from each parallel invocation and display it as if
+   had been generated sequentially. This flag cannot be used with
+   -show-name-prefix, -show-key-prefix or -interactive.
+ -env=
+   specify an environment variable in the form: <var>=[<val>],...
+ -exit-on-error=false
+   If set, all commands will killed as soon as one reports an error, otherwise,
+   each will run to completion.
+ -has-gerrit-message=false
+   If specified, match branches that have, or have no, gerrit message
+ -has-uncommitted=false
+   If specified, match projects that have, or have no, uncommitted changes
+ -has-untracked=false
+   if specified, match projects that have, or have no, untracked files
+ -interactive=true
+   If set, the command to be run is interactive and should not have its
+   stdout/stderr manipulated. This flag cannot be used with -show-name-prefix,
+   -show-key-prefix or -collate-stdout.
+ -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
+   specify policies for merging environment variables
+ -profiles=v23:base,jiri
+   a comma separated list of profiles to use
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   the path, relative to JIRI_ROOT, that contains the profiles database.
+ -projects=
+   A Regular expression specifying project keys to run commands in. By default,
+   runp will use projects that have the same branch checked as the current
+   project.
+ -show-key-prefix=false
+   If set, each line of output from each project will begin with the key of the
+   project followed by a colon. This is intended for use with long running
+   commands where the output needs to be streamed. Stdout and stderr are spliced
+   apart. This flag cannot be used with -interactive, -show-name-prefix or
+   -collate-stdout
+ -show-name-prefix=false
+   If set, each line of output from each project will begin with the name of the
+   project followed by a colon. This is intended for use with long running
+   commands where the output needs to be streamed. Stdout and stderr are spliced
+   apart. This flag cannot be used with -interactive, -show-key-prefix or
+   -collate-stdout.
+ -skip-profiles=false
+   if set, no profiles will be used
+ -target=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: <arch>-<os>[@<version>]
+ -v=false
+   Print verbose logging information
+
+ -color=true
+   Use color to format output.
 
 Jiri help - Display help for commands or topics
 
