@@ -818,7 +818,8 @@ The jiri runp flags are:
  -projects=
    A Regular expression specifying project keys to run commands in. By default,
    runp will use projects that have the same branch checked as the current
-   project.
+   project unless it is run from outside of a project in which case it will
+   default to using all projects.
  -show-key-prefix=false
    If set, each line of output from each project will begin with the key of the
    project followed by a colon. This is intended for use with long running

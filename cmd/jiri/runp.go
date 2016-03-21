@@ -74,7 +74,7 @@ type runpFlagValues struct {
 func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
 	profilescmdline.RegisterReaderFlags(flags, &values.ReaderFlagValues, jiri.ProfilesDBDir)
 	flags.BoolVar(&values.verbose, "v", false, "Print verbose logging information")
-	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project.")
+	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project unless it is run from outside of a project in which case it will default to using all projects.")
 	flags.BoolVar(&values.hasUncommitted, "has-uncommitted", false, "If specified, match projects that have, or have no, uncommitted changes")
 	flags.BoolVar(&values.hasUntracked, "has-untracked", false, "If specified, match projects that have, or have no, untracked files")
 	flags.BoolVar(&values.hasGerritMessage, "has-gerrit-message", false, "If specified, match branches that have, or have no, gerrit message")
@@ -336,7 +336,11 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	git := gitutil.New(jirix.NewSeq())
 	homeBranch, err := git.CurrentBranchName()
 	if err != nil {
-		return fmt.Errorf("failed to determine name of current git branch: %s", err)
+		// jiri was run from outside of a project, so let's assume we'll
+		// all projects if none have been specified.
+		if keysRE == nil {
+			keysRE = regexp.MustCompile(".*")
+		}
 	}
 
 	dirty := false
