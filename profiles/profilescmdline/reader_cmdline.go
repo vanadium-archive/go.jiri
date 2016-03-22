@@ -74,7 +74,7 @@ func newCmdEnv() *cmdline.Command {
 		Long: `
 List profile specific and target specific environment variables. If the
 requested environment variable name ends in = then only the value will
-be printed, otherwise both name and value are printed, i.e. GOPATH="foo" vs
+be printed, otherwise both name and value are printed, i.e. CFLAGS="foo" vs
 just "foo".
 
 If no environment variable names are requested then all will be printed
@@ -132,7 +132,7 @@ func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
 	// TODO(cnicolaou): we need a better way of setting the default profiles,
 	// ideally via the profiles db, or some other config. Provide a command
 	// line tool for setting the default profiles.
-	defaultProfiles := "v23:base,jiri"
+	defaultProfiles := "v23:base"
 	flags.StringVar(profiles, "profiles", defaultProfiles, "a comma separated list of profiles to use")
 }
 

@@ -12,17 +12,16 @@ Usage:
    jiri [flags] <command>
 
 The jiri commands are:
-   cl           Manage project changelists
-   contributors List project contributors
-   import       Adds imports to .jiri_manifest file
-   profile      Display information about installed profiles
-   project      Manage the jiri projects
-   rebuild      Rebuild all jiri tools
-   snapshot     Manage project snapshots
-   update       Update all jiri tools and projects
-   which        Show path to the jiri tool
-   runp         Run a command in parallel across jiri projects
-   help         Display help for commands or topics
+   cl          Manage project changelists
+   import      Adds imports to .jiri_manifest file
+   profile     Display information about installed profiles
+   project     Manage the jiri projects
+   rebuild     Rebuild all jiri tools
+   snapshot    Manage project snapshots
+   update      Update all jiri tools and projects
+   which       Show path to the jiri tool
+   runp        Run a command in parallel across jiri projects
+   help        Display help for commands or topics
 
 The jiri additional help topics are:
    filesystem  Description of jiri file system layout
@@ -174,28 +173,6 @@ The jiri cl sync flags are:
  -v=false
    Print verbose output.
 
-Jiri contributors - List project contributors
-
-Lists project contributors. Projects to consider can be specified as an
-argument. If no projects are specified, all projects in the current manifest are
-considered by default.
-
-Usage:
-   jiri contributors [flags] <projects>
-
-<projects> is a list of projects to consider.
-
-The jiri contributors flags are:
- -aliases=
-   Path to the aliases file.
- -n=false
-   Show number of contributions.
-
- -color=true
-   Use color to format output.
- -v=false
-   Print verbose output.
-
 Jiri import
 
 Command "import" adds imports to the $JIRI_ROOT/.jiri_manifest file, which
@@ -297,7 +274,7 @@ The jiri profile list flags are:
    	Note: if no profiles are specified then the requested field will be displayed for all profiles.
  -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
    specify policies for merging environment variables
- -profiles=v23:base,jiri
+ -profiles=v23:base
    a comma separated list of profiles to use
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
    the path, relative to JIRI_ROOT, that contains the profiles database.
@@ -315,7 +292,7 @@ Jiri profile env - Display profile environment variables
 
 List profile specific and target specific environment variables. If the
 requested environment variable name ends in = then only the value will be
-printed, otherwise both name and value are printed, i.e. GOPATH="foo" vs just
+printed, otherwise both name and value are printed, i.e. CFLAGS="foo" vs just
 "foo".
 
 If no environment variable names are requested then all will be printed in
@@ -332,7 +309,7 @@ The jiri profile env flags are:
    specify an environment variable in the form: <var>=[<val>],...
  -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
    specify policies for merging environment variables
- -profiles=v23:base,jiri
+ -profiles=v23:base
    a comma separated list of profiles to use
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
    the path, relative to JIRI_ROOT, that contains the profiles database.
@@ -474,7 +451,6 @@ The jiri project commands are:
                 branches
    list         List existing jiri projects and branches
    shell-prompt Print a succinct status of projects suitable for shell prompts
-   poll         Poll existing jiri projects
 
 The jiri project flags are:
  -color=true
@@ -567,26 +543,6 @@ The jiri project shell-prompt flags are:
    the output.
  -show-name=false
    Show the name of the current repo.
-
- -color=true
-   Use color to format output.
- -v=false
-   Print verbose output.
-
-Jiri project poll - Poll existing jiri projects
-
-Poll jiri projects that can affect the outcome of the given tests and report
-whether any new changes in these projects exist. If no tests are specified, all
-projects are polled by default.
-
-Usage:
-   jiri project poll [flags] <test ...>
-
-<test ...> is a list of tests that determine what projects to poll.
-
-The jiri project poll flags are:
- -manifest=
-   Name of the project manifest.
 
  -color=true
    Use color to format output.
@@ -811,7 +767,7 @@ The jiri runp flags are:
    -show-key-prefix or -collate-stdout.
  -merge-policies=+CCFLAGS,+CGO_CFLAGS,+CGO_CXXFLAGS,+CGO_LDFLAGS,+CXXFLAGS,GOARCH,GOOS,GOPATH:,^GOROOT*,+LDFLAGS,:PATH,VDLPATH:
    specify policies for merging environment variables
- -profiles=v23:base,jiri
+ -profiles=v23:base
    a comma separated list of profiles to use
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
    the path, relative to JIRI_ROOT, that contains the profiles database.

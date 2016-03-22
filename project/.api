@@ -6,7 +6,6 @@ pkg project, func CheckoutSnapshot(*jiri.X, string, bool) error
 pkg project, func CleanupProjects(*jiri.X, Projects, bool) error
 pkg project, func CreateSnapshot(*jiri.X, string, string) error
 pkg project, func CurrentProjectKey(*jiri.X) (ProjectKey, error)
-pkg project, func DataDirPath(*jiri.X, string) (string, error)
 pkg project, func GetProjectState(*jiri.X, ProjectKey, bool) (*ProjectState, error)
 pkg project, func GetProjectStates(*jiri.X, bool) (map[ProjectKey]*ProjectState, error)
 pkg project, func InstallTools(*jiri.X, string) error

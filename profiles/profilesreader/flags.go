@@ -7,7 +7,6 @@ package profilesreader
 import (
 	"flag"
 	"path/filepath"
-	"strings"
 
 	"v.io/jiri"
 )
@@ -37,22 +36,4 @@ func registerManifestFlag(flags *flag.FlagSet, manifest *string, defaultManifest
 	root := jiri.FindRoot()
 	flags.StringVar(manifest, "profiles-manifest", filepath.Join(root, defaultManifest), "specify the profiles XML manifest filename.")
 	flags.Lookup("profiles-manifest").DefValue = filepath.Join("$JIRI_ROOT", defaultManifest)
-}
-
-type AppendJiriProfileMode bool
-
-const (
-	AppendJiriProfile      AppendJiriProfileMode = true
-	DoNotAppendJiriProfile                       = false
-)
-
-// InitProfilesFromFlag splits a comma separated list of profile names into
-// a slice and optionally appends the 'jiri' profile if it's not already
-// present.
-func InitProfilesFromFlag(flag string, appendJiriProfile AppendJiriProfileMode) []string {
-	n := strings.Split(flag, ",")
-	if appendJiriProfile == AppendJiriProfile && !strings.Contains(flag, "jiri") {
-		n = append(n, "jiri")
-	}
-	return n
 }

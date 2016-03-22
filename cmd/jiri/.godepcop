@@ -1,0 +1,10 @@
+<godepcop>
+  <!-- The jiri tool is critical since it's used for bootstrapping the
+       codebase.
+
+       Ensure the strict rule of only allowing dependencies on v.io/x/lib, to
+       reduce the exposure to breakage.  -->
+  <pkg allow="v.io/jiri/..."/>
+  <pkg allow="v.io/x/lib/..."/>
+  <pkg deny="..."/>
+</godepcop>

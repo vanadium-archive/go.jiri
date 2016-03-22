@@ -9,15 +9,12 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
 	"v.io/jiri"
 	"v.io/jiri/profiles"
-	"v.io/jiri/project"
-	"v.io/jiri/util"
 	"v.io/x/lib/envvar"
 )
 
@@ -103,8 +100,6 @@ type Reader struct {
 	profilesMode bool
 	path         string
 	jirix        *jiri.X
-	config       *util.Config
-	projects     project.Projects
 	pdb          *profiles.DB
 }
 
@@ -113,14 +108,6 @@ type Reader struct {
 // existing, if any, in-memory profiles information will be used. If SkipProfiles
 // is specified for profilesMode, then no profiles are used.
 func NewReader(jirix *jiri.X, profilesMode ProfilesMode, path string) (*Reader, error) {
-	config, err := util.LoadConfig(jirix)
-	if err != nil {
-		return nil, err
-	}
-	projects, err := project.LocalProjects(jirix, project.FastScan)
-	if err != nil {
-		return nil, err
-	}
 	pdb := profiles.NewDB()
 	if profilesMode == UseProfiles && len(path) > 0 {
 		if err := pdb.Read(jirix, path); err != nil {
@@ -130,8 +117,6 @@ func NewReader(jirix *jiri.X, profilesMode ProfilesMode, path string) (*Reader, 
 	rd := &Reader{
 		jirix:        jirix,
 		path:         path,
-		config:       config,
-		projects:     projects,
 		profilesMode: bool(profilesMode),
 		pdb:          pdb,
 	}
@@ -200,19 +185,13 @@ func (rd *Reader) EnvFromProfile(name string, target profiles.Target) []string {
 
 // MergeEnvFromProfiles merges the embedded environment with the environment
 // variables stored in the requested profiles. The profiles are those read from
-// the manifest and in addition the 'jiri' profile may be used which refers to
-// the environment variables maintained by the jiri tool itself. It will also
-// expand all instances of ${JIRI_ROOT} in the returned environment.
+// the manifest. It will also expand all instances of ${JIRI_ROOT} in the
+// returned environment.
 func (rd *Reader) MergeEnvFromProfiles(policies map[string]MergePolicy, target profiles.Target, profileNames ...string) {
 	envs := [][]string{}
 	for _, name := range profileNames {
-		var e []string
-		if name == "jiri" {
-			e = rd.JiriProfile()
-		} else {
-			installer, profile := profiles.SplitProfileName(name)
-			e = rd.pdb.EnvFromProfile(installer, profile, target)
-		}
+		installer, profile := profiles.SplitProfileName(name)
+		e := rd.pdb.EnvFromProfile(installer, profile, target)
 		if e == nil {
 			continue
 		}
@@ -236,9 +215,6 @@ func (rd *Reader) ValidateRequestedProfilesAndTarget(profileNames []string, targ
 		return nil
 	}
 	for _, name := range profileNames {
-		if name == "jiri" {
-			continue
-		}
 		installer, profile := profiles.SplitProfileName(name)
 		if rd.pdb.LookupProfileTarget(installer, profile, target) == nil {
 			return fmt.Errorf("%q for %q is not available or not installed, use the \"list\" command to see the installed/available profiles.", target, name)
@@ -251,54 +227,6 @@ func (rd *Reader) ValidateRequestedProfilesAndTarget(profileNames []string, targ
 func (rd *Reader) PrependToPATH(path string) {
 	existing := rd.GetTokens("PATH", ":")
 	rd.SetTokens("PATH", append([]string{path}, existing...), ":")
-}
-
-// JiriProfile returns a pseudo profile that is maintained by the Jiri
-// tool itself, this currently consists of the GoPath and VDLPath variables.
-// It will generally be used as the last profile in the set of profiles
-// passed to MergeEnv.
-func (rd *Reader) JiriProfile() []string {
-	return []string{rd.GoPath(), rd.VDLPath()}
-}
-
-// GoPath computes and returns the GOPATH environment variable based on the
-// current jiri configuration.
-func (rd *Reader) GoPath() string {
-	path := pathHelper(rd.jirix, rd.projects, rd.config.GoWorkspaces(), "")
-	return "GOPATH=" + envvar.JoinTokens(path, ":")
-}
-
-// VDLPath computes and returns the VDLPATH environment variable based on the
-// current jiri configuration.
-func (rd *Reader) VDLPath() string {
-	path := pathHelper(rd.jirix, rd.projects, rd.config.VDLWorkspaces(), "src")
-	return "VDLPATH=" + envvar.JoinTokens(path, ":")
-}
-
-// pathHelper is a utility function for determining paths for project workspaces.
-func pathHelper(jirix *jiri.X, projects project.Projects, workspaces []string, suffix string) []string {
-	path := []string{}
-	for _, workspace := range workspaces {
-		absWorkspace := filepath.Join(jirix.Root, workspace, suffix)
-		// Only append an entry to the path if the workspace is rooted
-		// under a jiri project that exists locally or vice versa.
-		for _, project := range projects {
-			// We check if <project.Path> is a prefix of <absWorkspace> to
-			// account for Go workspaces nested under a single jiri project,
-			// such as: $JIRI_ROOT/release/projects/chat/go.
-			//
-			// We check if <absWorkspace> is a prefix of <project.Path> to
-			// account for Go workspaces that span multiple jiri projects,
-			// such as: $JIRI_ROOT/release/go.
-			if strings.HasPrefix(absWorkspace, project.Path) || strings.HasPrefix(project.Path, absWorkspace) {
-				if _, err := jirix.NewSeq().Stat(filepath.Join(absWorkspace)); err == nil {
-					path = append(path, absWorkspace)
-					break
-				}
-			}
-		}
-	}
-	return path
 }
 
 // The environment variables passed to a subprocess are the result

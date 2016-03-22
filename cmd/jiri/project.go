@@ -6,7 +6,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -16,10 +15,7 @@ import (
 
 	"v.io/jiri"
 	"v.io/jiri/project"
-	"v.io/jiri/tool"
-	"v.io/jiri/util"
 	"v.io/x/lib/cmdline"
-	"v.io/x/lib/set"
 )
 
 var (
@@ -38,8 +34,6 @@ func init() {
 	cmdProjectShellPrompt.Flags.BoolVar(&checkDirtyFlag, "check-dirty", true, "If false, don't check for uncommitted changes or untracked files. Setting this option to false is dangerous: dirty master branches will not appear in the output.")
 	cmdProjectShellPrompt.Flags.BoolVar(&showNameFlag, "show-name", false, "Show the name of the current repo.")
 	cmdProjectInfo.Flags.StringVar(&formatFlag, "f", "{{.Project.Name}}", "The go template for the fields to display.")
-	tool.InitializeProjectFlags(&cmdProjectPoll.Flags)
-
 }
 
 // cmdProject represents the "jiri project" command.
@@ -47,7 +41,7 @@ var cmdProject = &cmdline.Command{
 	Name:     "project",
 	Short:    "Manage the jiri projects",
 	Long:     "Manage the jiri projects.",
-	Children: []*cmdline.Command{cmdProjectClean, cmdProjectInfo, cmdProjectList, cmdProjectShellPrompt, cmdProjectPoll},
+	Children: []*cmdline.Command{cmdProjectClean, cmdProjectInfo, cmdProjectList, cmdProjectShellPrompt},
 }
 
 // cmdProjectClean represents the "jiri project clean" command.
@@ -287,67 +281,5 @@ func runProjectShellPrompt(jirix *jiri.X, args []string) error {
 		}
 	}
 	fmt.Println(strings.Join(statuses, ","))
-	return nil
-}
-
-// cmdProjectPoll represents the "jiri project poll" command.
-var cmdProjectPoll = &cmdline.Command{
-	Runner: jiri.RunnerFunc(runProjectPoll),
-	Name:   "poll",
-	Short:  "Poll existing jiri projects",
-	Long: `
-Poll jiri projects that can affect the outcome of the given tests
-and report whether any new changes in these projects exist. If no
-tests are specified, all projects are polled by default.
-`,
-	ArgsName: "<test ...>",
-	ArgsLong: "<test ...> is a list of tests that determine what projects to poll.",
-}
-
-// runProjectPoll generates a description of changes that exist
-// remotely but do not exist locally.
-func runProjectPoll(jirix *jiri.X, args []string) error {
-	projectSet := map[string]struct{}{}
-	if len(args) > 0 {
-		config, err := util.LoadConfig(jirix)
-		if err != nil {
-			return err
-		}
-		// Compute a map from tests to projects that can change the
-		// outcome of the test.
-		testProjects := map[string][]string{}
-		for _, project := range config.Projects() {
-			for _, test := range config.ProjectTests([]string{project}) {
-				testProjects[test] = append(testProjects[test], project)
-			}
-		}
-		for _, arg := range args {
-			projects, ok := testProjects[arg]
-			if !ok {
-				return fmt.Errorf("failed to find any projects for test %q", arg)
-			}
-			set.String.Union(projectSet, set.String.FromSlice(projects))
-		}
-	}
-	update, err := project.PollProjects(jirix, projectSet)
-	if err != nil {
-		return err
-	}
-
-	// Remove projects with empty changes.
-	for project := range update {
-		if changes := update[project]; len(changes) == 0 {
-			delete(update, project)
-		}
-	}
-
-	// Print update if it is not empty.
-	if len(update) > 0 {
-		bytes, err := json.MarshalIndent(update, "", "  ")
-		if err != nil {
-			return fmt.Errorf("MarshalIndent() failed: %v", err)
-		}
-		fmt.Fprintf(jirix.Stdout(), "%s\n", bytes)
-	}
 	return nil
 }

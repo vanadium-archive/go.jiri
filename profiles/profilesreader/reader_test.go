@@ -14,8 +14,6 @@ import (
 	"v.io/jiri/jiritest"
 	"v.io/jiri/profiles"
 	"v.io/jiri/profiles/profilesreader"
-	"v.io/jiri/project"
-	"v.io/jiri/util"
 	"v.io/x/lib/envvar"
 )
 
@@ -141,73 +139,6 @@ func TestMergeEnv(t *testing.T) {
 			t.Errorf("failed to find %v in %v", g, expected)
 		}
 	}
-}
-
-func testSetPathHelper(t *testing.T, name string) {
-	pdb := profiles.NewDB()
-	fake, cleanup := jiritest.NewFakeJiriRoot(t)
-	defer cleanup()
-
-	// Create a test project and identify it as a Go workspace.
-	if err := fake.CreateRemoteProject("test"); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := fake.AddProject(project.Project{
-		Name:   "test",
-		Path:   "test",
-		Remote: fake.Projects["test"],
-	}); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := fake.UpdateUniverse(false); err != nil {
-		t.Fatalf("%v", err)
-	}
-	var config *util.Config
-	switch name {
-	case "GOPATH":
-		config = util.NewConfig(util.GoWorkspacesOpt([]string{"test", "does/not/exist"}))
-	case "VDLPATH":
-		config = util.NewConfig(util.VDLWorkspacesOpt([]string{"test", "does/not/exist"}))
-	}
-
-	if err := pdb.Write(fake.X, "test", filepath.Join(fake.X.Root, "profiles-manifest")); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := util.SaveConfig(fake.X, config); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	rd, err := profilesreader.NewReader(fake.X, profilesreader.UseProfiles, filepath.Join(fake.X.Root, "profiles-manifest"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var got, want string
-	switch name {
-	case "GOPATH":
-		want = "GOPATH=" + filepath.Join(fake.X.Root, "test")
-		got = rd.GoPath()
-	case "VDLPATH":
-		// Make a fake src directory.
-		want = filepath.Join(fake.X.Root, "test", "src")
-		if err := fake.X.NewSeq().MkdirAll(want, 0755).Done(); err != nil {
-			t.Fatalf("%v", err)
-		}
-		want = "VDLPATH=" + want
-		got = rd.VDLPath()
-	}
-	if got != want {
-		t.Fatalf("unexpected value: got %v, want %v", got, want)
-	}
-}
-
-func TestGoPath(t *testing.T) {
-	testSetPathHelper(t, "GOPATH")
-}
-
-func TestVDLPath(t *testing.T) {
-	testSetPathHelper(t, "VDLPATH")
 }
 
 func TestMergePolicyFlags(t *testing.T) {
