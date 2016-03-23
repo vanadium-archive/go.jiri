@@ -79,8 +79,9 @@ func TestCommandFail(t *testing.T) {
 	if err := s.Last("go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`Command("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
-	if got, want := removeTimestampsAndPath(t, &out, "go"), ">> go run ./testdata/fail_hello.go\n>> FAILED: exit status 1\nhello\nexit status 1\n"; got != want {
-		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
+
+	if got, wantCommon, want1, want2 := removeTimestampsAndPath(t, &out, "go"), ">> go run ./testdata/fail_hello.go\n>> FAILED: exit status 1\n", "hello\nexit status 1\n", "exit status 1\nhello\n"; got != wantCommon+want1 && got != wantCommon+want2 {
+		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v\nor\n%v\n", got, wantCommon+want1, wantCommon+want2)
 	}
 	var cout, cerr bytes.Buffer
 	if err := s.Capture(&cout, &cerr).Last("go", "run", "./testdata/fail_hello.go"); err == nil {
