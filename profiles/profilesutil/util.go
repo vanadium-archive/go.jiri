@@ -159,6 +159,17 @@ func Fetch(jirix *jiri.X, dst, url string) error {
 	return file.Close()
 }
 
+// Untar untars the file in srcFile and puts resulting files in directory dstDir.
+func Untar(jirix *jiri.X, srcFile, dstDir string) error {
+	s := jirix.NewSeq()
+	if err := s.MkdirAll(dstDir, 0755).Done(); err != nil {
+		return err
+	}
+	return s.Output([]string{"untarring " + srcFile + " into " + dstDir}).
+		Pushd(dstDir).
+		Last("tar", "xvf", srcFile)
+}
+
 // Unzip unzips the file in srcFile and puts resulting files in directory dstDir.
 func Unzip(jirix *jiri.X, srcFile, dstDir string) error {
 	r, err := zip.OpenReader(srcFile)
