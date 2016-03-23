@@ -141,8 +141,8 @@ func TestTimedCommandOK(t *testing.T) {
 }
 
 func TestTimedCommandFail(t *testing.T) {
-	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	var out, stderr bytes.Buffer
+	s := runutil.NewSequence(nil, os.Stdin, &out, &stderr, false, true)
 	bin, err := buildTestProgram("slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -161,9 +161,8 @@ func TestTimedCommandFail(t *testing.T) {
 >> TIMED OUT
 hello
 >> Waiting for command to exit: ["`+bin+`"]
-SIGQUIT: quit
-PC=`; !strings.HasPrefix(o, want) {
-		t.Errorf("output doesn't start with %v, got: %v", want, got)
+`; !strings.HasPrefix(o, want) {
+		t.Errorf("output doesn't start with %v, got: %v (stderr: %v)", want, got, stderr.String())
 	}
 }
 
