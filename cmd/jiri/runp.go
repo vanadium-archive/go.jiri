@@ -336,8 +336,8 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	git := gitutil.New(jirix.NewSeq())
 	homeBranch, err := git.CurrentBranchName()
 	if err != nil {
-		// jiri was run from outside of a project, so let's assume we'll
-		// all projects if none have been specified.
+		// jiri was run from outside of a project. Let's assume we'll
+		// use all projects if none have been specified via the projects flag.
 		if keysRE == nil {
 			keysRE = regexp.MustCompile(".*")
 		}
