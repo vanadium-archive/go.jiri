@@ -523,12 +523,18 @@ func (g *Git) Pull(remote, branch string) error {
 // Push pushes the given branch to the given remote.
 func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
 	args := []string{"push"}
+	force := false
 	verify := true
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
+		case ForceOpt:
+			force = bool(typedOpt)
 		case VerifyOpt:
 			verify = bool(typedOpt)
 		}
+	}
+	if force {
+		args = append(args, "--force")
 	}
 	if verify {
 		args = append(args, "--verify")

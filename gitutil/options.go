@@ -28,6 +28,7 @@ type ForceOpt bool
 
 func (ForceOpt) checkoutOpt()     {}
 func (ForceOpt) deleteBranchOpt() {}
+func (ForceOpt) pushOpt()         {}
 
 type MessageOpt string
 
