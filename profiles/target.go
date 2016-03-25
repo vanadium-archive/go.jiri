@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -137,7 +138,7 @@ func (pt *Target) Less(pt2 *Target) bool {
 	case len(pt.version) > 0 && len(pt2.version) == 0:
 		return false
 	case pt.version != pt2.version:
-		return pt.version > pt2.version
+		return compareVersions(pt.version, pt2.version) > 0
 	default:
 		return false
 	}
@@ -338,4 +339,51 @@ func FindTargetWithDefault(targets Targets, target *Target) *Target {
 		return &tmp
 	}
 	return FindTarget(targets, target)
+}
+
+// compareVersions compares version numbers.  It handles cases like:
+// compareVersions("2", "11") => 1
+// compareVersions("1.1", "1.2") => 1
+// compareVersions("1.2", "1.2.1") => 1
+// compareVersions("1.2.1.b", "1.2.1.c") => 1
+func compareVersions(v1, v2 string) int {
+	v1parts := strings.Split(v1, ".")
+	v2parts := strings.Split(v2, ".")
+
+	maxLen := len(v1parts)
+	if len(v2parts) > maxLen {
+		maxLen = len(v2parts)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		if i == len(v1parts) {
+			// v2 has more parts than v1, so v2 > v1.
+			return -1
+		}
+		if i == len(v2parts) {
+			// v1 has more parts than v2, so v1 > v2.
+			return 1
+		}
+
+		mustCompareStrings := false
+		v1part, err := strconv.Atoi(v1parts[i])
+		if err != nil {
+			mustCompareStrings = true
+		}
+		v2part, err := strconv.Atoi(v2parts[i])
+		if err != nil {
+			mustCompareStrings = true
+		}
+		if mustCompareStrings {
+			return strings.Compare(v1parts[i], v2parts[i])
+		}
+
+		if v1part > v2part {
+			return 1
+		}
+		if v2part > v1part {
+			return -1
+		}
+	}
+	return 0
 }

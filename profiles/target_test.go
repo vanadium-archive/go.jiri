@@ -219,8 +219,13 @@ func TestOrderedTargets(t *testing.T) {
 		{"x-b", "x-b@1", true},
 		{"x-b@1", "x-b@", false},
 		{"x-b@1", "x-b@2", false},
-		{"x-b@12", "x-b@2", false},
+		{"x-b@12", "x-b@2", true},
 		{"x-b@2", "x-b@1", true},
+		{"x-b@1.2", "x-b@1.1", true},
+		{"x-b@1.2.c", "x-b@1.2.b", true},
+		{"x-b@1.2.1", "x-b@1.2", true},
+		{"x-b@1.2.1.3", "x-b@1.2", true},
+		{"x-b@2.2", "x-b@1.2.3.4", true},
 		{"x-b", "x-b", false},
 	} {
 		a, err := profiles.NewTarget(c.a, "")
@@ -254,7 +259,7 @@ func TestOrderedTargets(t *testing.T) {
 			t.Errorf("%v is not less than %v", ol[i], ol[j])
 		}
 	}
-	if got, want := ol[0].String(), "a-b@3"; got != want {
+	if got, want := ol[0].String(), "a-b@12"; got != want {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 	if got, want := ol[len(ol)-1].String(), "x-y@2"; got != want {
