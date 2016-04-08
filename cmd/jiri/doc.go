@@ -12,7 +12,7 @@ Usage:
    jiri [flags] <command>
 
 The jiri commands are:
-   cl          Manage project changelists
+   cl          Manage changelists for multiple projects
    import      Adds imports to .jiri_manifest file
    profile     Display information about installed profiles
    project     Manage the jiri projects
@@ -39,9 +39,9 @@ The global flags are:
  -time=false
    Dump timing information to stderr before exiting the program.
 
-Jiri cl - Manage project changelists
+Jiri cl - Manage changelists for multiple projects
 
-Manage project changelists.
+Manage changelists for multiple projects.
 
 Usage:
    jiri cl [flags] <command>
@@ -100,6 +100,14 @@ The jiri cl mail flags are:
    Comma-seperated list of emails or LDAPs to cc.
  -check-uncommitted=true
    Check that no uncommitted changes exist.
+ -clean-multipart-metadata=false
+   Cleanup the metadata associated with multipart CLs pertaining the MultiPart:
+   x/y message without mailing any CLs.
+ -commit-message-body-file=
+   file containing the body of the CL description, that is, text without a
+   ChangeID, MultiPart etc.
+ -current-project-only=false
+   Run mail in the current project only.
  -d=false
    Send a draft changelist.
  -edit=true

@@ -6,10 +6,13 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"v.io/jiri"
@@ -22,25 +25,29 @@ import (
 )
 
 const (
-	commitMessageFileName  = ".gerrit_commit_message"
-	dependencyPathFileName = ".dependency_path"
+	commitMessageFileName     = ".gerrit_commit_message"
+	dependencyPathFileName    = ".dependency_path"
+	multiPartMetaDataFileName = "multipart_index"
 )
 
 var (
-	autosubmitFlag   bool
-	ccsFlag          string
-	draftFlag        bool
-	editFlag         bool
-	forceFlag        bool
-	hostFlag         string
-	messageFlag      string
-	presubmitFlag    string
-	remoteBranchFlag string
-	reviewersFlag    string
-	setTopicFlag     bool
-	topicFlag        string
-	uncommittedFlag  bool
-	verifyFlag       bool
+	autosubmitFlag        bool
+	ccsFlag               string
+	draftFlag             bool
+	editFlag              bool
+	forceFlag             bool
+	hostFlag              string
+	messageFlag           string
+	commitMessageBodyFlag string
+	presubmitFlag         string
+	remoteBranchFlag      string
+	reviewersFlag         string
+	setTopicFlag          bool
+	topicFlag             string
+	uncommittedFlag       bool
+	verifyFlag            bool
+	currentProjectFlag    bool
+	cleanupMultiPartFlag  bool
 )
 
 // Special labels stored in the commit message.
@@ -51,9 +58,14 @@ var (
 	// Change-Ids start with 'I' and are followed by 40 characters of hex.
 	changeIDRE *regexp.Regexp = regexp.MustCompile("Change-Id: (I[0123456789abcdefABCDEF]{40})")
 
+	// MultiPart messages are of the form: MultiPart: <n>/<m>
+	multiPartRE *regexp.Regexp = regexp.MustCompile(`(?m)^MultiPart: \d+/\d+$`)
+
 	// Presubmit test label.
 	// PresubmitTest: <type>
 	presubmitTestLabelRE *regexp.Regexp = regexp.MustCompile(`PresubmitTest:\s*(.*)`)
+
+	noChangesRE *regexp.Regexp = regexp.MustCompile(`! \[remote rejected\] HEAD -> refs/(for|drafts)/\S+ \(no new changes\)`)
 )
 
 // init carries out the package initialization.
@@ -66,6 +78,7 @@ func init() {
 	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, `Open an editor to edit the CL description.`)
 	cmdCLMail.Flags.StringVar(&hostFlag, "host", "", `Gerrit host to use.  Defaults to gerrit host specified in manifest.`)
 	cmdCLMail.Flags.StringVar(&messageFlag, "m", "", `CL description.`)
+	cmdCLMail.Flags.StringVar(&commitMessageBodyFlag, "commit-message-body-file", "", `file containing the body of the CL description, that is, text without a ChangeID, MultiPart etc.`)
 	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
@@ -74,6 +87,8 @@ func init() {
 	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", `CL topic, defaults to <username>-<branchname>.`)
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, `Check that no uncommitted changes exist.`)
 	cmdCLMail.Flags.BoolVar(&verifyFlag, "verify", true, `Run pre-push git hooks.`)
+	cmdCLMail.Flags.BoolVar(&currentProjectFlag, "current-project-only", false, `Run mail in the current project only.`)
+	cmdCLMail.Flags.BoolVar(&cleanupMultiPartFlag, "clean-multipart-metadata", false, `Cleanup the metadata associated with multipart CLs pertaining the MultiPart: x/y message without mailing any CLs.`)
 	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
 }
 
@@ -116,8 +131,8 @@ func getDependentCLs(jirix *jiri.X, branch string) ([]string, error) {
 // cmdCL represents the "jiri cl" command.
 var cmdCL = &cmdline.Command{
 	Name:     "cl",
-	Short:    "Manage project changelists",
-	Long:     "Manage project changelists.",
+	Short:    "Manage changelists for multiple projects",
+	Long:     "Manage changelists for multiple projects.",
 	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync},
 }
 
@@ -335,19 +350,15 @@ var defaultMessageHeader = `
 
 // currentProject returns the Project containing the current working directory.
 // The current working directory must be inside JIRI_ROOT.
-func currentProject(jirix *jiri.X, cmd string) (project.Project, error) {
+func currentProject(jirix *jiri.X) (project.Project, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return project.Project{}, fmt.Errorf("os.Getwd() failed: %v", err)
 	}
 
-	// Error if current working dir is not inside jirix.Root.
-	if !strings.HasPrefix(dir, jirix.Root) {
-		return project.Project{}, fmt.Errorf("'%s' must be run from within a project in JIRI_ROOT", cmd)
-	}
-
 	// Walk up the path until we find a project at that path, or hit the jirix.Root.
-	for dir != jirix.Root {
+	// Note that we can't just compare path prefixes because of soft links.
+	for dir != jirix.Root && dir != string(filepath.Separator) {
 		p, err := project.ProjectAtPath(jirix, dir)
 		if err != nil {
 			dir = filepath.Dir(dir)
@@ -358,8 +369,209 @@ func currentProject(jirix *jiri.X, cmd string) (project.Project, error) {
 	return project.Project{}, fmt.Errorf("directory %q is not contained in a project", dir)
 }
 
-// runCLMail is a wrapper that sets up and runs a review instance.
-func runCLMail(jirix *jiri.X, _ []string) error {
+type multiPart struct {
+	clean, current bool
+	currentKey     project.ProjectKey
+	states         map[project.ProjectKey]*project.ProjectState
+	keys           project.ProjectKeys
+}
+
+// initForMultiPart determines the actions to be taken
+// based on command line flags and project state.
+func initForMultiPart(jirix *jiri.X) (*multiPart, error) {
+	mp := &multiPart{}
+	mp.clean = cleanupMultiPartFlag
+	if currentProjectFlag {
+		mp.current = true
+		return mp, nil
+	}
+	if mp.clean {
+		states, keys, err := projectStates(jirix, true)
+		if err != nil {
+			return nil, err
+		}
+		mp.states = states
+		mp.keys = keys
+		return mp, nil
+	}
+	states, keys, err := projectStates(jirix, false)
+	if err != nil {
+		return nil, err
+	}
+	current, err := currentProject(jirix)
+	if err != nil {
+		return nil, err
+	}
+	mp.currentKey = current.Key()
+	if len(keys) == 1 {
+		filename := filepath.Join(states[keys[0]].Project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+		os.Remove(filename)
+		if mp.currentKey == states[keys[0]].Project.Key() {
+			mp.current = true
+			return mp, nil
+		}
+	}
+	mp.states = states
+	mp.keys = keys
+	return mp, nil
+}
+
+// projectStates returns a map with all projects that are on the same
+// current branch as the current project, as well as a slice of their
+// project keys sorted lexicographically. Unless "allowdirty" is true,
+// an error is returned if any matching project has uncommitted changes.
+// The keys are returned, sorted, to avoid the caller having to recreate
+// the them by iterating over the map.
+func projectStates(jirix *jiri.X, allowdirty bool) (map[project.ProjectKey]*project.ProjectState, project.ProjectKeys, error) {
+	git := gitutil.New(jirix.NewSeq())
+	branch, err := git.CurrentBranchName()
+	if err != nil {
+		return nil, nil, err
+	}
+	states, err := project.GetProjectStates(jirix, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	uncommitted := []string{}
+	var keys project.ProjectKeys
+	for _, s := range states {
+		if s.CurrentBranch == branch {
+			key := s.Project.Key()
+			fullState, err := project.GetProjectState(jirix, key, true)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !allowdirty && fullState.HasUncommitted {
+				uncommitted = append(uncommitted, string(key))
+			} else {
+				keys = append(keys, key)
+			}
+		}
+	}
+	if len(uncommitted) > 0 {
+		return nil, nil, fmt.Errorf("the following projects have uncommitted changes: %s", strings.Join(uncommitted, ", "))
+	}
+	members := map[project.ProjectKey]*project.ProjectState{}
+	for _, key := range keys {
+		members[key] = states[key]
+	}
+	if len(members) == 0 {
+		return nil, nil, nil
+	}
+	sort.Sort(keys)
+	return members, keys, nil
+}
+
+func (mp *multiPart) writeMultiPartMetadata(jirix *jiri.X) error {
+	total := len(mp.states)
+	index := 1
+	s := jirix.NewSeq()
+	for _, key := range mp.keys {
+		state := mp.states[key]
+		filename := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+		if total < 2 {
+			os.Remove(filename)
+			continue
+		}
+		msg := fmt.Sprintf("MultiPart: %d/%d\n", index, total)
+		if err := s.WriteFile(filename, []byte(msg), os.FileMode(0644)).Done(); err != nil {
+			return err
+		}
+		index++
+	}
+	return nil
+}
+
+func (mp *multiPart) cleanMultiPartMetadata(jirix *jiri.X) error {
+	s := jirix.NewSeq()
+	for _, state := range mp.states {
+		filename := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+		ok, err := s.IsFile(filename)
+		if err != nil {
+			return err
+		}
+		if ok {
+			if err := s.Remove(filename).Done(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (mp *multiPart) commandline(excludeKey project.ProjectKey, args []string) []string {
+	keyflag := "--projects="
+	for _, k := range mp.keys {
+		if k == excludeKey {
+			continue
+		}
+		keyflag += string(k) + ","
+	}
+	keyflag = strings.TrimSuffix(keyflag, ",")
+	clargs := []string{
+		"runp",
+		"--interactive",
+		keyflag,
+		"jiri",
+		"cl",
+		"mail",
+		"--current-project-only=true",
+	}
+	return append(clargs, args...)
+}
+
+// runCLMail is a wrapper that sets up and runs a review instance across
+// multiple projects.
+func runCLMail(jirix *jiri.X, args []string) error {
+	mp, err := initForMultiPart(jirix)
+	if err != nil {
+		return err
+	}
+	if mp.clean {
+		if err := mp.cleanMultiPartMetadata(jirix); err != nil {
+			return err
+		}
+		return nil
+	}
+	if mp.current {
+		return runCLMailCurrent(jirix, []string{})
+	}
+	// multipart mode
+	if err := mp.writeMultiPartMetadata(jirix); err != nil {
+		mp.cleanMultiPartMetadata(jirix)
+		return err
+	}
+	if err := runCLMailCurrent(jirix, []string{}); err != nil {
+		return err
+	}
+	git := gitutil.New(jirix.NewSeq())
+	branch, err := git.CurrentBranchName()
+	if err != nil {
+		return err
+	}
+	initialMessage, err := strippedGerritCommitMessage(jirix, branch)
+	if err != nil {
+		return err
+	}
+	s := jirix.NewSeq()
+	tmp, err := s.TempFile("", branch+"-")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		tmp.Close()
+		os.Remove(tmp.Name())
+	}()
+	if _, err := io.WriteString(tmp, initialMessage); err != nil {
+		return err
+	}
+	// Use Capture to make sure that all output from the subcommands is
+	// sent to stdout/stderr.
+	return s.Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", mp.commandline(mp.currentKey, append([]string{"--edit=false", "--commit-message-body-file=" + tmp.Name()}, args...))...)
+
+}
+
+func runCLMailCurrent(jirix *jiri.X, _ []string) error {
 	// Check that working dir exist on remote branch.  Otherwise checking out
 	// remote branch will break the users working dir.
 	git := gitutil.New(jirix.NewSeq())
@@ -385,7 +597,7 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 			strings.Join(gerrit.PresubmitTestTypes(), ","))
 	}
 
-	p, err := currentProject(jirix, "jiri cl mail")
+	p, err := currentProject(jirix)
 	if err != nil {
 		return err
 	}
@@ -409,7 +621,7 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 	gerritRemote.Path = projectRemoteUrl.Path
 
 	// Create and run the review.
-	review, err := newReview(jirix, gerrit.CLOpts{
+	review, err := newReview(jirix, p, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
 		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
@@ -429,7 +641,13 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 	} else if !confirmed {
 		return nil
 	}
-	return review.run()
+	err = review.run()
+	// Ignore the error that is returned when there are no differences
+	// between the local and gerrit branches.
+	if err != nil && noChangesRE.MatchString(err.Error()) {
+		return nil
+	}
+	return err
 }
 
 // parseEmails input a list of comma separated tokens and outputs a
@@ -488,10 +706,11 @@ $ git checkout %v
 type review struct {
 	jirix        *jiri.X
 	reviewBranch string
+	project      project.Project
 	gerrit.CLOpts
 }
 
-func newReview(jirix *jiri.X, opts gerrit.CLOpts) (*review, error) {
+func newReview(jirix *jiri.X, project project.Project, opts gerrit.CLOpts) (*review, error) {
 	// Sync all CLs in the sequence of dependent CLs ending in the
 	// current branch.
 	if err := syncCL(jirix); err != nil {
@@ -524,6 +743,7 @@ func newReview(jirix *jiri.X, opts gerrit.CLOpts) (*review, error) {
 	}
 	return &review{
 		jirix:        jirix,
+		project:      project,
 		reviewBranch: branch + "-REVIEW",
 		CLOpts:       opts,
 	}, nil
@@ -750,18 +970,59 @@ func (review *review) squashBranches(branches []string, message string) (e error
 	return nil
 }
 
-// defaultCommitMessage creates the default commit message from the
-// list of commits on the branch.
-func (review *review) defaultCommitMessage() (string, error) {
-	commitMessages, err := gitutil.New(review.jirix.NewSeq()).CommitMessages(review.CLOpts.Branch, review.reviewBranch)
+func (review *review) readMultiPart() string {
+	s := review.jirix.NewSeq()
+	filename := filepath.Join(review.project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+	mpart, err := s.ReadFile(filename)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(mpart))
+}
+
+// strippedGerritCommitMessage returns the commit message stripped of variable
+// meta-data such as multipart messages, or change IDs:
+func strippedGerritCommitMessage(jirix *jiri.X, branch string) (string, error) {
+	filename, err := getCommitMessageFileName(jirix, branch)
 	if err != nil {
 		return "", err
 	}
+	msg, err := jirix.NewSeq().ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+	// Strip "MultiPart ..." from the commit messages.
+	strippedMessages := multiPartRE.ReplaceAllLiteralString(string(msg), "")
 	// Strip "Change-Id: ..." from the commit messages.
-	strippedMessages := changeIDRE.ReplaceAllLiteralString(commitMessages, "")
+	strippedMessages = changeIDRE.ReplaceAllLiteralString(strippedMessages, "")
+	return strippedMessages, nil
+}
+
+// defaultCommitMessage creates the default commit message from the
+// list of commits on the branch.
+func (review *review) defaultCommitMessage() (string, error) {
+	commitMessages := ""
+	var err error
+	if commitMessageBodyFlag != "" {
+		msg, tmpErr := ioutil.ReadFile(commitMessageBodyFlag)
+		commitMessages = string(msg)
+		err = tmpErr
+	} else {
+		commitMessages, err = gitutil.New(review.jirix.NewSeq()).CommitMessages(review.CLOpts.Branch, review.reviewBranch)
+	}
+	if err != nil {
+		return "", err
+	}
+	// Strip "MultiPart ..." from the commit messages.
+	strippedMessages := multiPartRE.ReplaceAllLiteralString(commitMessages, "")
+	// Strip "Change-Id: ..." from the commit messages.
+	strippedMessages = changeIDRE.ReplaceAllLiteralString(strippedMessages, "")
 	// Add comment markers (#) to every line.
 	commentedMessages := "# " + strings.Replace(strippedMessages, "\n", "\n# ", -1)
 	message := defaultMessageHeader + commentedMessages
+	if multipart := review.readMultiPart(); multipart != "" {
+		message = message + "\n" + multipart + "\n"
+	}
 	return message, nil
 }
 
@@ -779,15 +1040,24 @@ func (review *review) ensureChangeID() error {
 	return nil
 }
 
-// processLabels adds/removes labels for the given commit message.
-func (review *review) processLabels(message string) string {
-	// Find the Change-ID line.
+// processLabelsAndCommitFile adds/removes labels for the given commit
+// message and merges in the contents of the initial-message-file.
+func (review *review) processLabelsAndCommitFile(message string) string {
+	// Find the Change-ID and MultiPart lines.
 	changeIDLine := changeIDRE.FindString(message)
+	multiPartLine := multiPartRE.FindString(message)
+
+	if commitMessageBodyFlag != "" {
+		if msg, err := ioutil.ReadFile(commitMessageBodyFlag); err == nil {
+			message = string(msg)
+		}
+	}
 
 	// Strip existing labels and change-ID.
 	message = autosubmitLabelRE.ReplaceAllLiteralString(message, "")
 	message = presubmitTestLabelRE.ReplaceAllLiteralString(message, "")
 	message = changeIDRE.ReplaceAllLiteralString(message, "")
+	message = multiPartRE.ReplaceAllLiteralString(message, "")
 
 	// Insert labels and change-ID back.
 	if review.CLOpts.Autosubmit {
@@ -796,11 +1066,21 @@ func (review *review) processLabels(message string) string {
 	if review.CLOpts.Presubmit != gerrit.PresubmitTestTypeAll {
 		message += fmt.Sprintf("PresubmitTest: %s\n", review.CLOpts.Presubmit)
 	}
+	if multiPartLine != "" && !strings.HasSuffix(message, "\n") {
+		message += "\n"
+	} else {
+		if multipart := review.readMultiPart(); multipart != "" {
+			if !strings.HasSuffix(message, "\n") {
+				message += "\n"
+			}
+			multiPartLine = multipart
+		}
+	}
+	message += multiPartLine
 	if changeIDLine != "" && !strings.HasSuffix(message, "\n") {
 		message += "\n"
 	}
 	message += changeIDLine
-
 	return message
 }
 
@@ -838,10 +1118,12 @@ func (review *review) run() (e error) {
 		return err
 	}
 	defer collect.Error(func() error { return review.jirix.NewSeq().Chdir(wd).Done() }, &e)
+
 	file, err := getCommitMessageFileName(review.jirix, review.CLOpts.Branch)
 	if err != nil {
 		return err
 	}
+
 	message := messageFlag
 	if message == "" {
 		// Message was not passed in flag.  Attempt to read it from file.
@@ -863,7 +1145,7 @@ func (review *review) run() (e error) {
 	// message is edited by users, which happens in the
 	// updateReviewMessage method.
 	if message != "" {
-		message = review.processLabels(message)
+		message = review.processLabelsAndCommitFile(message)
 	}
 	if err := review.createReviewBranch(message); err != nil {
 		return err
@@ -893,7 +1175,7 @@ func (review *review) send() error {
 	return nil
 }
 
-// getChangeID reads the commit message and extracts the change-Id.
+// getChangeID reads the commit message and extracts the change-Id
 func (review *review) getChangeID() (string, error) {
 	file, err := getCommitMessageFileName(review.jirix, review.CLOpts.Branch)
 	if err != nil {
@@ -922,7 +1204,7 @@ func (review *review) setTopic() error {
 		return fmt.Errorf("Cannot set topic for gerrit host %q. Please use a host url with 'https' scheme or run with '--set-topic=false'.", host.String())
 	}
 	if err := review.jirix.Gerrit(host).SetTopic(changeID, review.CLOpts); err != nil {
-		return err
+		return fmt.Errorf("failed to set topic for %v, %#v: %v", changeID, review.CLOpts, err)
 	}
 	return nil
 }
@@ -937,6 +1219,9 @@ func (review *review) updateReviewMessage(file string) error {
 	if err != nil {
 		return err
 	}
+	// update MultiPart metadata.
+	mpart := review.readMultiPart()
+	newMessage = multiPartRE.ReplaceAllLiteralString(newMessage, mpart)
 	s := review.jirix.NewSeq()
 	// For the initial commit where the commit message file doesn't exist,
 	// add/remove labels after users finish editing the commit message.
@@ -945,7 +1230,7 @@ func (review *review) updateReviewMessage(file string) error {
 	// initial commit so we don't confuse users.
 	if _, err := s.Stat(file); err != nil {
 		if runutil.IsNotExist(err) {
-			newMessage = review.processLabels(newMessage)
+			newMessage = review.processLabelsAndCommitFile(newMessage)
 			if err := git.CommitAmendWithMessage(newMessage); err != nil {
 				return err
 			}

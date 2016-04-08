@@ -6,9 +6,12 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -17,6 +20,7 @@ import (
 	"v.io/jiri/gerrit"
 	"v.io/jiri/gitutil"
 	"v.io/jiri/jiritest"
+	"v.io/jiri/project"
 	"v.io/jiri/runutil"
 )
 
@@ -155,10 +159,13 @@ func createRepo(t *testing.T, jirix *jiri.X, prefix string) string {
 	return repoPath
 }
 
-// Simple commit-msg hook that adds a fake Change Id.
+// Simple commit-msg hook that removes any existing Change-Id and adds a
+// fake one.
 var commitMsgHook string = `#!/bin/sh
 MSG="$1"
-echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG
+cat $MSG | sed -e "/Change-Id/d" > $MSG.tmp
+echo "Change-Id: I0000000000000000000000000000000000000000" >> $MSG.tmp
+mv $MSG.tmp $MSG
 `
 
 // installCommitMsgHook links the gerrit commit-msg hook into a different repo.
@@ -314,7 +321,7 @@ func TestCreateReviewBranch(t *testing.T) {
 	}
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, fake.X, files)
-	review, err := newReview(fake.X, gerrit.CLOpts{})
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -346,7 +353,7 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	if err := gitutil.New(fake.X.NewSeq()).CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
-	review, err := newReview(fake.X, gerrit.CLOpts{Remote: branch})
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: branch})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -372,7 +379,7 @@ func TestSendReview(t *testing.T) {
 	commitFiles(t, fake.X, files)
 	{
 		// Test with draft = false, no reviewiers, and no ccs.
-		review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
+		review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritPath})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -384,7 +391,7 @@ func TestSendReview(t *testing.T) {
 	}
 	{
 		// Test with draft = true, no reviewers, and no ccs.
-		review, err := newReview(fake.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
 			Draft:  true,
 			Remote: gerritPath,
 		})
@@ -399,7 +406,7 @@ func TestSendReview(t *testing.T) {
 	}
 	{
 		// Test with draft = false, reviewers, and no ccs.
-		review, err := newReview(fake.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
 			Remote:    gerritPath,
 			Reviewers: parseEmails("reviewer1,reviewer2@example.org"),
 		})
@@ -414,7 +421,7 @@ func TestSendReview(t *testing.T) {
 	}
 	{
 		// Test with draft = true, reviewers, and ccs.
-		review, err := newReview(fake.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
 			Ccs:       parseEmails("cc1@example.org,cc2"),
 			Draft:     true,
 			Remote:    gerritPath,
@@ -442,7 +449,7 @@ func TestSendReviewNoChangeID(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	commitFiles(t, fake.X, []string{"file1"})
-	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -465,7 +472,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, fake.X, files)
-	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -503,7 +510,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	// Test setting -presubmit=none and autosubmit.
 	files := []string{"file1", "file2", "file3"}
 	commitFiles(t, fake.X, files)
-	review, err := newReview(fake.X, gerrit.CLOpts{
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
 		Autosubmit: true,
 		Presubmit:  gerrit.PresubmitTestTypeNone,
 		Remote:     gerritPath,
@@ -546,7 +553,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting -presubmit=all but keep autosubmit=true.
-	review, err = newReview(fake.X, gerrit.CLOpts{
+	review, err = newReview(fake.X, project.Project{}, gerrit.CLOpts{
 		Autosubmit: true,
 		Remote:     gerritPath,
 		Reviewers:  parseEmails("run2"),
@@ -575,7 +582,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	}
 
 	// Test setting autosubmit=false.
-	review, err = newReview(fake.X, gerrit.CLOpts{
+	review, err = newReview(fake.X, project.Project{}, gerrit.CLOpts{
 		Remote:    gerritPath,
 		Reviewers: parseEmails("run3"),
 	})
@@ -638,7 +645,7 @@ func TestDirtyBranch(t *testing.T) {
 	if err := s.WriteFile(untrackedFile, []byte(untrackedFileContent), 0644).Done(); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", untrackedFile, untrackedFileContent, err)
 	}
-	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -684,7 +691,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	files := []string{path.Join(subdir, "file1")}
 	commitFiles(t, fake.X, files)
 	chdir(t, fake.X, subdir)
-	review, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritPath})
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -787,14 +794,14 @@ Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
 	for _, test := range testCases {
-		review, err := newReview(fake.X, gerrit.CLOpts{
+		review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
 			Autosubmit: test.autosubmit,
 			Presubmit:  test.presubmitType,
 		})
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		if got := review.processLabels(test.originalMessage); got != test.expectedMessage {
+		if got := review.processLabelsAndCommitFile(test.originalMessage); got != test.expectedMessage {
 			t.Fatalf("want %s, got %s", test.expectedMessage, got)
 		}
 	}
@@ -868,7 +875,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	if err := gitutil.New(fake.X.NewSeq()).CommitWithMessage("editing stuff"); err != nil {
 		t.Fatalf("git commit failed: %v", err)
 	}
-	review, err := newReview(fake.X, gerrit.CLOpts{
+	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
 		Remote:    gerritPath,
 		Reviewers: parseEmails("run1"), // See hack note about TestLabelsInCommitMessage
 	})
@@ -889,7 +896,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	if err := gitutil.New(fake.X.NewSeq()).CommitWithMessage("deleting stuff"); err != nil {
 		t.Fatalf("git commit failed: %v", err)
 	}
-	review, err = newReview(fake.X, gerrit.CLOpts{
+	review, err = newReview(fake.X, project.Project{}, gerrit.CLOpts{
 		Remote:    gerritPath,
 		Reviewers: parseEmails("run2"),
 	})
@@ -928,7 +935,7 @@ func TestParallelDev(t *testing.T) {
 	createCLWithFiles(t, fake.X, "feature1-B", "B")
 	commitFile(t, fake.X, "A", "Don't tread on me.")
 
-	reviewB, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritBPath})
+	reviewB, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritBPath})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -949,7 +956,7 @@ func TestParallelDev(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	reviewA, err := newReview(fake.X, gerrit.CLOpts{Remote: gerritAPath})
+	reviewA, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritAPath})
 	if err == nil {
 		t.Fatalf("creating a review did not fail when it should")
 	}
@@ -979,7 +986,7 @@ func TestParallelDev(t *testing.T) {
 	}
 
 	// Retry review.
-	reviewA, err = newReview(fake.X, gerrit.CLOpts{Remote: gerritAPath})
+	reviewA, err = newReview(fake.X, project.Project{}, gerrit.CLOpts{Remote: gerritAPath})
 	if err != nil {
 		t.Fatalf("review failed: %v", err)
 	}
@@ -1030,4 +1037,278 @@ func TestCLSync(t *testing.T) {
 		}
 		assertFilesExist(t, fake.X, []string{"test"})
 	}
+}
+
+func TestMultiPart(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+	projects := addProjects(t, fake)
+
+	origCleanupFlag, origCurrentProjectFlag := cleanupMultiPartFlag, currentProjectFlag
+	defer func() {
+		cleanupMultiPartFlag, currentProjectFlag = origCleanupFlag, origCurrentProjectFlag
+	}()
+	cleanupMultiPartFlag, currentProjectFlag = false, false
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd)
+
+	relchdir := func(dir string) {
+		chdir(t, fake.X, dir)
+	}
+
+	initMP := func() *multiPart {
+		mp, err := initForMultiPart(fake.X)
+		if err != nil {
+			_, file, line, _ := runtime.Caller(1)
+			t.Fatalf("%s:%d: %v", filepath.Base(file), line, err)
+		}
+		return mp
+	}
+
+	wr := func(mp *multiPart) *multiPart {
+		return mp
+	}
+
+	cleanupMultiPartFlag = true
+	if got, want := initMP(), wr(&multiPart{clean: true}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+
+	currentProjectFlag = true
+	if got, want := initMP(), wr(&multiPart{clean: true, current: true}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+	cleanupMultiPartFlag, currentProjectFlag = false, false
+
+	git := func(dir string) *gitutil.Git {
+		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+	}
+
+	// Test metadata generation.
+	ra := projects[0].Path
+	rb := projects[1].Path
+	rc := projects[2].Path
+	t1 := projects[3].Path
+	git(ra).CreateAndCheckoutBranch("a1")
+	relchdir(ra)
+
+	if got, want := initMP(), wr(&multiPart{current: true, currentKey: projects[0].Key()}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+
+	git(rb).CreateAndCheckoutBranch("a1")
+	mp := initMP()
+	if mp.current != false || mp.clean != false {
+		t.Errorf("current or clean not false: %v, %v", mp.current, mp.clean)
+	}
+	if got, want := len(mp.keys), 2; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	tmp := &multiPart{
+		keys: project.ProjectKeys{projects[0].Key(), projects[1].Key()},
+	}
+	for i, k := range mp.keys {
+		if got, want := k, tmp.keys[i]; got != want {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	}
+	if got, want := len(mp.states), 2; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	git(rc).CreateAndCheckoutBranch("a1")
+	git(t1).CreateAndCheckoutBranch("a2")
+	mp = initMP()
+	if got, want := len(mp.keys), 3; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if err := mp.writeMultiPartMetadata(fake.X); err != nil {
+		t.Fatal(err)
+	}
+
+	hasMetaData := func(total int, projectPaths ...string) {
+		for i, dir := range projectPaths {
+			filename := filepath.Join(dir, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+			msg, err := ioutil.ReadFile(filename)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := string(msg), fmt.Sprintf("MultiPart: %d/%d\n", i+1, total); got != want {
+				t.Errorf("%v: got %v, want %v", dir, got, want)
+			}
+		}
+	}
+
+	hasNoMetaData := func(projectPaths ...string) {
+		for _, dir := range projectPaths {
+			filename := filepath.Join(fake.X.Root, dir, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+			_, err := os.Stat(filename)
+			if !os.IsNotExist(err) {
+				t.Fatalf("%s should not exist", filename)
+			}
+		}
+	}
+
+	newFile := func(dir, file string) {
+		testfile := filepath.Join(dir, file)
+		_, err := fake.X.NewSeq().Create(testfile)
+		if err != nil {
+			t.Errorf("failed to create %s: %v", testfile, err)
+		}
+	}
+
+	hasMetaData(len(mp.keys), ra, rb, rc)
+	hasNoMetaData(t1)
+	if err := mp.cleanMultiPartMetadata(fake.X); err != nil {
+		t.Fatal(err)
+	}
+	hasNoMetaData(ra, rb, rc, t1)
+
+	// Test CL messages.
+
+	for _, p := range projects {
+		// Install commit hook so that Change-Id is written.
+		installCommitMsgHook(t, fake.X, p.Path)
+
+	}
+
+	// Create a fake jiri root for the fake gerrit repos.
+	gerritFake, gerritCleanup := jiritest.NewFakeJiriRoot(t)
+	defer gerritCleanup()
+
+	relchdir(ra)
+
+	if err := mp.writeMultiPartMetadata(fake.X); err != nil {
+		t.Fatal(err)
+	}
+	hasMetaData(len(mp.keys), ra, rb, rc)
+
+	gitAddFiles := func(name string, repos ...string) {
+		for _, dir := range repos {
+			newFile(dir, name)
+			if err := git(dir).Add(name); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+
+	gitCommit := func(msg string, repos ...string) {
+		for _, dir := range repos {
+			committer := git(dir).NewCommitter(false)
+			if err := committer.Commit(msg); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+
+	gitAddFiles("new-file", ra, rb, rc)
+	_, err = initForMultiPart(fake.X)
+	if err == nil || !strings.Contains(err.Error(), "uncommitted changes:") {
+		t.Fatalf("expected an error about uncommitted changes: got %v", err)
+	}
+
+	gitCommit("oh multipart test\n", ra, rb, rc)
+	bodyMessage := "xyz\n\na simple message\n"
+	messageFile := filepath.Join(fake.X.Root, jiri.RootMetaDir, "message-body")
+	if err := ioutil.WriteFile(messageFile, []byte(bodyMessage), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	mp = initMP()
+	setTopicFlag = false
+	commitMessageBodyFlag = messageFile
+
+	testCommitMsgs := func(branch string, cls ...*project.Project) {
+		_, file, line, _ := runtime.Caller(1)
+		loc := fmt.Sprintf("%s:%d", filepath.Base(file), line)
+
+		total := len(cls)
+		for index, p := range cls {
+			// Create a new gerrit repo each time we commit, since we can't
+			// push more than once to the fake gerrit repo without actually
+			// running gerrit.
+			gp := createRepoFromOrigin(t, gerritFake.X, "gerrit", p.Remote)
+			defer os.Remove(gp)
+			relchdir(p.Path)
+			review, err := newReview(fake.X, *p, gerrit.CLOpts{
+				Presubmit: gerrit.PresubmitTestTypeNone,
+				Remote:    gp,
+			})
+			if err != nil {
+				t.Fatalf("%v: %v: %v", loc, p.Path, err)
+			}
+			// use the default commit message
+			if err := review.run(); err != nil {
+				t.Fatalf("%v: %v, %v", loc, p.Path, err)
+			}
+			filename, err := getCommitMessageFileName(fake.X, branch)
+			if err != nil {
+				t.Fatalf("%v: %v", loc, err)
+			}
+			msg, err := ioutil.ReadFile(filename)
+			if err != nil {
+				t.Fatalf("%v: %v", loc, err)
+			}
+			if total < 2 {
+				if strings.Contains(string(msg), "MultiPart") {
+					t.Errorf("%v: commit message contains MultiPart when it should not: %v", loc, string(msg))
+				}
+				continue
+			}
+			expected := fmt.Sprintf("\nMultiPart: %d/%d\n", index+1, total)
+			if !strings.Contains(string(msg), expected) {
+				t.Errorf("%v: commit message for %v does not contain %v: %v", loc, p.Path, expected, string(msg))
+			}
+			if got, want := string(msg), bodyMessage+"PresubmitTest: none"+expected+"Change-Id: I0000000000000000000000000000000000000000"; got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		}
+	}
+
+	testCommitMsgs("a1", projects[0], projects[1], projects[2])
+	return
+
+	cl := mp.commandline("", []string{"jiri", "cl", "mail"})
+	expected := []string{
+		"runp",
+		"--interactive",
+		"--show-key-prefix",
+		"--projects=" + string(projects[0].Key()) + "," + string(projects[1].Key()) + "," + string(projects[2].Key()),
+		"--current-project-only",
+		"jiri",
+		"cl",
+		"mail",
+	}
+	if got, want := strings.Join(cl, " "), strings.Join(expected, " "); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	cl = mp.commandline(projects[0].Key(), []string{"jiri", "cl", "mail"})
+	expected[3] = "--projects=" + string(projects[1].Key()) + "," + string(projects[2].Key())
+	if got, want := strings.Join(cl, " "), strings.Join(expected, " "); got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	git(rb).CreateAndCheckoutBranch("a2")
+	gitAddFiles("new-file1", ra, rc)
+	gitCommit("oh multipart test: 2\n", ra, rc)
+
+	mp = initMP()
+	if err := mp.writeMultiPartMetadata(fake.X); err != nil {
+		t.Fatal(err)
+	}
+	hasMetaData(len(mp.keys), ra, rc)
+	testCommitMsgs("a1", projects[0], projects[2])
+
+	git(ra).CreateAndCheckoutBranch("a2")
+
+	mp = initMP()
+	if err := mp.writeMultiPartMetadata(fake.X); err != nil {
+		t.Fatal(err)
+	}
+	hasNoMetaData(rc)
+	testCommitMsgs("a1", projects[2])
 }

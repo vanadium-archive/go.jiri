@@ -48,7 +48,7 @@ func addProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
 		}
 		p := project.Project{
 			Name:         projectPath,
-			Path:         projectPath,
+			Path:         filepath.Join(fake.X.Root, projectPath),
 			Remote:       fake.Projects[projectPath],
 			RemoteBranch: "master",
 		}
@@ -97,7 +97,7 @@ func TestRunP(t *testing.T) {
 	defer os.Chdir(cwd)
 
 	chdir := func(dir string) {
-		if err := os.Chdir(filepath.Join(fake.X.Root, dir)); err != nil {
+		if err := os.Chdir(dir); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -157,15 +157,15 @@ func TestRunP(t *testing.T) {
 
 	s := fake.X.NewSeq()
 	newfile := func(dir, file string) {
-		testfile := filepath.Join(fake.X.Root, dir, file)
+		testfile := filepath.Join(dir, file)
 		_, err := s.Create(testfile)
 		if err != nil {
 			t.Errorf("failed to create %s: %v", testfile, err)
 		}
 	}
 
-	git := func(root, dir string) *gitutil.Git {
-		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(filepath.Join(fake.X.Root, dir)))
+	git := func(dir string) *gitutil.Git {
+		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
 	}
 
 	newfile(rb, "untracked.go")
@@ -182,7 +182,7 @@ func TestRunP(t *testing.T) {
 
 	newfile(rc, "uncommitted.go")
 
-	if err := git(fake.X.Root, rc).Add("uncommitted.go"); err != nil {
+	if err := git(rc).Add("uncommitted.go"); err != nil {
 		t.Error(err)
 	}
 
@@ -208,10 +208,10 @@ func TestRunP(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	git(fake.X.Root, rb).CreateAndCheckoutBranch("a1")
-	git(fake.X.Root, rb).CreateAndCheckoutBranch("b2")
-	git(fake.X.Root, rc).CreateAndCheckoutBranch("b2")
-	git(fake.X.Root, t1).CreateAndCheckoutBranch("a1")
+	git(rb).CreateAndCheckoutBranch("a1")
+	git(rb).CreateAndCheckoutBranch("b2")
+	git(rc).CreateAndCheckoutBranch("b2")
+	git(t1).CreateAndCheckoutBranch("a1")
 
 	chdir(rc)
 
@@ -227,13 +227,13 @@ func TestRunP(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if err := s.MkdirAll(filepath.Join(fake.X.Root, rb, ".jiri", "a1"), os.FileMode(0755)).Done(); err != nil {
+	if err := s.MkdirAll(filepath.Join(rb, ".jiri", "a1"), os.FileMode(0755)).Done(); err != nil {
 		t.Fatal(err)
 	}
 	newfile(rb, filepath.Join(".jiri", "a1", ".gerrit_commit_message"))
 
-	git(fake.X.Root, rb).CheckoutBranch("a1")
-	git(fake.X.Root, t1).CheckoutBranch("a1")
+	git(rb).CheckoutBranch("a1")
+	git(t1).CheckoutBranch("a1")
 	chdir(t1)
 
 	got = run(sh, dir, "jiri", "runp", "--has-gerrit-message", "--show-name-prefix", "echo")

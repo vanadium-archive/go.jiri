@@ -312,7 +312,12 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	var err error
 
 	if profilescmdline.IsFlagSet(cmd.ParsedFlags, "projects") {
-		keysRE, err = regexp.Compile(runpFlags.projectKeys)
+		re := ""
+		for _, pre := range strings.Split(runpFlags.projectKeys, ",") {
+			re += pre + "|"
+		}
+		re = strings.TrimRight(re, "|")
+		keysRE, err = regexp.Compile(re)
 		if err != nil {
 			return fmt.Errorf("failed to compile projects regexp: %q: %v", runpFlags.projectKeys, err)
 		}
@@ -327,6 +332,9 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 
 	for _, f := range []string{"show-key-prefix", "show-name-prefix"} {
 		if profilescmdline.IsFlagSet(cmd.ParsedFlags, f) {
+			if runpFlags.interactive && profilescmdline.IsFlagSet(cmd.ParsedFlags, "interactive") {
+				fmt.Fprintf(jirix.Stderr(), "WARNING: interactive mode being disabled because %s was set\n", f)
+			}
 			runpFlags.interactive = false
 			runpFlags.collateOutput = true
 			break
