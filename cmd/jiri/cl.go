@@ -87,7 +87,7 @@ func init() {
 	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", `CL topic, defaults to <username>-<branchname>.`)
 	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, `Check that no uncommitted changes exist.`)
 	cmdCLMail.Flags.BoolVar(&verifyFlag, "verify", true, `Run pre-push git hooks.`)
-	cmdCLMail.Flags.BoolVar(&currentProjectFlag, "current-project-only", false, `Run mail in the current project only.`)
+	cmdCLMail.Flags.BoolVar(&currentProjectFlag, "current-project-only", true, `Run mail in the current project only.`)
 	cmdCLMail.Flags.BoolVar(&cleanupMultiPartFlag, "clean-multipart-metadata", false, `Cleanup the metadata associated with multipart CLs pertaining the MultiPart: x/y message without mailing any CLs.`)
 	cmdCLSync.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
 }
