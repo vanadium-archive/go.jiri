@@ -128,11 +128,7 @@ func RegisterDBPathFlag(flags *flag.FlagSet, manifest *string, defaultDBPath str
 }
 
 // RegisterProfilesFlag registers the --profiles flag
-func RegisterProfilesFlag(flags *flag.FlagSet, profiles *string) {
-	// TODO(cnicolaou): we need a better way of setting the default profiles,
-	// ideally via the profiles db, or some other config. Provide a command
-	// line tool for setting the default profiles.
-	defaultProfiles := "v23:base"
+func RegisterProfilesFlag(flags *flag.FlagSet, defaultProfiles string, profiles *string) {
 	flags.StringVar(profiles, "profiles", defaultProfiles, "a comma separated list of profiles to use")
 }
 
@@ -150,10 +146,10 @@ func RegisterMergePoliciesFlag(flags *flag.FlagSet, policies *profilesreader.Mer
 //  --profiles
 //  --merge-policies
 //  --target and --env
-func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBPath string) {
+func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultProfiles, defaultDBPath string) {
 	flags.Var(&fv.ProfilesMode, "skip-profiles", "if set, no profiles will be used")
 	RegisterDBPathFlag(flags, &fv.DBFilename, defaultDBPath)
-	RegisterProfilesFlag(flags, &fv.Profiles)
+	RegisterProfilesFlag(flags, defaultProfiles, &fv.Profiles)
 	fv.MergePolicies = profilesreader.JiriMergePolicies()
 	RegisterMergePoliciesFlag(flags, &fv.MergePolicies)
 	profiles.RegisterTargetAndEnvFlags(flags, &fv.Target)
@@ -165,20 +161,20 @@ func RegisterReaderFlags(flags *flag.FlagSet, fv *ReaderFlagValues, defaultDBPat
 // the supplied ReaderFlagValues struct.
 // RegisterReaderCommandsUsingParent results in a command line of the form:
 // <parent> <reader-flags> [list|env] <list/env specific commands>
-func RegisterReaderCommandsUsingParent(parent *cmdline.Command, fv *ReaderFlagValues, defaultDBPath string) {
+func RegisterReaderCommandsUsingParent(parent *cmdline.Command, fv *ReaderFlagValues, defaultProfiles, defaultDBPath string) {
 	envFlags.ReaderFlagValues = fv
 	listFlags.ReaderFlagValues = fv
-	RegisterReaderFlags(&parent.Flags, fv, defaultDBPath)
-	RegisterReaderCommands(parent, defaultDBPath)
+	RegisterReaderFlags(&parent.Flags, fv, defaultProfiles, defaultDBPath)
+	RegisterReaderCommands(parent, defaultProfiles, defaultDBPath)
 }
 
 // RegisterReaderCommands registers the list and env subcommands. The
 // subcommands will host the 'reader' flags (see RegisterReaderFlags)
 // resulting in a command line of the form:
 // <parent> [list|env] <reader-flags> <list/env specific specific commands>
-func RegisterReaderCommands(parent *cmdline.Command, defaultDBPath string) {
-	registerListCommand(parent, defaultDBPath)
-	registerEnvCommand(parent, defaultDBPath)
+func RegisterReaderCommands(parent *cmdline.Command, defaultProfiles, defaultDBPath string) {
+	registerListCommand(parent, defaultProfiles, defaultDBPath)
+	registerEnvCommand(parent, defaultProfiles, defaultDBPath)
 }
 
 func newReaderFlags() *ReaderFlagValues {
@@ -187,11 +183,11 @@ func newReaderFlags() *ReaderFlagValues {
 
 // registerListCommand the profiles list subcommand and returns it
 // and a struct containing  the values of the command line flags.
-func registerListCommand(parent *cmdline.Command, defaultDBPath string) {
+func registerListCommand(parent *cmdline.Command, defaultProfiles, defaultDBPath string) {
 	parent.Children = append(parent.Children, cmdList)
 	if listFlags.ReaderFlagValues == nil {
 		listFlags.ReaderFlagValues = newReaderFlags()
-		RegisterReaderFlags(&cmdList.Flags, listFlags.ReaderFlagValues, defaultDBPath)
+		RegisterReaderFlags(&cmdList.Flags, listFlags.ReaderFlagValues, defaultProfiles, defaultDBPath)
 	}
 	cmdList.Flags.BoolVar(&listFlags.Verbose, "v", false, "print more detailed information")
 	cmdList.Flags.StringVar(&listFlags.info, "info", "", infoUsage())
@@ -199,11 +195,11 @@ func registerListCommand(parent *cmdline.Command, defaultDBPath string) {
 
 // registerEnvCommand the profiles env subcommand and returns it and a
 // struct containing the values of the command line flags.
-func registerEnvCommand(parent *cmdline.Command, defaultDBPath string) {
+func registerEnvCommand(parent *cmdline.Command, defaultProfiles, defaultDBPath string) {
 	parent.Children = append(parent.Children, cmdEnv)
 	if envFlags.ReaderFlagValues == nil {
 		envFlags.ReaderFlagValues = newReaderFlags()
-		RegisterReaderFlags(&cmdEnv.Flags, envFlags.ReaderFlagValues, defaultDBPath)
+		RegisterReaderFlags(&cmdEnv.Flags, envFlags.ReaderFlagValues, defaultProfiles, defaultDBPath)
 	}
 	cmdEnv.Flags.BoolVar(&envFlags.Verbose, "v", false, "print more detailed information")
 }

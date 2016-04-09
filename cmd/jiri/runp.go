@@ -72,7 +72,7 @@ type runpFlagValues struct {
 }
 
 func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
-	profilescmdline.RegisterReaderFlags(flags, &values.ReaderFlagValues, jiri.ProfilesDBDir)
+	profilescmdline.RegisterReaderFlags(flags, &values.ReaderFlagValues, "", jiri.ProfilesDBDir)
 	flags.BoolVar(&values.verbose, "v", false, "Print verbose logging information")
 	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project unless it is run from outside of a project in which case it will default to using all projects.")
 	flags.BoolVar(&values.hasUncommitted, "has-uncommitted", false, "If specified, match projects that have, or have no, uncommitted changes")

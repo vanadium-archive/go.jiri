@@ -28,7 +28,7 @@ func TestReaderParent(t *testing.T) {
 	var rf profilescmdline.ReaderFlagValues
 	// If RegisterReaderCommandsUsingParent is called, the common reader
 	// flags are hosted by the parent command.
-	profilescmdline.RegisterReaderCommandsUsingParent(&p, &rf, "")
+	profilescmdline.RegisterReaderCommandsUsingParent(&p, &rf, "", "")
 	if got, want := len(p.Children), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -47,7 +47,7 @@ func TestReaderParent(t *testing.T) {
 
 	profilescmdline.Reset()
 	p = parent
-	profilescmdline.RegisterReaderFlags(&p.Flags, &rf, "")
+	profilescmdline.RegisterReaderFlags(&p.Flags, &rf, "", "")
 	if got, want := len(p.Children), 0; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -62,7 +62,7 @@ func TestReaderParent(t *testing.T) {
 	p = parent
 	// If RegisterReaderCommands is not called, the common reader
 	// flags are hosted by the subcommands.
-	profilescmdline.RegisterReaderCommands(&p, "")
+	profilescmdline.RegisterReaderCommands(&p, "", "")
 	if err := p.Flags.Parse(args); err == nil {
 		t.Fatal(fmt.Errorf("this should have failed"))
 	}
@@ -77,7 +77,7 @@ func TestSubcommandFlags(t *testing.T) {
 	profilescmdline.Reset()
 	p := parent
 	var rf profilescmdline.ReaderFlagValues
-	profilescmdline.RegisterReaderCommandsUsingParent(&p, &rf, "")
+	profilescmdline.RegisterReaderCommandsUsingParent(&p, &rf, "", "")
 	if got, want := len(p.Children), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -91,7 +91,7 @@ func TestSubcommandFlags(t *testing.T) {
 
 	profilescmdline.Reset()
 	p = parent
-	profilescmdline.RegisterReaderCommands(&p, "")
+	profilescmdline.RegisterReaderCommands(&p, "", "")
 	if got, want := len(p.Children), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
