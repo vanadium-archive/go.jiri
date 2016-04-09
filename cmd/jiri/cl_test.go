@@ -1050,6 +1050,25 @@ func TestMultiPart(t *testing.T) {
 	}()
 	cleanupMultiPartFlag, currentProjectFlag = false, false
 
+	name, err := gitutil.New(fake.X.NewSeq()).CurrentBranchName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name == "master" {
+		// The test cases below assume that they are run on a feature-branch,
+		// but this is not necessarily always the case when running under
+		// jenkins, so if it's run on a master branch it will create
+		// a feature branch.
+		if err := gitutil.New(fake.X.NewSeq()).CreateAndCheckoutBranch("feature-branch"); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			git := gitutil.New(fake.X.NewSeq())
+			git.CheckoutBranch("master", gitutil.ForceOpt(true))
+			git.DeleteBranch("feature-branch", gitutil.ForceOpt(true))
+		}()
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -1073,6 +1092,10 @@ func TestMultiPart(t *testing.T) {
 		return mp
 	}
 
+	git := func(dir string) *gitutil.Git {
+		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+	}
+
 	cleanupMultiPartFlag = true
 	if got, want := initMP(), wr(&multiPart{clean: true}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
@@ -1083,10 +1106,6 @@ func TestMultiPart(t *testing.T) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 	cleanupMultiPartFlag, currentProjectFlag = false, false
-
-	git := func(dir string) *gitutil.Git {
-		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
-	}
 
 	// Test metadata generation.
 	ra := projects[0].Path
