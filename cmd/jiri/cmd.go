@@ -17,6 +17,7 @@ import (
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	cmdRoot = newCmdRoot()
 	tool.InitializeRunFlags(&cmdRoot.Flags)
 }
 
@@ -25,27 +26,34 @@ func main() {
 }
 
 // cmdRoot represents the root of the jiri tool.
-var cmdRoot = &cmdline.Command{
-	Name:  "jiri",
-	Short: "Multi-purpose tool for multi-repo development",
-	Long: `
+var cmdRoot *cmdline.Command
+
+// Use a factory to avoid an initialization loop between between the
+// Runner functions in subcommands and the ParsedFlags field in the
+// Command.
+func newCmdRoot() *cmdline.Command {
+	return &cmdline.Command{
+		Name:  "jiri",
+		Short: "Multi-purpose tool for multi-repo development",
+		Long: `
 Command jiri is a multi-purpose tool for multi-repo development.
 `,
-	LookPath: true,
-	Children: []*cmdline.Command{
-		cmdCL,
-		cmdImport,
-		cmdProfile,
-		cmdProject,
-		cmdRebuild,
-		cmdSnapshot,
-		cmdUpdate,
-		cmdWhich,
-	},
-	Topics: []cmdline.Topic{
-		topicFileSystem,
-		topicManifest,
-	},
+		LookPath: true,
+		Children: []*cmdline.Command{
+			cmdCL,
+			cmdImport,
+			cmdProfile,
+			cmdProject,
+			cmdRebuild,
+			cmdSnapshot,
+			cmdUpdate,
+			cmdWhich,
+		},
+		Topics: []cmdline.Topic{
+			topicFileSystem,
+			topicManifest,
+		},
+	}
 }
 
 var topicFileSystem = cmdline.Topic{

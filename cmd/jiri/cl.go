@@ -19,6 +19,7 @@ import (
 	"v.io/jiri/collect"
 	"v.io/jiri/gerrit"
 	"v.io/jiri/gitutil"
+	"v.io/jiri/profiles/profilescmdline"
 	"v.io/jiri/project"
 	"v.io/jiri/runutil"
 	"v.io/x/lib/cmdline"
@@ -70,6 +71,8 @@ var (
 
 // init carries out the package initialization.
 func init() {
+	cmdCLMail = newCmdCLMail()
+	cmdCL = newCmdCL()
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, `Ignore unmerged changes.`)
 	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
 	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, `Automatically submit the changelist when feasible.`)
@@ -129,11 +132,17 @@ func getDependentCLs(jirix *jiri.X, branch string) ([]string, error) {
 }
 
 // cmdCL represents the "jiri cl" command.
-var cmdCL = &cmdline.Command{
-	Name:     "cl",
-	Short:    "Manage changelists for multiple projects",
-	Long:     "Manage changelists for multiple projects.",
-	Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync},
+var cmdCL *cmdline.Command
+
+// Use a factory to avoid an initialization loop between between the
+// Runner function and the ParsedFlags field in the Command.
+func newCmdCL() *cmdline.Command {
+	return &cmdline.Command{
+		Name:     "cl",
+		Short:    "Manage changelists for multiple projects",
+		Long:     "Manage changelists for multiple projects.",
+		Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync},
+	}
 }
 
 // cmdCLCleanup represents the "jiri cl cleanup" command.
@@ -273,11 +282,16 @@ func runCLCleanup(jirix *jiri.X, args []string) error {
 }
 
 // cmdCLMail represents the "jiri cl mail" command.
-var cmdCLMail = &cmdline.Command{
-	Runner: jiri.RunnerFunc(runCLMail),
-	Name:   "mail",
-	Short:  "Mail a changelist for review",
-	Long: `
+var cmdCLMail *cmdline.Command
+
+// Use a factory to avoid an initialization loop between between the
+// Runner function and the ParsedFlags field in the Command.
+func newCmdCLMail() *cmdline.Command {
+	return &cmdline.Command{
+		Runner: jiri.RunnerFunc(runCLMail),
+		Name:   "mail",
+		Short:  "Mail a changelist for review",
+		Long: `
 Command "mail" squashes all commits of a local branch into a single
 "changelist" and mails this changelist to Gerrit as a single
 commit. First time the command is invoked, it generates a Change-Id
@@ -286,6 +300,7 @@ message. Consecutive invocations of the command use the same Change-Id
 by default, informing Gerrit that the incomming commit is an update of
 an existing changelist.
 `,
+	}
 }
 
 type changeConflictError struct {
@@ -520,6 +535,56 @@ func (mp *multiPart) commandline(excludeKey project.ProjectKey, args []string) [
 	return append(clargs, args...)
 }
 
+// clMailMultiFlags extracts flags from the invocation of cl mail
+// that should be passed on to the sub invocations of cl mail when
+// operating across multiple repos.
+// These are:
+// -autosubmit, -cc, -d, -edit, -host, -m, -presubmit, remote-branch, -r,
+// -set-topic, -topic, -check-uncommitted and -verify,
+func clMailMultiFlags() []string {
+	flags := []string{}
+	stringFlag := func(name, value string) {
+		if profilescmdline.IsFlagSet(cmdCLMail.ParsedFlags, name) {
+			flags = append(flags, fmt.Sprintf("--%s=%s", name, value))
+		}
+	}
+	boolFlag := func(name string, value bool) {
+		if profilescmdline.IsFlagSet(cmdCLMail.ParsedFlags, name) {
+			flags = append(flags, fmt.Sprintf("--%s=%t", name, value))
+		}
+	}
+
+	// --edit is handled differently to other flags, if it is not
+	// specifically set, the default is to run the editor once
+	// and then reuse that message for the other parts of a multipart
+	// CL - that is, set -edit=false for the other repos. If edit
+	// is specifically set then that setting is used for all repos.
+	// So using --edit=true allows for a different CL message in
+	// each repo of a multipart CL.
+	if profilescmdline.IsFlagSet(cmdCLMail.ParsedFlags, "edit") {
+		// if --edit is set on the command line, use that value
+		// for all subcommands
+		flags = append(flags, fmt.Sprintf("--edit=%t", editFlag))
+	} else {
+		// if --edit is not set on the command line, use --edit=false
+		// for subcommands.
+		flags = append(flags, "--edit=false")
+	}
+
+	boolFlag("autosubmit", autosubmitFlag)
+	stringFlag("cc", ccsFlag)
+	boolFlag("d", draftFlag)
+	stringFlag("host", hostFlag)
+	stringFlag("m", messageFlag)
+	stringFlag("presubmit", presubmitFlag)
+	stringFlag("remote-branch", remoteBranchFlag)
+	stringFlag("r", reviewersFlag)
+	boolFlag("set-topic", setTopicFlag)
+	boolFlag("check-uncommitted", uncommittedFlag)
+	boolFlag("verify", verifyFlag)
+	return flags
+}
+
 // runCLMail is a wrapper that sets up and runs a review instance across
 // multiple projects.
 func runCLMail(jirix *jiri.X, args []string) error {
@@ -567,8 +632,9 @@ func runCLMail(jirix *jiri.X, args []string) error {
 	}
 	// Use Capture to make sure that all output from the subcommands is
 	// sent to stdout/stderr.
-	return s.Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", mp.commandline(mp.currentKey, append([]string{"--edit=false", "--commit-message-body-file=" + tmp.Name()}, args...))...)
-
+	flags := clMailMultiFlags()
+	flags = append(flags, "--commit-message-body-file="+tmp.Name())
+	return s.Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", mp.commandline(mp.currentKey, append(flags, args...))...)
 }
 
 func runCLMailCurrent(jirix *jiri.X, _ []string) error {
