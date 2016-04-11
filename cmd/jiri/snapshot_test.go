@@ -223,6 +223,7 @@ func TestGetSnapshotDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Getwd() failed: %v", err)
 	}
+	defer fake.X.NewSeq().RemoveAll(filepath.Join(cwd, "some"))
 	got, err = getSnapshotDir(fake.X)
 	if err != nil {
 		t.Fatalf("getSnapshotDir() failed: %v\n", err)
