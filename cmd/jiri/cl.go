@@ -387,6 +387,7 @@ func currentProject(jirix *jiri.X) (project.Project, error) {
 type multiPart struct {
 	clean, current bool
 	currentKey     project.ProjectKey
+	currentBranch  string
 	states         map[project.ProjectKey]*project.ProjectState
 	keys           project.ProjectKeys
 }
@@ -413,13 +414,17 @@ func initForMultiPart(jirix *jiri.X) (*multiPart, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(states) == 0 {
+		return nil, fmt.Errorf("Failed to find any projects")
+	}
 	current, err := currentProject(jirix)
 	if err != nil {
 		return nil, err
 	}
 	mp.currentKey = current.Key()
+	mp.currentBranch = states[mp.currentKey].CurrentBranch
 	if len(keys) == 1 {
-		filename := filepath.Join(states[keys[0]].Project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+		filename := filepath.Join(states[keys[0]].Project.Path, jiri.ProjectMetaDir, mp.currentBranch, multiPartMetaDataFileName)
 		os.Remove(filename)
 		if mp.currentKey == states[keys[0]].Project.Key() {
 			mp.current = true
@@ -483,13 +488,16 @@ func (mp *multiPart) writeMultiPartMetadata(jirix *jiri.X) error {
 	s := jirix.NewSeq()
 	for _, key := range mp.keys {
 		state := mp.states[key]
-		filename := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+		dir := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, mp.currentBranch)
+		filename := filepath.Join(dir, multiPartMetaDataFileName)
 		if total < 2 {
 			os.Remove(filename)
 			continue
 		}
 		msg := fmt.Sprintf("MultiPart: %d/%d\n", index, total)
-		if err := s.WriteFile(filename, []byte(msg), os.FileMode(0644)).Done(); err != nil {
+		if err := s.MkdirAll(dir, os.FileMode(0755)).
+			WriteFile(filename, []byte(msg), os.FileMode(0644)).
+			Done(); err != nil {
 			return err
 		}
 		index++
@@ -500,7 +508,7 @@ func (mp *multiPart) writeMultiPartMetadata(jirix *jiri.X) error {
 func (mp *multiPart) cleanMultiPartMetadata(jirix *jiri.X) error {
 	s := jirix.NewSeq()
 	for _, state := range mp.states {
-		filename := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+		filename := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, mp.currentBranch, multiPartMetaDataFileName)
 		ok, err := s.IsFile(filename)
 		if err != nil {
 			return err
@@ -514,7 +522,7 @@ func (mp *multiPart) cleanMultiPartMetadata(jirix *jiri.X) error {
 	return nil
 }
 
-func (mp *multiPart) commandline(excludeKey project.ProjectKey, args []string) []string {
+func (mp *multiPart) commandline(excludeKey project.ProjectKey, flags []string) []string {
 	keyflag := "--projects="
 	for _, k := range mp.keys {
 		if k == excludeKey {
@@ -527,12 +535,9 @@ func (mp *multiPart) commandline(excludeKey project.ProjectKey, args []string) [
 		"runp",
 		"--interactive",
 		keyflag,
-		"jiri",
-		"cl",
-		"mail",
-		"--current-project-only=true",
 	}
-	return append(clargs, args...)
+	clargs = append(clargs, "jiri", "cl", "mail", "--current-project-only=true")
+	return append(clargs, flags...)
 }
 
 // clMailMultiFlags extracts flags from the invocation of cl mail
@@ -587,7 +592,7 @@ func clMailMultiFlags() []string {
 
 // runCLMail is a wrapper that sets up and runs a review instance across
 // multiple projects.
-func runCLMail(jirix *jiri.X, args []string) error {
+func runCLMail(jirix *jiri.X, _ []string) error {
 	mp, err := initForMultiPart(jirix)
 	if err != nil {
 		return err
@@ -634,7 +639,7 @@ func runCLMail(jirix *jiri.X, args []string) error {
 	// sent to stdout/stderr.
 	flags := clMailMultiFlags()
 	flags = append(flags, "--commit-message-body-file="+tmp.Name())
-	return s.Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", mp.commandline(mp.currentKey, append(flags, args...))...)
+	return s.Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", mp.commandline(mp.currentKey, flags)...)
 }
 
 func runCLMailCurrent(jirix *jiri.X, _ []string) error {
@@ -770,9 +775,10 @@ $ git checkout %v
 }
 
 type review struct {
-	jirix        *jiri.X
-	reviewBranch string
-	project      project.Project
+	jirix         *jiri.X
+	featureBranch string
+	reviewBranch  string
+	project       project.Project
 	gerrit.CLOpts
 }
 
@@ -808,10 +814,11 @@ func newReview(jirix *jiri.X, project project.Project, opts gerrit.CLOpts) (*rev
 		opts.RemoteBranch = "master" // use master as the default
 	}
 	return &review{
-		jirix:        jirix,
-		project:      project,
-		reviewBranch: branch + "-REVIEW",
-		CLOpts:       opts,
+		jirix:         jirix,
+		project:       project,
+		featureBranch: branch,
+		reviewBranch:  branch + "-REVIEW",
+		CLOpts:        opts,
 	}, nil
 }
 
@@ -1038,7 +1045,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 
 func (review *review) readMultiPart() string {
 	s := review.jirix.NewSeq()
-	filename := filepath.Join(review.project.Path, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+	filename := filepath.Join(review.project.Path, jiri.ProjectMetaDir, review.featureBranch, multiPartMetaDataFileName)
 	mpart, err := s.ReadFile(filename)
 	if err != nil {
 		return ""

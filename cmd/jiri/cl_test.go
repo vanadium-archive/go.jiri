@@ -1115,7 +1115,7 @@ func TestMultiPart(t *testing.T) {
 	git(ra).CreateAndCheckoutBranch("a1")
 	relchdir(ra)
 
-	if got, want := initMP(), wr(&multiPart{current: true, currentKey: projects[0].Key()}); !reflect.DeepEqual(got, want) {
+	if got, want := initMP(), wr(&multiPart{current: true, currentKey: projects[0].Key(), currentBranch: "a1"}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 
@@ -1149,12 +1149,14 @@ func TestMultiPart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hasMetaData := func(total int, projectPaths ...string) {
+	hasMetaData := func(total int, branch string, projectPaths ...string) {
+		_, file, line, _ := runtime.Caller(1)
+		loc := fmt.Sprintf("%s:%d", filepath.Base(file), line)
 		for i, dir := range projectPaths {
-			filename := filepath.Join(dir, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+			filename := filepath.Join(dir, jiri.ProjectMetaDir, branch, multiPartMetaDataFileName)
 			msg, err := ioutil.ReadFile(filename)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("%s: %v", loc, err)
 			}
 			if got, want := string(msg), fmt.Sprintf("MultiPart: %d/%d\n", i+1, total); got != want {
 				t.Errorf("%v: got %v, want %v", dir, got, want)
@@ -1162,12 +1164,14 @@ func TestMultiPart(t *testing.T) {
 		}
 	}
 
-	hasNoMetaData := func(projectPaths ...string) {
+	hasNoMetaData := func(branch string, projectPaths ...string) {
+		_, file, line, _ := runtime.Caller(1)
+		loc := fmt.Sprintf("%s:%d", filepath.Base(file), line)
 		for _, dir := range projectPaths {
-			filename := filepath.Join(fake.X.Root, dir, jiri.ProjectMetaDir, multiPartMetaDataFileName)
+			filename := filepath.Join(fake.X.Root, dir, jiri.ProjectMetaDir, branch, multiPartMetaDataFileName)
 			_, err := os.Stat(filename)
 			if !os.IsNotExist(err) {
-				t.Fatalf("%s should not exist", filename)
+				t.Fatalf("%s: %s should not exist", loc, filename)
 			}
 		}
 	}
@@ -1180,12 +1184,12 @@ func TestMultiPart(t *testing.T) {
 		}
 	}
 
-	hasMetaData(len(mp.keys), ra, rb, rc)
-	hasNoMetaData(t1)
+	hasMetaData(len(mp.keys), "a1", ra, rb, rc)
+	hasNoMetaData(t1, "a2")
 	if err := mp.cleanMultiPartMetadata(fake.X); err != nil {
 		t.Fatal(err)
 	}
-	hasNoMetaData(ra, rb, rc, t1)
+	hasNoMetaData(ra, "a1", rb, rc, t1)
 
 	// Test CL messages.
 
@@ -1204,7 +1208,7 @@ func TestMultiPart(t *testing.T) {
 	if err := mp.writeMultiPartMetadata(fake.X); err != nil {
 		t.Fatal(err)
 	}
-	hasMetaData(len(mp.keys), ra, rb, rc)
+	hasMetaData(len(mp.keys), "a1", ra, rb, rc)
 
 	gitAddFiles := func(name string, repos ...string) {
 		for _, dir := range repos {
@@ -1289,24 +1293,24 @@ func TestMultiPart(t *testing.T) {
 	}
 
 	testCommitMsgs("a1", projects[0], projects[1], projects[2])
-	return
 
-	cl := mp.commandline("", []string{"jiri", "cl", "mail"})
+	cl := mp.commandline("", []string{"-r=alice"})
 	expected := []string{
 		"runp",
 		"--interactive",
-		"--show-key-prefix",
 		"--projects=" + string(projects[0].Key()) + "," + string(projects[1].Key()) + "," + string(projects[2].Key()),
-		"--current-project-only",
 		"jiri",
 		"cl",
 		"mail",
+		"--current-project-only=true",
+		"-r=alice",
 	}
 	if got, want := strings.Join(cl, " "), strings.Join(expected, " "); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	cl = mp.commandline(projects[0].Key(), []string{"jiri", "cl", "mail"})
-	expected[3] = "--projects=" + string(projects[1].Key()) + "," + string(projects[2].Key())
+	cl = mp.commandline(projects[0].Key(), []string{"-r=bob"})
+	expected[2] = "--projects=" + string(projects[1].Key()) + "," + string(projects[2].Key())
+	expected[len(expected)-1] = "-r=bob"
 	if got, want := strings.Join(cl, " "), strings.Join(expected, " "); got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -1319,7 +1323,7 @@ func TestMultiPart(t *testing.T) {
 	if err := mp.writeMultiPartMetadata(fake.X); err != nil {
 		t.Fatal(err)
 	}
-	hasMetaData(len(mp.keys), ra, rc)
+	hasMetaData(len(mp.keys), "a1", ra, rc)
 	testCommitMsgs("a1", projects[0], projects[2])
 
 	git(ra).CreateAndCheckoutBranch("a2")
