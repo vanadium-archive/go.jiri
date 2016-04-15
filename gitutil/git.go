@@ -320,13 +320,30 @@ func (g *Git) DirExistsOnBranch(dir, branch string) bool {
 }
 
 // Fetch fetches refs and tags from the given remote.
-func (g *Git) Fetch(remote string) error {
-	return g.run("fetch", remote)
+func (g *Git) Fetch(remote string, opts ...FetchOpt) error {
+	return g.FetchRefspec(remote, "", opts...)
 }
 
 // FetchRefspec fetches refs and tags from the given remote for a particular refspec.
-func (g *Git) FetchRefspec(remote, refspec string) error {
-	return g.run("fetch", remote, refspec)
+func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
+	args := []string{"fetch"}
+	tags := false
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case TagsOpt:
+			tags = bool(typedOpt)
+		}
+	}
+	if tags {
+		args = append(args, "--tags")
+	}
+
+	args = append(args, remote)
+	if refspec != "" {
+		args = append(args, refspec)
+	}
+
+	return g.run(args...)
 }
 
 // FilesWithUncommittedChanges returns the list of files that have
@@ -525,12 +542,17 @@ func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
 	args := []string{"push"}
 	force := false
 	verify := true
+	// TODO(youngseokyoon): consider making followTags option default to true, after verifying that
+	// it works well for the madb repository.
+	followTags := false
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case ForceOpt:
 			force = bool(typedOpt)
 		case VerifyOpt:
 			verify = bool(typedOpt)
+		case FollowTagsOpt:
+			followTags = bool(typedOpt)
 		}
 	}
 	if force {
@@ -540,6 +562,9 @@ func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
 		args = append(args, "--verify")
 	} else {
 		args = append(args, "--no-verify")
+	}
+	if followTags {
+		args = append(args, "--follow-tags")
 	}
 	args = append(args, remote, branch)
 	return g.run(args...)

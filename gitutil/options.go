@@ -13,16 +13,22 @@ type CommitOpt interface {
 type DeleteBranchOpt interface {
 	deleteBranchOpt()
 }
+type FetchOpt interface {
+	fetchOpt()
+}
 type MergeOpt interface {
 	mergeOpt()
 }
 type PushOpt interface {
 	pushOpt()
 }
-
 type ResetOpt interface {
 	resetOpt()
 }
+
+type FollowTagsOpt bool
+
+func (FollowTagsOpt) pushOpt() {}
 
 type ForceOpt bool
 
@@ -49,6 +55,10 @@ func (SquashOpt) mergeOpt() {}
 type StrategyOpt string
 
 func (StrategyOpt) mergeOpt() {}
+
+type TagsOpt bool
+
+func (TagsOpt) fetchOpt() {}
 
 type VerifyOpt bool
 

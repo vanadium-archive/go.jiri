@@ -27,8 +27,8 @@ pkg gitutil, method (*Git) CurrentRevision() (string, error)
 pkg gitutil, method (*Git) CurrentRevisionOfBranch(string) (string, error)
 pkg gitutil, method (*Git) DeleteBranch(string, ...DeleteBranchOpt) error
 pkg gitutil, method (*Git) DirExistsOnBranch(string, string) bool
-pkg gitutil, method (*Git) Fetch(string) error
-pkg gitutil, method (*Git) FetchRefspec(string, string) error
+pkg gitutil, method (*Git) Fetch(string, ...FetchOpt) error
+pkg gitutil, method (*Git) FetchRefspec(string, string, ...FetchOpt) error
 pkg gitutil, method (*Git) FilesWithUncommittedChanges() ([]string, error)
 pkg gitutil, method (*Git) GetBranches(...string) ([]string, string, error)
 pkg gitutil, method (*Git) HasUncommittedChanges() (bool, error)
@@ -64,6 +64,8 @@ pkg gitutil, type CommitOpt interface, unexported methods
 pkg gitutil, type Committer struct
 pkg gitutil, type CommitterDateOpt string
 pkg gitutil, type DeleteBranchOpt interface, unexported methods
+pkg gitutil, type FetchOpt interface, unexported methods
+pkg gitutil, type FollowTagsOpt bool
 pkg gitutil, type ForceOpt bool
 pkg gitutil, type Git struct
 pkg gitutil, type GitError struct
@@ -76,4 +78,5 @@ pkg gitutil, type ResetOpt interface, unexported methods
 pkg gitutil, type RootDirOpt string
 pkg gitutil, type SquashOpt bool
 pkg gitutil, type StrategyOpt string
+pkg gitutil, type TagsOpt bool
 pkg gitutil, type VerifyOpt bool
