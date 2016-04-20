@@ -79,6 +79,8 @@ Usage:
 
 The jiri profile-i1 commands are:
    install     Install the given profiles
+   os-packages List the commands to install the OS packages required by the
+               given profiles
    uninstall   Uninstall the given profiles
    update      Install the latest default version of the given profiles
    cleanup     Cleanup the locally installed profiles
@@ -111,6 +113,36 @@ The jiri profile-i1 install flags are:
    specify an environment variable in the form: <var>=[<val>],...
  -force=false
    force install the profile even if it is already installed
+ -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
+   the path, relative to JIRI_ROOT, that contains the profiles database.
+ -profiles-dir=.jiri_root/profiles
+   the directory, relative to JIRI_ROOT, that profiles are installed in
+ -target=<runtime.GOARCH>-<runtime.GOOS>
+   specifies a profile target in the following form: <arch>-<os>[@<version>]
+
+ -color=true
+   Use color to format output.
+ -v=false
+   Print verbose output.
+
+Jiri profile-i1 os-packages - List the commands to install the OS packages required by the given profiles
+
+List or optionally run the commands to install the OS packages required by the
+given profiles.
+
+Usage:
+   jiri profile-i1 os-packages [flags] <profiles>
+
+<profiles> is a list of profiles to list OS packages for.
+
+The jiri profile-i1 os-packages flags are:
+ -all=false
+   print commands to install all required OS packages, not just those that are
+   missing
+ -env=
+   specify an environment variable in the form: <var>=[<val>],...
+ -install=false
+   install the requested packages. This may need to be run as root.
  -profiles-db=$JIRI_ROOT/.jiri_root/profile_db
    the path, relative to JIRI_ROOT, that contains the profiles database.
  -profiles-dir=.jiri_root/profiles

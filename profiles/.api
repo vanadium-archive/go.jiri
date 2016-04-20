@@ -70,12 +70,13 @@ pkg profiles, type Action int
 pkg profiles, type DB struct
 pkg profiles, type Environment struct
 pkg profiles, type Environment struct, Vars []string
-pkg profiles, type Manager interface { AddFlags, Info, Install, Installer, Name, String, Uninstall, VersionInfo }
+pkg profiles, type Manager interface { AddFlags, Info, Install, Installer, Name, OSPackages, String, Uninstall, VersionInfo }
 pkg profiles, type Manager interface, AddFlags(*flag.FlagSet, Action)
 pkg profiles, type Manager interface, Info() string
 pkg profiles, type Manager interface, Install(*jiri.X, *DB, jiri.RelPath, Target) error
 pkg profiles, type Manager interface, Installer() string
 pkg profiles, type Manager interface, Name() string
+pkg profiles, type Manager interface, OSPackages(*jiri.X, *DB, jiri.RelPath, Target) ([]string, error)
 pkg profiles, type Manager interface, String() string
 pkg profiles, type Manager interface, Uninstall(*jiri.X, *DB, jiri.RelPath, Target) error
 pkg profiles, type Manager interface, VersionInfo() *VersionInfo

@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"v.io/jiri"
 	"v.io/jiri/tool"
@@ -84,57 +83,58 @@ func brewList(jirix *jiri.X) (map[string]bool, error) {
 	return pkgs, err
 }
 
-// InstallPackages identifies the packages that need to be installed
-// and installs them using the OS-specific package manager.
-func InstallPackages(jirix *jiri.X, pkgs []string) error {
-	installDepsFn := func() error {
-		s := jirix.NewSeq()
-		switch runtime.GOOS {
-		case "linux":
-			if IsFNLHost() {
-				fmt.Fprintf(jirix.Stdout(), "skipping installation of %v on FNL host", pkgs)
-				fmt.Fprintf(jirix.Stdout(), "success\n")
-				break
-			}
-			installPkgs := []string{}
-			for _, pkg := range pkgs {
-				if err := s.Last("dpkg", "-L", pkg); err != nil {
-					installPkgs = append(installPkgs, pkg)
-				}
-			}
-			if len(installPkgs) > 0 {
-				args := append([]string{"apt-get", "install", "-y"}, installPkgs...)
-				fmt.Fprintf(jirix.Stdout(), "Running: sudo %s: ", strings.Join(args, " "))
-				if err := s.Last("sudo", args...); err != nil {
-					fmt.Fprintf(jirix.Stdout(), "%v\n", err)
-					return err
-				}
-				fmt.Fprintf(jirix.Stdout(), "success\n")
-			}
-		case "darwin":
-			installPkgs := []string{}
-			installedPkgs, err := brewList(jirix)
-			if err != nil {
-				return err
-			}
-			for _, pkg := range pkgs {
-				if !installedPkgs[pkg] {
-					installPkgs = append(installPkgs, pkg)
-				}
-			}
-			if len(installPkgs) > 0 {
-				args := append([]string{"install"}, installPkgs...)
-				fmt.Fprintf(jirix.Stdout(), "Running: brew %s: ", strings.Join(args, " "))
-				if err := s.Last("brew", args...); err != nil {
-					fmt.Fprintf(jirix.Stdout(), "%v\n", err)
-					return err
-				}
-				fmt.Fprintf(jirix.Stdout(), "success\n")
+// MissingOSPackages returns the subset of the supplied packages that are
+// missing from the underlying operating system and hence will need to
+// be installed.
+func MissingOSPackages(jirix *jiri.X, pkgs []string) ([]string, error) {
+	var installedPkgs map[string]bool
+	s := jirix.NewSeq()
+	switch runtime.GOOS {
+	case "linux":
+		if IsFNLHost() {
+			fmt.Fprintf(jirix.Stdout(), "skipping %v on FNL host\n", pkgs)
+			break
+		}
+		for _, pkg := range pkgs {
+			if err := s.Last("dpkg", "-L", pkg); err != nil {
+				installedPkgs[pkg] = true
 			}
 		}
-		return nil
+	case "darwin":
+		var err error
+		installedPkgs, err = brewList(jirix)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return jirix.NewSeq().Call(installDepsFn, "Install dependencies: "+strings.Join(pkgs, ",")).Done()
+	missing := []string{}
+	for _, pkg := range pkgs {
+		if !installedPkgs[pkg] {
+			missing = append(missing, pkg)
+		}
+	}
+	return missing, nil
+}
+
+// OSPackagesInstallCommands returns the list of commands required to
+// install the specified packages on the underlying operating system.
+func OSPackageInstallCommands(jirix *jiri.X, pkgs []string) [][]string {
+	cmds := make([][]string, 0, 1)
+	switch runtime.GOOS {
+	case "linux":
+		if IsFNLHost() {
+			fmt.Fprintf(jirix.Stdout(), "skipping %v on FNL host\n", pkgs)
+			break
+		}
+		if len(pkgs) > 0 {
+			return append(cmds, append([]string{"apt-get", "install", "-y"}, pkgs...))
+		}
+	case "darwin":
+		if len(pkgs) > 0 {
+			return append(cmds, append([]string{"brew", "install"}, pkgs...))
+		}
+	}
+	return cmds
 }
 
 // Fetch downloads the specified url and saves it to dst.

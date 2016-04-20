@@ -5,18 +5,23 @@
 package profilescmdline
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"v.io/jiri"
 	"v.io/jiri/profiles"
 	"v.io/jiri/profiles/profilesmanager"
+	"v.io/jiri/profiles/profilesutil"
 	"v.io/jiri/runutil"
 )
 
 // profileManager is implemented for both in-process and sub-command
 // implemented profiles.
 type profileManager interface {
+	packageCmds(jirix *jiri.X, cl *packagesFlagValues, root jiri.RelPath) ([][]string, error)
 	install(jirix *jiri.X, cl *installFlagValues, root jiri.RelPath) error
 	uninstall(jirix *jiri.X, cl *uninstallFlagValues, root jiri.RelPath) error
 	update(jirix *jiri.X, cl *updateFlagValues, root jiri.RelPath) error
@@ -40,6 +45,39 @@ type inproc struct {
 
 func (ip *inproc) mgrName() string {
 	return ip.qname
+}
+
+func (ip *inproc) packageCmds(jirix *jiri.X, cl *packagesFlagValues, root jiri.RelPath) ([][]string, error) {
+	mgr := profilesmanager.LookupManager(ip.qname)
+	if mgr == nil {
+		return nil, fmt.Errorf("profile %v is not available via this installer %q", ip.qname, ip.installer)
+	}
+	def, err := targetAtDefaultVersion(mgr, cl.target)
+	if err != nil {
+		return nil, err
+	}
+	needed, err := mgr.OSPackages(jirix, ip.db, root, def)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to obtain packages for %v %v: %v", ip.name, cl.target, err)
+	}
+	if !cl.allPackages {
+		if missing, err := profilesutil.MissingOSPackages(jirix, needed); err != nil {
+			return nil, fmt.Errorf("Failed to obtain missing packages for %v %v: %v", ip.name, cl.target, err)
+		} else {
+			needed = missing
+		}
+	}
+	// Dedup & sort.
+	deduped := []string{}
+	m := map[string]bool{}
+	for _, n := range needed {
+		if !m[n] {
+			m[n] = true
+			deduped = append(deduped, n)
+		}
+	}
+	sort.Strings(deduped)
+	return profilesutil.OSPackageInstallCommands(jirix, deduped), nil
 }
 
 func (ip *inproc) install(jirix *jiri.X, cl *installFlagValues, root jiri.RelPath) error {
@@ -195,6 +233,22 @@ func (sc *subcommand) run(jirix *jiri.X, verb string, args []string) error {
 	cl = append(cl, args...)
 	cl = append(cl, sc.qname)
 	return jirix.NewSeq().Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", cl...)
+}
+
+func (sc *subcommand) packageCmds(jirix *jiri.X, cl *packagesFlagValues, root jiri.RelPath) ([][]string, error) {
+	cmd := []string{"profile-" + sc.installer, "os-packages"}
+	cmd = append(cmd, cl.args()...)
+	cmd = append(cmd, sc.qname)
+	var out bytes.Buffer
+	if err := jirix.NewSeq().Capture(&out, jirix.Stderr()).Last("jiri", cmd...); err != nil {
+		return nil, err
+	}
+	scanner := bufio.NewScanner(&out)
+	cmds := make([][]string, 0, 5)
+	for scanner.Scan() {
+		cmds = append(cmds, strings.Split(scanner.Text(), " "))
+	}
+	return cmds, nil
 }
 
 func (sc *subcommand) install(jirix *jiri.X, cl *installFlagValues, root jiri.RelPath) error {

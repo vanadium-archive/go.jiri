@@ -59,6 +59,10 @@ func (eg *exampleManager) String() string {
 	return fmt.Sprintf("Profile: %s installed by %s: %s\n", eg.name, eg.installer, eg.versionInfo)
 }
 
+func (eg *exampleManager) OSPackages(jirix *jiri.X, pdb *profiles.DB, root jiri.RelPath, target profiles.Target) ([]string, error) {
+	return nil, nil
+}
+
 func (eg *exampleManager) AddFlags(*flag.FlagSet, profiles.Action) {
 }
 

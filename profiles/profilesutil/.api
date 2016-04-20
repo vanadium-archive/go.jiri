@@ -2,7 +2,8 @@ pkg profilesutil, const DefaultDirPerm os.FileMode
 pkg profilesutil, const DefaultFilePerm os.FileMode
 pkg profilesutil, func AtomicAction(*jiri.X, func() error, string, string) error
 pkg profilesutil, func Fetch(*jiri.X, string, string) error
-pkg profilesutil, func InstallPackages(*jiri.X, []string) error
 pkg profilesutil, func IsFNLHost() bool
+pkg profilesutil, func MissingOSPackages(*jiri.X, []string) ([]string, error)
+pkg profilesutil, func OSPackageInstallCommands(*jiri.X, []string) [][]string
 pkg profilesutil, func Untar(*jiri.X, string, string) error
 pkg profilesutil, func Unzip(*jiri.X, string, string) error

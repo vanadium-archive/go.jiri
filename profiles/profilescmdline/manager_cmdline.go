@@ -39,6 +39,18 @@ import (
 	"v.io/x/lib/lookpath"
 )
 
+// newCmdOSPackages represents the "profile os-packages" command.
+func newCmdOSPackages() *cmdline.Command {
+	return &cmdline.Command{
+		Runner:   jiri.RunnerFunc(runPackages),
+		Name:     "os-packages",
+		Short:    "List the commands to install the OS packages required by the given profiles",
+		Long:     "List or optionally run the commands to install the OS packages required by the given profiles.",
+		ArgsName: "<profiles>",
+		ArgsLong: "<profiles> is a list of profiles to list OS packages for.",
+	}
+}
+
 // newCmdInstall represents the "profile install" command.
 func newCmdInstall() *cmdline.Command {
 	return &cmdline.Command{
@@ -105,6 +117,10 @@ func runCleanup(jirix *jiri.X, args []string) error {
 	return cleanupImpl(jirix, &cleanupFlags, args)
 }
 
+func runPackages(jirix *jiri.X, args []string) error {
+	return packagesImpl(jirix, &packagesFlags, args)
+}
+
 func runInstall(jirix *jiri.X, args []string) error {
 	return installImpl(jirix, &installFlags, args)
 }
@@ -133,6 +149,38 @@ func (cv *commonFlagValues) args() []string {
 	a := append([]string{}, "--profiles-db="+cv.dbPath)
 	a = append(a, "--profiles-dir="+cv.root)
 	return a
+}
+
+type packagesFlagValues struct {
+	commonFlagValues
+	// The value of --target and --env
+	target profiles.Target
+	// Show commands for all required packages, rather than just the missing ones
+	allPackages bool
+	// Install the required packages
+	installPackages bool
+}
+
+func initPackagesCommand(flags *flag.FlagSet, installer, defaultDBPath, defaultProfilesPath string) {
+	initCommon(flags, &packagesFlags.commonFlagValues, installer, defaultDBPath, defaultProfilesPath)
+	profiles.RegisterTargetAndEnvFlags(flags, &packagesFlags.target)
+	flags.BoolVar(&packagesFlags.allPackages, "all", false, "print commands to install all required OS packages, not just those that are missing")
+	flags.BoolVar(&packagesFlags.installPackages, "install", false, "install the requested packages. This may need to be run as root.")
+	for _, name := range profilesmanager.Managers() {
+		profilesmanager.LookupManager(name).AddFlags(flags, profiles.Install)
+	}
+}
+
+func (pv *packagesFlagValues) args() []string {
+	a := pv.commonFlagValues.args()
+	if t := pv.target.String(); t != "" {
+		a = append(a, "--target="+t)
+	}
+	if e := pv.target.CommandLineEnv().String(); e != "" {
+		a = append(a, "--target="+e)
+	}
+	a = append(a, fmt.Sprintf("--%s=%v", "all", pv.allPackages))
+	return append(a, fmt.Sprintf("--%s=%v", "install", pv.installPackages))
 }
 
 type installFlagValues struct {
@@ -256,6 +304,7 @@ func (av *availableFlagValues) args() []string {
 }
 
 var (
+	packagesFlags    packagesFlagValues
 	installFlags     installFlagValues
 	uninstallFlags   uninstallFlagValues
 	cleanupFlags     cleanupFlagValues
@@ -268,17 +317,19 @@ var (
 // RegisterManagementCommands registers the management subcommands:
 // uninstall, install, update and cleanup.
 func RegisterManagementCommands(parent *cmdline.Command, useSubcommands bool, installer, defaultDBPath, defaultProfilesPath string) {
+	cmdOSPackages := newCmdOSPackages()
 	cmdInstall := newCmdInstall()
 	cmdUninstall := newCmdUninstall()
 	cmdUpdate := newCmdUpdate()
 	cmdCleanup := newCmdCleanup()
 	cmdAvailable := newCmdAvailable()
+	initPackagesCommand(&cmdOSPackages.Flags, installer, defaultDBPath, defaultProfilesPath)
 	initInstallCommand(&cmdInstall.Flags, installer, defaultDBPath, defaultProfilesPath)
 	initUninstallCommand(&cmdUninstall.Flags, installer, defaultDBPath, defaultProfilesPath)
 	initUpdateCommand(&cmdUpdate.Flags, installer, defaultDBPath, defaultProfilesPath)
 	initCleanupCommand(&cmdCleanup.Flags, installer, defaultDBPath, defaultProfilesPath)
 	initAvailableCommand(&cmdAvailable.Flags, installer, defaultDBPath, defaultProfilesPath)
-	parent.Children = append(parent.Children, cmdInstall, cmdUninstall, cmdUpdate, cmdCleanup, cmdAvailable)
+	parent.Children = append(parent.Children, cmdInstall, cmdOSPackages, cmdUninstall, cmdUpdate, cmdCleanup, cmdAvailable)
 	profileInstaller = installer
 	runSubcommands = useSubcommands
 }
@@ -441,6 +492,35 @@ func cleanupImpl(jirix *jiri.X, cl *cleanupFlagValues, args []string) error {
 	}
 	if !cl.rmAll {
 		return writeDB(jirix, db, profileInstaller, cl.dbPath)
+	}
+	return nil
+}
+
+func packagesImpl(jirix *jiri.X, cl *packagesFlagValues, args []string) error {
+	mgrs, _, err := availableProfileManagers(jirix, cl.dbPath, args)
+	if err != nil {
+		return err
+	}
+	cl.target.UseCommandLineEnv()
+	root := jiri.NewRelPath(cl.root).Join(profileInstaller)
+	s := jirix.NewSeq()
+	installPackages := cl.installPackages
+	// Never ask a subcommand to install packages.
+	cl.installPackages = false
+	for _, mgr := range mgrs {
+		cmds, err := mgr.packageCmds(jirix, cl, root)
+		if err != nil {
+			return err
+		}
+		for _, cmd := range cmds {
+			if installPackages {
+				if err := s.Verbose(true).Last(cmd[0], cmd[1:]...); err != nil {
+					return err
+				}
+			} else {
+				fmt.Fprintf(jirix.Stdout(), "%s\n", strings.TrimSpace(strings.Join(cmd, " ")))
+			}
+		}
 	}
 	return nil
 }

@@ -64,6 +64,10 @@ func (p *myNewProfileMgr) String() string {
 func (p *myNewProfileMgr) AddFlags(*flag.FlagSet, profiles.Action) {
 }
 
+func (p *myNewProfileMgr) OSPackages(jirix *jiri.X, pdb *profiles.DB, root jiri.RelPath, target profiles.Target) ([]string, error) {
+	return nil, nil
+}
+
 func (p *myNewProfileMgr) Install(jirix *jiri.X, pdb *profiles.DB, root jiri.RelPath, target profiles.Target) error {
 	p.profile = pdb.InstallProfile(p.name, "", "root")
 	return pdb.AddProfileTarget(p.name, "", target)

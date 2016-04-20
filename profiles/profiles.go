@@ -156,6 +156,10 @@ type Manager interface {
 	// They should be named <profile-name>.<flag>.
 	AddFlags(*flag.FlagSet, Action)
 
+	// OSPackages returns the set of operating system packages required by the
+	// specified profile and target.
+	OSPackages(jirix *jiri.X, pdb *DB, root jiri.RelPath, target Target) ([]string, error)
+
 	// Install installs the profile for the specified build target.
 	Install(jirix *jiri.X, pdb *DB, root jiri.RelPath, target Target) error
 
