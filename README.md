@@ -120,7 +120,7 @@ information on manifests, read the [manifest docs][manifests].
 
 ```
 cd "$MY_ROOT"
-jiri import minimal https://vanadium.googlesource.com/manifest
+jiri import -name=manifest minimal https://vanadium.googlesource.com/manifest
 ```
 
 You should now have a file in the root directory called `.jiri_manifest`, which
