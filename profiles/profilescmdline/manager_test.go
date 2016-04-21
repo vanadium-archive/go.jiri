@@ -135,6 +135,11 @@ func TestManagerAvailable(t *testing.T) {
 			t.Errorf("%v does not contain %v\n", got, want)
 		}
 	}
+	os.RemoveAll(filepath.Join(fake.X.Root, jiri.ProfilesDBDir))
+	stdout = run(sh, dir, "jiri", "profile", "available", "-v")
+	if got, want := strings.TrimSpace(stdout), "Available Subcommands:"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }
 
 func loc() string {
