@@ -29,7 +29,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"v.io/jiri"
@@ -338,12 +337,8 @@ func findProfileSubcommands(jirix *jiri.X) []string {
 	if !runSubcommands {
 		return nil
 	}
-	fi, err := os.Stat(filepath.Join(jirix.Root, jiri.ProfilesDBDir))
-	if err == nil && fi.IsDir() {
-		cmds, _ := lookpath.LookPrefix(jirix.Env(), "jiri-profile-", nil)
-		return cmds
-	}
-	return nil
+	cmds, _ := lookpath.LookPrefix(jirix.Env(), "jiri-profile-", nil)
+	return cmds
 }
 
 func allAvailableManagers(jirix *jiri.X) ([]string, error) {
