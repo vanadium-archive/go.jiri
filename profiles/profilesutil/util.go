@@ -87,7 +87,7 @@ func brewList(jirix *jiri.X) (map[string]bool, error) {
 // missing from the underlying operating system and hence will need to
 // be installed.
 func MissingOSPackages(jirix *jiri.X, pkgs []string) ([]string, error) {
-	var installedPkgs map[string]bool
+	installedPkgs := map[string]bool{}
 	s := jirix.NewSeq()
 	switch runtime.GOOS {
 	case "linux":
@@ -96,7 +96,7 @@ func MissingOSPackages(jirix *jiri.X, pkgs []string) ([]string, error) {
 			break
 		}
 		for _, pkg := range pkgs {
-			if err := s.Last("dpkg", "-L", pkg); err != nil {
+			if err := s.Last("dpkg", "-L", pkg); err == nil {
 				installedPkgs[pkg] = true
 			}
 		}
