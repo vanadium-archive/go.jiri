@@ -29,7 +29,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"v.io/jiri"
@@ -338,12 +337,8 @@ func findProfileSubcommands(jirix *jiri.X) []string {
 	if !runSubcommands {
 		return nil
 	}
-	fi, err := os.Stat(filepath.Join(jirix.Root, jiri.ProfilesDBDir))
-	if err == nil && fi.IsDir() {
-		cmds, _ := lookpath.LookPrefix(jirix.Env(), "jiri-profile-", nil)
-		return cmds
-	}
-	return nil
+	cmds, _ := lookpath.LookPrefix(jirix.Env(), "jiri-profile-", nil)
+	return cmds
 }
 
 func allAvailableManagers(jirix *jiri.X) ([]string, error) {
@@ -421,34 +416,27 @@ func targetAtDefaultVersion(mgr profiles.Manager, target profiles.Target) (profi
 }
 
 func writeDB(jirix *jiri.X, db *profiles.DB, installer, path string) error {
-	// If path is a directory and installer is empty, then do nothing,
-	// otherwise write out the file.
-	isdir := false
+	// Do nothing if the installer is not supplied. This will generally
+	// happen when/if writeDB is called from the top-level profile driver
+	// command rather than from a subcommand.
+	if installer == "" {
+		return nil
+	}
 	fi, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
+		// New setup, but the directory doesn't exist yet.
+		if err := os.MkdirAll(path, os.FileMode(0755)); err != nil {
+			return err
+		}
 	} else {
-		isdir = fi.IsDir()
-	}
-	if isdir {
-		if installer != "" {
-			// New setup with installers writing their own file in a directory
-			return db.Write(jirix, installer, path)
-		} else {
-			// New setup, no installer, so don't write out the file.
-			return nil
+		if !fi.IsDir() {
+			return fmt.Errorf("%s exists but is not a directory", path)
 		}
 	}
-	if installer == "" {
-		// Old setup with no installers and writing to a file.
-		return db.Write(jirix, installer, path)
-	}
-	// New setup, but the directory doesn't exist yet.
-	if err := os.MkdirAll(path, os.FileMode(0755)); err != nil {
-		return err
-	}
+	// New setup with installers writing their own file in a directory
 	return db.Write(jirix, installer, path)
 }
 
