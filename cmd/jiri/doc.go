@@ -106,7 +106,7 @@ The jiri cl mail flags are:
  -commit-message-body-file=
    file containing the body of the CL description, that is, text without a
    ChangeID, MultiPart etc.
- -current-project-only=true
+ -current-project-only=false
    Run mail in the current project only.
  -d=false
    Send a draft changelist.
