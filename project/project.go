@@ -1079,7 +1079,7 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 
 // BuildTools builds the given tools and places the resulting binaries into the
 // given directory.
-func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string) error {
+func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string) (e error) {
 	jirix.TimerPush("build tools")
 	defer jirix.TimerPop()
 	if len(tools) == 0 {
@@ -1119,7 +1119,14 @@ func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string)
 		workspaces = append(workspaces, strings.Split(envGoPath, string(filepath.ListSeparator))...)
 	}
 	s := jirix.NewSeq()
-	var stderr bytes.Buffer
+	// Put pkg files in a tempdir.  BuildTools uses the system go, and if
+	// jiri-go uses a different go version than the system go, then you can get
+	// weird errors when they share a pkgdir.
+	tmpPkgDir, err := s.TempDir("", "tmp-pkg-dir")
+	if err != nil {
+		return fmt.Errorf("TempDir() failed: %v", err)
+	}
+	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpPkgDir).Done() }, &e)
 
 	// We unset GOARCH and GOOS because jiri update should always build for the
 	// native architecture and OS.  Also, as of go1.5, setting GOBIN is not
@@ -1130,7 +1137,8 @@ func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string)
 		"GOBIN":  outputDir,
 		"GOPATH": strings.Join(workspaces, string(filepath.ListSeparator)),
 	}
-	args := append([]string{"install"}, toolPkgs...)
+	args := append([]string{"install", "-pkgdir", tmpPkgDir}, toolPkgs...)
+	var stderr bytes.Buffer
 	if err := s.Env(env).Capture(ioutil.Discard, &stderr).Last("go", args...); err != nil {
 		return fmt.Errorf("tool build failed\n%v", stderr.String())
 	}
