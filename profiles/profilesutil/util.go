@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -96,7 +97,7 @@ func MissingOSPackages(jirix *jiri.X, pkgs []string) ([]string, error) {
 			break
 		}
 		for _, pkg := range pkgs {
-			if err := s.Last("dpkg", "-L", pkg); err == nil {
+			if err := s.Capture(ioutil.Discard, ioutil.Discard).Last("dpkg", "-L", pkg); err == nil {
 				installedPkgs[pkg] = true
 			}
 		}
