@@ -178,6 +178,8 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 
 // The following types reflect the schema Gerrit uses to represent
 // CLs.
+type CLList []Change
+type ClRefMap map[string]Change
 type Change struct {
 	// CL data.
 	Change_id        string
@@ -212,6 +214,18 @@ type Owner struct {
 	Email string
 }
 type Files map[string]struct{}
+type ChangeError struct {
+	Err error
+	CL  Change
+}
+
+func (ce *ChangeError) Error() string {
+	return ce.Err.Error()
+}
+
+func NewChangeError(cl Change, err error) *ChangeError {
+	return &ChangeError{err, cl}
+}
 
 func (c Change) Reference() string {
 	return c.Revisions[c.Current_revision].Fetch.Http.Ref
@@ -232,17 +246,9 @@ func PresubmitTestTypes() []string {
 	return []string{string(PresubmitTestTypeNone), string(PresubmitTestTypeAll)}
 }
 
-// MultiPartCLInfo contains data used to process multiple cls across
-// different projects.
-type MultiPartCLInfo struct {
-	Topic string
-	Index int // This should be 1-based.
-	Total int
-}
-
 // parseQueryResults parses a list of Gerrit ChangeInfo entries (json
 // result of a query) and returns a list of Change entries.
-func parseQueryResults(reader io.Reader) ([]Change, error) {
+func parseQueryResults(reader io.Reader) (CLList, error) {
 	r := bufio.NewReader(reader)
 
 	// The first line of the input is the XSSI guard
@@ -253,12 +259,12 @@ func parseQueryResults(reader io.Reader) ([]Change, error) {
 
 	// Parse the remaining input to construct a slice of Change objects
 	// to return.
-	var changes []Change
+	var changes CLList
 	if err := json.NewDecoder(r).Decode(&changes); err != nil {
 		return nil, fmt.Errorf("Decode() failed: %v", err)
 	}
 
-	newChanges := []Change{}
+	newChanges := CLList{}
 	for _, change := range changes {
 		clMessage := change.Revisions[change.Current_revision].Commit.Message
 		multiPartCLInfo, err := parseMultiPartMatch(clMessage)
@@ -320,7 +326,7 @@ func parsePresubmitTestType(match string) PresubmitTestType {
 // See the following links for more details about Gerrit search syntax:
 // - https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#list-changes
 // - https://gerrit-review.googlesource.com/Documentation/user-search.html
-func (g *Gerrit) Query(query string) (_ []Change, e error) {
+func (g *Gerrit) Query(query string) (_ CLList, e error) {
 	cred, err := hostCredentials(g.s, g.host)
 	if err != nil {
 		return nil, err

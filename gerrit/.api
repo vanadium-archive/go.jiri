@@ -1,15 +1,29 @@
 pkg gerrit, const PresubmitTestTypeAll PresubmitTestType
 pkg gerrit, const PresubmitTestTypeNone PresubmitTestType
+pkg gerrit, func GenCL(int, int, string) Change
+pkg gerrit, func GenCLWithMoreData(int, int, string, PresubmitTestType, string) Change
+pkg gerrit, func GenMultiPartCL(int, int, string, string, int, int) Change
+pkg gerrit, func GenMultiPartCLWithMoreData(int, int, string, string, int, int, string) Change
 pkg gerrit, func New(runutil.Sequence, *url.URL) *Gerrit
+pkg gerrit, func NewChangeError(Change, error) *ChangeError
+pkg gerrit, func NewMultiPartCLSet() *MultiPartCLSet
+pkg gerrit, func NewOpenCLs(ClRefMap, CLList) ([]CLList, []error)
 pkg gerrit, func PresubmitTestTypes() []string
 pkg gerrit, func Push(runutil.Sequence, CLOpts) error
+pkg gerrit, func ReadLog(string) (ClRefMap, error)
 pkg gerrit, func Reference(CLOpts) string
+pkg gerrit, func WriteLog(string, CLList) error
+pkg gerrit, method (*ChangeError) Error() string
 pkg gerrit, method (*Gerrit) PostReview(string, string, map[string]string) error
-pkg gerrit, method (*Gerrit) Query(string) ([]Change, error)
+pkg gerrit, method (*Gerrit) Query(string) (CLList, error)
 pkg gerrit, method (*Gerrit) SetTopic(string, CLOpts) error
 pkg gerrit, method (*Gerrit) Submit(string) error
+pkg gerrit, method (*MultiPartCLSet) AddCL(Change) error
+pkg gerrit, method (*MultiPartCLSet) CLs() CLList
+pkg gerrit, method (*MultiPartCLSet) Complete() bool
 pkg gerrit, method (Change) OwnerEmail() string
 pkg gerrit, method (Change) Reference() string
+pkg gerrit, type CLList []Change
 pkg gerrit, type CLOpts struct
 pkg gerrit, type CLOpts struct, Autosubmit bool
 pkg gerrit, type CLOpts struct, Branch string
@@ -34,6 +48,10 @@ pkg gerrit, type Change struct, PresubmitTest PresubmitTestType
 pkg gerrit, type Change struct, Project string
 pkg gerrit, type Change struct, Revisions Revisions
 pkg gerrit, type Change struct, Topic string
+pkg gerrit, type ChangeError struct
+pkg gerrit, type ChangeError struct, CL Change
+pkg gerrit, type ChangeError struct, Err error
+pkg gerrit, type ClRefMap map[string]Change
 pkg gerrit, type Comment struct
 pkg gerrit, type Comment struct, Line int
 pkg gerrit, type Comment struct, Message string
@@ -49,6 +67,7 @@ pkg gerrit, type MultiPartCLInfo struct
 pkg gerrit, type MultiPartCLInfo struct, Index int
 pkg gerrit, type MultiPartCLInfo struct, Topic string
 pkg gerrit, type MultiPartCLInfo struct, Total int
+pkg gerrit, type MultiPartCLSet struct
 pkg gerrit, type Owner struct
 pkg gerrit, type Owner struct, Email string
 pkg gerrit, type PresubmitTestType string
