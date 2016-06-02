@@ -458,3 +458,33 @@ func (j *Jenkins) invoke(method, suffix string, values url.Values) (_ []byte, er
 	}
 	return bytes, nil
 }
+
+// GenBuildSpec returns a spec string for the given Jenkins build.
+//
+// If the main job is a multi-configuration job, the spec is in the form of:
+// <jobName>/axis1Label=axis1Value,axis2Label=axis2Value,.../<suffix>
+// The axis values are taken from the given axisValues map.
+//
+// If no axisValues are provides, the spec will be: <jobName>/<suffix>.
+func GenBuildSpec(jobName string, axisValues map[string]string, suffix string) string {
+	if len(axisValues) == 0 {
+		return fmt.Sprintf("%s/%s", jobName, suffix)
+	}
+
+	parts := []string{}
+	for k, v := range axisValues {
+		parts = append(parts, fmt.Sprintf("%s=%s", k, v))
+	}
+	return fmt.Sprintf("%s/%s/%s", jobName, strings.Join(parts, ","), suffix)
+}
+
+// LastCompletedBuildStatus returns the most recent completed BuildInfo for the given job.
+//
+// axisValues can be set to nil if the job is not multi-configuration.
+func (j *Jenkins) LastCompletedBuildStatus(jobName string, axisValues map[string]string) (*BuildInfo, error) {
+	buildInfo, err := j.BuildInfoForSpec(GenBuildSpec(jobName, axisValues, "lastCompletedBuild"))
+	if err != nil {
+		return nil, err
+	}
+	return buildInfo, nil
+}

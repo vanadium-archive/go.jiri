@@ -1,3 +1,4 @@
+pkg jenkins, func GenBuildSpec(string, map[string]string, string) string
 pkg jenkins, func New(string) (*Jenkins, error)
 pkg jenkins, func NewForTesting() *Jenkins
 pkg jenkins, method (*BuildInfo) ParseRefs() string
@@ -10,6 +11,7 @@ pkg jenkins, method (*Jenkins) CancelOngoingBuild(string, int) error
 pkg jenkins, method (*Jenkins) CancelQueuedBuild(string) error
 pkg jenkins, method (*Jenkins) FailedTestCasesForBuildSpec(string) ([]TestCase, error)
 pkg jenkins, method (*Jenkins) IsNodeIdle(string) (bool, error)
+pkg jenkins, method (*Jenkins) LastCompletedBuildStatus(string, map[string]string) (*BuildInfo, error)
 pkg jenkins, method (*Jenkins) MockAPI(string, string)
 pkg jenkins, method (*Jenkins) OngoingBuilds(string) ([]BuildInfo, error)
 pkg jenkins, method (*Jenkins) QueuedBuilds(string) ([]QueuedBuild, error)
