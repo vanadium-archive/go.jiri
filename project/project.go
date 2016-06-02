@@ -1556,6 +1556,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 	// Process remote imports.
 	for _, remote := range m.Imports {
 		nextRoot := filepath.Join(root, remote.Root)
+		remote.Name = filepath.Join(nextRoot, remote.Name)
 		key := remote.ProjectKey()
 		p, ok := ld.localProjects[key]
 		if !ok {
@@ -1604,6 +1605,8 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 	for _, project := range m.Projects {
 		// Make paths absolute by prepending JIRI_ROOT/<root>.
 		project.absolutizePaths(filepath.Join(jirix.Root, root))
+		// Prepend the root to the project name.  This will be a noop if the import is not rooted.
+		project.Name = filepath.Join(root, project.Name)
 		key := project.Key()
 		if dup, ok := ld.Projects[key]; ok && dup != project {
 			// TODO(toddw): Tell the user the other conflicting file.
