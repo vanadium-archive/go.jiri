@@ -310,5 +310,53 @@ machine vanadium-review.googlesource.com login git-johndoe.example.com password 
 	}
 }
 
+func TestParseRefString(t *testing.T) {
+	type testCase struct {
+		ref              string
+		expectErr        bool
+		expectedCL       int
+		expectedPatchSet int
+	}
+	testCases := []testCase{
+		// Normal case
+		testCase{
+			ref:              "ref/changes/12/3412/2",
+			expectedCL:       3412,
+			expectedPatchSet: 2,
+		},
+		// Error cases
+		testCase{
+			ref:       "ref/123",
+			expectErr: true,
+		},
+		testCase{
+			ref:       "ref/changes/12/a/2",
+			expectErr: true,
+		},
+		testCase{
+			ref:       "ref/changes/12/3412/a",
+			expectErr: true,
+		},
+	}
+	for _, test := range testCases {
+		cl, patchset, err := ParseRefString(test.ref)
+		if test.expectErr {
+			if err == nil {
+				t.Fatalf("want errors, got: %v", err)
+			}
+		} else {
+			if err != nil {
+				t.Fatalf("want no errors, got: %v", err)
+			}
+			if cl != test.expectedCL {
+				t.Fatalf("want %v, got %v", test.expectedCL, cl)
+			}
+			if patchset != test.expectedPatchSet {
+				t.Fatalf("want %v, got %v", test.expectedPatchSet, patchset)
+			}
+		}
+	}
+}
+
 // TODO(jsimsa): Add a test for the hostCredentials function that
 // exercises the logic that reads the .netrc and git cookie files.

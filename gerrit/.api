@@ -8,6 +8,7 @@ pkg gerrit, func New(runutil.Sequence, *url.URL) *Gerrit
 pkg gerrit, func NewChangeError(Change, error) *ChangeError
 pkg gerrit, func NewMultiPartCLSet() *MultiPartCLSet
 pkg gerrit, func NewOpenCLs(ClRefMap, CLList) ([]CLList, []error)
+pkg gerrit, func ParseRefString(string) (int, int, error)
 pkg gerrit, func PresubmitTestTypes() []string
 pkg gerrit, func Push(runutil.Sequence, CLOpts) error
 pkg gerrit, func ReadLog(string) (ClRefMap, error)
