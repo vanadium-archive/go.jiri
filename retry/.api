@@ -1,0 +1,4 @@
+pkg retry, func Function(*tool.Context, func() error, ...RetryOpt) error
+pkg retry, type AttemptsOpt int
+pkg retry, type IntervalOpt time.Duration
+pkg retry, type RetryOpt interface, unexported methods
