@@ -177,7 +177,7 @@ func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
 // The following types reflect the schema Gerrit uses to represent
 // CLs.
 type CLList []Change
-type ClRefMap map[string]Change
+type CLRefMap map[string]Change
 type Change struct {
 	// CL data.
 	Change_id        string

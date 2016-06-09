@@ -7,11 +7,11 @@ pkg gerrit, func GenMultiPartCLWithMoreData(int, int, string, string, int, int, 
 pkg gerrit, func New(runutil.Sequence, *url.URL) *Gerrit
 pkg gerrit, func NewChangeError(Change, error) *ChangeError
 pkg gerrit, func NewMultiPartCLSet() *MultiPartCLSet
-pkg gerrit, func NewOpenCLs(ClRefMap, CLList) ([]CLList, []error)
+pkg gerrit, func NewOpenCLs(CLRefMap, CLList) ([]CLList, []error)
 pkg gerrit, func ParseRefString(string) (int, int, error)
 pkg gerrit, func PresubmitTestTypes() []string
 pkg gerrit, func Push(runutil.Sequence, CLOpts) error
-pkg gerrit, func ReadLog(string) (ClRefMap, error)
+pkg gerrit, func ReadLog(string) (CLRefMap, error)
 pkg gerrit, func Reference(CLOpts) string
 pkg gerrit, func WriteLog(string, CLList) error
 pkg gerrit, method (*ChangeError) Error() string
@@ -38,6 +38,7 @@ pkg gerrit, type CLOpts struct, RemoteBranch string
 pkg gerrit, type CLOpts struct, Reviewers []string
 pkg gerrit, type CLOpts struct, Topic string
 pkg gerrit, type CLOpts struct, Verify bool
+pkg gerrit, type CLRefMap map[string]Change
 pkg gerrit, type Change struct
 pkg gerrit, type Change struct, AutoSubmit bool
 pkg gerrit, type Change struct, Change_id string
@@ -52,7 +53,6 @@ pkg gerrit, type Change struct, Topic string
 pkg gerrit, type ChangeError struct
 pkg gerrit, type ChangeError struct, CL Change
 pkg gerrit, type ChangeError struct, Err error
-pkg gerrit, type ClRefMap map[string]Change
 pkg gerrit, type Comment struct
 pkg gerrit, type Comment struct, Line int
 pkg gerrit, type Comment struct, Message string

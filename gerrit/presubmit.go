@@ -17,8 +17,8 @@ import (
 // system that queries Gerrit for new changes and does <something> with them.
 
 // ReadLog returns a map of CLs indexed by their refs, read from the given log file.
-func ReadLog(logFilePath string) (ClRefMap, error) {
-	results := ClRefMap{}
+func ReadLog(logFilePath string) (CLRefMap, error) {
+	results := CLRefMap{}
 	bytes, err := ioutil.ReadFile(logFilePath)
 	if err != nil {
 		// File not existing is OK: just return an empty map of CLs.
@@ -38,7 +38,7 @@ func ReadLog(logFilePath string) (ClRefMap, error) {
 // map of ref strings => CLs.
 func WriteLog(logFilePath string, cls CLList) (e error) {
 	// Index CLs with their refs.
-	results := ClRefMap{}
+	results := CLRefMap{}
 	for _, cl := range cls {
 		results[cl.Reference()] = cl
 	}
@@ -80,7 +80,7 @@ func WriteLog(logFilePath string, cls CLList) (e error) {
 //   a CLList [3001/1 3002/1] will be returned. Then suppose in the next query,
 //   we got cl 3002/2 which is newer then 3002/1. In this case, a CLList
 //   [3001/1 3002/2] will be returned.
-func NewOpenCLs(prevCLsMap ClRefMap, curCLs CLList) ([]CLList, []error) {
+func NewOpenCLs(prevCLsMap CLRefMap, curCLs CLList) ([]CLList, []error) {
 	retNewCLs := []CLList{}
 	topicsInNewCLs := map[string]bool{}
 	multiPartCLs := CLList{}
