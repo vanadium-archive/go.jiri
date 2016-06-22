@@ -15,6 +15,7 @@ pkg gerrit, func ReadLog(string) (CLRefMap, error)
 pkg gerrit, func Reference(CLOpts) string
 pkg gerrit, func WriteLog(string, CLList) error
 pkg gerrit, method (*ChangeError) Error() string
+pkg gerrit, method (*Gerrit) GetChange(int) (*Change, error)
 pkg gerrit, method (*Gerrit) PostReview(string, string, map[string]string) error
 pkg gerrit, method (*Gerrit) Query(string) (CLList, error)
 pkg gerrit, method (*Gerrit) SetTopic(string, CLOpts) error

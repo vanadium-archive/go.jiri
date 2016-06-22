@@ -363,6 +363,23 @@ func (g *Gerrit) Query(query string) (_ CLList, e error) {
 	return parseQueryResults(res.Body)
 }
 
+// GetChange returns a Change object for the given changeId number.
+func (g *Gerrit) GetChange(changeNumber int) (*Change, error) {
+	clList, err := g.Query(fmt.Sprintf("%d", changeNumber))
+	if err != nil {
+		return nil, err
+	}
+	if len(clList) == 0 {
+		return nil, fmt.Errorf("Query for change '%d' returned no results", changeNumber)
+	}
+	if len(clList) > 1 {
+		// Based on cursory testing with Gerrit, I don't expect this to ever happen, but in
+		// case it does, I'm raising an error to inspire investigation. -- lanechr
+		return nil, fmt.Errorf("Too many changes returned for query '%d'", changeNumber)
+	}
+	return &clList[0], nil
+}
+
 // Submit submits the given changelist through Gerrit.
 func (g *Gerrit) Submit(changeID string) (e error) {
 	cred, err := hostCredentials(g.s, g.host)
