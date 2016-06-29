@@ -205,9 +205,8 @@ Usage:
 <remote> specifies the remote manifest repository.
 
 The jiri import flags are:
- -name=
-   The name of the remote manifest project, used to disambiguate manifest
-   projects with the same remote.  Typically empty.
+ -name=manifest
+   The name of the remote manifest project.
  -out=
    The output file.  Uses $JIRI_ROOT/.jiri_manifest if unspecified.  Uses stdout
    if set to "-".

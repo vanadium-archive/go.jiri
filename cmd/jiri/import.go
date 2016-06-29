@@ -22,7 +22,7 @@ var (
 )
 
 func init() {
-	cmdImport.Flags.StringVar(&flagImportName, "name", "", `The name of the remote manifest project, used to disambiguate manifest projects with the same remote.  Typically empty.`)
+	cmdImport.Flags.StringVar(&flagImportName, "name", "manifest", `The name of the remote manifest project.`)
 	cmdImport.Flags.StringVar(&flagImportProtocol, "protocol", "git", `The version control protocol used by the remote manifest project.`)
 	cmdImport.Flags.StringVar(&flagImportRemoteBranch, "remote-branch", "master", `The branch of the remote manifest project to track, without the leading "origin/".`)
 	cmdImport.Flags.StringVar(&flagImportRoot, "root", "", `Root to store the manifest project locally.`)

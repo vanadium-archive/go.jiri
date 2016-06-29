@@ -50,7 +50,7 @@ func TestImport(t *testing.T) {
 			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -60,7 +60,7 @@ func TestImport(t *testing.T) {
 			Filename: `file`,
 			Want: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -69,7 +69,7 @@ func TestImport(t *testing.T) {
 			Args: []string{"-out=-", "foo", "https://github.com/new.git"},
 			Stdout: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -78,14 +78,14 @@ func TestImport(t *testing.T) {
 			Args: []string{"foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
-    <import manifest="bar" remote="https://github.com/orig.git"/>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
   </imports>
 </manifest>
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="bar" remote="https://github.com/orig.git"/>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -95,7 +95,7 @@ func TestImport(t *testing.T) {
 			Args: []string{"-overwrite", "foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -105,7 +105,7 @@ func TestImport(t *testing.T) {
 			Filename: `file`,
 			Want: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -114,7 +114,7 @@ func TestImport(t *testing.T) {
 			Args: []string{"-overwrite", "-out=-", "foo", "https://github.com/new.git"},
 			Stdout: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
@@ -123,13 +123,13 @@ func TestImport(t *testing.T) {
 			Args: []string{"-overwrite", "foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
-    <import manifest="bar" remote="https://github.com/orig.git"/>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
   </imports>
 </manifest>
 `,
 			Want: `<manifest>
   <imports>
-    <import manifest="foo" remote="https://github.com/new.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
 `,
