@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 
 	"v.io/jiri"
 	"v.io/jiri/tool"
@@ -33,6 +34,41 @@ const (
 // from GOHOSTOSs similarly to how targets are defined.
 func IsFNLHost() bool {
 	return os.Getenv("FNL_SYSTEM") != ""
+}
+
+var (
+	usingAptitude = false
+	usingYum      = false
+	usingPacman   = false
+
+	testAptitudeOnce, testYumOnce, testPacmanOnce sync.Once
+)
+
+// UsingAptitude returns true if the aptitude package manager (debian, ubuntu)
+// is being used by the underlying OS.
+func UsingAptitude(jirix *jiri.X) bool {
+	testAptitudeOnce.Do(func() {
+		usingAptitude = jirix.NewSeq().Last("apt-get", "-v") == nil
+	})
+	return usingAptitude
+}
+
+// UsingYum returns true if the yum/rpm package manager (redhat) is being used
+// by the underlying OS.
+func UsingYum(jirix *jiri.X) bool {
+	testYumOnce.Do(func() {
+		usingYum = jirix.NewSeq().Last("yum", "--version") == nil
+	})
+	return usingYum
+}
+
+// UsingPacman returns true if the pacman package manager (archlinux) is being
+// used by the underlying OS.
+func UsingPacman(jirix *jiri.X) bool {
+	testPacmanOnce.Do(func() {
+		usingPacman = jirix.NewSeq().Last("pacman", "-V") == nil
+	})
+	return usingPacman
 }
 
 // AtomicAction performs an action 'atomically' by keeping track of successfully
@@ -84,22 +120,65 @@ func brewList(jirix *jiri.X) (map[string]bool, error) {
 	return pkgs, err
 }
 
+func linuxList(jirix *jiri.X, pkgs []string) (map[string]bool, error) {
+	aptitude, yum, pacman := UsingAptitude(jirix), UsingYum(jirix), UsingPacman(jirix)
+	cmd := ""
+	opt := ""
+	switch {
+	case aptitude:
+		cmd = "dpkg"
+		opt = "-L"
+	case yum:
+		cmd = "yum"
+		opt = "list"
+	case pacman:
+		cmd = "pacman"
+		opt = "-Q"
+	default:
+		return nil, fmt.Errorf("no usable package manager found, tested for aptitude, yum and pacman")
+	}
+	s := jirix.NewSeq()
+	installedPkgs := map[string]bool{}
+	for _, pkg := range pkgs {
+		if err := s.Capture(ioutil.Discard, ioutil.Discard).Last(cmd, opt, pkg); err == nil {
+			installedPkgs[pkg] = true
+		}
+	}
+	return installedPkgs, nil
+}
+
+func linuxInstall(jirix *jiri.X, pkgs []string) []string {
+	aptitude, yum, pacman := UsingAptitude(jirix), UsingYum(jirix), UsingPacman(jirix)
+	var cmd []string
+	switch {
+	case aptitude:
+		cmd = append(cmd, "apt-get", "install", "-y")
+	case yum:
+		cmd = append(cmd, "yum", "install", "-y")
+	case pacman:
+		cmd = append(cmd, "pacman", "-S", "--noconfirm")
+	default:
+		fmt.Fprintf(jirix.Stdout(), "no usable package manager found, tested for aptitude, yum and pacman")
+		return nil
+	}
+	return append(cmd, pkgs...)
+}
+
 // MissingOSPackages returns the subset of the supplied packages that are
 // missing from the underlying operating system and hence will need to
 // be installed.
 func MissingOSPackages(jirix *jiri.X, pkgs []string) ([]string, error) {
 	installedPkgs := map[string]bool{}
-	s := jirix.NewSeq()
 	switch runtime.GOOS {
 	case "linux":
 		if IsFNLHost() {
 			fmt.Fprintf(jirix.Stdout(), "skipping %v on FNL host\n", pkgs)
 			break
 		}
-		for _, pkg := range pkgs {
-			if err := s.Capture(ioutil.Discard, ioutil.Discard).Last("dpkg", "-L", pkg); err == nil {
-				installedPkgs[pkg] = true
-			}
+		var err error
+		installedPkgs, err = linuxList(jirix, pkgs)
+		if err != nil {
+			return nil, err
 		}
 	case "darwin":
 		var err error
@@ -128,7 +207,7 @@ func OSPackageInstallCommands(jirix *jiri.X, pkgs []string) [][]string {
 			break
 		}
 		if len(pkgs) > 0 {
-			return append(cmds, append([]string{"apt-get", "install", "-y"}, pkgs...))
+			cmds = append(cmds, linuxInstall(jirix, pkgs))
 		}
 	case "darwin":
 		if len(pkgs) > 0 {

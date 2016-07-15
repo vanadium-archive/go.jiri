@@ -7,3 +7,6 @@ pkg profilesutil, func MissingOSPackages(*jiri.X, []string) ([]string, error)
 pkg profilesutil, func OSPackageInstallCommands(*jiri.X, []string) [][]string
 pkg profilesutil, func Untar(*jiri.X, string, string) error
 pkg profilesutil, func Unzip(*jiri.X, string, string) error
+pkg profilesutil, func UsingAptitude(*jiri.X) bool
+pkg profilesutil, func UsingPacman(*jiri.X) bool
+pkg profilesutil, func UsingYum(*jiri.X) bool
